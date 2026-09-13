@@ -25,8 +25,7 @@ import { createDagGroupEditorController } from "/dag_group_editor_controller.mjs
 import { deriveDagView, excludedForConnectivity } from "/dag_view.mjs";
 import { createDagNetworkController } from "/dag_network_controller.mjs";
 import { createDagEventController } from "/dag_event_controller.mjs";
-import { PERSON_UOA_SENTINEL, projectForUoa, uoaCounts,
-  uoaMatches as matchesUoa } from "/dag_uoa.mjs";
+import { createUoaController } from "/uoa_controller.mjs";
 import { groupingSchemaUrl, schemaPublicationId } from "/dag_data_config.mjs";
 import { applyPermalink, buildPermalink, CUSTOM_SCHEMA_INSTRUCTIONS,
   permalinkInput, schemaMatchesProject } from "/dag_permalink.mjs";
@@ -1055,81 +1054,31 @@ function renderRejectedVariablesPanel() {
 // ─── UOA filter helpers ────────────────────────────────────────────────────────
 
 function getAllUoaParts() {
-  return uoaCounts(visibleVariables());
+  return uoaController.getAllParts();
 }
 
 function uoaMatches(variableUoa, selected) {
-  return matchesUoa(variableUoa, selected);
+  return uoaController.matches(variableUoa, selected);
 }
 
 function uoaSupportedByAnchors(uoa) {
-  if (state.interfaceMode !== "dag2") return true;
-  return [state.project?.iv_group_id, state.project?.dv_group_id].every(groupId => {
-    const group = groupById(groupId);
-    return group?.variable_ids?.some(variableId =>
-      uoaMatches(state.variableById.get(variableId)?.uoa, uoa));
-  });
+  return uoaController.supportedByAnchors(uoa);
 }
 
 function renderUoaStep() {
-  if (!els.uoaChips) return;
-  const parts = getAllUoaParts();
-  if (!parts.length) {
-    replaceChildren(els.uoaChips, h("p", { className: "small-note", textContent: "No unit-of-analysis data found." }));
-    return;
-  }
-  const personCount = visibleVariables().filter(v => uoaMatches(v.uoa, PERSON_UOA_SENTINEL)).length;
-  const personDisabled = !uoaSupportedByAnchors(PERSON_UOA_SENTINEL);
-  const uoaChip = (part, count, disabled, combined = false) => h("button", {
-    className: `uoa-chip${combined ? " uoa-chip-combined" : ""}${state.selectedUoa === part ? " active" : ""}`,
-    type: "button", dataset: { uoa: part }, disabled,
-    title: disabled ? `The selected IV and DV do not both contain ${combined ? "person-level variables" : "this unit of analysis"}` : "",
-  }, combined ? "person (all)" : part, h("span", { className: "uoa-count", textContent: count }));
-  const personChip = personCount > 0 ? uoaChip(PERSON_UOA_SENTINEL, personCount, personDisabled, true) : null;
-  replaceChildren(els.uoaChips, personChip, parts.map(([part, count]) => {
-    const disabled = !uoaSupportedByAnchors(part);
-    return uoaChip(part, count, disabled);
-  }));
-  els.uoaChips.querySelectorAll(".uoa-chip").forEach(btn => {
-    btn.addEventListener("click", () => selectUoa(btn.dataset.uoa));
-  });
+  return uoaController.renderStep();
 }
 
 function selectUoa(uoa) {
-  if (!uoaSupportedByAnchors(uoa)) return;
-  Object.assign(state, workflow.transition(state, {
-    type: "uoa", uoa, nextPhase: state.interfaceMode === "dag2" ? "build" : undefined,
-  }));
-  renderAll();
+  return uoaController.select(uoa);
 }
 
 function renderUoaFilterBar() {
-  if (!state.selectedUoa) {
-    els.uoaFilterBar.hidden = true;
-    return;
-  }
-  els.uoaFilterBar.hidden = false;
-  els.uoaSelectedLabel.textContent = state.selectedUoa === PERSON_UOA_SENTINEL ? "person (all)" : state.selectedUoa;
-  els.uoaFilterToggle.checked = state.uoaFilterEnabled;
+  return uoaController.renderFilterBar();
 }
 
 function renderSeedRows() {
-  renderSeedRow("iv", els.ivSeeds);
-  renderSeedRow("dv", els.dvSeeds);
-}
-
-function renderSeedRow(side, container) {
-  replaceChildren(container, [...state.seeds[side]].map((variableId) => {
-    const v = state.variableById.get(variableId);
-    return h("span", { className: "chip", title: v?.display_label || variableId }, truncate(v?.display_label || variableId, 34),
-      h("button", { type: "button", dataset: { side, variableId }, textContent: "×" }));
-  }));
-  container.querySelectorAll("button").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.seeds[btn.dataset.side].delete(btn.dataset.variableId);
-      renderAll();
-    });
-  });
+  return uoaController.renderSeeds();
 }
 
 // ─── Target group setup ───────────────────────────────────────────────────────
@@ -1500,9 +1449,7 @@ function dagGroups() {
 }
 
 function dagProjectView() {
-  return projectForUoa(
-    state.project, state.variableById, state.selectedUoa, state.uoaFilterEnabled,
-  );
+  return uoaController.projectView();
 }
 
 function groupById(groupId) {
@@ -1638,6 +1585,10 @@ function groupCoherence(variableIds) {
 function groupCentroid(variableIds) { return mapGeometry.centroid(variableIds, state.variableById); }
 
 function distance(a, b) { return mapGeometry.distance(a, b); }
+
+const uoaController = createUoaController({
+  state, elements: els, visibleVariables, groupById, clusterRep, truncate, renderAll,
+});
 
 const projectController = createDagProjectController({
   state, storage: window.localStorage, storagePrefix: PROJECT_STORAGE_PREFIX,
