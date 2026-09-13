@@ -1,5 +1,6 @@
 import * as duckdb from "./vendor/duckdb/duckdb-browser.mjs";
 import { evidenceManifestUrl, groupingSchemaUrl, schemaPublicationId } from "./dag_data_config.mjs";
+import { manifestFileEntries } from "./dag_manifest.mjs";
 import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
 import { loadPublishedSchema } from "./published_schema_loader.mjs";
 
@@ -40,6 +41,7 @@ export class ParquetManifestDagDataSource {
     const response = await fetch(manifestUrl, { cache: "no-store" });
     if (!response.ok) throw new Error(`Could not load DAG snapshot manifest ${manifestUrl.href}: HTTP ${response.status}`);
     this.manifest = await response.json();
+    const files = manifestFileEntries(this.manifest.files);
     this.onStatus("Loading grouping schema…");
     const publicationId = schemaPublicationId();
     if (publicationId) {
@@ -61,12 +63,11 @@ export class ParquetManifestDagDataSource {
     );
     await database.instantiate(mainModule);
     this.connection = await database.connect();
-    const files = Object.entries(this.manifest.files);
-    for (const [index, [relation, file]] of files.entries()) {
+    for (const [index, { relation, sqlIdentifier, file }] of files.entries()) {
       this.onStatus(`Preparing evidence tables (${index + 1} of ${files.length})…`);
       const url = new URL(file.url, manifestUrl).href.replaceAll("'", "''");
       await this.connection.query(
-        `CREATE VIEW ${relation} AS SELECT * FROM read_parquet('${url}')`,
+        `CREATE VIEW ${sqlIdentifier} AS SELECT * FROM read_parquet('${url}')`,
       );
     }
   }
