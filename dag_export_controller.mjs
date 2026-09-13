@@ -11,6 +11,10 @@ export function createDagExportController({
   alertImpl = message => window.alert(message),
 }) {
   const crossRefCache = new Map();
+  const crossRefPending = new Map();
+  let crossRefQueue = Promise.resolve();
+  let nextCrossRefStart = 0;
+  const CROSSREF_INTERVAL_MS = 210; // Public pool: at most five requests per second.
 
   function captureInput() {
     return structuredClone({
@@ -21,26 +25,63 @@ export function createDagExportController({
     });
   }
 
-  async function fetchCrossRef(doi) {
+  async function fetchCrossRefNow(doi, attempt = 0) {
     if (crossRefCache.has(doi)) return crossRefCache.get(doi);
     try {
+      const delay = Math.max(0, nextCrossRefStart - Date.now());
+      if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+      nextCrossRefStart = Date.now() + CROSSREF_INTERVAL_MS;
       const response = await fetchImpl(
         `https://api.crossref.org/works/${encodeURIComponent(doi)}`,
         { signal: AbortSignal.timeout(8000) },
       );
-      if (!response.ok) return null;
-      const data = (await response.json()).message;
-      crossRefCache.set(doi, data);
-      return data;
+      if (response.status === 429 && attempt < 4) {
+        const retryAfter = Number(response.headers.get("retry-after"));
+        const retryDelay = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 1000;
+        nextCrossRefStart = Math.max(nextCrossRefStart, Date.now() + retryDelay);
+        return fetchCrossRefNow(doi, attempt + 1);
+      }
+      if (response.ok) return (await response.json()).message;
     } catch {
-      return null;
+      // DOI-only fallback entries keep exports usable when Crossref is unavailable.
     }
+    return null;
   }
 
-  async function fetchBibliography(input) {
+  function fetchCrossRef(doi) {
+    if (crossRefCache.has(doi)) return Promise.resolve(crossRefCache.get(doi));
+    if (crossRefPending.has(doi)) return crossRefPending.get(doi);
+    const pending = crossRefQueue
+      .then(() => fetchCrossRefNow(doi))
+      .then((data) => {
+        crossRefCache.set(doi, data);
+        crossRefPending.delete(doi);
+        return data;
+      });
+    crossRefPending.set(doi, pending);
+    crossRefQueue = pending.catch(() => null);
+    return pending;
+  }
+
+  function requestedDois(input) {
     const dois = exportData.collectAllDagDois(input);
-    const requested = [...new Set([exportData.METHOD_DOI, ...dois])];
-    const entries = await Promise.all(requested.map(async doi => [doi, await fetchCrossRef(doi)]));
+    return { dois, requested: [...new Set([exportData.METHOD_DOI, ...dois])] };
+  }
+
+  function warmBibliography(input = captureInput()) {
+    const { requested } = requestedDois(input);
+    for (const doi of requested) void fetchCrossRef(doi);
+  }
+
+  async function fetchBibliography(input, onProgress = () => {}) {
+    const { dois, requested } = requestedDois(input);
+    let completed = 0;
+    const entries = await Promise.all(requested.map(async (doi) => {
+      const data = await fetchCrossRef(doi);
+      completed += 1;
+      onProgress(completed, requested.length);
+      return [doi, data];
+    }));
     return exportData.buildBibText(dois, new Map(entries));
   }
 
@@ -54,6 +95,15 @@ export function createDagExportController({
         button.textContent = button._origText || button.textContent;
         button.disabled = false;
       }
+    });
+  }
+
+  function setEnrichmentProgress(completed, total) {
+    const message = completed
+      ? `Enriching references… ${completed}/${total}`
+      : `Waiting for reference enrichment… 0/${total}`;
+    [elements.exportBib, elements.exportMd, elements.exportTex].forEach(button => {
+      button.textContent = message;
     });
   }
 
@@ -78,7 +128,9 @@ export function createDagExportController({
     }
     setBusy(true);
     try {
-      const { bibText } = await fetchBibliography(input);
+      const total = requestedDois(input).requested.length;
+      setEnrichmentProgress(0, total);
+      const { bibText } = await fetchBibliography(input, setEnrichmentProgress);
       downloadBlob(new Blob([bibText], { type: "text/plain" }), "references.bib");
     } finally {
       setBusy(false);
@@ -89,7 +141,9 @@ export function createDagExportController({
     const input = captureInput();
     setBusy(true);
     try {
-      const bibliography = await fetchBibliography(input);
+      const total = requestedDois(input).requested.length;
+      setEnrichmentProgress(0, total);
+      const bibliography = await fetchBibliography(input, setEnrichmentProgress);
       const files = format === "md"
         ? exportData.buildMarkdownFiles(input, bibliography, getDagSvgString())
         : exportData.buildLatexFiles(input, bibliography, getDagSvgString());
@@ -119,5 +173,6 @@ export function createDagExportController({
     exportProject,
     exportWorkingMap,
     downloadJson,
+    warmBibliography,
   };
 }

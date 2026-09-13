@@ -475,6 +475,9 @@ const renderCoordinator = createRenderCoordinator({
 
 function renderAll() {
   renderCoordinator.renderAll();
+  // Enrich references opportunistically while the user works. Export actions
+  // await the same de-duplicated, rate-limited requests before downloading.
+  exportController.warmBibliography();
 }
 
 function rebuildProject() {
