@@ -1,4 +1,5 @@
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contracts.mjs";
+import { validateGroupingSchema } from "./data_validation.mjs";
 const LIST_COLUMNS = new Set(["member_variable_ids", "previous_group_ids"]);
 
 function parseYamlMapping(text, source) {
@@ -129,17 +130,17 @@ export async function loadGroupingSchemaFolder(baseUrl, fetchImpl = fetch) {
       return row;
     });
   }
-  return schema;
+  return validateGroupingSchema(schema);
 }
 
 /** Import legacy monolithic JSON during transition, preferring folder URLs. */
 export async function loadGroupingSchema(source, fetchImpl = fetch) {
-  if (source && typeof source === "object") return source;
+  if (source && typeof source === "object") return validateGroupingSchema(source);
   const url = new URL(source, globalThis.location?.href || "http://localhost/");
   if (url.pathname.endsWith(".json")) {
     const response = await fetchImpl(url, { cache: "no-store" });
     if (!response.ok) throw new Error(`Could not load grouping schema: ${response.status}`);
-    return response.json();
+    return validateGroupingSchema(await response.json());
   }
   return loadGroupingSchemaFolder(url, fetchImpl);
 }

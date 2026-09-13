@@ -1,6 +1,7 @@
 import { withoutGroupReviewStatus, replaceSchemaGroups, normalizeDuplicateAssignments } from "./dag_project.mjs";
 import { missingAnchorWorkflow, restoreWorkflowMode } from "./dag_workflow.mjs";
 import { PROJECT_FORMAT_VERSION } from "./app_contracts.mjs";
+import { validateProjectPayload } from "./data_validation.mjs";
 export { restoreWorkflowMode } from "./dag_workflow.mjs";
 
 export function applyCurrentSchema(loaded, schema, clusterOf, clusterMembers) {
@@ -39,6 +40,7 @@ export function projectStorageKey(prefix, data, variableCount) {
 // Defaults are supplied by the caller so restoration does not generate IDs or time.
 export function restoreProjectPayload(payload, defaults, currentLayoutSource) {
   if (payload?.schema_version !== PROJECT_FORMAT_VERSION) return null;
+  validateProjectPayload(payload);
   const projectDefaults = { ...defaults };
   delete projectDefaults.candidate_queue;
   const persistedProject = Object.fromEntries(
