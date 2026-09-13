@@ -11,6 +11,7 @@ import {
   filterGraphNodes,
   highlightedBidirectionalArrowDirections,
 } from "../site/dag_graph.mjs";
+import { pairKey } from "../site/edge_keys.mjs";
 
 function link(groupA, groupB, direction = "A_TO_B", extra = {}) {
   return { group_a: groupA, group_b: groupB, direction_type: direction, ...extra };
@@ -20,7 +21,7 @@ test("node and link filters return new graphs without mutating their input", () 
   const source = createGraph(["a", "b", "c"], [link("a", "b"), link("b", "c")]);
   const nodes = filterGraphNodes(source, new Set(["a", "b"]));
   const links = filterGraphLinks(source, (edge) => edge.group_b === "c");
-  const pairs = filterGraphByLinkPairs(source, new Set(["a__b"]));
+  const pairs = filterGraphByLinkPairs(source, new Set([pairKey("a", "b")]));
 
   assert.deepEqual([...nodes.nodeIds], ["a", "b"]);
   assert.deepEqual(nodes.links, [source.links[0]]);
@@ -29,6 +30,12 @@ test("node and link filters return new graphs without mutating their input", () 
   assert.deepEqual([...source.nodeIds], ["a", "b", "c"]);
   assert.equal(source.links.length, 2);
   assert.notEqual(nodes, source);
+});
+
+test("unordered pair keys are order-independent and collision-free", () => {
+  assert.equal(pairKey("a", "b"), pairKey("b", "a"));
+  assert.notEqual(pairKey("a__b", "c"), pairKey("a", "b__c"));
+  assert.notEqual(pairKey('a","b', "c"), pairKey("a", 'b","c'));
 });
 
 test("connected-component filtering treats links as undirected connectivity", () => {

@@ -1,4 +1,7 @@
-export const pairKey = (a, b) => [a, b].sort().join("__");
+export function pairKey(a, b) {
+  const pair = [String(a), String(b)].sort();
+  return JSON.stringify(pair);
+}
 
 export function pathPairKeys(path = []) {
   const keys = new Set();
