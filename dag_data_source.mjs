@@ -1,7 +1,7 @@
-import * as duckdb from "/vendor/duckdb/duckdb-browser.mjs";
-import { evidenceManifestUrl, groupingSchemaUrl, schemaPublicationId } from "/dag_data_config.mjs";
-import { loadGroupingSchema } from "/grouping_schema_loader.mjs";
-import { loadPublishedSchema } from "/published_schema_loader.mjs";
+import * as duckdb from "./vendor/duckdb/duckdb-browser.mjs";
+import { evidenceManifestUrl, groupingSchemaUrl, schemaPublicationId } from "./dag_data_config.mjs";
+import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
+import { loadPublishedSchema } from "./published_schema_loader.mjs";
 
 function plainRows(result) {
   return result.toArray().map((row) => {
@@ -35,10 +35,10 @@ export class ParquetManifestDagDataSource {
 
   async initialize() {
     if (this.connection) return;
-    const manifestUrl = new URL(this.manifestUrl, window.location.origin);
+    const manifestUrl = new URL(this.manifestUrl, window.location.href);
     this.onStatus("Loading evidence manifest…");
     const response = await fetch(manifestUrl, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Could not load DAG snapshot manifest: ${response.status}`);
+    if (!response.ok) throw new Error(`Could not load DAG snapshot manifest ${manifestUrl.href}: HTTP ${response.status}`);
     this.manifest = await response.json();
     this.onStatus("Loading grouping schema…");
     const publicationId = schemaPublicationId();
@@ -52,8 +52,8 @@ export class ParquetManifestDagDataSource {
     }
 
     this.onStatus("Starting query engine…");
-    const mainModule = new URL("/vendor/duckdb/duckdb-eh.wasm", window.location.origin).href;
-    const mainWorker = new URL("/vendor/duckdb/duckdb-browser-eh.worker.js", window.location.origin).href;
+    const mainModule = new URL("./vendor/duckdb/duckdb-eh.wasm", import.meta.url).href;
+    const mainWorker = new URL("./vendor/duckdb/duckdb-browser-eh.worker.js", import.meta.url).href;
     const worker = new Worker(mainWorker);
     const database = new duckdb.AsyncDuckDB(
       new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING),

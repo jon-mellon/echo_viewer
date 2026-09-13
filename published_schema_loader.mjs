@@ -1,12 +1,13 @@
-import { supabase } from "/supabase_client.mjs";
-import { loadGroupingSchemaFolder } from "/grouping_schema_loader.mjs";
-import { canonicalFolderHash } from "/grouping_schema_writer.mjs";
-import { buildPermalink } from "/dag_permalink.mjs";
+import { supabase } from "./supabase_client.mjs";
+import { PRODUCTION_APP_ORIGIN } from "./dag_data_config.mjs";
+import { loadGroupingSchemaFolder } from "./grouping_schema_loader.mjs";
+import { canonicalFolderHash } from "./grouping_schema_writer.mjs";
+import { buildPermalink } from "./dag_permalink.mjs";
 
 export const PUBLISHED_SCHEMA_BUCKET = "published-schemas";
 
 export function publicationPermalink(publicationId, location = globalThis.location, state = null) {
-  const origin = location?.origin || "http://127.0.0.1:8767";
+  const origin = location?.origin || PRODUCTION_APP_ORIGIN;
   const url = state
     ? new URL(buildPermalink({
         location: new URL("/", origin),

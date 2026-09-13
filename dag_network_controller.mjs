@@ -310,7 +310,7 @@ function renderDag() {
     applyDagRender(groups, layout, routes);
     return;
   }
-  const worker = new Worker("/dag_layout_worker.mjs", { type: "module" });
+  const worker = new Worker(new URL("./dag_layout_worker.mjs", import.meta.url), { type: "module" });
   _dagRenderWorker = worker;
   worker.addEventListener("message", (event) => {
     if (event.data.requestId !== _dagRenderRequest) return;

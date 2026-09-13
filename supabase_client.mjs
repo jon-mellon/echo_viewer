@@ -1,8 +1,9 @@
-import { createClient } from "/vendor/supabase.mjs";
-import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "/supabase_config.mjs";
+import { createClient } from "./vendor/supabase.mjs";
+import { PRODUCTION_APP_ORIGIN } from "./dag_data_config.mjs";
+import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase_config.mjs";
 
 export const AUTH_MESSAGE_TYPE = "dag-supabase-auth-result";
-export const APP_ORIGIN = "http://127.0.0.1:8767";
+export const APP_ORIGIN = globalThis.location?.origin || PRODUCTION_APP_ORIGIN;
 export const AUTH_CALLBACK_URL = `${APP_ORIGIN}/auth-callback.html`;
 
 export function hasSupabaseConfig() {
@@ -19,4 +20,3 @@ export const supabase = hasSupabaseConfig()
       },
     })
   : null;
-
