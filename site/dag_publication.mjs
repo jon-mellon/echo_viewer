@@ -2,6 +2,7 @@ import { supabase } from "/supabase_client.mjs";
 import { canonicalFolderHash, writeGroupingSchemaFolder } from "/grouping_schema_writer.mjs";
 import { PUBLISHED_SCHEMA_BUCKET, publicationPermalink } from "/published_schema_loader.mjs";
 import { ensureAnonymousPublicationUser } from "/dag_anonymous_auth.mjs";
+import { setSafeUrl } from "/dom_builder.mjs";
 
 export const CANONICAL_BASELINE_ID = "a0118906-2366-4cc8-8809-bafdf3860c23";
 export const CANONICAL_BASELINE_HASH = "6732ed0bb2bce913c8b6611903f6c5d12ebccf3d5dc4f020887f5422515d7dfb";
@@ -145,7 +146,7 @@ export function createPublicationController({
     elements.badge.classList.toggle("muted", !published?.publication_id);
     elements.badge.classList.toggle("warn", Boolean(published?.publication_id && hasLocalChanges));
     elements.permalink.hidden = !permalink;
-    if (permalink) elements.permalink.href = permalink;
+    if (permalink) setSafeUrl(elements.permalink, "href", permalink);
   }
 
   async function refreshPublicationState() {

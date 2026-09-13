@@ -4,6 +4,7 @@ import * as mapInteractions from "./map_interactions.mjs";
 import * as mapRenderModel from "./map_render_model.mjs";
 import * as projectOps from "./dag_project.mjs";
 import * as visibility from "./variable_visibility.mjs";
+import { h, replaceChildren } from "./dom_builder.mjs";
 
 export function createDagMapUiController({
   state, elements: els, beginDraw, canvasWidth, canvasHeight, worldToScreen, screenToWorld,
@@ -182,8 +183,8 @@ function importantMapVariables() {
 }
 
 function renderMapLabels(width, height) {
-  const varLabelHtml = [];
-  const groupLabelHtml = [];
+  const variableLabels = [];
+  const groupLabels = [];
   const occupied = [];
   const fewVisible = (state.map._visibleVarCount ?? 999) <= 50;
 
@@ -215,13 +216,8 @@ function renderMapLabels(width, height) {
       const placed = placeLabel(screen, size, occupied, width, height, force);
       if (!placed) continue;
       occupied.push(placed);
-      varLabelHtml.push(`
-        <div class="map-label ${mapLabelClasses(item)}" data-variable-id="${escapeHtml(v.variable_id)}"
-          title="${escapeHtml(text)}"
-          style="left:${placed.x.toFixed(1)}px; top:${placed.y.toFixed(1)}px; max-width:${maxWidth}px; transform:none">
-          ${escapeHtml(text)}
-        </div>
-      `);
+      variableLabels.push(h("div", { className: `map-label ${mapLabelClasses(item)}`, dataset: { variableId: v.variable_id },
+        title: text, textContent: text, style: { left: `${placed.x.toFixed(1)}px`, top: `${placed.y.toFixed(1)}px`, maxWidth: `${maxWidth}px`, transform: "none" } }));
     }
   }
 
@@ -238,17 +234,13 @@ function renderMapLabels(width, height) {
         const screenAnchor = worldToScreen(labelRegion.cx, labelRegion.cy);
         const { x: cx, y: cy } = screenAnchor;
         if (cx < -10 || cx > width + 10 || cy < -10 || cy > height + 10) continue;
-        groupLabelHtml.push(`
-          <div class="map-label group-region-label" title="${escapeHtml(group.label)}"
-            style="left:${cx.toFixed(1)}px;top:${cy.toFixed(1)}px;color:${color};border-color:${hexToRgba(color, 0.35)};transform:translate(-50%,-50%)">
-            ${escapeHtml(group.label)}
-          </div>
-        `);
+        groupLabels.push(h("div", { className: "map-label group-region-label", title: group.label, textContent: group.label,
+          style: { left: `${cx.toFixed(1)}px`, top: `${cy.toFixed(1)}px`, color, borderColor: hexToRgba(color, 0.35), transform: "translate(-50%,-50%)" } }));
       }
     }
   }
 
-  els.dagMapLabels.innerHTML = varLabelHtml.join("") + groupLabelHtml.join("");
+  replaceChildren(els.dagMapLabels, variableLabels, groupLabels);
 }
 
 function estimateLabelSize(text, maxWidth, item) {
@@ -470,25 +462,15 @@ function showMapTooltip(variable, clientX, clientY) {
     .filter(Boolean);
   const displayVariable = clusterDisplayVariable(variable.variable_id) || variable;
   const exactStrings = clusterExactStringGroups(variable.variable_id);
-  const duplicatePreview = members.length > 1
-    ? `
-      <div class="tooltip-duplicate-heading">${members.length} variables · ${exactStrings.length} exact strings</div>
-      <div class="tooltip-duplicate-list">
-        ${exactStrings.slice(0, 5).map((entry) => `
-          <div>${escapeHtml(entry.label)} <strong>×${entry.count}</strong></div>
-        `).join("")}
-        ${exactStrings.length > 5 ? `<div>…and ${exactStrings.length - 5} more exact strings</div>` : ""}
-      </div>
-      <span>Right-click the node to inspect every distinct string.</span>
-    `
-    : "";
-  els.dagMapTooltip.innerHTML = `
-    <strong>${escapeHtml(displayVariable.display_label || displayVariable.concept_label)}</strong>
-    <span>${escapeHtml(displayVariable.paper_id || "unknown paper")}</span>
-    <span>${escapeHtml(displayVariable.raw_variable_text || "")}</span>
-    <span>${escapeHtml(displayVariable.uoa ? `UOA: ${displayVariable.uoa}` : "")}</span>
-    ${duplicatePreview}
-  `;
+  const duplicatePreview = members.length > 1 ? [
+    h("div", { className: "tooltip-duplicate-heading", textContent: `${members.length} variables · ${exactStrings.length} exact strings` }),
+    h("div", { className: "tooltip-duplicate-list" }, exactStrings.slice(0, 5).map(entry => h("div", {}, entry.label, " ", h("strong", { textContent: `×${entry.count}` }))),
+      exactStrings.length > 5 ? h("div", { textContent: `…and ${exactStrings.length - 5} more exact strings` }) : null),
+    h("span", { textContent: "Right-click the node to inspect every distinct string." }),
+  ] : [];
+  replaceChildren(els.dagMapTooltip, h("strong", { textContent: displayVariable.display_label || displayVariable.concept_label }),
+    h("span", { textContent: displayVariable.paper_id || "unknown paper" }), h("span", { textContent: displayVariable.raw_variable_text || "" }),
+    h("span", { textContent: displayVariable.uoa ? `UOA: ${displayVariable.uoa}` : "" }), duplicatePreview);
   els.dagMapTooltip.hidden = false;
   const rect = state.map.canvas.getBoundingClientRect();
   const x = clientX - rect.left + 14;
@@ -501,21 +483,12 @@ function duplicateDetailsHtml(variable) {
   const members = clusterMemberIds(variable.variable_id)
     .map((variableId) => state.variableById.get(variableId))
     .filter(Boolean);
-  if (members.length <= 1) return "";
+  if (members.length <= 1) return null;
   const exactStrings = clusterExactStringGroups(variable.variable_id);
-  return `
-    <details class="duplicate-details" open>
-      <summary>${members.length} merged variables · ${exactStrings.length} exact strings</summary>
-      <div class="duplicate-member-list">
-        ${exactStrings.map((entry) => `
-          <div class="duplicate-member">
-            <strong>${escapeHtml(entry.label)}</strong>
-            <span class="duplicate-string-count">×${entry.count}</span>
-          </div>
-        `).join("")}
-      </div>
-    </details>
-  `;
+  return h("details", { className: "duplicate-details", open: true },
+    h("summary", { textContent: `${members.length} merged variables · ${exactStrings.length} exact strings` }),
+    h("div", { className: "duplicate-member-list" }, exactStrings.map(entry => h("div", { className: "duplicate-member" },
+      h("strong", { textContent: entry.label }), h("span", { className: "duplicate-string-count", textContent: `×${entry.count}` })))));
 }
 
 function hideMapContextMenu() {
@@ -524,7 +497,7 @@ function hideMapContextMenu() {
   state.mapContextMenu.variableId = null;
   state.mapContextMenu.query = "";
   els.dagMapContextMenu.hidden = true;
-  els.dagMapContextMenu.innerHTML = "";
+  els.dagMapContextMenu.replaceChildren();
 }
 
 function removeVariablesFromAllGroups(variableIds) {
@@ -620,6 +593,19 @@ function showMapContextMenu(variable, clientX, clientY, variableIds = null) {
   renderMapContextMenu();
 }
 
+function contextMenuItem(title, description, dataset) {
+  return h("button", { className: "map-context-menu-item", type: "button", dataset },
+    h("div", {}, h("strong", { textContent: title }), h("span", { textContent: description })));
+}
+
+function contextMenuSearch() {
+  return h("input", { className: "map-context-menu-search", type: "search", placeholder: "Search groups", value: state.mapContextMenu.query });
+}
+
+function flagContextAction(action, title, description) {
+  return h("div", { className: "map-context-menu-actions" }, contextMenuItem(title, description, { action }));
+}
+
 function renderMapContextMenu() {
   if (!els.dagMapContextMenu) return;
   const selectedIds = [...new Set((state.mapContextMenu.variableIds || []).map((id) => clusterRep(id)).filter(Boolean))];
@@ -634,12 +620,9 @@ function renderMapContextMenu() {
     const selected = new Set(state.definitionDraft.new_variable_ids || []);
     const allIncluded = ids.every(id => selected.has(id));
     const rect = state.map.canvas.getBoundingClientRect();
-    els.dagMapContextMenu.innerHTML = `
-      <div class="map-context-menu-title">${escapeHtml(isBatchSelection ? `${ids.length} selected variables`
-        : (clusterDisplayVariable(variable.variable_id)?.display_label || variable.variable_id))}</div>
-      <button class="map-context-menu-item" type="button" data-definition-action="${allIncluded ? "remove" : "add"}">
-        <div><strong>${allIncluded ? "Return to source leftovers" : "Add to new variable"}</strong>
-        <span>Applies only within this definition draft.</span></div></button>`;
+    replaceChildren(els.dagMapContextMenu,
+      h("div", { className: "map-context-menu-title", textContent: isBatchSelection ? `${ids.length} selected variables` : (clusterDisplayVariable(variable.variable_id)?.display_label || variable.variable_id) }),
+      contextMenuItem(allIncluded ? "Return to source leftovers" : "Add to new variable", "Applies only within this definition draft.", { definitionAction: allIncluded ? "remove" : "add" }));
     els.dagMapContextMenu.querySelector("button[data-definition-action]").addEventListener("click", buttonEvent => {
       const add = buttonEvent.currentTarget.dataset.definitionAction === "add";
       for (const id of ids) {
@@ -670,29 +653,12 @@ function renderMapContextMenu() {
         })
       : allTargets;
     const rect = state.map.canvas.getBoundingClientRect();
-    els.dagMapContextMenu.innerHTML = `
-      <div class="map-context-menu-title">${escapeHtml(`${selectedIds.length} selected variables`)}</div>
-      <div class="map-context-menu-actions">
-        <button class="map-context-menu-item" type="button" data-action="flag-low-quality-batch">
-          <div>
-            <strong>Delete selected nodes</strong>
-            <span>Remove all selected variables from the viewer and save them as rejected.</span>
-          </div>
-        </button>
-      </div>
-      <div class="map-context-menu-subtitle">Selection created with Draw +. You can delete it or move the whole selection into one group.</div>
-      <input class="map-context-menu-search" type="search" placeholder="Search groups" value="${escapeHtml(state.mapContextMenu.query)}">
-      <div class="map-context-menu-list">
-        ${targets.map((group) => `
-          <button class="map-context-menu-item" type="button" data-group-id="${escapeHtml(group.group_id)}">
-            <div>
-              <strong>${escapeHtml(group.label || group.group_id)}</strong>
-              <span>Add ${escapeHtml(String(selectedIds.length))} selected vars · ${escapeHtml(String(group.variable_ids?.length || 0))} vars</span>
-            </div>
-          </button>
-        `).join("")}
-      </div>
-    `;
+    replaceChildren(els.dagMapContextMenu,
+      h("div", { className: "map-context-menu-title", textContent: `${selectedIds.length} selected variables` }),
+      flagContextAction("flag-low-quality-batch", "Delete selected nodes", "Remove all selected variables from the viewer and save them as rejected."),
+      h("div", { className: "map-context-menu-subtitle", textContent: "Selection created with Draw +. You can delete it or move the whole selection into one group." }),
+      contextMenuSearch(), h("div", { className: "map-context-menu-list" }, targets.map(group =>
+        contextMenuItem(group.label || group.group_id, `Add ${selectedIds.length} selected vars · ${group.variable_ids?.length || 0} vars`, { groupId: group.group_id }))));
     els.dagMapContextMenu.querySelector("[data-action='flag-low-quality-batch']")?.addEventListener("click", () => {
       if (!window.confirm(`Flag ${selectedIds.length} selected variables as low quality and remove them from the viewer?`)) return;
       const before = takeSnapshot();
@@ -746,46 +712,17 @@ function renderMapContextMenu() {
   const rect = state.map.canvas.getBoundingClientRect();
   const duplicateDetails = duplicateDetailsHtml(variable);
   const displayVariable = clusterDisplayVariable(variable.variable_id) || variable;
+  const common = [h("div", { className: "map-context-menu-title", textContent: displayVariable.display_label || displayVariable.concept_label || variable.variable_id }),
+    duplicateDetails, flagContextAction("flag-low-quality", "Flag low quality variable", "Remove it from the viewer and save it as rejected.")];
   if (!targets.length) {
-    els.dagMapContextMenu.innerHTML = `
-      <div class="map-context-menu-title">${escapeHtml(displayVariable.display_label || displayVariable.concept_label || variable.variable_id)}</div>
-      ${duplicateDetails}
-      <div class="map-context-menu-actions">
-        <button class="map-context-menu-item" type="button" data-action="flag-low-quality">
-          <div>
-            <strong>Flag low quality variable</strong>
-            <span>Remove it from the viewer and save it as rejected.</span>
-          </div>
-        </button>
-      </div>
-      <div class="map-context-menu-subtitle">${query ? "No matching groups." : "No eligible groups to add this variable to."}</div>
-      ${allTargets.length ? `<input class="map-context-menu-search" type="search" placeholder="Search groups" value="${escapeHtml(state.mapContextMenu.query)}">` : ""}
-    `;
+    replaceChildren(els.dagMapContextMenu, common,
+      h("div", { className: "map-context-menu-subtitle", textContent: query ? "No matching groups." : "No eligible groups to add this variable to." }),
+      allTargets.length ? contextMenuSearch() : null);
   } else {
-    els.dagMapContextMenu.innerHTML = `
-      <div class="map-context-menu-title">${escapeHtml(displayVariable.display_label || displayVariable.concept_label || variable.variable_id)}</div>
-      ${duplicateDetails}
-      <div class="map-context-menu-actions">
-        <button class="map-context-menu-item" type="button" data-action="flag-low-quality">
-          <div>
-            <strong>Flag low quality variable</strong>
-            <span>Remove it from the viewer and save it as rejected.</span>
-          </div>
-        </button>
-      </div>
-      <div class="map-context-menu-subtitle">Add this variable to an existing group</div>
-      <input class="map-context-menu-search" type="search" placeholder="Search groups" value="${escapeHtml(state.mapContextMenu.query)}">
-      <div class="map-context-menu-list">
-        ${targets.map((group) => `
-          <button class="map-context-menu-item" type="button" data-group-id="${escapeHtml(group.group_id)}" data-variable-id="${escapeHtml(variable.variable_id)}">
-            <div>
-              <strong>${escapeHtml(group.label || group.group_id)}</strong>
-              <span>${escapeHtml(String(group.variable_ids?.length || 0))} vars</span>
-            </div>
-          </button>
-        `).join("")}
-      </div>
-    `;
+    replaceChildren(els.dagMapContextMenu, common,
+      h("div", { className: "map-context-menu-subtitle", textContent: "Add this variable to an existing group" }), contextMenuSearch(),
+      h("div", { className: "map-context-menu-list" }, targets.map(group =>
+        contextMenuItem(group.label || group.group_id, `${group.variable_ids?.length || 0} vars`, { groupId: group.group_id, variableId: variable.variable_id }))));
     els.dagMapContextMenu.querySelectorAll("button[data-group-id]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const group = groupById(btn.dataset.groupId);

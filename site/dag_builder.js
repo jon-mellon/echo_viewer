@@ -35,6 +35,7 @@ import { writeGroupingSchemaFolder } from "/grouping_schema_writer.mjs";
 import { makeZip } from "/dag_export_zip.mjs";
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "/app_contracts.mjs";
 import { escapeHtml } from "/text_utils.mjs";
+import { h, replaceChildren, safeUrl } from "/dom_builder.mjs";
 
 
 const ROLE_LABELS = {
@@ -413,15 +414,12 @@ function renderUndoRedo() {
 function renderActionHistory() {
   if (!state.showActionHistory) return;
   if (!state.actionLog.length) {
-    els.actionHistory.innerHTML = `<div class="ah-empty">No actions yet.</div>`;
+    replaceChildren(els.actionHistory, h("div", { className: "ah-empty", textContent: "No actions yet." }));
     return;
   }
-  els.actionHistory.innerHTML = state.actionLog.map((entry) => `
-    <div class="ah-entry">
-      <span class="ah-desc">${escapeHtml(entry.description)}</span>
-      <span class="ah-time">${escapeHtml(entry.time.slice(11, 19))}</span>
-    </div>
-  `).join("");
+  replaceChildren(els.actionHistory, state.actionLog.map(entry => h("div", { className: "ah-entry" },
+    h("span", { className: "ah-desc", textContent: entry.description }),
+    h("span", { className: "ah-time", textContent: entry.time.slice(11, 19) }))));
 }
 
 // ─── Mode management ──────────────────────────────────────────────────────────
@@ -477,9 +475,8 @@ function rebuildProject() {
 
 function renderMapToolbarToggles() {
   const layoutSources = state.data?.layout?.sources || [];
-  els.variableLayoutSelect.innerHTML = layoutSources.map((source) => `
-    <option value="${escapeHtml(source.source)}">${escapeHtml(source.label || source.source)}</option>
-  `).join("");
+  replaceChildren(els.variableLayoutSelect, layoutSources.map(source =>
+    h("option", { value: source.source, textContent: source.label || source.source })));
   els.variableLayoutSelect.value = state.variableLayoutSource;
   els.variableLayoutSelect.hidden = layoutSources.length < 2;
   renderAssignmentCoverage();
@@ -577,10 +574,9 @@ function assignmentCoverage() {
 
 function renderAssignmentCoverage() {
   const coverage = assignmentCoverage();
-  els.variableAssignmentCounts.innerHTML = `
-    <span class="coverage-count assigned">${coverage.assigned.toLocaleString()} assigned</span>
-    <span class="coverage-count unassigned">${coverage.unassigned.toLocaleString()} unassigned</span>
-  `;
+  replaceChildren(els.variableAssignmentCounts,
+    h("span", { className: "coverage-count assigned", textContent: `${coverage.assigned.toLocaleString()} assigned` }),
+    h("span", { className: "coverage-count unassigned", textContent: `${coverage.unassigned.toLocaleString()} unassigned` }));
   const scope = coverage.uoaFiltered ? ` for UOA “${state.selectedUoa}”` : "";
   const rejected = coverage.rejected ? `; ${coverage.rejected.toLocaleString()} rejected variables excluded` : "";
   els.variableAssignmentCounts.title = `${coverage.total.toLocaleString()} variables${scope} represented by ${coverage.plottedNodes.toLocaleString()} plotted nodes${rejected}`;
@@ -801,12 +797,12 @@ function renderDefinition() {
     const groups = (state.project.groups || []).map((group, index) =>
       searchModel.anchorGroupSearchMatch(group, query, index, state.variableById))
       .filter(item => item.group.variable_ids?.length && item.matches).slice(0, 60);
-    els.definitionSourceList.innerHTML = groups.map(({ group, variableMatch }) => `
-      <div class="definition-source-row"><label><span class="definition-source-main">
-        <strong>${escapeHtml(group.label || group.group_id)}</strong>
-        <span>${new Set(group.variable_ids.map(clusterRep)).size} canonical</span></span>
-        ${variableMatch ? `<span class="setup-group-variable-match">Matched: ${escapeHtml(truncate(variableMatch, 72))}</span>` : ""}</label>
-        <input type="checkbox" data-source-id="${escapeHtml(group.group_id)}" ${selected.has(group.group_id) ? "checked" : ""}></div>`).join("");
+    replaceChildren(els.definitionSourceList, groups.map(({ group, variableMatch }) =>
+      h("div", { className: "definition-source-row" }, h("label", {},
+        h("span", { className: "definition-source-main" }, h("strong", { textContent: group.label || group.group_id }),
+          h("span", { textContent: `${new Set(group.variable_ids.map(clusterRep)).size} canonical` })),
+        variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched: ${truncate(variableMatch, 72)}` }) : null),
+      h("input", { type: "checkbox", dataset: { sourceId: group.group_id }, checked: selected.has(group.group_id) }))));
     els.definitionSourceList.querySelectorAll("input[data-source-id]").forEach(input => input.addEventListener("change", () => {
       const ids = new Set(draft.source_group_ids);
       if (input.checked) ids.add(input.dataset.sourceId); else ids.delete(input.dataset.sourceId);
@@ -827,54 +823,55 @@ function renderDefinition() {
     const matches = searchVariables(els.definitionVariableSearch.value, visibleVariables().length)
       .filter(variable => !selectedIds.has(clusterRep(variable.variable_id)))
       .slice(0, 30);
-    els.definitionVariableResults.innerHTML = matches.map(variable => {
+    replaceChildren(els.definitionVariableResults, matches.map(variable => {
       const id = clusterRep(variable.variable_id);
-      return `<button class="result-button" type="button" data-variable-id="${escapeHtml(id)}">
-        <strong>${escapeHtml(variable.display_label || variable.concept_label || id)}</strong>
-        <span>${escapeHtml(truncate(variable.raw_variable_text || variable.concept_label, 90))}</span>
-        <span>In leftover — click to add</span></button>`;
-    }).join("");
+      return h("button", { className: "result-button", type: "button", dataset: { variableId: id } },
+        h("strong", { textContent: variable.display_label || variable.concept_label || id }),
+        h("span", { textContent: truncate(variable.raw_variable_text || variable.concept_label, 90) }),
+        h("span", { textContent: "In leftover — click to add" }));
+    }));
     els.definitionVariableResults.querySelectorAll("button[data-variable-id]").forEach(button =>
       button.addEventListener("click", () => toggleDefinitionVariable(button.dataset.variableId)));
-    els.definitionSelectedVariables.innerHTML = draft.new_variable_ids.length
+    replaceChildren(els.definitionSelectedVariables, draft.new_variable_ids.length
       ? draft.new_variable_ids.map(id => {
         const variable = clusterDisplayVariable(id) || state.variableById.get(id);
-        return `<button class="definition-selected-variable" type="button" data-selected-variable-id="${escapeHtml(id)}"
-          title="Remove from new group"><span>${escapeHtml(variable?.display_label || variable?.concept_label || id)}</span><b>×</b></button>`;
-      }).join("")
-      : `<div class="small-note">No variables picked yet. Click a point, search result, or draw around variables.</div>`;
+        return h("button", { className: "definition-selected-variable", type: "button", dataset: { selectedVariableId: id }, title: "Remove from new group" },
+          h("span", { textContent: variable?.display_label || variable?.concept_label || id }), h("b", { textContent: "×" }));
+      })
+      : h("div", { className: "small-note", textContent: "No variables picked yet. Click a point, search result, or draw around variables." }));
     els.definitionSelectedVariables.querySelectorAll("button[data-selected-variable-id]").forEach(button =>
       button.addEventListener("click", () => toggleDefinitionVariable(button.dataset.selectedVariableId, false)));
     const neighbors = definitionNeighbors();
     els.definitionAddNeighbors.disabled = !neighbors.length;
-    els.definitionNeighborResults.innerHTML = neighbors.map(neighbor => {
+    replaceChildren(els.definitionNeighborResults, neighbors.map(neighbor => {
       const variable = clusterDisplayVariable(neighbor.variable_id) || state.variableById.get(neighbor.variable_id);
-      return `<button class="result-button" type="button" data-neighbor-id="${escapeHtml(neighbor.variable_id)}">
-        <strong>${escapeHtml(variable?.display_label || variable?.concept_label || neighbor.variable_id)}</strong>
-        <span>LLM rank ${escapeHtml(neighbor.llm_rank || "")}; cosine ${Number(neighbor.cosine_similarity || 0).toFixed(3)}</span></button>`;
-    }).join("");
+      return h("button", { className: "result-button", type: "button", dataset: { neighborId: neighbor.variable_id } },
+        h("strong", { textContent: variable?.display_label || variable?.concept_label || neighbor.variable_id }),
+        h("span", { textContent: `LLM rank ${neighbor.llm_rank || ""}; cosine ${Number(neighbor.cosine_similarity || 0).toFixed(3)}` }));
+    }));
     els.definitionNeighborResults.querySelectorAll("button[data-neighbor-id]").forEach(button =>
       button.addEventListener("click", () => toggleDefinitionVariable(button.dataset.neighborId, true)));
   } else {
     els.definitionNewLabel.value = draft.new_label || "";
-    els.definitionReviewVariables.innerHTML = draft.new_variable_ids.map(id => {
+    replaceChildren(els.definitionReviewVariables, draft.new_variable_ids.map(id => {
       const variable = clusterDisplayVariable(id) || state.variableById.get(id);
-      return `<div class="definition-review-variable">${escapeHtml(variable?.display_label || variable?.concept_label || id)}</div>`;
-    }).join("");
-    els.definitionResidualLabels.innerHTML = definitionSources().map(source => `
-      <div class="definition-residual-row"><label class="dag-label" for="residual_${escapeHtml(source.group_id)}">
-        Leftover from ${escapeHtml(source.label || source.group_id)} (${definitionResidualIds(source).length})</label>
-        <input id="residual_${escapeHtml(source.group_id)}" class="search-input" data-residual-id="${escapeHtml(source.group_id)}"
-          value="${escapeHtml(draft.residual_labels[source.group_id] || "")}"></div>`).join("");
+      return h("div", { className: "definition-review-variable", textContent: variable?.display_label || variable?.concept_label || id });
+    }));
+    replaceChildren(els.definitionResidualLabels, definitionSources().map(source => {
+      const inputId = `residual_${source.group_id}`;
+      return h("div", { className: "definition-residual-row" },
+        h("label", { className: "dag-label", htmlFor: inputId, textContent: `Leftover from ${source.label || source.group_id} (${definitionResidualIds(source).length})` }),
+        h("input", { id: inputId, className: "search-input", dataset: { residualId: source.group_id }, value: draft.residual_labels[source.group_id] || "" }));
+    }));
     els.definitionResidualLabels.querySelectorAll("input[data-residual-id]").forEach(input =>
       input.addEventListener("input", () => { draft.residual_labels[input.dataset.residualId] = input.value; persistProjectLocally(); }));
     const affected = draft.mode === "edit" ? [] : affectedDefinitionManualEdges();
-    els.definitionManualReview.innerHTML = affected.length
-      ? `<h3>Review affected manual records</h3>${affected.map(edge => `<div class="definition-manual-row">
-          <div>${escapeHtml(groupById(edge.source_group_id)?.label || edge.source_group_id)} → ${escapeHtml(groupById(edge.target_group_id)?.label || edge.target_group_id)}</div>
-          <select class="select-input" data-manual-id="${escapeHtml(edge.edge_id)}">
-            <option value="keep">Keep with leftover</option><option value="move">Move to new variable</option><option value="remove">Remove</option>
-          </select></div>`).join("")}` : "";
+    replaceChildren(els.definitionManualReview, affected.length ? [h("h3", { textContent: "Review affected manual records" }),
+      affected.map(edge => h("div", { className: "definition-manual-row" },
+        h("div", { textContent: `${groupById(edge.source_group_id)?.label || edge.source_group_id} → ${groupById(edge.target_group_id)?.label || edge.target_group_id}` }),
+        h("select", { className: "select-input", dataset: { manualId: edge.edge_id } },
+          h("option", { value: "keep", textContent: "Keep with leftover" }), h("option", { value: "move", textContent: "Move to new variable" }),
+          h("option", { value: "remove", textContent: "Remove" }))))] : []);
     els.definitionManualReview.querySelectorAll("select[data-manual-id]").forEach(select => {
       select.value = draft.manual_edge_dispositions[select.dataset.manualId] || "keep";
       select.addEventListener("change", () => { draft.manual_edge_dispositions[select.dataset.manualId] = select.value; persistProjectLocally(); });
@@ -967,19 +964,16 @@ function renderSearch(side) {
   const selected = state.seeds[side];
   if (state.anchorSearchMode[side] !== "new") {
     state.searchMatches[side] = [];
-    container.innerHTML = "";
+    container.replaceChildren();
     renderSetupGroupPicker(side);
     return;
   }
   const matches = query ? searchVariables(query, 16) : [];
   state.searchMatches[side] = matches.map((v) => v.variable_id);
-  container.innerHTML = matches.map((v) => `
-    <button class="result-button" type="button" data-side="${side}" data-variable-id="${escapeHtml(v.variable_id)}">
-      <strong>${escapeHtml(v.display_label || v.concept_label)}</strong>
-      <span>${escapeHtml(truncate(v.raw_variable_text || v.concept_label, 110))}</span>
-      <span>${escapeHtml(v.paper_id || "unknown paper")} ${selected.has(v.variable_id) ? "(selected)" : ""}</span>
-    </button>
-  `).join("");
+  replaceChildren(container, matches.map(v => h("button", { className: "result-button", type: "button", dataset: { side, variableId: v.variable_id } },
+    h("strong", { textContent: v.display_label || v.concept_label }),
+    h("span", { textContent: truncate(v.raw_variable_text || v.concept_label, 110) }),
+    h("span", { textContent: `${v.paper_id || "unknown paper"} ${selected.has(v.variable_id) ? "(selected)" : ""}` }))));
   container.querySelectorAll(".result-button").forEach((btn) => {
     btn.addEventListener("click", () => {
       const variableId = btn.dataset.variableId;
@@ -1038,21 +1032,14 @@ function renderRejectedVariablesPanel() {
       ].join(" ")).includes(query))
     : entries;
   els.rejectedVariablesPanel.hidden = entries.length === 0;
-  els.rejectedVariablesList.innerHTML = filtered.length
-    ? filtered.map((entry) => `
-      <div class="group-row group-row-rejected rejected-variable-row" data-variable-id="${escapeHtml(entry.variable_id)}">
-        <div class="group-row-head">
-          <strong>${escapeHtml(entry.label || entry.variable_id)}</strong>
-          <span class="group-row-meta">${escapeHtml(String(entry.member_variable_ids?.length || 1))} vars</span>
-        </div>
-        <span>${escapeHtml(entry.reason || "low_quality")}</span>
-        <div class="group-row-footer">
-          <span class="group-status-label rejected">rejected variable</span>
-          <button class="action-button" type="button" data-action="restore">Restore</button>
-        </div>
-      </div>
-    `).join("")
-    : `<div class="small-note">No rejected variables match this search.</div>`;
+  replaceChildren(els.rejectedVariablesList, filtered.length
+    ? filtered.map(entry => h("div", { className: "group-row group-row-rejected rejected-variable-row", dataset: { variableId: entry.variable_id } },
+      h("div", { className: "group-row-head" }, h("strong", { textContent: entry.label || entry.variable_id }),
+        h("span", { className: "group-row-meta", textContent: `${entry.member_variable_ids?.length || 1} vars` })),
+      h("span", { textContent: entry.reason || "low_quality" }), h("div", { className: "group-row-footer" },
+        h("span", { className: "group-status-label rejected", textContent: "rejected variable" }),
+        h("button", { className: "action-button", type: "button", dataset: { action: "restore" }, textContent: "Restore" }))))
+    : h("div", { className: "small-note", textContent: "No rejected variables match this search." }));
   els.rejectedVariablesList.querySelectorAll("button[data-action='restore']").forEach((btn) => {
     btn.addEventListener("click", () => {
       const row = btn.closest("[data-variable-id]");
@@ -1088,24 +1075,21 @@ function renderUoaStep() {
   if (!els.uoaChips) return;
   const parts = getAllUoaParts();
   if (!parts.length) {
-    els.uoaChips.innerHTML = `<p class="small-note">No unit-of-analysis data found.</p>`;
+    replaceChildren(els.uoaChips, h("p", { className: "small-note", textContent: "No unit-of-analysis data found." }));
     return;
   }
   const personCount = visibleVariables().filter(v => uoaMatches(v.uoa, PERSON_UOA_SENTINEL)).length;
   const personDisabled = !uoaSupportedByAnchors(PERSON_UOA_SENTINEL);
-  const personChip = personCount > 0 ? `
-    <button class="uoa-chip uoa-chip-combined${state.selectedUoa === PERSON_UOA_SENTINEL ? " active" : ""}" type="button" data-uoa="${PERSON_UOA_SENTINEL}"${personDisabled ? ' disabled title="The selected IV and DV do not both contain person-level variables"' : ""}>
-      person (all)<span class="uoa-count">${personCount}</span>
-    </button>
-  ` : "";
-  els.uoaChips.innerHTML = personChip + parts.map(([part, count]) => {
+  const uoaChip = (part, count, disabled, combined = false) => h("button", {
+    className: `uoa-chip${combined ? " uoa-chip-combined" : ""}${state.selectedUoa === part ? " active" : ""}`,
+    type: "button", dataset: { uoa: part }, disabled,
+    title: disabled ? `The selected IV and DV do not both contain ${combined ? "person-level variables" : "this unit of analysis"}` : "",
+  }, combined ? "person (all)" : part, h("span", { className: "uoa-count", textContent: count }));
+  const personChip = personCount > 0 ? uoaChip(PERSON_UOA_SENTINEL, personCount, personDisabled, true) : null;
+  replaceChildren(els.uoaChips, personChip, parts.map(([part, count]) => {
     const disabled = !uoaSupportedByAnchors(part);
-    return `
-    <button class="uoa-chip${state.selectedUoa === part ? " active" : ""}" type="button" data-uoa="${escapeHtml(part)}"${disabled ? ' disabled title="The selected IV and DV do not both contain this unit of analysis"' : ""}>
-      ${escapeHtml(part)}<span class="uoa-count">${count}</span>
-    </button>
-  `;
-  }).join("");
+    return uoaChip(part, count, disabled);
+  }));
   els.uoaChips.querySelectorAll(".uoa-chip").forEach(btn => {
     btn.addEventListener("click", () => selectUoa(btn.dataset.uoa));
   });
@@ -1135,15 +1119,11 @@ function renderSeedRows() {
 }
 
 function renderSeedRow(side, container) {
-  container.innerHTML = [...state.seeds[side]].map((variableId) => {
+  replaceChildren(container, [...state.seeds[side]].map((variableId) => {
     const v = state.variableById.get(variableId);
-    return `
-      <span class="chip" title="${escapeHtml(v?.display_label || variableId)}">
-        ${escapeHtml(truncate(v?.display_label || variableId, 34))}
-        <button type="button" data-side="${side}" data-variable-id="${escapeHtml(variableId)}">×</button>
-      </span>
-    `;
-  }).join("");
+    return h("span", { className: "chip", title: v?.display_label || variableId }, truncate(v?.display_label || variableId, 34),
+      h("button", { type: "button", dataset: { side, variableId }, textContent: "×" }));
+  }));
   container.querySelectorAll("button").forEach((btn) => {
     btn.addEventListener("click", () => {
       state.seeds[btn.dataset.side].delete(btn.dataset.variableId);
@@ -1385,39 +1365,27 @@ function renderVariableComparison() {
   els.edgeInspector.className = "edge-inspector variable-comparison";
   els.provenancePanel.hidden = false;
   if (!rows.length) {
-    els.edgeInspector.innerHTML = `
-      <strong>Variable comparison</strong>
-      <div>${escapeHtml(sourceLabel)} ↔ ${escapeHtml(targetLabel)}</div>
-      <div class="small-note">No evidence about a link between these variables.</div>
-    `;
-    els.provenancePanel.innerHTML = "";
+    replaceChildren(els.edgeInspector, h("strong", { textContent: "Variable comparison" }),
+      h("div", { textContent: `${sourceLabel} ↔ ${targetLabel}` }),
+      h("div", { className: "small-note", textContent: "No evidence about a link between these variables." }));
+    els.provenancePanel.replaceChildren();
     return true;
   }
 
-  els.edgeInspector.innerHTML = `
-    <strong>Evidence between variables</strong>
-    <div>${escapeHtml(sourceLabel)} ↔ ${escapeHtml(targetLabel)}</div>
-    <div class="small-note">${rows.length} extracted evidence record${rows.length === 1 ? "" : "s"}; “present” supports a link and “absent” records evidence against one.</div>
-  `;
+  replaceChildren(els.edgeInspector, h("strong", { textContent: "Evidence between variables" }),
+    h("div", { textContent: `${sourceLabel} ↔ ${targetLabel}` }),
+    h("div", { className: "small-note", textContent: `${rows.length} extracted evidence record${rows.length === 1 ? "" : "s"}; “present” supports a link and “absent” records evidence against one.` }));
   const evidenceRows = rows.map((link) => {
     const doi = isDoi(link.paper_id) ? link.paper_id.trim() : null;
     const paper = truncate(link.paper_title || link.paper_id, 44);
-    const paperCell = doi
-      ? `<a href="https://doi.org/${encodeURIComponent(doi)}" target="_blank" rel="noopener" title="${escapeHtml(link.paper_title || doi)}">${escapeHtml(paper)}</a>`
-      : escapeHtml(paper);
-    return `<tr>
-      <td>${link.direction}</td><td>${paperCell}</td>
-      <td>${escapeHtml(link.causal_link_existence || "")}</td>
-      <td>${escapeHtml(link.identification_strategy || "")}</td>
-      <td>${escapeHtml(truncate(link.target_population || "", 60))}</td>
-    </tr>`;
-  }).join("");
-  els.provenancePanel.innerHTML = `
-    <table class="provenance-table">
-      <thead><tr><th>Direction</th><th>Paper</th><th>Evidence</th><th>Strategy</th><th>Population</th></tr></thead>
-      <tbody>${evidenceRows}</tbody>
-    </table>
-  `;
+    const paperCell = doi ? h("a", { href: safeUrl(`https://doi.org/${encodeURIComponent(doi)}`), target: "_blank", rel: "noopener", title: link.paper_title || doi, textContent: paper }) : document.createTextNode(paper);
+    return h("tr", {}, h("td", { textContent: link.direction }), h("td", {}, paperCell),
+      h("td", { textContent: link.causal_link_existence || "" }), h("td", { textContent: link.identification_strategy || "" }),
+      h("td", { textContent: truncate(link.target_population || "", 60) }));
+  });
+  const headings = ["Direction", "Paper", "Evidence", "Strategy", "Population"];
+  replaceChildren(els.provenancePanel, h("table", { className: "provenance-table" },
+    h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))), h("tbody", {}, evidenceRows)));
   return true;
 }
 
@@ -1776,6 +1744,6 @@ const eventController = createDagEventController({
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 
-init().catch((error) => {
-  document.body.innerHTML = `<main class="panel-section"><h1>DAG Builder</h1><p>${escapeHtml(error?.message || error)}</p></main>`;
-});
+init().catch((error) => replaceChildren(document.body,
+  h("main", { className: "panel-section" }, h("h1", { textContent: "DAG Builder" }),
+    h("p", { textContent: error?.message || error }))));

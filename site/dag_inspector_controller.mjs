@@ -1,5 +1,6 @@
 import * as inspector from "./dag_inspector.mjs";
 import * as projectOps from "./dag_project.mjs";
+import { h, replaceChildren, safeUrl } from "./dom_builder.mjs";
 
 export const STUDY_DESIGN_EDGE_ID = "__study_design_iv_to_dv__";
 
@@ -53,12 +54,12 @@ export function createDagInspectorController({
     if (!model) return;
     const { sourceLabel, targetLabel, rawIds, keys } = model;
     elements.edgeInspector.className = "edge-inspector";
-    elements.edgeInspector.innerHTML = `
-      <strong>${escapeHtml(sourceLabel)} → ${escapeHtml(targetLabel)}</strong>
-      <div>Focal study relationship; not itself an evidence link.</div>
-      <div>${rawIds.length ? `${rawIds.length} evidence record(s) attached across both directions.` : "No raw evidence records attached."}</div>
-      ${keys.length ? `<div>Papers/tables:<br>${keys.map(escapeHtml).join("<br>")}</div>` : ""}
-    `;
+    const papers = keys.length ? h("div", {}, "Papers/tables:", h("br"),
+      keys.flatMap((key, index) => [index ? h("br") : null, document.createTextNode(key)])) : null;
+    replaceChildren(elements.edgeInspector,
+      h("strong", { textContent: `${sourceLabel} → ${targetLabel}` }),
+      h("div", { textContent: "Focal study relationship; not itself an evidence link." }),
+      h("div", { textContent: rawIds.length ? `${rawIds.length} evidence record(s) attached across both directions.` : "No raw evidence records attached." }), papers);
   }
 
   function renderEdge() {
@@ -71,17 +72,21 @@ export function createDagInspectorController({
     }
     const model = inspector.edgeInspector(link, state.project);
     elements.edgeInspector.className = "edge-inspector";
-    elements.edgeInspector.innerHTML = `
-      <strong>${escapeHtml(model.sourceLabel)} ${escapeHtml(model.arrow)} ${escapeHtml(model.targetLabel)}</strong>
-      <div>${escapeHtml(link.is_target_relation ? "Target relationship. " : "")}${escapeHtml(link.edge_source)}; ${model.rawCount ? `${model.rawCount} evidence record(s)` : "no provenance"}</div>
-      ${model.manual.length ? `<div>${escapeHtml(model.manual.map(edge => edge.user_note || "Manual edge").join("; "))}</div>` : ""}
-      ${model.existingDecision?.display_status === "excluded" && model.existingDecision.exclude_reason
-        ? `<div class="small-note" style="color:#9b5c2e"><strong>Excluded:</strong> ${escapeHtml(model.existingDecision.exclude_reason)}</div>` : ""}
-      <div class="edge-actions">${model.actions.map(item => `<button class="action-button" type="button" data-edge-action="${item.action}"${item.manualId ? ` data-manual-id="${escapeHtml(item.manualId)}"` : ""}>${item.label}</button>`).join("")}</div>
-      <div id="excludeReasonRow" class="exclude-reason-row" hidden>
-        <textarea id="excludeReasonInput" class="dag-textarea exclude-reason-input" rows="2" placeholder="Required: why is this link excluded? (methodological assumption, covariate balance, etc.)"></textarea>
-        <div class="exclude-reason-actions"><button class="primary-button" type="button" id="excludeConfirmBtn">Confirm exclusion</button><button class="text-button" type="button" id="excludeCancelBtn">Cancel</button></div>
-      </div>`;
+    const reason = model.existingDecision?.display_status === "excluded" && model.existingDecision.exclude_reason
+      ? h("div", { className: "small-note", style: { color: "#9b5c2e" } }, h("strong", { textContent: "Excluded:" }), ` ${model.existingDecision.exclude_reason}`) : null;
+    const reasonRow = h("div", { id: "excludeReasonRow", className: "exclude-reason-row", hidden: true },
+      h("textarea", { id: "excludeReasonInput", className: "dag-textarea exclude-reason-input", rows: 2,
+        placeholder: "Required: why is this link excluded? (methodological assumption, covariate balance, etc.)" }),
+      h("div", { className: "exclude-reason-actions" },
+        h("button", { className: "primary-button", type: "button", id: "excludeConfirmBtn", textContent: "Confirm exclusion" }),
+        h("button", { className: "text-button", type: "button", id: "excludeCancelBtn", textContent: "Cancel" })));
+    replaceChildren(elements.edgeInspector,
+      h("strong", { textContent: `${model.sourceLabel} ${model.arrow} ${model.targetLabel}` }),
+      h("div", { textContent: `${link.is_target_relation ? "Target relationship. " : ""}${link.edge_source}; ${model.rawCount ? `${model.rawCount} evidence record(s)` : "no provenance"}` }),
+      model.manual.length ? h("div", { textContent: model.manual.map(edge => edge.user_note || "Manual edge").join("; ") }) : null, reason,
+      h("div", { className: "edge-actions" }, model.actions.map(item => h("button", {
+        className: "action-button", type: "button", dataset: { edgeAction: item.action, ...(item.manualId ? { manualId: item.manualId } : {}) }, textContent: item.label,
+      }))), reasonRow);
     elements.edgeInspector.querySelectorAll("button[data-edge-action]").forEach(button => {
       button.addEventListener("click", () => handleEdgeAction(link, button.dataset.edgeAction, button.dataset.manualId));
     });
@@ -103,29 +108,35 @@ export function createDagInspectorController({
     if (!link) { elements.provenancePanel.hidden = true; return; }
     elements.provenancePanel.hidden = false;
     const model = inspector.provenanceModel(link, state.project, state.rawLinksById, state.variableById);
-    const manualHtml = model.manual.length
-      ? `<div class="small-note"><strong>Manual annotation</strong><br>${escapeHtml(model.manual.map(edge => edge.user_note || "Manual edge added by user.").join("; "))}</div>` : "";
+    const manualNode = model.manual.length
+      ? h("div", { className: "small-note" }, h("strong", { textContent: "Manual annotation" }), h("br"), model.manual.map(edge => edge.user_note || "Manual edge added by user.").join("; ")) : null;
     if (!model.rawIds.length) {
-      elements.provenancePanel.innerHTML = `${manualHtml}<div class="small-note">No raw provenance for this edge.</div>`;
+      replaceChildren(elements.provenancePanel, manualNode, h("div", { className: "small-note", textContent: "No raw provenance for this edge." }));
       return;
     }
     const rows = model.rows.map(({ raw, source, target }) => {
       const doi = isDoi(raw.paper_id) ? raw.paper_id.trim() : null;
       const title = truncate(raw.paper_title || raw.paper_id, 44);
       const paper = doi
-        ? `<a href="https://doi.org/${encodeURIComponent(doi)}" target="_blank" rel="noopener" title="${escapeHtml(raw.paper_title || doi)}">${escapeHtml(title)}</a>`
-        : escapeHtml(title);
-      return `<tr><td>${paper}</td><td class="provenance-concept">${escapeHtml(source.concept)}</td><td class="provenance-classification">${escapeHtml(source.classifications.length ? source.classifications.join("; ") : "Unclassified")}</td><td class="provenance-concept">${escapeHtml(target.concept)}</td><td class="provenance-classification">${escapeHtml(target.classifications.length ? target.classifications.join("; ") : "Unclassified")}</td><td>${escapeHtml(raw.within_table_occurrence_id || "")}</td><td>${escapeHtml(raw.causal_link_existence || "")}</td><td>${escapeHtml(raw.identification_strategy || "")}</td><td>${escapeHtml(truncate(raw.target_population || "", 60))}</td></tr>`;
-    }).join("");
-    elements.provenancePanel.innerHTML = `${manualHtml}<table class="provenance-table"><thead><tr><th>Paper</th><th>Source concept</th><th>Source classification</th><th>Target concept</th><th>Target classification</th><th>Occurrence</th><th>Existence</th><th>Strategy</th><th>Population</th></tr></thead><tbody>${rows}</tbody></table>`;
+        ? h("a", { href: safeUrl(`https://doi.org/${encodeURIComponent(doi)}`), target: "_blank", rel: "noopener", title: raw.paper_title || doi, textContent: title })
+        : document.createTextNode(title);
+      const cell = (text, className) => h("td", { className, textContent: text });
+      return h("tr", {}, h("td", {}, paper), cell(source.concept, "provenance-concept"),
+        cell(source.classifications.length ? source.classifications.join("; ") : "Unclassified", "provenance-classification"),
+        cell(target.concept, "provenance-concept"), cell(target.classifications.length ? target.classifications.join("; ") : "Unclassified", "provenance-classification"),
+        cell(raw.within_table_occurrence_id || ""), cell(raw.causal_link_existence || ""), cell(raw.identification_strategy || ""), cell(truncate(raw.target_population || "", 60)));
+    });
+    const headings = ["Paper", "Source concept", "Source classification", "Target concept", "Target classification", "Occurrence", "Existence", "Strategy", "Population"];
+    replaceChildren(elements.provenancePanel, manualNode, h("table", { className: "provenance-table" },
+      h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))), h("tbody", {}, rows)));
   }
 
   function renderManualControls() {
     const groups = dagGroups ? dagGroups() : state.project.groups.filter(group => group.variable_ids?.length);
     const sourceValue = groups.some(group => group.group_id === elements.manualSource.value) ? elements.manualSource.value : groups[0]?.group_id;
     const targetValue = groups.some(group => group.group_id === elements.manualTarget.value) ? elements.manualTarget.value : groups.find(group => group.group_id !== sourceValue)?.group_id;
-    const options = groups.map(group => `<option value="${escapeHtml(group.group_id)}">${escapeHtml(group.label)}</option>`).join("");
-    elements.manualSource.innerHTML = options; elements.manualTarget.innerHTML = options;
+    const options = () => groups.map(group => h("option", { value: group.group_id, textContent: group.label }));
+    replaceChildren(elements.manualSource, options()); replaceChildren(elements.manualTarget, options());
     if (sourceValue) elements.manualSource.value = sourceValue;
     if (targetValue) elements.manualTarget.value = targetValue;
     if (elements.manualSource.value === elements.manualTarget.value) {

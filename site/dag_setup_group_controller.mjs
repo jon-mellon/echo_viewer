@@ -1,6 +1,7 @@
 import * as groupListModel from "./dag_group_list.mjs";
 import * as searchModel from "./dag_search.mjs";
 import * as workflow from "./dag_workflow.mjs";
+import { h, replaceChildren } from "./dom_builder.mjs";
 
 export function createDagSetupGroupController({
   state, elements, escapeHtml, normalized, truncate, groupById,
@@ -120,7 +121,7 @@ export function createDagSetupGroupController({
     const container = side === "dv" ? elements.dvGroupPicker : elements.ivGroupPicker;
     if (!container) return;
     if (state.definitionDraft || state.workflowMode !== "setup" || state.phase !== `select_${side}`) {
-      container.hidden = true; container.innerHTML = ""; return;
+      container.hidden = true; container.replaceChildren(); return;
     }
     const input = side === "dv" ? elements.dvInput : elements.ivInput;
     const label = side === "dv" ? elements.dvInputLabel : elements.ivInputLabel;
@@ -129,12 +130,24 @@ export function createDagSetupGroupController({
     label.textContent = isNew ? "Search raw variables" : "Search existing groups";
     toggle.textContent = isNew ? "Back to existing groups" : "Define new group";
     input.placeholder = isNew ? (side === "dv" ? "Income, prejudice, labor-market outcome" : "Education, religiosity, parental status") : "Search group or constituent variable";
-    if (isNew) { container.hidden = true; container.innerHTML = ""; return; }
+    if (isNew) { container.hidden = true; container.replaceChildren(); return; }
     const searchProject = dagProjectView ? dagProjectView() : state.project;
     const groups = searchModel.searchAnchorGroups(searchProject, side, normalized(input.value), state.variableById);
     container.hidden = false;
-    if (!groups.length) { container.innerHTML = `<div class="setup-group-picker-title">No matching existing groups</div>`; return; }
-    container.innerHTML = `<div class="setup-group-picker-title">Existing groups</div><div class="setup-group-picker-list">${groups.map(({ group, variableMatch }) => `<div class="setup-group-picker-row"><div><strong>${escapeHtml(group.label || group.group_id)}</strong><span>${escapeHtml(String(group.variable_ids?.length || 0))} vars</span>${variableMatch ? `<span class="setup-group-variable-match">Matched variable: ${escapeHtml(truncate(variableMatch, 86))}</span>` : ""}</div><button class="action-button" type="button" data-side="${side}" data-group-id="${escapeHtml(group.group_id)}">Use as ${side.toUpperCase()}</button></div>`).join("")}<div class="setup-group-picker-row define-new-row"><div><strong>Define new variable…</strong><span>Chop one or more existing categories in the spatial viewer</span></div><button class="action-button" type="button" data-define-side="${side}">Define</button></div></div>`;
+    if (!groups.length) {
+      replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: "No matching existing groups" }));
+      return;
+    }
+    const rows = groups.map(({ group, variableMatch }) => h("div", { className: "setup-group-picker-row" },
+      h("div", {}, h("strong", { textContent: group.label || group.group_id }),
+        h("span", { textContent: `${group.variable_ids?.length || 0} vars` }),
+        variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched variable: ${truncate(variableMatch, 86)}` }) : null),
+      h("button", { className: "action-button", type: "button", dataset: { side, groupId: group.group_id }, textContent: `Use as ${side.toUpperCase()}` })));
+    rows.push(h("div", { className: "setup-group-picker-row define-new-row" },
+      h("div", {}, h("strong", { textContent: "Define new variable…" }), h("span", { textContent: "Chop one or more existing categories in the spatial viewer" })),
+      h("button", { className: "action-button", type: "button", dataset: { defineSide: side }, textContent: "Define" })));
+    replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: "Existing groups" }),
+      h("div", { className: "setup-group-picker-list" }, rows));
     container.querySelectorAll("button[data-group-id]").forEach(button =>
       button.addEventListener("click", () => assignGroupAsAnchor(button.dataset.side, button.dataset.groupId)));
     container.querySelector("button[data-define-side]")?.addEventListener("click", event =>
@@ -145,7 +158,13 @@ export function createDagSetupGroupController({
     const model = groupListModel.buildGroupListModel(dagProjectView ? dagProjectView() : state.project, { candidateQueue: state.candidateQueue,
       sort: state.groupListSort, activeGroupId: state.activeGroupId, roleLabels });
     if (elements.groupListCount) elements.groupListCount.textContent = model.countText;
-    elements.groupList.innerHTML = model.rows.map(item => `<div class="group-row ${item.isActive ? "group-row-active" : ""}" data-group-id="${escapeHtml(item.groupId)}"><div class="group-row-head"><strong>${escapeHtml(item.label)}</strong><span class="group-row-meta">${escapeHtml(item.variableCount)} vars</span></div>${item.roleLabels.length ? `<div class="role-list">${item.roleLabels.map(label => `<span class="role-pill">${escapeHtml(label)}</span>`).join("")}</div>` : ""}<div class="group-row-footer"><span class="group-role-label">${item.anchorLabel}</span><button class="action-button group-open-btn" type="button" data-action="open">Open</button></div></div>`).join("");
+    replaceChildren(elements.groupList, model.rows.map(item => h("div", {
+      className: `group-row${item.isActive ? " group-row-active" : ""}`, dataset: { groupId: item.groupId },
+    }, h("div", { className: "group-row-head" }, h("strong", { textContent: item.label }),
+      h("span", { className: "group-row-meta", textContent: `${item.variableCount} vars` })),
+    item.roleLabels.length ? h("div", { className: "role-list" }, item.roleLabels.map(label => h("span", { className: "role-pill", textContent: label }))) : null,
+    h("div", { className: "group-row-footer" }, h("span", { className: "group-role-label", textContent: item.anchorLabel }),
+      h("button", { className: "action-button group-open-btn", type: "button", dataset: { action: "open" }, textContent: "Open" })))));
     elements.groupList.querySelectorAll("button").forEach(button => button.addEventListener("click", () => {
       const group = groupById(button.closest(".group-row").dataset.groupId);
       if (!group) return;
@@ -155,7 +174,8 @@ export function createDagSetupGroupController({
   }
 
   function renderGroupingControls() {
-    elements.groupingSetSelect.innerHTML = (state.data.grouping_sets || []).map(set => `<option value="${escapeHtml(set.grouping_set_id)}">${escapeHtml(set.label || set.grouping_set_id)}</option>`).join("");
+    replaceChildren(elements.groupingSetSelect, (state.data.grouping_sets || []).map(set =>
+      h("option", { value: set.grouping_set_id, textContent: set.label || set.grouping_set_id })));
     elements.groupingSetSelect.value = state.project.active_grouping_set_id;
     const active = (state.data.grouping_sets || []).find(set => set.grouping_set_id === state.project.active_grouping_set_id) || (state.data.grouping_sets || [])[0];
     elements.groupingSummary.textContent = active

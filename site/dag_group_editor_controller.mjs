@@ -1,4 +1,5 @@
 import * as projectOps from "./dag_project.mjs";
+import { h, replaceChildren } from "./dom_builder.mjs";
 import * as groupEditorModel from "./dag_group_editor.mjs";
 import * as searchModel from "./dag_search.mjs";
 import * as workflow from "./dag_workflow.mjs";
@@ -141,14 +142,10 @@ function renderGroupEditor() {
     els.groupSeedInput.dataset.groupId = group.group_id;
   }
 
-  els.includedVariables.innerHTML = model.members.map(({ variableId, title, label }) => {
-    return `
-      <span class="chip" title="${escapeHtml(title)}">
-        ${escapeHtml(truncate(label, 42))}
-        <button type="button" data-variable-id="${escapeHtml(variableId)}">×</button>
-      </span>
-    `;
-  }).join("");
+  replaceChildren(els.includedVariables, model.members.map(({ variableId, title, label }) =>
+    h("span", { className: "chip", title }, truncate(label, 42),
+      h("button", { type: "button", dataset: { variableId }, textContent: "×" })),
+  ));
   els.includedVariables.querySelectorAll("button").forEach((btn) => {
     btn.addEventListener("click", () => {
       const before = takeSnapshot();
@@ -175,13 +172,11 @@ function renderGroupSeedSearch() {
       .filter((v) => !clusterMemberIds(v.variable_id).some((id) => blockedIds.has(id)))
       .slice(0, 12)
     : [];
-  els.groupSeedResults.innerHTML = matches.map((v) => `
-    <button class="result-button" type="button" data-variable-id="${escapeHtml(v.variable_id)}">
-      <strong>${escapeHtml(v.display_label || v.concept_label)}</strong>
-      <span>${escapeHtml(truncate(v.raw_variable_text || v.concept_label, 100))}</span>
-      <span>${escapeHtml(v.paper_id || "unknown paper")}</span>
-    </button>
-  `).join("");
+  replaceChildren(els.groupSeedResults, matches.map(v => h("button", {
+    className: "result-button", type: "button", dataset: { variableId: v.variable_id },
+  }, h("strong", { textContent: v.display_label || v.concept_label }),
+  h("span", { textContent: truncate(v.raw_variable_text || v.concept_label, 100) }),
+  h("span", { textContent: v.paper_id || "unknown paper" }))));
   els.groupSeedResults.querySelectorAll(".result-button").forEach((btn) => {
     btn.addEventListener("click", () => {
       const g = activeGroup();
@@ -202,16 +197,13 @@ function renderGroupSeedSearch() {
 
 function renderNeighborSuggestions(group) {
   const suggestions = groupNeighborSuggestions(group, 14);
-  els.neighborSuggestions.innerHTML = suggestions.map((item) => {
+  replaceChildren(els.neighborSuggestions, suggestions.map((item) => {
     const v = state.variableById.get(item.variable_id);
-    return `
-      <button class="result-button" type="button" data-variable-id="${escapeHtml(item.variable_id)}">
-        <strong>${escapeHtml(v?.display_label || item.variable_id)}</strong>
-        <span>${escapeHtml(truncate(v?.raw_variable_text || v?.concept_label || "", 100))}</span>
-        <span>LLM rank ${escapeHtml(item.llm_rank || "")}; cosine ${Number(item.cosine_similarity || 0).toFixed(3)}</span>
-      </button>
-    `;
-  }).join("");
+    return h("button", { className: "result-button", type: "button", dataset: { variableId: item.variable_id } },
+      h("strong", { textContent: v?.display_label || item.variable_id }),
+      h("span", { textContent: truncate(v?.raw_variable_text || v?.concept_label || "", 100) }),
+      h("span", { textContent: `LLM rank ${item.llm_rank || ""}; cosine ${Number(item.cosine_similarity || 0).toFixed(3)}` }));
+  }));
   els.neighborSuggestions.querySelectorAll(".result-button").forEach((btn) => {
     btn.addEventListener("click", () => {
       const before = takeSnapshot();

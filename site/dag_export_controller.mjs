@@ -1,5 +1,6 @@
 import * as exportData from "./dag_exports.mjs";
 import { makeZip } from "./dag_export_zip.mjs";
+import { setSafeUrl } from "./dom_builder.mjs";
 
 // Browser-side export orchestration. Pure serialization stays in dag_exports;
 // this controller owns metadata I/O, snapshots, busy state, and downloads.
@@ -110,7 +111,7 @@ export function createDagExportController({
   function downloadBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
-    anchor.href = url;
+    setSafeUrl(anchor, "href", url);
     anchor.download = filename;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
