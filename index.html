@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Variable DAG Builder</title>
+    <link rel="stylesheet" href="/styles.css?v=dag2-publication-v6">
+  </head>
+  <body class="dag-body password-locked">
+    <div id="passwordGate" class="password-gate" role="dialog" aria-modal="true" aria-labelledby="passwordGateTitle">
+      <form id="passwordGateForm" class="password-gate-card">
+        <p class="eyebrow">Private preview</p>
+        <h1 id="passwordGateTitle">Enter password</h1>
+        <p>This viewer is not ready for public consumption.</p>
+        <label class="dag-label" for="passwordGateInput">Password</label>
+        <input id="passwordGateInput" class="search-input" type="password" autocomplete="current-password" required autofocus>
+        <p id="passwordGateError" class="password-gate-error" role="alert" hidden>Incorrect password.</p>
+        <button class="primary-button" type="submit">Open viewer</button>
+      </form>
+    </div>
+    <div id="startupLoading" class="startup-loading" role="status" aria-live="polite">
+      <div class="startup-loading-card">
+        <span class="startup-spinner" aria-hidden="true"></span>
+        <div>
+          <strong>Loading viewer</strong>
+          <p id="startupLoadingStage">Preparing application…</p>
+        </div>
+      </div>
+    </div>
+    <main class="dag-shell">
+
+      <!-- LEFT PANEL: Navigation + mode-specific content -->
+      <aside class="dag-left-panel">
+        <header class="panel-header">
+          <div>
+            <p class="eyebrow">Working causal map</p>
+            <h1>DAG Builder</h1>
+          </div>
+          <div id="dagAuth" class="dag-auth" hidden>
+            <span id="authIdentity" class="auth-identity" hidden></span>
+            <button id="authSignIn" class="toolbar-button" type="button">Sign in with Google</button>
+            <button id="authSignOut" class="text-button" type="button" hidden>Sign out</button>
+            <span id="authStatus" class="auth-status" role="status" aria-live="polite"></span>
+          </div>
+        </header>
+
+        <nav id="modeSwitcher" class="mode-switcher" aria-label="Workflow mode">
+          <button class="mode-tab active" data-mode="setup" type="button">Setup</button>
+          <button class="mode-tab" data-mode="group_review" type="button">Groups</button>
+        </nav>
+
+        <!-- Study anchors: change which group is IV / DV at any time -->
+        <div id="anchorBar" class="anchor-bar" hidden>
+          <div class="anchor-row">
+            <span class="anchor-tag anchor-dv">DV</span>
+            <strong id="anchorDvLabel" class="anchor-label"></strong>
+            <button id="editSplitDv" class="text-button" type="button" hidden>Edit split</button>
+            <button id="changeDv" class="text-button" type="button">Change</button>
+          </div>
+          <div class="anchor-row">
+            <span class="anchor-tag anchor-iv">IV</span>
+            <strong id="anchorIvLabel" class="anchor-label"></strong>
+            <button id="editSplitIv" class="text-button" type="button" hidden>Edit split</button>
+            <button id="changeIv" class="text-button" type="button">Change</button>
+          </div>
+          <div class="mini-toolbar dag2-history-controls">
+            <button id="dag2UndoBtn" class="toolbar-button" type="button" disabled>↩ Undo</button>
+            <button id="dag2RedoBtn" class="toolbar-button" type="button" disabled>Redo ↪</button>
+          </div>
+        </div>
+
+        <!-- SETUP mode: IV/DV selection and schema choice -->
+        <section id="setupSection" class="panel-section">
+          <div class="section-title">
+            <h2 id="currentStepTitle">Select unit of analysis</h2>
+            <span id="dagStatusBadge" class="status-pill">Setup</span>
+          </div>
+
+          <!-- UOA filter bar — shown after UOA is chosen -->
+          <div id="uoaFilterBar" class="uoa-filter-bar" hidden>
+            <span class="uoa-filter-label">UOA: <strong id="uoaSelectedLabel"></strong></span>
+            <label class="toggle-label">
+              <input type="checkbox" id="uoaFilterToggle" checked>
+              Filter
+            </label>
+            <button id="uoaReset" class="text-button" type="button">Change</button>
+          </div>
+
+          <!-- UOA step -->
+          <div id="uoaSearchBlock" class="search-block">
+            <label class="dag-label">Unit of analysis</label>
+            <div id="uoaChips" class="uoa-chips"></div>
+          </div>
+
+          <div id="dvSearchBlock" class="search-block">
+            <div class="anchor-source-header">
+              <label id="dvInputLabel" class="dag-label" for="dvInput">Search existing groups</label>
+              <button id="dvDefineNew" class="text-button" type="button">Define new group</button>
+            </div>
+            <input id="dvInput" class="search-input" type="search" placeholder="Income, prejudice, labor-market outcome">
+            <div id="dvSeeds" class="seed-row"></div>
+            <div id="dvResults" class="search-results"></div>
+            <div id="dvGroupPicker" class="setup-group-picker" hidden></div>
+          </div>
+
+          <div id="ivSearchBlock" class="search-block">
+            <div class="anchor-source-header">
+              <label id="ivInputLabel" class="dag-label" for="ivInput">Search existing groups</label>
+              <button id="ivDefineNew" class="text-button" type="button">Define new group</button>
+            </div>
+            <input id="ivInput" class="search-input" type="search" placeholder="Education, religiosity, parental status">
+            <div id="ivSeeds" class="seed-row"></div>
+            <div id="ivResults" class="search-results"></div>
+            <div id="ivGroupPicker" class="setup-group-picker" hidden></div>
+          </div>
+
+          <div id="schemaChoice" class="schema-choice" hidden>
+            <button id="loadSchema" class="primary-button" type="button">Load grouping schema</button>
+            <button id="skipSchema" class="toolbar-button" type="button">Work without schema</button>
+          </div>
+          <div id="definitionBlock" class="definition-block" hidden>
+            <div class="definition-heading">
+              <strong id="definitionTitle">Define new variable</strong>
+              <button id="definitionCancel" class="text-button" type="button">Cancel</button>
+            </div>
+            <div id="definitionSourcesStep">
+              <label class="dag-label" for="definitionSourceSearch">Choose one or more categories to chop from</label>
+              <input id="definitionSourceSearch" class="search-input" type="search" placeholder="Search categories or constituent variables">
+              <div id="definitionSourceList" class="setup-group-picker-list"></div>
+              <button id="definitionContinue" class="primary-button" type="button" disabled>Continue</button>
+            </div>
+            <div id="definitionPartitionStep" hidden>
+              <div id="definitionCounts" class="workflow-hint"></div>
+              <label class="dag-label" for="definitionVariableSearch">Search displayed variables</label>
+              <input id="definitionVariableSearch" class="search-input" type="search" placeholder="Search canonical variables">
+              <div id="definitionVariableResults" class="search-results"></div>
+              <div class="section-title compact-title"><h2>New group variables</h2></div>
+              <div id="definitionSelectedVariables" class="definition-selected-variables"></div>
+              <div class="section-title compact-title"><h2>Nearby variables</h2></div>
+              <button id="definitionAddNeighbors" class="action-button" type="button">Add top neighbors</button>
+              <div id="definitionNeighborResults" class="search-results"></div>
+              <div class="mini-toolbar">
+                <button id="definitionBack" class="toolbar-button" type="button">Back</button>
+                <button id="definitionReview" class="primary-button" type="button" disabled>Name and review</button>
+              </div>
+            </div>
+            <div id="definitionReviewStep" hidden>
+              <label class="dag-label" for="definitionNewLabel">New variable name</label>
+              <input id="definitionNewLabel" class="search-input" type="text" placeholder="New variable">
+              <div class="section-title compact-title"><h2>New group variables</h2></div>
+              <div id="definitionReviewVariables" class="definition-review-variables"></div>
+              <div id="definitionResidualLabels"></div>
+              <div id="definitionManualReview"></div>
+              <div id="definitionValidation" class="small-note" aria-live="polite"></div>
+              <div class="mini-toolbar">
+                <button id="definitionReviewBack" class="toolbar-button" type="button">Back</button>
+                <button id="definitionSave" class="primary-button" type="button">Save and use</button>
+              </div>
+            </div>
+          </div>
+          <div id="workflowHint" class="workflow-hint"></div>
+        </section>
+
+        <!-- GROUPS / DAG modes: unified group list with filters -->
+        <section id="groupListPanel" class="panel-section" hidden>
+          <div class="section-title">
+            <div style="display:flex;gap:8px;align-items:center">
+              <h2>Groups</h2>
+              <span id="groupListCount" class="status-pill muted">0</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button id="createGroupBtn" class="toolbar-button" type="button" title="Create a blank group">+ New</button>
+              <select id="groupListSort" class="select-input-sm" title="Sort order">
+                <option value="relevance">By relevance to IV/DV</option>
+                <option value="alpha">A–Z</option>
+              </select>
+            </div>
+          </div>
+          <div id="groupList" class="group-list"></div>
+        </section>
+
+        <!-- Grouping schema (shown in setup + groups modes) -->
+        <section id="groupingPanel" class="panel-section">
+          <div class="section-title">
+            <h2>Grouping Schema</h2>
+            <span id="schemaPublicationBadge" class="status-pill muted">Private working copy</span>
+          </div>
+          <select id="groupingSetSelect" class="select-input"></select>
+          <div class="mini-toolbar">
+            <label class="toolbar-button file-button">
+              Import schema
+              <input id="groupingImport" type="file" accept="application/json,.json">
+            </label>
+            <button id="exportGrouping" class="toolbar-button" type="button">Export schema</button>
+            <button id="publishSchema" class="primary-button" type="button" hidden>Publish publicly</button>
+          </div>
+          <div id="publicationStatus" class="publication-status" role="status" aria-live="polite"></div>
+          <a id="publishedSchemaPermalink" class="published-schema-permalink" href="#" target="_blank" rel="noopener" hidden>Open public version</a>
+          <div id="groupingSummary" class="small-note"></div>
+        </section>
+
+        <section id="rejectedVariablesPanel" class="panel-section" hidden>
+          <div class="section-title">
+            <h2>Rejected Variables</h2>
+          </div>
+          <input id="rejectedVariableSearch" class="search-input" type="search" placeholder="Search rejected variables">
+          <div id="rejectedVariablesList" class="group-list"></div>
+        </section>
+      </aside>
+
+      <dialog id="publishSchemaDialog" class="publication-dialog">
+        <form method="dialog">
+          <h2>Publish this schema publicly?</h2>
+          <p>Publishing creates an immutable public version of this schema. Anyone with the link can view and download it, and it may appear in public schema discovery or recommendation features.</p>
+          <p>Your unpublished local edits remain private until you publish them.</p>
+          <div class="publication-dialog-actions">
+            <button class="toolbar-button" value="cancel" type="submit">Cancel</button>
+            <button class="primary-button" value="publish" type="submit">Publish publicly</button>
+          </div>
+        </form>
+      </dialog>
+
+      <!-- Drag handle between left panel and map -->
+      <div id="leftResizer" class="panel-resizer"></div>
+
+      <!-- CENTER: Semantic variable map -->
+      <section class="dag-map-panel">
+        <div class="map-toolbar dag-map-toolbar">
+          <button id="dagZoomIn" class="icon-button" type="button" title="Zoom in">+</button>
+          <button id="dagZoomOut" class="icon-button" type="button" title="Zoom out">−</button>
+          <button id="dagFitView" class="toolbar-button" type="button">Fit</button>
+          <button id="toggleVariableLabels" class="toolbar-button active" type="button" aria-pressed="true" title="Toggle variable labels across the whole map">Labels</button>
+          <button id="toggleGroupLabels" class="toolbar-button active" type="button" aria-pressed="true" title="Toggle group region labels across the whole map">Groups</button>
+          <div class="toolbar-sep"></div>
+          <button id="dagSelectMode" class="toolbar-button active" type="button" aria-pressed="true" title="Inspect variables — click to select, no edits">Inspect</button>
+          <button id="dagBrushMode" class="toolbar-button" type="button" aria-pressed="false" title="Draw a boundary to add variables to the active group">Draw +</button>
+          <button id="dagEraseMode" class="toolbar-button" type="button" aria-pressed="false" title="Draw a boundary to remove variables from the active group">Draw −</button>
+          <span id="selectionCount" class="status-pill muted selection-count" hidden>0 selected</span>
+          <div class="toolbar-sep"></div>
+          <button id="undoBtn" class="toolbar-button" type="button" title="Undo last action" disabled>↩ Undo</button>
+          <button id="redoBtn" class="toolbar-button" type="button" title="Redo" disabled>Redo ↪</button>
+          <button id="historyToggle" class="toolbar-button" type="button" title="Toggle action history">History</button>
+          <div class="toolbar-sep"></div>
+          <button id="fullscreenVariableMap" class="toolbar-button fullscreen-toggle" type="button" aria-pressed="false" title="Expand the variable viewer to fill the window; press Escape to exit">Full screen map</button>
+        </div>
+        <div class="map-toolbar variable-layout-control">
+          <label for="variableLayoutSelect">Variable layout</label>
+          <select id="variableLayoutSelect" class="select-input-sm" aria-label="Variable map layout" title="Change the variable embedding layout"></select>
+          <span id="variableAssignmentCounts" class="assignment-coverage" aria-live="polite"></span>
+        </div>
+        <canvas id="dagMapCanvas"></canvas>
+        <div id="dagMapLabels" class="dag-map-labels"></div>
+        <div id="dagMapTooltip" class="tooltip" hidden></div>
+        <div id="dagMapContextMenu" class="map-context-menu" hidden></div>
+        <!-- Action history overlay -->
+        <div id="actionHistory" class="action-history" hidden></div>
+      </section>
+
+      <!-- Drag handle between map and right panel -->
+      <div id="rightResizer" class="panel-resizer"></div>
+
+      <!-- RIGHT PANEL: Context workspace (group editor OR DAG workspace) -->
+      <aside class="dag-right-panel">
+
+        <!-- Group editor — shown when a group is open -->
+        <section id="groupEditorSection" class="panel-section group-editor-section">
+          <div class="section-title">
+            <h2 id="groupEditorTitle">Group</h2>
+            <button id="cancelGroupEdit" class="text-button" type="button">Close</button>
+          </div>
+          <div id="groupEditorHint" class="workflow-hint"></div>
+          <input id="groupLabelInput" class="search-input" type="text" placeholder="Group label">
+          <textarea id="groupNotesInput" class="dag-textarea" placeholder="Notes (optional)"></textarea>
+          <button id="useGroupAsAnchor" class="primary-button" type="button" hidden>Use as anchor</button>
+          <div class="mini-toolbar">
+            <button id="zoomGroup" class="toolbar-button" type="button">Zoom to group</button>
+            <button id="editSplit" class="toolbar-button" type="button" hidden>Edit split</button>
+          </div>
+          <div class="search-block" id="groupSeedBlock">
+            <input id="groupSeedInput" class="search-input" type="search" placeholder="Search variables to add to this group">
+            <div id="groupSeedResults" class="search-results"></div>
+          </div>
+          <div class="section-title compact-title">
+            <h2>Variables in group</h2>
+          </div>
+          <div class="mini-toolbar">
+            <button id="addNeighbors" class="action-button" type="button">Add neighbors</button>
+            <button id="removeNeighbors" class="action-button" type="button">Remove non-seeds</button>
+            <button id="clearGroupSelection" class="action-button" type="button">Clear all</button>
+          </div>
+          <div id="includedVariables" class="chip-list"></div>
+          <div class="section-title compact-title">
+            <h2>Nearby variables</h2>
+          </div>
+          <div id="neighborSuggestions" class="search-results"></div>
+        </section>
+
+        <!-- DAG workspace — shown when no group is open -->
+        <section id="dagWorkspaceSection" class="panel-section dag-workspace">
+          <div class="dag-ws-header section-title">
+            <h2>Working Map</h2>
+            <div class="dag-ws-controls">
+              <select id="dagLayoutSelect" class="select-input-sm" aria-label="DAG layout" title="Change the DAG node layout">
+                <option value="auto">Layout: Auto</option>
+                <option value="hierarchical">Layout: Hierarchical</option>
+                <option value="organic">Layout: Organic</option>
+              </select>
+              <button id="toggleCausalFilter" class="toolbar-button" type="button" aria-pressed="false" title="Show only groups causally connected to the IV/DV path">Causal view</button>
+              <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the IV, DV, and groups that could point into both; bidirectional edges count in either direction">Confounders only</button>
+              <button id="toggleCollidersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the IV, DV, and groups that both could point into; bidirectional edges count in either direction">Colliders only</button>
+              <label class="path-length-control" for="confounderPathLength" title="Maximum number of directed edges allowed on each path from a confounder to the IV and DV">
+                <span>Max path</span>
+                <input id="confounderPathLength" class="path-length-input" type="number" min="1" max="99" step="1" value="1" inputmode="numeric" aria-label="Maximum confounder path length">
+              </label>
+              <button id="toggleBottleneckedConfounders" class="toolbar-button" type="button" aria-pressed="false" title="Keep only candidates with bounded paths to the IV and DV that share no intermediate group; mouseover shows that same qualifying pair">Exclude bottlenecked</button>
+              <button id="toggleIrrelevantConfounderLinks" class="toolbar-button" type="button" aria-pressed="false" title="Hide links that are not used by any currently displayed confounder's IV or DV witness path">Path links only</button>
+              <button id="dagSvgZoomIn" class="icon-button" type="button" title="Zoom in">+</button>
+              <button id="dagSvgZoomOut" class="icon-button" type="button" title="Zoom out">−</button>
+              <button id="dagSvgFit" class="toolbar-button" type="button" title="Reset zoom">Fit</button>
+              <button id="fullscreenDag" class="toolbar-button fullscreen-toggle" type="button" aria-pressed="false" title="Expand the DAG to fill the window; press Escape to exit">Full screen DAG</button>
+              <button id="copyPermalink" class="toolbar-button" type="button" title="Copy a link to this view of the public schema">Share view</button>
+            </div>
+          </div>
+          <div class="dag-network-wrapper">
+            <div id="dagNetwork" class="dag-network"></div>
+          </div>
+          <div id="dagWorkspaceResizer" class="dag-workspace-resizer" title="Resize table viewer"></div>
+          <div class="dag-ws-footer">
+            <!-- Edge inspector: appears when an edge is selected -->
+            <div id="edgeInspector" class="edge-inspector empty">Select an edge to inspect its provenance</div>
+            <!-- Provenance detail: appears when edge selected -->
+            <div id="provenancePanel" class="provenance-panel" hidden></div>
+            <!-- + Add edge: collapsed by default -->
+            <div class="add-edge-bar">
+              <button id="addEdgeToggle" class="toolbar-button" type="button">+ Add edge</button>
+            </div>
+            <div id="addEdgeDrawer" class="add-edge-drawer" hidden>
+              <div class="add-edge-header">
+                <span class="dag-label" style="margin:0">Manual edge</span>
+                <button id="closeAddEdge" class="text-button" type="button">Cancel</button>
+              </div>
+              <select id="manualSource" class="select-input"></select>
+              <select id="manualTarget" class="select-input"></select>
+              <select id="manualDirection" class="select-input">
+                <option value="source_to_target">Source → Target</option>
+                <option value="target_to_source">Target → Source</option>
+                <option value="bidirectional">Bidirectional</option>
+              </select>
+              <textarea id="manualNote" class="dag-textarea" placeholder="Note or justification (optional)"></textarea>
+              <button id="addManualEdge" class="primary-button" type="button">Add edge</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Export — collapsible, compact -->
+        <section id="exportSection" class="panel-section export-section">
+          <div class="section-title export-toggle-header" id="exportToggleBtn" role="button" tabindex="0" title="Toggle export options">
+            <h2>Export</h2>
+            <span class="export-chevron">▲</span>
+          </div>
+          <div id="exportBody" class="export-body">
+            <div class="mini-toolbar">
+              <button id="exportProject" class="toolbar-button" type="button">Project JSON</button>
+              <button id="exportWorkingMap" class="toolbar-button" type="button">Working map</button>
+              <label class="toolbar-button file-button">
+                Import project
+                <input id="projectImport" type="file" accept="application/json,.json">
+              </label>
+            </div>
+            <div class="mini-toolbar">
+              <button id="exportBib" class="toolbar-button" type="button">References .bib</button>
+              <button id="exportMd" class="toolbar-button" type="button">Export .md</button>
+              <button id="exportTex" class="toolbar-button" type="button">Export .tex</button>
+            </div>
+            <div id="strictDagStatus" class="small-note"></div>
+          </div>
+        </section>
+      </aside>
+
+    </main>
+    <script src="/password_gate.js"></script>
+    <script src="/visjs-min.js"></script>
+  <script type="module" src="/dag_builder.js?v=dag2-publication-v6"></script>
+  </body>
+</html>

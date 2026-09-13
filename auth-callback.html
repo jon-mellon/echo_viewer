@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Completing sign in…</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="auth-callback-body">
+    <main class="auth-callback-card">
+      <h1>Completing sign in…</h1>
+      <p id="authCallbackStatus">This window will close automatically.</p>
+    </main>
+    <script type="module">
+      import { APP_ORIGIN, AUTH_MESSAGE_TYPE, supabase } from "/supabase_client.mjs";
+
+      const status = document.getElementById("authCallbackStatus");
+      function finish(payload) {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: AUTH_MESSAGE_TYPE, ...payload }, APP_ORIGIN);
+        }
+        if (payload.ok) window.close();
+        else status.textContent = payload.error || "Sign in failed. You may close this window.";
+      }
+
+      try {
+        if (!supabase) throw new Error("Supabase auth is not configured.");
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!data.session) throw new Error("Supabase did not return an authenticated session.");
+        finish({ ok: true });
+      } catch (error) {
+        finish({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      }
+    </script>
+  </body>
+</html>
+
