@@ -32,6 +32,8 @@ import { applyPermalink, buildPermalink, CUSTOM_SCHEMA_INSTRUCTIONS,
   permalinkInput, schemaMatchesProject } from "/dag_permalink.mjs";
 import { initDagAuth } from "/dag_auth.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
+import { writeGroupingSchemaFolder } from "/grouping_schema_writer.mjs";
+import { makeZip } from "/dag_export_zip.mjs";
 
 
 const ROLE_LABELS = {
@@ -132,7 +134,7 @@ function initElements() {
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",
     // Grouping schema
-    "groupingPanel", "groupingSetSelect", "groupingImport", "exportGrouping", "publishSchema",
+    "groupingPanel", "groupingSetSelect", "exportGroupingFolder", "publishSchema",
     "copyPermalink", "groupingSummary", "publicationStatus", "schemaPublicationBadge",
     "publishedSchemaPermalink", "publishSchemaDialog",
     // Rejected variables
@@ -1329,120 +1331,31 @@ function renderGroupList() {
   setupGroupController.renderGroupList();
 }
 
-// ─── Grouping schema import/export ────────────────────────────────────────────
+// ─── Grouping schema folder export ───────────────────────────────────────────
 
-async function importGroupingSet(event) {
-  const file = event.target.files?.[0];
-  event.target.value = "";
-  if (!file) return;
+async function exportGroupingFolder() {
+  const button = els.exportGroupingFolder;
+  button.disabled = true;
+  const originalLabel = button.textContent;
+  button.textContent = "Building ZIP…";
   try {
-    const text = await file.text();
-    const payload = JSON.parse(text);
-    const normalizedPayload = normalizeGroupingSetForImport(payload);
-    const existingIndex = state.data.grouping_sets.findIndex(
-      grouping => grouping.grouping_set_id === normalizedPayload.grouping_set_id,
-    );
-    if (existingIndex >= 0) state.data.grouping_sets[existingIndex] = normalizedPayload;
-    else state.data.grouping_sets.push(normalizedPayload);
-    state.project.grouping_imports.push({
-      grouping_set_id: normalizedPayload.grouping_set_id,
-      imported_at: nowIso(),
-      file_name: file.name,
-      overlap_resolution: normalizedPayload._import_overlap_summary || null,
+    const timestamp = nowIso();
+    const schema = currentWorkingGroupingSchema();
+    const folder = await writeGroupingSchemaFolder(schema);
+    const archive = makeZip([...folder].map(([name, data]) => ({ name, data })));
+    state.project.grouping_exports.push({
+      grouping_set_id: schema.grouping_set_id,
+      exported_at: timestamp,
+      format: "groupings-v2-folder",
     });
-    state.project.active_grouping_set_id = normalizedPayload.grouping_set_id;
-    state.project.rejected_variables = mergeRejectedVariables(
-      state.project.rejected_variables || [],
-      normalizedPayload.rejected_variables || []
-    );
-    invalidateMapCaches();
-    const iv = groupById(state.project.iv_group_id);
-    const dv = groupById(state.project.dv_group_id);
-    const anchorsReady = Boolean(iv?.variable_ids?.length && dv?.variable_ids?.length);
-    if (!anchorsReady) state.filterDagByCausalRelevance = false;
-    const loadedGroupIds = applyActiveGroupingSet();
-    if (loadedGroupIds.length && !IS_DAG2) {
-      Object.assign(state, workflow.transition(state, {
-        type: "grouping-imported", anchorsReady, groupId: loadedGroupIds[0],
-      }));
-    }
-    rebuildProject();
-    if (loadedGroupIds.length && !IS_DAG2) {
-      const loadedVariableIds = loadedGroupIds.flatMap((groupId) => groupById(groupId)?.variable_ids || []);
-      fitMap(loadedVariableIds);
-    }
-    renderAll();
+    exportController.downloadBlob(new Blob([archive], { type: "application/zip" }), "grouping_schema.zip");
   } catch (error) {
-    window.alert(error?.message || "Could not import grouping set.");
+    console.error("Could not export grouping schema folder", error);
+    window.alert(error?.message || "Could not export the grouping schema folder.");
+  } finally {
+    button.textContent = originalLabel;
+    button.disabled = false;
   }
-}
-
-function validateGroupingSet(payload) {
-  if (payload?.schema_version !== "groupings-v2" || !Array.isArray(payload.groups)) {
-    throw new Error("Grouping import must use schema_version groupings-v2.");
-  }
-  if (payload.membership_unit !== "canonical_variable") {
-    throw new Error("Grouping v2 import must use canonical_variable membership.");
-  }
-  for (const group of payload.groups) {
-    if (!group.group_id || !Array.isArray(group.variable_ids)) throw new Error("Each group must include group_id and variable_ids.");
-  }
-  if (payload.rejected_variables != null && !Array.isArray(payload.rejected_variables)) {
-    throw new Error("Grouping import rejected_variables must be an array when provided.");
-  }
-  const expected = state.data?.cache_compatibility;
-  const actual = payload.cache_compatibility;
-  if (!expected || !actual) {
-    throw new Error("Grouping import must include a cache_compatibility fingerprint.");
-  }
-  for (const field of ["fingerprint_version", "record_signature", "source_dir", "n_variables"]) {
-    if (expected[field] !== actual[field]) {
-      throw new Error(`Grouping schema does not match this viewer cache (${field} differs).`);
-    }
-  }
-}
-
-function mergeRejectedVariables(existingEntries, incomingEntries) {
-  return visibility.mergeRejections(existingEntries, incomingEntries, state.clusterOf, state.clusterMembers);
-}
-
-function findGroupingSetOverlaps(payload) {
-  const owners = new Map();
-  const overlaps = [];
-  for (const group of payload.groups || []) {
-    for (const variableId of group.variable_ids || []) {
-      if (!owners.has(variableId)) {
-        owners.set(variableId, group.group_id);
-        continue;
-      }
-      overlaps.push({
-        variable_id: variableId,
-        keep_group_id: owners.get(variableId),
-        drop_group_id: group.group_id,
-      });
-    }
-  }
-  return overlaps;
-}
-
-function normalizeGroupingSetForImport(payload) {
-  validateGroupingSet(payload);
-  const overlaps = findGroupingSetOverlaps(payload);
-  if (overlaps.length) {
-    const example = overlaps[0];
-    throw new Error(`${overlaps.length} conflicting canonical assignment(s) found. `
-      + `${example.variable_id} appears in ${example.keep_group_id} and ${example.drop_group_id}.`);
-  }
-  return payload;
-}
-
-function exportReusableGroupingSet() {
-  const timestamp = nowIso();
-  const payload = exportData.buildGroupingPayload(captureExportInput(), {
-    groupingSetId: `project_grouping_${Date.now()}`, timestamp,
-  });
-  state.project.grouping_exports.push({ grouping_set_id: payload.grouping_set_id, exported_at: timestamp });
-  downloadJson(payload, "grouping_set.json");
 }
 
 // ─── DAG / Link aggregation ───────────────────────────────────────────────────
@@ -1854,8 +1767,6 @@ const exportMd = () => exportController.exportMd();
 const exportTex = () => exportController.exportTex();
 const exportProject = () => exportController.exportProject();
 const exportWorkingMap = () => exportController.exportWorkingMap();
-const downloadJson = (payload, filename) => exportController.downloadJson(payload, filename);
-
 const eventController = createDagEventController({
   state, elements: els, dagNetwork: dagNetworkController,
   renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
@@ -1863,8 +1774,8 @@ const eventController = createDagEventController({
   setWorkflowMode, renderGroupList, closeGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
-  saveProjectLocally, applyActiveGroupingSet, rebuildProject, importGroupingSet,
-  exportReusableGroupingSet, copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
+  saveProjectLocally, applyActiveGroupingSet, rebuildProject, exportGroupingFolder,
+  copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
   canvasHeight, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber, setMapMode,
   undo, redo, renderActionHistory, renderDag, setFullscreenPanel, addManualEdge,
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,

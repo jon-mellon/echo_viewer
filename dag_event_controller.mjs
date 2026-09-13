@@ -9,8 +9,8 @@ export function createDagEventController({
   setWorkflowMode, renderGroupList, closeGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
-  saveProjectLocally, applyActiveGroupingSet, rebuildProject, importGroupingSet,
-  exportReusableGroupingSet, copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
+  saveProjectLocally, applyActiveGroupingSet, rebuildProject, exportGroupingFolder,
+  copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
   canvasHeight, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber, setMapMode,
   undo, redo, renderActionHistory, renderDag, setFullscreenPanel, addManualEdge,
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,
@@ -100,8 +100,7 @@ function installHandlers() {
     applyActiveGroupingSet();
     rebuildProject();
   });
-  els.groupingImport.addEventListener("change", importGroupingSet);
-  els.exportGrouping.addEventListener("click", exportReusableGroupingSet);
+  els.exportGroupingFolder.addEventListener("click", exportGroupingFolder);
   els.copyPermalink.addEventListener("click", copyPermalink);
 
   // Map toolbar

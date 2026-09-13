@@ -317,45 +317,6 @@ export function buildProjectPayload({ project, ...view }, savedAt) {
   };
 }
 
-export function buildGroupingPayload({ project, cacheCompatibility, rejectedVariables, hiddenVariableIds,
-  canonicalByVariableId: canonicalEntries = [] }, { groupingSetId, timestamp }) {
-  const canonicalByVariableId = new Map(canonicalEntries);
-  const ownerByCanonical = new Map();
-  const groups = project.groups
-    .filter((g) => g.variable_ids?.length)
-    .map((g) => {
-      const variable_ids = [...new Set(g.variable_ids.map(id => canonicalByVariableId.get(id) || id))];
-      for (const id of variable_ids) {
-        const owner = ownerByCanonical.get(id);
-        if (owner && owner !== g.group_id) throw new Error(`Canonical variable ${id} belongs to both ${owner} and ${g.group_id}.`);
-        ownerByCanonical.set(id, g.group_id);
-      }
-      return { group_id: g.group_id, label: g.label, variable_ids,
-        source: g.source || "project_export", notes: g.notes || "", provenance: g.provenance || null };
-    });
-  const payload = {
-    schema_version: "groupings-v2",
-    grouping_set_id: groupingSetId,
-    label: "Project groups",
-    description: "Reusable canonical-variable grouping set exported from the project.",
-    cache_compatibility: cacheCompatibility,
-    built_against: cacheCompatibility,
-    membership_unit: "canonical_variable",
-    exported_at: timestamp,
-    groups,
-    rejected_variables: rejectedVariables.map((entry) => ({
-      variable_id: entry.variable_id,
-      member_variable_ids: (entry.member_variable_ids || []).slice(),
-      label: entry.label || "",
-      reason: entry.reason || "low_quality",
-      flagged_at: entry.flagged_at || timestamp,
-      previous_group_ids: (entry.previous_group_ids || []).slice(),
-    })),
-    hidden_variable_ids: [...hiddenVariableIds],
-  };
-  return payload;
-}
-
 export function buildWorkingMapPayload({ project, visibleLinks, rejectedVariables, hiddenVariableIds }, timestamp) {
   const visibleGroupIds = new Set([
     project.iv_group_id,

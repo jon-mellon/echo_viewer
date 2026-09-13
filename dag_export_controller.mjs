@@ -172,6 +172,7 @@ export function createDagExportController({
     exportTex: () => exportDocument("tex"),
     exportProject,
     exportWorkingMap,
+    downloadBlob,
     downloadJson,
     warmBibliography,
   };

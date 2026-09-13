@@ -187,11 +187,7 @@
           </div>
           <select id="groupingSetSelect" class="select-input"></select>
           <div class="mini-toolbar">
-            <label class="toolbar-button file-button">
-              Import schema
-              <input id="groupingImport" type="file" accept="application/json,.json">
-            </label>
-            <button id="exportGrouping" class="toolbar-button" type="button">Export schema</button>
+            <button id="exportGroupingFolder" class="toolbar-button" type="button">Download folder ZIP</button>
             <button id="publishSchema" class="primary-button" type="button" hidden>Publish publicly</button>
           </div>
           <div id="publicationStatus" class="publication-status" role="status" aria-live="polite"></div>
@@ -380,6 +376,6 @@
     </main>
     <script src="/password_gate.js"></script>
     <script src="/visjs-min.js"></script>
-  <script type="module" src="/dag_builder.js?v=dag2-publication-v6"></script>
+  <script type="module" src="/dag_builder.js?v=dag2-publication-v7"></script>
   </body>
 </html>
