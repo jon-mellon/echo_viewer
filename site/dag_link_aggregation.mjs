@@ -2,9 +2,16 @@
 export { pairKey } from "./edge_keys.mjs";
 import { pairKey } from "./edge_keys.mjs";
 
+/** @typedef {import("./app_contracts.mjs").Project} Project */
+/** @typedef {import("./app_contracts.mjs").AggregatedLink} AggregatedLink */
+
 export const linkKey = (sourceId, targetId) => `${sourceId}->${targetId}`;
 export const edgeKey = (a, b) => `${a}__${b}`;
 
+/**
+ * @param {{project: Project, linkLookup: Map<string, string[]>, rawLinksById: Map<string, *>}} input
+ * @returns {AggregatedLink[]}
+ */
 export function aggregateGroupLinks({ project, linkLookup, rawLinksById }) {
   const groups = project.groups.filter(g => g.variable_ids?.length);
   const iv = project.groups.find(g => g.group_id === project.iv_group_id);
@@ -110,12 +117,14 @@ function compareRank(a, b) {
   return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 }
 
+/** @returns {AggregatedLink["edge_source"]} */
 function edgeSource(hasMapping, hasManual) {
   if (hasMapping && hasManual) return "mapping_and_manual";
   if (hasManual) return "user_manual";
   return "mapping_derived";
 }
 
+/** @returns {AggregatedLink["direction_type"]} */
 function directionType(aToB, bToA, targetPair) {
   const forward = aToB || targetPair;
   if (forward && bToA) return "BIDIRECTIONAL";

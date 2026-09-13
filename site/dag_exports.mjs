@@ -1,6 +1,8 @@
 import { PROJECT_FORMAT_VERSION, WORKING_MAP_FORMAT_VERSION } from "./app_contracts.mjs";
 import { escapeHtml } from "./text_utils.mjs";
 
+/** @typedef {import("./app_contracts.mjs").SerializedProjectPayload} SerializedProjectPayload */
+
 // Pure export generation. The caller supplies a snapshot, metadata and timestamps.
 // Returned file records contain content only; fetching and downloading stay in the UI.
 export const METHOD_DOI = "10.31235/osf.io/zr5vf_v1";
@@ -303,9 +305,10 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null) {
   return files;
 }
 
+/** @returns {SerializedProjectPayload} */
 export function buildProjectPayload({ project, ...view }, savedAt) {
   const { candidate_queue: _derivedCandidateQueue, ...persistedProject } = project;
-  return {
+  return /** @type {SerializedProjectPayload} */ ({
     ...persistedProject,
     schema_version: PROJECT_FORMAT_VERSION,
     saved_at: savedAt,
@@ -324,7 +327,7 @@ export function buildProjectPayload({ project, ...view }, savedAt) {
     ...(Object.hasOwn(view, "undoHistory") ? { undoHistory: view.undoHistory || [],
       undoPointer: Number.isInteger(view.undoPointer) ? view.undoPointer : -1,
       actionLog: view.actionLog || [] } : {}),
-  };
+  });
 }
 
 export function buildWorkingMapPayload({ project, visibleLinks, rejectedVariables, hiddenVariableIds }, timestamp) {

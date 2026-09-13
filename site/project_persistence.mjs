@@ -4,6 +4,10 @@ import { PROJECT_FORMAT_VERSION } from "./app_contracts.mjs";
 import { validateProjectPayload } from "./data_validation.mjs";
 export { restoreWorkflowMode } from "./dag_workflow.mjs";
 
+/** @typedef {import("./app_contracts.mjs").Project} Project */
+/** @typedef {import("./app_contracts.mjs").SerializedProjectPayload} SerializedProjectPayload */
+/** @typedef {import("./app_contracts.mjs").GroupingSchema} GroupingSchema */
+
 export function applyCurrentSchema(loaded, schema, clusterOf, clusterMembers) {
   if (!schema) return loaded;
   const project = replaceSchemaGroups(loaded.project, schema, clusterOf, clusterMembers);
@@ -38,41 +42,50 @@ export function projectStorageKey(prefix, data, variableCount) {
 
 
 // Defaults are supplied by the caller so restoration does not generate IDs or time.
+/**
+ * The sole conversion from the JSON-safe persistence envelope to live project state.
+ * @param {unknown} payload
+ * @param {Project} defaults
+ * @param {string} currentLayoutSource
+ */
 export function restoreProjectPayload(payload, defaults, currentLayoutSource) {
-  if (payload?.schema_version !== PROJECT_FORMAT_VERSION) return null;
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  const record = /** @type {Record<string, unknown>} */ (payload);
+  if (record.schema_version !== PROJECT_FORMAT_VERSION) return null;
   validateProjectPayload(payload);
-  const projectDefaults = { ...defaults };
-  delete projectDefaults.candidate_queue;
+  const serialized = /** @type {SerializedProjectPayload} */ (payload);
+  const { candidate_queue: _derivedCandidateQueue, ...projectDefaults } =
+    /** @type {Project & {candidate_queue?: unknown}} */ ({ ...defaults });
   const persistedProject = Object.fromEntries(
     Object.keys(projectDefaults)
-      .filter(key => Object.hasOwn(payload, key))
-      .map(key => [key, payload[key]]),
+      .filter(key => Object.hasOwn(serialized, key))
+      .map(key => [key, serialized[key]]),
   );
-  const selectedUoa = payload.selectedUoa || null;
-  const phase = payload.phase || (selectedUoa ? "select_dv" : "select_uoa");
+  const selectedUoa = serialized.selectedUoa || null;
+  const phase = serialized.phase || (selectedUoa ? "select_dv" : "select_uoa");
   return {
     project: {
       ...projectDefaults, ...persistedProject,
-      groups: Array.isArray(payload.groups) ? payload.groups.map(withoutGroupReviewStatus) : [],
-      decisions: Array.isArray(payload.decisions) ? payload.decisions : [],
-      manual_edges: Array.isArray(payload.manual_edges) ? payload.manual_edges : [],
-      rejected_variables: Array.isArray(payload.rejected_variables) ? payload.rejected_variables : [],
-      restored_variable_ids: Array.isArray(payload.restored_variable_ids) ? payload.restored_variable_ids : [],
-      link_decisions: payload.link_decisions || {},
-      carve_outs: Array.isArray(payload.carve_outs) ? payload.carve_outs : [],
+      groups: Array.isArray(serialized.groups) ? serialized.groups.map(withoutGroupReviewStatus) : [],
+      decisions: Array.isArray(serialized.decisions) ? serialized.decisions : [],
+      manual_edges: Array.isArray(serialized.manual_edges) ? serialized.manual_edges : [],
+      rejected_variables: Array.isArray(serialized.rejected_variables) ? serialized.rejected_variables : [],
+      restored_variable_ids: serialized.restored_variable_ids || [],
+      link_decisions: serialized.link_decisions || {},
+      carve_outs: Array.isArray(serialized.carve_outs) ? serialized.carve_outs : [],
     },
     selectedUoa,
-    uoaFilterEnabled: payload.uoaFilterEnabled !== false,
+    uoaFilterEnabled: serialized.uoaFilterEnabled !== false,
     phase,
-    workflowMode: restoreWorkflowMode(payload.workflowMode, phase),
-    changingAnchorSide: ["iv", "dv"].includes(payload.changingAnchorSide) ? payload.changingAnchorSide : null,
-    variableLayoutSource: String(payload.variableLayoutSource ?? "").trim() || currentLayoutSource,
-    dagLayoutMode: ["auto", "hierarchical", "organic"].includes(payload.dagLayoutMode) ? payload.dagLayoutMode : "auto",
-    seeds: { iv: new Set(payload.seeds?.iv || []), dv: new Set(payload.seeds?.dv || []) },
-    definitionDraft: payload.definitionDraft || null,
-    undoHistory: Array.isArray(payload.undoHistory) ? payload.undoHistory : [],
-    undoPointer: Number.isInteger(payload.undoPointer) ? payload.undoPointer : -1,
-    actionLog: Array.isArray(payload.actionLog) ? payload.actionLog : [],
+    workflowMode: restoreWorkflowMode(serialized.workflowMode, phase),
+    changingAnchorSide: ["iv", "dv"].includes(serialized.changingAnchorSide) ? serialized.changingAnchorSide : null,
+    variableLayoutSource: String(serialized.variableLayoutSource ?? "").trim() || currentLayoutSource,
+    dagLayoutMode: ["auto", "hierarchical", "organic"].includes(serialized.dagLayoutMode) ? serialized.dagLayoutMode : "auto",
+    seeds: { iv: new Set(serialized.seeds?.iv || []), dv: new Set(serialized.seeds?.dv || []) },
+    definitionDraft: serialized.definitionDraft || null,
+    undoHistory: serialized.undoHistory || [],
+    undoPointer: Number.isInteger(serialized.undoPointer) ? serialized.undoPointer : -1,
+    actionLog: serialized.actionLog || [],
   };
 }
 

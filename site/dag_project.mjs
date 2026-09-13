@@ -7,11 +7,15 @@ import { rawLinksBetween } from "./dag_link_aggregation.mjs";
 
 import * as visibility from "./variable_visibility.mjs";
 
+/** @typedef {import("./app_contracts.mjs").Project} Project */
+/** @typedef {import("./app_contracts.mjs").Group} Group */
+
 export function withoutGroupReviewStatus(group) {
   const { status, ...definition } = group;
   return definition;
 }
 
+/** @returns {Project} */
 export function createProject({ projectId, groupingSetId }) {
   return {
     project_id: projectId, active_grouping_set_id: groupingSetId,

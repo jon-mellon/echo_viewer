@@ -1,5 +1,6 @@
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contracts.mjs";
 import { validateGroupingSchema } from "./data_validation.mjs";
+/** @typedef {import("./app_contracts.mjs").GroupingSchema} GroupingSchema */
 const LIST_COLUMNS = new Set(["member_variable_ids", "previous_group_ids"]);
 
 function parseYamlMapping(text, source) {
@@ -80,7 +81,10 @@ async function mapWithConcurrency(items, concurrency, operation) {
   return results;
 }
 
-/** Load a folder schema using only ordinary static HTTP requests. */
+/**
+ * Load a folder schema using only ordinary static HTTP requests.
+ * @returns {Promise<GroupingSchema>}
+ */
 export async function loadGroupingSchemaFolder(baseUrl, fetchImpl = fetch) {
   const base = new URL(baseUrl, globalThis.location?.href || "http://localhost/");
   if (!base.pathname.endsWith("/")) base.pathname += "/";
@@ -133,9 +137,13 @@ export async function loadGroupingSchemaFolder(baseUrl, fetchImpl = fetch) {
   return validateGroupingSchema(schema);
 }
 
-/** Import legacy monolithic JSON during transition, preferring folder URLs. */
+/**
+ * Import legacy monolithic JSON during transition, preferring folder URLs.
+ * @param {string | GroupingSchema} source
+ * @returns {Promise<GroupingSchema>}
+ */
 export async function loadGroupingSchema(source, fetchImpl = fetch) {
-  if (source && typeof source === "object") return validateGroupingSchema(source);
+  if (typeof source !== "string") return validateGroupingSchema(source);
   const url = new URL(source, globalThis.location?.href || "http://localhost/");
   if (url.pathname.endsWith(".json")) {
     const response = await fetchImpl(url, { cache: "no-store" });

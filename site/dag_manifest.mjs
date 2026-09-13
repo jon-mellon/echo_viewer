@@ -1,5 +1,13 @@
+// @ts-check
+
+/** @typedef {import("./app_contracts.mjs").EvidenceManifestFile} EvidenceManifestFile */
+
 const SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/**
+ * @param {Record<string, EvidenceManifestFile>} files
+ * @returns {{relation: string, sqlIdentifier: string, file: EvidenceManifestFile}[]}
+ */
 export function manifestFileEntries(files) {
   if (!files || typeof files !== "object" || Array.isArray(files)) {
     throw new Error("Evidence manifest files must be an object.");

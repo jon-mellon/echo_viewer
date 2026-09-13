@@ -1,5 +1,9 @@
+// @ts-check
+
+/** @typedef {import("./app_contracts.mjs").DagAppState} DagAppState */
+
 export function createDagAppState(interfaceMode = "classic") {
-  return {
+  return /** @type {DagAppState} */ ({
     interfaceMode,
     data: null,
     variables: [], variableById: new Map(), clusterOf: new Map(), clusterMembers: new Map(),
@@ -33,5 +37,5 @@ export function createDagAppState(interfaceMode = "classic") {
       transform: { scale: 1, tx: 0, ty: 0 }, fitScale: 1,
       dragging: false, moved: false, dragStart: null, mode: "select", brush: null,
     },
-  };
+  });
 }
