@@ -16,7 +16,7 @@ export function createProject({ projectId, groupingSetId }) {
   return {
     project_id: projectId, active_grouping_set_id: groupingSetId,
     iv_group_id: 'g_iv', dv_group_id: 'g_dv', groups: [], links: [],
-    candidate_queue: [], decisions: [], filters: {}, grouping_imports: [],
+    decisions: [], filters: {}, grouping_imports: [],
     grouping_exports: [], carve_outs: [], link_decisions: {}, manual_edges: [],
     rejected_variables: [], publication: null,
   };

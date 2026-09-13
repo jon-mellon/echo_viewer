@@ -1,4 +1,4 @@
-const FORMAT_VERSION = "groupings-v2";
+import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contracts.mjs";
 const LIST_COLUMNS = new Set(["member_variable_ids", "previous_group_ids"]);
 
 function parseYamlMapping(text, source) {
@@ -85,15 +85,15 @@ export async function loadGroupingSchemaFolder(baseUrl, fetchImpl = fetch) {
   if (!base.pathname.endsWith("/")) base.pathname += "/";
   const manifestUrl = new URL("manifest.json", base);
   const manifest = JSON.parse(await fetchText(manifestUrl, fetchImpl));
-  if (manifest.format_version !== FORMAT_VERSION) {
+  if (manifest.format_version !== GROUPING_FORMAT_VERSION) {
     throw new Error(`Unsupported grouping schema format: ${manifest.format_version}.`);
   }
   const schema = parseYamlMapping(
     await fetchText(new URL(manifest.schema_file, base), fetchImpl), manifest.schema_file,
   );
   Object.assign(schema, manifest.extra || {});
-  schema.schema_version = FORMAT_VERSION;
-  schema.membership_unit = manifest.membership_unit || "canonical_variable";
+  schema.schema_version = GROUPING_FORMAT_VERSION;
+  schema.membership_unit = manifest.membership_unit || GROUPING_MEMBERSHIP_UNIT;
   const present = new Set(manifest.top_level_fields || []);
   if (present.has("cache_compatibility") || !manifest.top_level_fields) schema.cache_compatibility = manifest.compatibility || {};
   if (present.has("built_against")) schema.built_against = manifest.built_against || {};

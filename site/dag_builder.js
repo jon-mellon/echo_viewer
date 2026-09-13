@@ -34,6 +34,8 @@ import { initDagAuth } from "/dag_auth.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
 import { writeGroupingSchemaFolder } from "/grouping_schema_writer.mjs";
 import { makeZip } from "/dag_export_zip.mjs";
+import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "/app_contracts.mjs";
+import { escapeHtml } from "/text_utils.mjs";
 
 
 const ROLE_LABELS = {
@@ -62,11 +64,8 @@ const GROUP_PALETTE = [
 ];
 
 // The current interface has one canonical entry point at the site root.
-const IS_DAG2 = true;
-const PROJECT_STORAGE_PREFIX = IS_DAG2 ? "dag2-project-v1" : "dag-builder-project-v2";
-
-const state = createDagAppState();
-state.interfaceMode = IS_DAG2 ? "dag2" : "classic";
+const state = createDagAppState("dag2");
+const PROJECT_STORAGE_PREFIX = state.interfaceMode === "dag2" ? "dag2-project-v1" : "dag-builder-project-v2";
 
 window.__dagBuilderState = state;
 
@@ -84,14 +83,6 @@ function finishStartupLoading() {
 
 function $(id) {
   return document.getElementById(id);
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 function clean(value) {
@@ -173,8 +164,8 @@ function initElements() {
 
 async function init() {
   dagDataSource.onStatus = setStartupStage;
-  document.body.classList.toggle("dag2-mode", IS_DAG2);
-  if (IS_DAG2) {
+  document.body.classList.toggle("dag2-mode", state.interfaceMode === "dag2");
+  if (state.interfaceMode === "dag2") {
     document.title = "DAG Builder 2";
     document.querySelector(".panel-header h1").textContent = "DAG Builder 2";
     document.getElementById("uoaReset").textContent = "Clear";
@@ -191,7 +182,7 @@ async function init() {
   await loadDagData(permalink?.get("vlayout") || "");
   setStartupStage("Preparing workspace…");
   const restored = permalink || publicationId ? false : restoreProjectLocally();
-  if (restored && state.definitionDraft && IS_DAG2
+  if (restored && state.definitionDraft && state.interfaceMode === "dag2"
       && !window.confirm("Resume the unfinished variable definition? Press Cancel to discard it.")) {
     state.definitionDraft = null;
     saveProjectLocally();
@@ -200,7 +191,7 @@ async function init() {
     initializeProject();
     loadLatestSchemaGroups();
     normalizeProjectDuplicateAssignments();
-    if (IS_DAG2) {
+    if (state.interfaceMode === "dag2") {
       state.phase = "select_iv";
       state.workflowMode = "setup";
       state.selectedUoa = null;
@@ -218,7 +209,7 @@ async function init() {
       permalink: new URL(`/?schema=${state.data.publication_source.publication_id}`, window.location.origin).href,
     };
   }
-  if (IS_DAG2) publicationController.initialize();
+  if (state.interfaceMode === "dag2") publicationController.initialize();
   const restoredLayoutSource = state.variableLayoutSource;
   if (restoredLayoutSource && restoredLayoutSource !== state.data.layout?.active_source) {
     await loadDagData(restoredLayoutSource);
@@ -377,7 +368,7 @@ function persistProjectLocally() {
 
 function saveProjectLocally() {
   persistProjectLocally();
-  if (IS_DAG2) publicationController.workingCopyChanged();
+  if (state.interfaceMode === "dag2") publicationController.workingCopyChanged();
 }
 
 function restoreProjectLocally() {
@@ -660,7 +651,7 @@ function toggleAnchorSearchMode(side) {
 // ─── DAG2 category definition ────────────────────────────────────────────────
 
 function startDefinition(role) {
-  if (!IS_DAG2 || !["iv", "dv"].includes(role)) return;
+  if (state.interfaceMode !== "dag2" || !["iv", "dv"].includes(role)) return;
   state.definitionDraft = {
     role, step: "sources", source_group_ids: [], source_snapshot: [],
     eligible_variable_ids: [], new_variable_ids: [], new_label: "",
@@ -1087,7 +1078,7 @@ function uoaMatches(variableUoa, selected) {
 }
 
 function uoaSupportedByAnchors(uoa) {
-  if (!IS_DAG2) return true;
+  if (state.interfaceMode !== "dag2") return true;
   return [state.project?.iv_group_id, state.project?.dv_group_id].every(groupId => {
     const group = groupById(groupId);
     return group?.variable_ids?.some(variableId =>
@@ -1125,7 +1116,7 @@ function renderUoaStep() {
 function selectUoa(uoa) {
   if (!uoaSupportedByAnchors(uoa)) return;
   Object.assign(state, workflow.transition(state, {
-    type: "uoa", uoa, nextPhase: IS_DAG2 ? "build" : undefined,
+    type: "uoa", uoa, nextPhase: state.interfaceMode === "dag2" ? "build" : undefined,
   }));
   renderAll();
 }
@@ -1217,7 +1208,7 @@ function activeGroupingSet() {
 }
 
 async function copyPermalink() {
-  if (IS_DAG2) return publicationController.share();
+  if (state.interfaceMode === "dag2") return publicationController.share();
   const schema = activeGroupingSet();
   if (!schemaMatchesProject(schema, state.project)) return window.alert(CUSTOM_SCHEMA_INSTRUCTIONS);
   const dataVersion = state.data?.snapshot?.snapshot_id;
@@ -1256,13 +1247,13 @@ function currentWorkingGroupingSchema() {
     previous_group_ids: [...new Set(entry.previous_group_ids || [])].sort(),
   }));
   return {
-    schema_version: "groupings-v2",
+    schema_version: GROUPING_FORMAT_VERSION,
     grouping_set_id: source.grouping_set_id || state.project.active_grouping_set_id,
     label: source.label || "Published working schema",
     description: source.description || "Published working grouping schema.",
     cache_compatibility: structuredClone(source.cache_compatibility || state.data.cache_compatibility || {}),
     built_against: structuredClone(source.built_against || source.cache_compatibility || state.data.cache_compatibility || {}),
-    membership_unit: "canonical_variable",
+    membership_unit: GROUPING_MEMBERSHIP_UNIT,
     ...(source.migration_provenance ? { migration_provenance: structuredClone(source.migration_provenance) } : {}),
     groups,
     rejected_variables,
@@ -1277,7 +1268,7 @@ function renderGroupingSetControls() {
 function applyActiveGroupingSet() {
   const groupingSet = activeGroupingSet();
   if (!groupingSet) return [];
-  if (IS_DAG2) {
+  if (state.interfaceMode === "dag2") {
     applyProjectOperation(projectOps.replaceSchemaGroups(
       state.project, groupingSet, state.clusterOf, state.clusterMembers,
     ));
@@ -1322,7 +1313,6 @@ function createDensityCandidateGroup() {
 
 function buildCandidateQueue() {
   state.candidateQueue = candidates.buildCandidateQueue(state.project, candidateInputs());
-  state.project.candidate_queue = state.candidateQueue;
 }
 
 // ─── Unified group list ───────────────────────────────────────────────────────
@@ -1346,7 +1336,7 @@ async function exportGroupingFolder() {
     state.project.grouping_exports.push({
       grouping_set_id: schema.grouping_set_id,
       exported_at: timestamp,
-      format: "groupings-v2-folder",
+      format: `${GROUPING_FORMAT_VERSION}-folder`,
     });
     exportController.downloadBlob(new Blob([archive], { type: "application/zip" }), "grouping_schema.zip");
   } catch (error) {

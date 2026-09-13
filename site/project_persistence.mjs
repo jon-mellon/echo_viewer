@@ -1,5 +1,6 @@
 import { withoutGroupReviewStatus, replaceSchemaGroups, normalizeDuplicateAssignments } from "./dag_project.mjs";
 import { missingAnchorWorkflow, restoreWorkflowMode } from "./dag_workflow.mjs";
+import { PROJECT_FORMAT_VERSION } from "./app_contracts.mjs";
 export { restoreWorkflowMode } from "./dag_workflow.mjs";
 
 export function applyCurrentSchema(loaded, schema, clusterOf, clusterMembers) {
@@ -20,7 +21,7 @@ export function applyCurrentSchema(loaded, schema, clusterOf, clusterMembers) {
 // Shared preparation for file import and autosave restoration; no live-state writes.
 export function prepareLoadedProject(payload, { defaults, currentLayoutSource, schema, clusterOf, clusterMembers }) {
   const restored = restoreProjectPayload(payload, defaults, currentLayoutSource);
-  if (!restored) throw new Error("Project must use dag-builder-project-v1.");
+  if (!restored) throw new Error(`Project must use ${PROJECT_FORMAT_VERSION}.`);
   const loaded = applyCurrentSchema(restored, schema, clusterOf, clusterMembers);
   return { ...loaded,
     project: normalizeDuplicateAssignments(loaded.project, clusterOf, clusterMembers),
@@ -37,12 +38,14 @@ export function projectStorageKey(prefix, data, variableCount) {
 
 // Defaults are supplied by the caller so restoration does not generate IDs or time.
 export function restoreProjectPayload(payload, defaults, currentLayoutSource) {
-  if (payload?.schema_version !== "dag-builder-project-v1") return null;
+  if (payload?.schema_version !== PROJECT_FORMAT_VERSION) return null;
+  const { candidate_queue: _derivedCandidateQueue, ...persistedPayload } = payload;
+  const { candidate_queue: _defaultCandidateQueue, ...projectDefaults } = defaults;
   const selectedUoa = payload.selectedUoa || null;
   const phase = payload.phase || (selectedUoa ? "select_dv" : "select_uoa");
   return {
     project: {
-      ...defaults, ...payload,
+      ...projectDefaults, ...persistedPayload,
       groups: Array.isArray(payload.groups) ? payload.groups.map(withoutGroupReviewStatus) : [],
       decisions: Array.isArray(payload.decisions) ? payload.decisions : [],
       manual_edges: Array.isArray(payload.manual_edges) ? payload.manual_edges : [],

@@ -1,4 +1,5 @@
-export const GROUPING_FORMAT_VERSION = "groupings-v2";
+import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contracts.mjs";
+export { GROUPING_FORMAT_VERSION } from "./app_contracts.mjs";
 const SHARD_SIZE = 1000;
 const SCHEMA_KEYS = ["schema_version", "grouping_set_id", "label", "description"];
 const REJECTED_COLUMNS = [
@@ -58,10 +59,10 @@ async function shardName(variableId, cryptoApi) {
 
 function validateSchema(schema) {
   if (schema?.schema_version !== GROUPING_FORMAT_VERSION || !Array.isArray(schema.groups)) {
-    throw new Error("Working schema must use schema_version groupings-v2.");
+    throw new Error(`Working schema must use schema_version ${GROUPING_FORMAT_VERSION}.`);
   }
-  if (schema.membership_unit !== "canonical_variable") {
-    throw new Error("Working schema must use canonical_variable membership.");
+  if (schema.membership_unit !== GROUPING_MEMBERSHIP_UNIT) {
+    throw new Error(`Working schema must use ${GROUPING_MEMBERSHIP_UNIT} membership.`);
   }
   const groupIds = new Set();
   const owners = new Map();

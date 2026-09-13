@@ -1,16 +1,9 @@
 import { confounderPathNodeRole } from "./dag_graph.mjs";
 import { wrapDagLabel } from "./dag_layout.mjs";
 import { directedGroupLabels } from "./dag_exports.mjs";
+import { escapeHtml } from "./text_utils.mjs";
 
 // Display records only: no renderer, DOM or viewer-state access.
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
 export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const isIv = group.type === "iv";
   const isDv = group.type === "dv";

@@ -85,7 +85,6 @@ export function createDagProjectController({
   function restore() {
     try {
       const saved = persistence.readProject(storage, storageKey());
-      if (saved?.schema_version !== "dag-builder-project-v1") return false;
       applyLoaded(saved);
       return true;
     } catch (error) {

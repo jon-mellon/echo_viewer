@@ -1,15 +1,10 @@
+import { PROJECT_FORMAT_VERSION, WORKING_MAP_FORMAT_VERSION } from "./app_contracts.mjs";
+import { escapeHtml } from "./text_utils.mjs";
+
 // Pure export generation. The caller supplies a snapshot, metadata and timestamps.
 // Returned file records contain content only; fetching and downloading stay in the UI.
 export const METHOD_DOI = "10.31235/osf.io/zr5vf_v1";
 export const METHOD_BIB_KEY = "dagbuilder";
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
 
 function isDoi(id) {
   return typeof id === "string" && /^10\.\d{4,}\/\S+/.test(id.trim());
@@ -295,10 +290,11 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null) {
 }
 
 export function buildProjectPayload({ project, ...view }, savedAt) {
+  const { candidate_queue: _derivedCandidateQueue, ...persistedProject } = project;
   return {
-    schema_version: "dag-builder-project-v1",
+    schema_version: PROJECT_FORMAT_VERSION,
     saved_at: savedAt,
-    ...project,
+    ...persistedProject,
     selectedUoa: view.selectedUoa,
     uoaFilterEnabled: view.uoaFilterEnabled,
     phase: view.phase,
@@ -324,7 +320,7 @@ export function buildWorkingMapPayload({ project, visibleLinks, rejectedVariable
     ...visibleLinks.flatMap((link) => [link.group_a, link.group_b]),
   ]);
   return {
-    schema_version: "working-causal-map-v1",
+    schema_version: WORKING_MAP_FORMAT_VERSION,
     exported_at: timestamp,
     iv_group_id: project.iv_group_id,
     dv_group_id: project.dv_group_id,

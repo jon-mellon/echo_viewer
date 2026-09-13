@@ -1,22 +1,12 @@
 import { expandBox, pointInsideBox, simplifyRoute } from "./dag_routing_geometry.mjs";
+import { pairKey, pathPairKeys } from "./edge_keys.mjs";
+export { pathPairKeys } from "./edge_keys.mjs";
 
 const EDGE_PALETTE = {
   iv: { color: "#d32f2f", shadow: "rgba(211,47,47,0.34)" },
   dv: { color: "#1976d2", shadow: "rgba(25,118,210,0.34)" },
   shared: { color: "#d18b08", shadow: "rgba(209,139,8,0.38)" },
 };
-
-function pairKey(a, b) {
-  return [a, b].sort().join("__");
-}
-
-export function pathPairKeys(path = []) {
-  const keys = new Set();
-  for (let index = 0; index < path.length - 1; index += 1) {
-    keys.add(pairKey(path[index], path[index + 1]));
-  }
-  return keys;
-}
 
 export function addPathDirectionTargets(targetsByPair, path = []) {
   for (let index = 0; index < path.length - 1; index += 1) {

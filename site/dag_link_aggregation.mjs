@@ -1,6 +1,8 @@
 // Pure derived links. Ordering, target-pair direction and evidence IDs follow the viewer rules.
+export { pairKey } from "./edge_keys.mjs";
+import { pairKey } from "./edge_keys.mjs";
+
 export const linkKey = (sourceId, targetId) => `${sourceId}->${targetId}`;
-export const pairKey = (a, b) => [a, b].sort().join("__");
 export const edgeKey = (a, b) => `${a}__${b}`;
 
 export function aggregateGroupLinks({ project, linkLookup, rawLinksById }) {

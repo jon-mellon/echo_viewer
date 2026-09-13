@@ -1,3 +1,5 @@
+import { pairKey, pathPairKeys } from "./edge_keys.mjs";
+
 /**
  * Pure graph transformations used by the DAG viewer.
  *
@@ -232,16 +234,4 @@ function directedOutgoing(graph, traversableLink) {
     if (direction === "B_TO_A" || direction === "BIDIRECTIONAL") outgoing.get(groupB).add(groupA);
   }
   return outgoing;
-}
-
-function pathPairKeys(path) {
-  const keys = new Set();
-  for (let index = 0; index < path.length - 1; index += 1) {
-    keys.add(pairKey(path[index], path[index + 1]));
-  }
-  return keys;
-}
-
-function pairKey(a, b) {
-  return [a, b].sort().join("__");
 }

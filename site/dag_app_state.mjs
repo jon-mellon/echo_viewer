@@ -1,6 +1,6 @@
-export function createDagAppState() {
+export function createDagAppState(interfaceMode = "classic") {
   return {
-    interfaceMode: "classic",
+    interfaceMode,
     data: null,
     variables: [], variableById: new Map(), clusterOf: new Map(), clusterMembers: new Map(),
     rawLinks: [], rawLinksById: new Map(), linkLookup: new Map(), similarityEdgeMap: new Map(),
