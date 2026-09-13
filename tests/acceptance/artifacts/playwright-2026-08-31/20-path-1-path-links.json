@@ -1,0 +1,143 @@
+{
+  "schema_version": "working-causal-map-v1",
+  "exported_at": "2000-01-01T00:00:00.000Z",
+  "iv_group_id": "group_exposure",
+  "dv_group_id": "group_outcome",
+  "groups": [
+    {
+      "group_id": "group_exposure",
+      "label": "exposure",
+      "variable_ids": [
+        "synthetic_variable_01"
+      ],
+      "status": "accepted",
+      "source": "synthetic_test_fixture",
+      "notes": "",
+      "type": "iv"
+    },
+    {
+      "group_id": "group_outcome",
+      "label": "outcome",
+      "variable_ids": [
+        "synthetic_variable_02"
+      ],
+      "status": "accepted",
+      "source": "synthetic_test_fixture",
+      "notes": "",
+      "type": "dv"
+    },
+    {
+      "group_id": "group_direct_confounder",
+      "label": "direct confounder",
+      "variable_ids": [
+        "synthetic_variable_03"
+      ],
+      "status": "accepted",
+      "source": "synthetic_test_fixture",
+      "notes": "",
+      "type": "candidate"
+    },
+    {
+      "group_id": "group_shared_mediator",
+      "label": "shared mediator",
+      "variable_ids": [
+        "synthetic_variable_08"
+      ],
+      "status": "accepted",
+      "source": "synthetic_test_fixture",
+      "notes": "",
+      "type": "candidate"
+    }
+  ],
+  "links": [
+    {
+      "edge_id": "group_direct_confounder__group_exposure",
+      "group_a": "group_direct_confounder",
+      "group_b": "group_exposure",
+      "is_target_relation": false,
+      "target_direction": "",
+      "edge_source": "synthetic_test_fixture",
+      "is_manual": false,
+      "manual_edge_ids": [],
+      "mapping_a_to_b_exists": true,
+      "mapping_b_to_a_exists": false,
+      "manual_a_to_b_exists": false,
+      "manual_b_to_a_exists": false,
+      "direction_type": "A_TO_B",
+      "a_to_b_raw_link_ids": [],
+      "b_to_a_raw_link_ids": [],
+      "a_to_b_paper_table_keys": [],
+      "b_to_a_paper_table_keys": [],
+      "display_status": "active_by_default",
+      "user_decision": null
+    },
+    {
+      "edge_id": "group_direct_confounder__group_outcome",
+      "group_a": "group_direct_confounder",
+      "group_b": "group_outcome",
+      "is_target_relation": false,
+      "target_direction": "",
+      "edge_source": "synthetic_test_fixture",
+      "is_manual": false,
+      "manual_edge_ids": [],
+      "mapping_a_to_b_exists": true,
+      "mapping_b_to_a_exists": true,
+      "manual_a_to_b_exists": false,
+      "manual_b_to_a_exists": false,
+      "direction_type": "BIDIRECTIONAL",
+      "a_to_b_raw_link_ids": [],
+      "b_to_a_raw_link_ids": [],
+      "a_to_b_paper_table_keys": [],
+      "b_to_a_paper_table_keys": [],
+      "display_status": "active_by_default",
+      "user_decision": null
+    },
+    {
+      "edge_id": "group_exposure__group_shared_mediator",
+      "group_a": "group_shared_mediator",
+      "group_b": "group_exposure",
+      "is_target_relation": false,
+      "target_direction": "",
+      "edge_source": "synthetic_test_fixture",
+      "is_manual": false,
+      "manual_edge_ids": [],
+      "mapping_a_to_b_exists": true,
+      "mapping_b_to_a_exists": false,
+      "manual_a_to_b_exists": false,
+      "manual_b_to_a_exists": false,
+      "direction_type": "A_TO_B",
+      "a_to_b_raw_link_ids": [],
+      "b_to_a_raw_link_ids": [],
+      "a_to_b_paper_table_keys": [],
+      "b_to_a_paper_table_keys": [],
+      "display_status": "active_by_default",
+      "user_decision": null
+    },
+    {
+      "edge_id": "group_outcome__group_shared_mediator",
+      "group_a": "group_shared_mediator",
+      "group_b": "group_outcome",
+      "is_target_relation": false,
+      "target_direction": "",
+      "edge_source": "synthetic_test_fixture",
+      "is_manual": false,
+      "manual_edge_ids": [],
+      "mapping_a_to_b_exists": true,
+      "mapping_b_to_a_exists": false,
+      "manual_a_to_b_exists": false,
+      "manual_b_to_a_exists": false,
+      "direction_type": "A_TO_B",
+      "a_to_b_raw_link_ids": [],
+      "b_to_a_raw_link_ids": [],
+      "a_to_b_paper_table_keys": [],
+      "b_to_a_paper_table_keys": [],
+      "display_status": "active_by_default",
+      "user_decision": null
+    }
+  ],
+  "manual_edges": [],
+  "rejected_variables": [],
+  "hidden_variable_ids": [],
+  "allows_bidirectional_links": true,
+  "allows_cycles": true
+}

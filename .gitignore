@@ -1,2 +1,4 @@
 test-results/
+node_modules/
+tests/dagitty_cache/
 .DS_Store
