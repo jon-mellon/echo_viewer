@@ -292,9 +292,9 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null) {
 export function buildProjectPayload({ project, ...view }, savedAt) {
   const { candidate_queue: _derivedCandidateQueue, ...persistedProject } = project;
   return {
+    ...persistedProject,
     schema_version: PROJECT_FORMAT_VERSION,
     saved_at: savedAt,
-    ...persistedProject,
     selectedUoa: view.selectedUoa,
     uoaFilterEnabled: view.uoaFilterEnabled,
     phase: view.phase,

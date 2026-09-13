@@ -17,6 +17,7 @@ test("storage round-trip preserves settings and normalizes legacy project fields
     undoHistory: [{ description: "split", before: "0", after: "1" }],
     undoPointer: 0,
     actionLog: [{ description: "split", time: "t" }],
+    saved_at: "stale",
   };
   const key = projectStorageKey("prefix", { generated_at: "date" }, 2);
   assert.equal(key, "prefix:date:2:none");
@@ -44,6 +45,10 @@ test("storage round-trip preserves settings and normalizes legacy project fields
   assert.equal(result.undoPointer, 0);
   assert.equal(result.actionLog[0].description, "split");
   assert.deepEqual(result.project.links, []);
+  assert.equal(Object.hasOwn(result.project, "schema_version"), false);
+  assert.equal(Object.hasOwn(result.project, "saved_at"), false);
+  assert.equal(Object.hasOwn(result.project, "selectedUoa"), false);
+  assert.equal(Object.hasOwn(result.project, "undoHistory"), false);
 });
 
 test("missing, incompatible and malformed storage is explicit", () => {

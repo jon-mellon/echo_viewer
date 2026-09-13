@@ -39,13 +39,18 @@ export function projectStorageKey(prefix, data, variableCount) {
 // Defaults are supplied by the caller so restoration does not generate IDs or time.
 export function restoreProjectPayload(payload, defaults, currentLayoutSource) {
   if (payload?.schema_version !== PROJECT_FORMAT_VERSION) return null;
-  const { candidate_queue: _derivedCandidateQueue, ...persistedPayload } = payload;
-  const { candidate_queue: _defaultCandidateQueue, ...projectDefaults } = defaults;
+  const projectDefaults = { ...defaults };
+  delete projectDefaults.candidate_queue;
+  const persistedProject = Object.fromEntries(
+    Object.keys(projectDefaults)
+      .filter(key => Object.hasOwn(payload, key))
+      .map(key => [key, payload[key]]),
+  );
   const selectedUoa = payload.selectedUoa || null;
   const phase = payload.phase || (selectedUoa ? "select_dv" : "select_uoa");
   return {
     project: {
-      ...projectDefaults, ...persistedPayload,
+      ...projectDefaults, ...persistedProject,
       groups: Array.isArray(payload.groups) ? payload.groups.map(withoutGroupReviewStatus) : [],
       decisions: Array.isArray(payload.decisions) ? payload.decisions : [],
       manual_edges: Array.isArray(payload.manual_edges) ? payload.manual_edges : [],

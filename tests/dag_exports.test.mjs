@@ -54,6 +54,21 @@ test('citation collisions follow DOI order independently of metadata arrival ord
   assert.match(a.bibText, /@misc\{dagbuilder,/);
 });
 
+test('project serialization owns its format and save timestamp', () => {
+  const { input } = fixture();
+  Object.assign(input.project, {
+    schema_version: "obsolete-format",
+    saved_at: "2000-01-01T00:00:00Z",
+    selectedUoa: "stale-uoa",
+    candidate_queue: [{ group_id: "derived" }],
+  });
+  const payload = exports.buildProjectPayload(input, timestamp);
+  assert.equal(payload.schema_version, "dag-builder-project-v1");
+  assert.equal(payload.saved_at, timestamp);
+  assert.equal(payload.selectedUoa, input.selectedUoa);
+  assert.equal(Object.hasOwn(payload, "candidate_queue"), false);
+});
+
 test('ZIP bytes match previous archive and contain the original UTF-8 file contents', async () => {
   const files = [{ name: 'dag.md', data: 'A → B\n' }, { name: 'references.bib', data: '@misc{test}' }];
   const before = structuredClone(files);
