@@ -30,7 +30,6 @@ import { PERSON_UOA_SENTINEL, projectForUoa, uoaCounts,
 import { groupingSchemaUrl, schemaPublicationId } from "/dag_data_config.mjs";
 import { applyPermalink, buildPermalink, CUSTOM_SCHEMA_INSTRUCTIONS,
   permalinkInput, schemaMatchesProject } from "/dag_permalink.mjs";
-import { initDagAuth } from "/dag_auth.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
 import { writeGroupingSchemaFolder } from "/grouping_schema_writer.mjs";
 import { makeZip } from "/dag_export_zip.mjs";
@@ -171,7 +170,6 @@ async function init() {
     document.getElementById("uoaReset").textContent = "Clear";
     const exportSection = document.getElementById("exportSection");
     document.querySelector(".dag-left-panel")?.append(exportSection);
-    initDagAuth();
   }
   initElements();
   installHandlers();

@@ -1,6 +1,7 @@
 import { supabase } from "/supabase_client.mjs";
 import { canonicalFolderHash, writeGroupingSchemaFolder } from "/grouping_schema_writer.mjs";
 import { PUBLISHED_SCHEMA_BUCKET, publicationPermalink } from "/published_schema_loader.mjs";
+import { ensureAnonymousPublicationUser } from "/dag_anonymous_auth.mjs";
 
 export const CANONICAL_BASELINE_ID = "a0118906-2366-4cc8-8809-bafdf3860c23";
 export const CANONICAL_BASELINE_HASH = "6732ed0bb2bce913c8b6611903f6c5d12ebccf3d5dc4f020887f5422515d7dfb";
@@ -12,19 +13,6 @@ export function formatSupabaseError(error) {
     if (error[key] !== undefined && error[key] !== null && error[key] !== "") parts.push(`${key}: ${error[key]}`);
   }
   return parts.join(" | ");
-}
-
-async function validatedCurrentUser(client) {
-  if (!client) throw new Error("Supabase is not configured.");
-  const { data: sessionData, error: sessionError } = await client.auth.getSession();
-  if (sessionError) throw sessionError;
-  if (!sessionData?.session?.access_token) throw new Error("A valid Supabase session is required to publish.");
-  const { data: userData, error: userError } = await client.auth.getUser();
-  if (userError) throw userError;
-  if (!userData?.user?.id || userData.user.id !== sessionData.session.user?.id) {
-    throw new Error("Supabase could not validate the current session user.");
-  }
-  return userData.user;
 }
 
 function contentType(path) {
@@ -56,7 +44,7 @@ export async function publishWorkingSchema({
   cryptoApi = globalThis.crypto,
   onProgress = () => {},
 }) {
-  const user = await validatedCurrentUser(client);
+  const user = await ensureAnonymousPublicationUser(client);
   const canonical = await canonicalizeWorkingSchema(schema, cryptoApi);
   const existing = await findOwnedPublication(client, user.id, canonical.contentHash);
   if (existing) return { ...existing, publicationId: existing.id, contentHash: existing.content_hash, reused: true };
@@ -137,7 +125,9 @@ export function createPublicationController({
     }
     const { data, error } = await client.auth.getSession();
     elements.publish.hidden = false;
-    elements.publish.title = data?.session?.user ? "Create an immutable public version" : "Sign in is required only when you publish";
+    elements.publish.title = data?.session?.user
+      ? "Create an immutable public version"
+      : "Create an immutable public version; publishing will start a private anonymous session";
     if (error) showStatus(elements.status, formatSupabaseError(error), true);
   }
 

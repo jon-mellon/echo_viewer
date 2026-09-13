@@ -50,6 +50,12 @@ test("publication explicitly confirms public immutable access", () => {
   assert.match(source, /confirmPublicPublication\(\)/);
 });
 
+test("publication requests authentication only after immutable-public confirmation", () => {
+  const publish = source.slice(source.indexOf("async function publish()"), source.indexOf("async function share()"));
+  assert.ok(publish.indexOf("confirmPublicPublication()") < publish.indexOf("publishWorkingSchema({"));
+  assert.match(source, /ensureAnonymousPublicationUser\(client\)/);
+});
+
 test("published state distinguishes private working-copy changes", () => {
   assert.match(source, /Public schema · Unpublished local changes/);
   assert.match(source, /Private working copy/);

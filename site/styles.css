@@ -1965,31 +1965,6 @@ h2 {
     height: 72vh;
   }
 }
-.dag-auth {
-  display: grid;
-  justify-items: end;
-  gap: 4px;
-  margin-left: auto;
-}
-
-.auth-identity {
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.auth-status {
-  max-width: 240px;
-  color: var(--muted, #64748b);
-  font-size: 11px;
-  text-align: right;
-}
-
-.auth-status.auth-error { color: #b42318; }
-
 .publication-status {
   overflow-wrap: anywhere;
   color: var(--muted, #64748b);
@@ -2107,23 +2082,3 @@ h2 {
   gap: 8px;
   margin-top: 20px;
 }
-
-.auth-callback-body {
-  display: grid;
-  min-height: 100vh;
-  margin: 0;
-  place-items: center;
-  background: #f6f7f9;
-  font-family: system-ui, sans-serif;
-}
-
-.auth-callback-card {
-  width: min(360px, calc(100vw - 48px));
-  padding: 28px;
-  border: 1px solid #d8dde5;
-  border-radius: 12px;
-  background: white;
-  box-shadow: 0 12px 36px rgb(15 23 42 / 10%);
-}
-
-.auth-callback-card h1 { margin-top: 0; font-size: 20px; }
