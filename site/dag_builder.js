@@ -13,7 +13,6 @@ import * as inspector from "/dag_inspector.mjs";
 import * as searchModel from "/dag_search.mjs";
 import * as workflow from "/dag_workflow.mjs";
 import * as visibility from "/variable_visibility.mjs";
-import { dagDataSource } from "/dag_data_source.mjs";
 import { createDagAppState } from "/dag_app_state.mjs";
 import { createDagProjectController } from "/dag_project_controller.mjs";
 import { createDagInspectorController, STUDY_DESIGN_EDGE_ID } from "/dag_inspector_controller.mjs";
@@ -26,13 +25,11 @@ import { deriveDagView, excludedForConnectivity } from "/dag_view.mjs";
 import { createDagNetworkController } from "/dag_network_controller.mjs";
 import { createDagEventController } from "/dag_event_controller.mjs";
 import { createUoaController } from "/uoa_controller.mjs";
-import { groupingSchemaUrl, schemaPublicationId } from "/dag_data_config.mjs";
-import { applyPermalink, buildPermalink, CUSTOM_SCHEMA_INSTRUCTIONS,
-  permalinkInput, schemaMatchesProject } from "/dag_permalink.mjs";
+import { createToolbarPresenter } from "/toolbar_presenter.mjs";
+import { createDefinitionWorkflowController } from "/definition_workflow_controller.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
-import { writeGroupingSchemaFolder } from "/grouping_schema_writer.mjs";
-import { makeZip } from "/dag_export_zip.mjs";
-import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "/app_contracts.mjs";
+import { createGroupingSetController } from "/grouping_set_controller.mjs";
+import { createProjectBootstrap } from "/project_bootstrap.mjs";
 import { escapeHtml } from "/text_utils.mjs";
 import { h, replaceChildren, safeUrl } from "/dom_builder.mjs";
 
@@ -71,13 +68,11 @@ window.__dagBuilderState = state;
 const els = {};
 
 function setStartupStage(message) {
-  const stage = document.getElementById("startupLoadingStage");
-  if (stage) stage.textContent = message;
-  window.dispatchEvent(new CustomEvent("startupstage", { detail: message }));
+  return projectBootstrap.setStartupStage(message);
 }
 
 function finishStartupLoading() {
-  document.getElementById("startupLoading")?.setAttribute("hidden", "");
+  return projectBootstrap.finishStartupLoading();
 }
 
 function $(id) {
@@ -161,95 +156,9 @@ function initElements() {
   state.map.ctx = state.map.canvas.getContext("2d");
 }
 
-async function init() {
-  dagDataSource.onStatus = setStartupStage;
-  document.body.classList.toggle("dag2-mode", state.interfaceMode === "dag2");
-  if (state.interfaceMode === "dag2") {
-    document.title = "DAG Builder 2";
-    document.querySelector(".panel-header h1").textContent = "DAG Builder 2";
-    document.getElementById("uoaReset").textContent = "Clear";
-    const exportSection = document.getElementById("exportSection");
-    document.querySelector(".dag-left-panel")?.append(exportSection);
-  }
-  initElements();
-  installHandlers();
-  installDefinitionHandlers();
-  resizeMap();
-  const permalink = permalinkInput();
-  const publicationId = schemaPublicationId();
-  await loadDagData(permalink?.get("vlayout") || "");
-  setStartupStage("Preparing workspace…");
-  const restored = permalink || publicationId ? false : restoreProjectLocally();
-  if (restored && state.definitionDraft && state.interfaceMode === "dag2"
-      && !window.confirm("Resume the unfinished variable definition? Press Cancel to discard it.")) {
-    state.definitionDraft = null;
-    saveProjectLocally();
-  }
-  if (!restored) {
-    initializeProject();
-    loadLatestSchemaGroups();
-    normalizeProjectDuplicateAssignments();
-    if (state.interfaceMode === "dag2") {
-      state.phase = "select_iv";
-      state.workflowMode = "setup";
-      state.selectedUoa = null;
-      state.uoaFilterEnabled = false;
-      state.filterDagByCausalRelevance = false;
-    }
-    if (permalink) {
-      applyPermalink(permalink, state);
-      state.phase = "build";
-    }
-  }
-  if (state.data.publication_source && !state.project.publication) {
-    state.project.publication = {
-      ...state.data.publication_source,
-      permalink: new URL(`/?schema=${state.data.publication_source.publication_id}`, window.location.origin).href,
-    };
-  }
-  if (state.interfaceMode === "dag2") publicationController.initialize();
-  const restoredLayoutSource = state.variableLayoutSource;
-  if (restoredLayoutSource && restoredLayoutSource !== state.data.layout?.active_source) {
-    await loadDagData(restoredLayoutSource);
-  }
-  setStartupStage("Rendering graph…");
-  renderAll();
-  if (state.permalinkMapViewport) {
-    constrainMapTransform();
-    drawMap();
-  } else {
-    fitMap();
-  }
-  if (state.permalinkDagViewport) {
-    dagNetworkController.getNetwork()?.moveTo({ ...state.permalinkDagViewport, animation: false });
-  }
-  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  finishStartupLoading();
-}
+function init() { return projectBootstrap.init(); }
 
-async function loadDagData(layoutSource = "") {
-  state.data = await dagDataSource.load(layoutSource);
-  state.variables = (state.data.variables || []).slice().sort((a, b) => a.index - b.index);
-  if (state.projectStorageVariableCount === null) {
-    state.projectStorageVariableCount = Number(state.data.project_storage_variable_count || state.variables.length);
-  }
-  state.variableLayoutSource = state.data.layout?.active_source || layoutSource || "";
-  state.variableById = new Map(state.variables.map((v) => [v.variable_id, v]));
-  buildDuplicateClusters();
-  state.rawLinks = state.data.raw_causal_links || [];
-  state.rawLinksById = new Map(state.rawLinks.map((l) => [l.raw_causal_link_id, l]));
-  state.linkLookup = new Map();
-  for (const link of state.rawLinks) {
-    const key = linkKey(link.source_variable_id, link.target_variable_id);
-    if (!state.linkLookup.has(key)) state.linkLookup.set(key, []);
-    state.linkLookup.get(key).push(link.raw_causal_link_id);
-  }
-  state.similarityEdgeMap = new Map();
-  for (const edge of state.data.similarity_edges || []) {
-    state.similarityEdgeMap.set(pairKey(edge.source, edge.target), Number(edge.weight || 0));
-  }
-  if (state.project) normalizeProjectDuplicateAssignments();
-}
+function loadDagData(layoutSource = "") { return projectBootstrap.loadDagData(layoutSource); }
 
 // ─── Duplicate clusters ─────────────────────────────────────────────────────────
 // The corrected concept layout places every substantive duplicate of a construct at
@@ -472,114 +381,11 @@ function rebuildProject() {
   renderCoordinator.rebuildProject();
 }
 
-function renderMapToolbarToggles() {
-  const layoutSources = state.data?.layout?.sources || [];
-  replaceChildren(els.variableLayoutSelect, layoutSources.map(source =>
-    h("option", { value: source.source, textContent: source.label || source.source })));
-  els.variableLayoutSelect.value = state.variableLayoutSource;
-  els.variableLayoutSelect.hidden = layoutSources.length < 2;
-  renderAssignmentCoverage();
-  els.toggleVariableLabels.classList.toggle("active", state.showVariableLabels);
-  els.toggleVariableLabels.setAttribute("aria-pressed", state.showVariableLabels ? "true" : "false");
-  els.toggleGroupLabels.classList.toggle("active", state.showGroupLabels);
-  els.toggleGroupLabels.setAttribute("aria-pressed", state.showGroupLabels ? "true" : "false");
-  els.toggleCausalFilter.classList.toggle("active", state.filterDagByCausalRelevance);
-  els.toggleCausalFilter.setAttribute("aria-pressed", state.filterDagByCausalRelevance ? "true" : "false");
-  const visibleGroupIds = new Set(dagGroups().map(group => group.group_id));
-  const anchorsReady = visibleGroupIds.has(state.project?.iv_group_id)
-    && visibleGroupIds.has(state.project?.dv_group_id);
-  if (!anchorsReady) {
-    state.showConfoundersOnly = false;
-    state.showCollidersOnly = false;
-  }
-  const confounderCount = state.confounderGroupIds?.size || 0;
-  els.toggleConfoundersOnly.disabled = !anchorsReady;
-  els.toggleConfoundersOnly.classList.toggle("active", state.showConfoundersOnly);
-  els.toggleConfoundersOnly.setAttribute("aria-pressed", state.showConfoundersOnly ? "true" : "false");
-  els.toggleConfoundersOnly.textContent = `Confounders only (${confounderCount})`;
-  els.toggleConfoundersOnly.title = anchorsReady
-    ? `Show the IV, DV, and ${confounderCount} potential common cause${confounderCount === 1 ? "" : "s"} within ${state.confounderMaxPathLength} directed edge${state.confounderMaxPathLength === 1 ? "" : "s"} of each anchor. Bidirectional edges are treated pessimistically as possibly running either way.`
-    : "Select an IV and DV before filtering to confounders.";
-  const colliderCount = state.colliderGroupIds?.size || 0;
-  els.toggleCollidersOnly.disabled = !anchorsReady;
-  els.toggleCollidersOnly.classList.toggle("active", state.showCollidersOnly);
-  els.toggleCollidersOnly.setAttribute("aria-pressed", state.showCollidersOnly ? "true" : "false");
-  els.toggleCollidersOnly.textContent = `Colliders only (${colliderCount})`;
-  els.toggleCollidersOnly.title = anchorsReady
-    ? `Show the IV, DV, and ${colliderCount} potential common descendant${colliderCount === 1 ? "" : "s"} reachable from both anchors within ${state.confounderMaxPathLength} directed edge${state.confounderMaxPathLength === 1 ? "" : "s"}. Bidirectional edges are treated pessimistically as possibly running either way.`
-    : "Select an IV and DV before filtering to colliders.";
-  els.confounderPathLength.disabled = !anchorsReady;
-  els.confounderPathLength.value = String(state.confounderMaxPathLength);
-  els.confounderPathLength.title = anchorsReady
-    ? `Maximum directed-edge length of each qualifying ${state.showCollidersOnly ? "anchor-to-collider" : "confounder-to-anchor"} path. Intermediate path nodes are shown; a path cannot pass through the other anchor.`
-    : "Select an IV and DV before setting a diagnostic path length.";
-  const bottleneckedIds = state.showCollidersOnly
-    ? state.bottleneckedColliderIds
-    : state.bottleneckedConfounderIds;
-  const bottleneckedCount = bottleneckedIds?.size || 0;
-  const bottleneckedLabels = [...(bottleneckedIds || [])]
-    .map((groupId) => groupById(groupId)?.label || groupId)
-    .sort((a, b) => a.localeCompare(b));
-  const bottleneckedLabelNote = bottleneckedLabels.length
-    ? ` Bottlenecked: ${bottleneckedLabels.join(", ")}.`
-    : "";
-  els.toggleBottleneckedConfounders.hidden = false;
-  els.toggleBottleneckedConfounders.disabled = !anchorsReady;
-  els.toggleBottleneckedConfounders.classList.toggle("active", state.excludeBottleneckedConfounders);
-  els.toggleBottleneckedConfounders.setAttribute("aria-pressed", state.excludeBottleneckedConfounders ? "true" : "false");
-  els.toggleBottleneckedConfounders.textContent = `Exclude bottlenecked (${bottleneckedCount})`;
-  els.toggleBottleneckedConfounders.title = anchorsReady
-    ? `${state.excludeBottleneckedConfounders ? "Currently excluding" : "Exclude"} ${bottleneckedCount} ${state.showCollidersOnly ? "collider" : "confounder"} candidate${bottleneckedCount === 1 ? "" : "s"} when every admissible witness-path pair shares an intermediate node within the current maximum path length.${bottleneckedLabelNote}`
-    : "Select an IV and DV before filtering bottlenecked diagnostic candidates.";
-  const diagnosticLinkPairKeys = state.showCollidersOnly
-    ? state.colliderLinkPairKeys
-    : state.confounderLinkPairKeys;
-  const diagnosticLinkCount = diagnosticLinkPairKeys?.size || 0;
-  els.toggleIrrelevantConfounderLinks.disabled = !anchorsReady;
-  els.toggleIrrelevantConfounderLinks.classList.toggle("active", state.hideIrrelevantConfounderLinks);
-  els.toggleIrrelevantConfounderLinks.setAttribute("aria-pressed", state.hideIrrelevantConfounderLinks ? "true" : "false");
-  els.toggleIrrelevantConfounderLinks.textContent = `Path links only (${diagnosticLinkCount})`;
-  els.toggleIrrelevantConfounderLinks.title = anchorsReady
-    ? `Keep only the ${diagnosticLinkCount} logical link${diagnosticLinkCount === 1 ? "" : "s"} used by at least one currently displayed ${state.showCollidersOnly ? "collider's anchor-to-collider" : "confounder's candidate-to-anchor"} witness path.`
-    : "Select an IV and DV before filtering diagnostic-path links.";
-  const selectedCount = state.selectedVariableIds?.size || 0;
-  if (els.selectionCount) {
-    els.selectionCount.hidden = selectedCount === 0;
-    els.selectionCount.textContent = `${selectedCount} selected`;
-  }
-}
+function renderMapToolbarToggles() { return toolbarPresenter.render(); }
 
-function assignmentCoverage() {
-  const uoaActive = state.uoaFilterEnabled && state.selectedUoa;
-  const variables = visibleVariables().filter(
-    (variable) => !uoaActive || uoaMatches(variable.uoa, state.selectedUoa)
-  );
-  const variableIds = new Set(variables.map((variable) => variable.variable_id));
-  const assignedIds = new Set(
-    (state.project?.groups || [])
-      .flatMap((group) => group.variable_ids || [])
-      .filter((variableId) => variableIds.has(variableId))
-  );
-  const plottedNodes = new Set(variables.map((variable) => clusterRep(variable.variable_id))).size;
-  return {
-    assigned: assignedIds.size,
-    unassigned: Math.max(0, variables.length - assignedIds.size),
-    total: variables.length,
-    plottedNodes,
-    rejected: rejectedVariableIdSet().size,
-    uoaFiltered: Boolean(uoaActive),
-  };
-}
+function assignmentCoverage() { return toolbarPresenter.assignmentCoverage(); }
 
-function renderAssignmentCoverage() {
-  const coverage = assignmentCoverage();
-  replaceChildren(els.variableAssignmentCounts,
-    h("span", { className: "coverage-count assigned", textContent: `${coverage.assigned.toLocaleString()} assigned` }),
-    h("span", { className: "coverage-count unassigned", textContent: `${coverage.unassigned.toLocaleString()} unassigned` }));
-  const scope = coverage.uoaFiltered ? ` for UOA “${state.selectedUoa}”` : "";
-  const rejected = coverage.rejected ? `; ${coverage.rejected.toLocaleString()} rejected variables excluded` : "";
-  els.variableAssignmentCounts.title = `${coverage.total.toLocaleString()} variables${scope} represented by ${coverage.plottedNodes.toLocaleString()} plotted nodes${rejected}`;
-}
+function renderAssignmentCoverage() { return toolbarPresenter.renderAssignmentCoverage(); }
 
 // ─── Mode UI rendering ────────────────────────────────────────────────────────
 
@@ -643,316 +449,19 @@ function toggleAnchorSearchMode(side) {
 
 // ─── DAG2 category definition ────────────────────────────────────────────────
 
-function startDefinition(role) {
-  if (state.interfaceMode !== "dag2" || !["iv", "dv"].includes(role)) return;
-  state.definitionDraft = {
-    role, step: "sources", source_group_ids: [], source_snapshot: [],
-    eligible_variable_ids: [], new_variable_ids: [], new_label: "",
-    residual_labels: {}, manual_edge_dispositions: {},
-  };
-  state.selectedVariableIds.clear();
-  invalidateMapCaches();
-  renderAll();
-  els.definitionSourceSearch.focus();
-}
-
-function startEditSplit(groupId = null) {
-  const context = projectOps.editableSplitContext(state.project, groupId ? groupId : activeGroup());
-  if (!context) return;
-  const { splitId, newGroup, residuals } = context;
-  const eligible = [...new Set([...newGroup.variable_ids, ...residuals.flatMap(group => group.variable_ids)]
-    .map(clusterRep))];
-  state.definitionDraft = {
-    mode: "edit", split_id: splitId, existing_new_group_id: newGroup.group_id,
-    role: ["iv", "dv"].includes(newGroup.type) ? newGroup.type : null,
-    step: "partition", source_group_ids: residuals.map(group => group.group_id),
-    source_snapshot: [newGroup, ...residuals].map(group => ({ group_id: group.group_id,
-      label: group.label, variable_ids: [...group.variable_ids], updated_at: group.updated_at || null })),
-    eligible_variable_ids: eligible,
-    new_variable_ids: [...new Set(newGroup.variable_ids.map(clusterRep))],
-    new_label: newGroup.label || "",
-    residual_labels: Object.fromEntries(residuals.map(group => [group.group_id, group.label || ""])),
-    manual_edge_dispositions: {},
-  };
-  state.activeGroupId = null;
-  state.selectedVariableIds = new Set(state.definitionDraft.new_variable_ids);
-  invalidateMapCaches();
-  setMapMode("select");
-  renderAll();
-  fitMap(eligible);
-}
-
-function cancelDefinition() {
-  state.definitionDraft = null;
-  state.selectedVariableIds.clear();
-  state.selectedVariableId = null;
-  invalidateMapCaches();
-  setMapMode("select");
-  renderAll();
-}
-
-function definitionSources() {
-  const ids = new Set(state.definitionDraft?.source_group_ids || []);
-  return (state.project?.groups || []).filter(group => ids.has(group.group_id));
-}
-
-function continueDefinition() {
-  const draft = state.definitionDraft;
-  const sources = definitionSources();
-  if (!draft || !sources.length) return;
-  draft.source_snapshot = sources.map(group => ({ group_id: group.group_id, label: group.label,
-    variable_ids: [...group.variable_ids], updated_at: group.updated_at || null }));
-  draft.eligible_variable_ids = [...new Set(sources.flatMap(group =>
-    group.variable_ids.map(clusterRep)))];
-  draft.new_variable_ids = [];
-  draft.residual_labels = Object.fromEntries(sources.map(group =>
-    [group.group_id, `Other: ${group.label || group.group_id}`]));
-  draft.manual_edge_dispositions = Object.fromEntries(affectedDefinitionManualEdges()
-    .map(edge => [edge.edge_id, "keep"]));
-  draft.step = "partition";
-  state.selectedVariableIds.clear();
-  invalidateMapCaches();
-  setMapMode("select");
-  renderAll();
-  fitMap(draft.eligible_variable_ids);
-}
-
-function definitionResidualIds(source) {
-  const carved = new Set(state.definitionDraft?.new_variable_ids || []);
-  return [...new Set(source.variable_ids.map(clusterRep))].filter(id => !carved.has(id));
-}
-
-function toggleDefinitionVariable(variableId, add = null) {
-  const draft = state.definitionDraft;
-  if (!draft || draft.step !== "partition") return;
-  const id = clusterRep(variableId);
-  if (!draft.eligible_variable_ids.includes(id)) return;
-  const selected = new Set(draft.new_variable_ids);
-  const shouldAdd = add === null ? !selected.has(id) : add;
-  if (shouldAdd) selected.add(id); else selected.delete(id);
-  draft.new_variable_ids = [...selected];
-  state.selectedVariableIds = new Set(draft.new_variable_ids);
-  state.selectedVariableId = id;
-  invalidateMapCaches();
-  renderAll();
-}
-
-function affectedDefinitionManualEdges() {
-  const sources = new Set(state.definitionDraft?.source_group_ids || []);
-  return (state.project?.manual_edges || []).filter(edge => !edge.deleted
-    && (sources.has(edge.source_group_id) || sources.has(edge.target_group_id)));
-}
-
-function definitionCanReview() {
-  const draft = state.definitionDraft;
-  return Boolean(draft?.new_variable_ids?.length && definitionSources().every(source =>
-    definitionResidualIds(source).length));
-}
-
-function definitionNeighbors() {
-  const draft = state.definitionDraft;
-  if (!draft?.new_variable_ids?.length) return [];
-  const eligible = new Set(draft.eligible_variable_ids);
-  const selected = new Set(draft.new_variable_ids);
-  const best = new Map();
-  for (const id of draft.new_variable_ids) {
-    for (const neighbor of state.variableById.get(id)?.similarity_neighbors || []) {
-      const rep = clusterRep(neighbor.variable_id);
-      if (!eligible.has(rep) || selected.has(rep)) continue;
-      const current = best.get(rep);
-      if (!current || Number(neighbor.llm_rank || 99) < Number(current.llm_rank || 99)
-          || Number(neighbor.cosine_similarity || 0) > Number(current.cosine_similarity || 0)) {
-        best.set(rep, { ...neighbor, variable_id: rep });
-      }
-    }
-  }
-  return [...best.values()].sort((a, b) => Number(a.llm_rank || 99) - Number(b.llm_rank || 99)
-    || Number(b.cosine_similarity || 0) - Number(a.cosine_similarity || 0)).slice(0, 12);
-}
-
-function renderDefinition() {
-  const draft = state.definitionDraft;
-  const wasSpatial = document.body.classList.contains("defining-variable");
-  const isSpatial = Boolean(draft && draft.step !== "sources");
-  document.body.classList.toggle("defining-variable", isSpatial);
-  // The map is display:none in the normal DAG2 layout, so its initial canvas
-  // backing store is 1x1. Resize only after the browser has laid out the
-  // temporary spatial workspace, including when a saved draft is resumed.
-  if (isSpatial && !wasSpatial) requestAnimationFrame(() => {
-    resizeMap();
-    fitMap(draft.eligible_variable_ids);
-  });
-  els.definitionBlock.hidden = !draft;
-  if (!draft) return;
-  els.definitionTitle.textContent = draft.mode === "edit" ? "Edit split"
-    : `Define new ${draft.role.toUpperCase()}`;
-  els.definitionSourcesStep.hidden = draft.step !== "sources";
-  els.definitionPartitionStep.hidden = draft.step !== "partition";
-  els.definitionReviewStep.hidden = draft.step !== "review";
-  els.definitionBack.hidden = draft.mode === "edit";
-  if (draft.step === "sources") {
-    const query = normalized(els.definitionSourceSearch.value);
-    const selected = new Set(draft.source_group_ids);
-    const groups = (state.project.groups || []).map((group, index) =>
-      searchModel.anchorGroupSearchMatch(group, query, index, state.variableById))
-      .filter(item => item.group.variable_ids?.length && item.matches).slice(0, 60);
-    replaceChildren(els.definitionSourceList, groups.map(({ group, variableMatch }) =>
-      h("div", { className: "definition-source-row" }, h("label", {},
-        h("span", { className: "definition-source-main" }, h("strong", { textContent: group.label || group.group_id }),
-          h("span", { textContent: `${new Set(group.variable_ids.map(clusterRep)).size} canonical` })),
-        variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched: ${truncate(variableMatch, 72)}` }) : null),
-      h("input", { type: "checkbox", dataset: { sourceId: group.group_id }, checked: selected.has(group.group_id) }))));
-    els.definitionSourceList.querySelectorAll("input[data-source-id]").forEach(input => input.addEventListener("change", () => {
-      const ids = new Set(draft.source_group_ids);
-      if (input.checked) ids.add(input.dataset.sourceId); else ids.delete(input.dataset.sourceId);
-      draft.source_group_ids = [...ids];
-      renderDefinition(); persistProjectLocally();
-    }));
-    const count = definitionSources().reduce((sum, group) =>
-      sum + new Set(group.variable_ids.map(clusterRep)).size, 0);
-    els.definitionContinue.disabled = !selected.size;
-    els.definitionContinue.textContent = selected.size
-      ? `Continue with ${selected.size} categories (${count} variables)` : "Choose categories to continue";
-  } else if (draft.step === "partition") {
-    const residualText = definitionSources().map(source =>
-      `${source.label}: ${definitionResidualIds(source).length} leftover`).join(" · ");
-    els.definitionCounts.textContent = `${draft.new_variable_ids.length} in new variable · ${residualText}`;
-    els.definitionReview.disabled = !definitionCanReview();
-    const selectedIds = new Set(draft.new_variable_ids);
-    const matches = searchVariables(els.definitionVariableSearch.value, visibleVariables().length)
-      .filter(variable => !selectedIds.has(clusterRep(variable.variable_id)))
-      .slice(0, 30);
-    replaceChildren(els.definitionVariableResults, matches.map(variable => {
-      const id = clusterRep(variable.variable_id);
-      return h("button", { className: "result-button", type: "button", dataset: { variableId: id } },
-        h("strong", { textContent: variable.display_label || variable.concept_label || id }),
-        h("span", { textContent: truncate(variable.raw_variable_text || variable.concept_label, 90) }),
-        h("span", { textContent: "In leftover — click to add" }));
-    }));
-    els.definitionVariableResults.querySelectorAll("button[data-variable-id]").forEach(button =>
-      button.addEventListener("click", () => toggleDefinitionVariable(button.dataset.variableId)));
-    replaceChildren(els.definitionSelectedVariables, draft.new_variable_ids.length
-      ? draft.new_variable_ids.map(id => {
-        const variable = clusterDisplayVariable(id) || state.variableById.get(id);
-        return h("button", { className: "definition-selected-variable", type: "button", dataset: { selectedVariableId: id }, title: "Remove from new group" },
-          h("span", { textContent: variable?.display_label || variable?.concept_label || id }), h("b", { textContent: "×" }));
-      })
-      : h("div", { className: "small-note", textContent: "No variables picked yet. Click a point, search result, or draw around variables." }));
-    els.definitionSelectedVariables.querySelectorAll("button[data-selected-variable-id]").forEach(button =>
-      button.addEventListener("click", () => toggleDefinitionVariable(button.dataset.selectedVariableId, false)));
-    const neighbors = definitionNeighbors();
-    els.definitionAddNeighbors.disabled = !neighbors.length;
-    replaceChildren(els.definitionNeighborResults, neighbors.map(neighbor => {
-      const variable = clusterDisplayVariable(neighbor.variable_id) || state.variableById.get(neighbor.variable_id);
-      return h("button", { className: "result-button", type: "button", dataset: { neighborId: neighbor.variable_id } },
-        h("strong", { textContent: variable?.display_label || variable?.concept_label || neighbor.variable_id }),
-        h("span", { textContent: `LLM rank ${neighbor.llm_rank || ""}; cosine ${Number(neighbor.cosine_similarity || 0).toFixed(3)}` }));
-    }));
-    els.definitionNeighborResults.querySelectorAll("button[data-neighbor-id]").forEach(button =>
-      button.addEventListener("click", () => toggleDefinitionVariable(button.dataset.neighborId, true)));
-  } else {
-    els.definitionNewLabel.value = draft.new_label || "";
-    replaceChildren(els.definitionReviewVariables, draft.new_variable_ids.map(id => {
-      const variable = clusterDisplayVariable(id) || state.variableById.get(id);
-      return h("div", { className: "definition-review-variable", textContent: variable?.display_label || variable?.concept_label || id });
-    }));
-    replaceChildren(els.definitionResidualLabels, definitionSources().map(source => {
-      const inputId = `residual_${source.group_id}`;
-      return h("div", { className: "definition-residual-row" },
-        h("label", { className: "dag-label", htmlFor: inputId, textContent: `Leftover from ${source.label || source.group_id} (${definitionResidualIds(source).length})` }),
-        h("input", { id: inputId, className: "search-input", dataset: { residualId: source.group_id }, value: draft.residual_labels[source.group_id] || "" }));
-    }));
-    els.definitionResidualLabels.querySelectorAll("input[data-residual-id]").forEach(input =>
-      input.addEventListener("input", () => { draft.residual_labels[input.dataset.residualId] = input.value; persistProjectLocally(); }));
-    const affected = draft.mode === "edit" ? [] : affectedDefinitionManualEdges();
-    replaceChildren(els.definitionManualReview, affected.length ? [h("h3", { textContent: "Review affected manual records" }),
-      affected.map(edge => h("div", { className: "definition-manual-row" },
-        h("div", { textContent: `${groupById(edge.source_group_id)?.label || edge.source_group_id} → ${groupById(edge.target_group_id)?.label || edge.target_group_id}` }),
-        h("select", { className: "select-input", dataset: { manualId: edge.edge_id } },
-          h("option", { value: "keep", textContent: "Keep with leftover" }), h("option", { value: "move", textContent: "Move to new variable" }),
-          h("option", { value: "remove", textContent: "Remove" }))))] : []);
-    els.definitionManualReview.querySelectorAll("select[data-manual-id]").forEach(select => {
-      select.value = draft.manual_edge_dispositions[select.dataset.manualId] || "keep";
-      select.addEventListener("change", () => { draft.manual_edge_dispositions[select.dataset.manualId] = select.value; persistProjectLocally(); });
-    });
-    els.definitionSave.textContent = draft.mode === "edit" ? "Update split"
-      : `Save and use as ${draft.role.toUpperCase()}`;
-  }
-}
-
-function saveDefinition() {
-  const draft = state.definitionDraft;
-  if (!draft) return;
-  draft.new_label = clean(els.definitionNewLabel.value);
-  for (const input of els.definitionResidualLabels.querySelectorAll("input[data-residual-id]")) {
-    draft.residual_labels[input.dataset.residualId] = clean(input.value);
-  }
-  try {
-    for (const snap of draft.source_snapshot) {
-      const current = groupById(snap.group_id);
-      if (!current || JSON.stringify(current.variable_ids) !== JSON.stringify(snap.variable_ids)) {
-        throw new Error(`Source category ${snap.label} changed while this definition was open.`);
-      }
-    }
-    const before = takeSnapshot();
-    const newGroupId = draft.existing_new_group_id || `g_split_${Date.now()}`;
-    const operation = draft.mode === "edit" ? projectOps.updateSplitCategories : projectOps.splitCategories;
-    const next = operation(state.project, {
-      sourceGroupIds: draft.source_group_ids, newGroupId, newLabel: draft.new_label,
-      residualLabels: draft.residual_labels,
-      newVariableIds: expandToClusterMembers(draft.new_variable_ids), timestamp: nowIso(),
-      role: draft.role, manualEdgeDispositions: draft.manual_edge_dispositions,
-      splitId: draft.split_id,
-    });
-    applyProjectOperation(next);
-    state.definitionDraft = null;
-    state.selectedVariableIds.clear();
-    state.activeGroupId = null;
-    state.focusedGroupId = newGroupId;
-    state.phase = "build";
-    state.workflowMode = "group_review";
-    state.changingAnchorSide = null;
-    invalidateMapCaches();
-    addToUndoHistory(draft.mode === "edit" ? `Updated split "${draft.new_label}"`
-      : `Defined "${draft.new_label}" as ${draft.role.toUpperCase()}`, before);
-    setMapMode("select");
-    renderAll();
-  } catch (error) {
-    els.definitionValidation.textContent = error?.message || String(error);
-  }
-}
-
-function installDefinitionHandlers() {
-  els.definitionCancel.addEventListener("click", cancelDefinition);
-  els.definitionSourceSearch.addEventListener("input", renderDefinition);
-  els.definitionContinue.addEventListener("click", continueDefinition);
-  els.definitionVariableSearch.addEventListener("input", renderDefinition);
-  els.definitionAddNeighbors.addEventListener("click", () => {
-    const selected = new Set(state.definitionDraft?.new_variable_ids || []);
-    for (const neighbor of definitionNeighbors().slice(0, 8)) selected.add(neighbor.variable_id);
-    state.definitionDraft.new_variable_ids = [...selected];
-    state.selectedVariableIds = new Set(selected);
-    invalidateMapCaches();
-    renderAll();
-  });
-  els.definitionBack.addEventListener("click", () => {
-    state.definitionDraft.step = "sources"; state.selectedVariableIds.clear();
-    invalidateMapCaches(); renderAll();
-  });
-  els.definitionReview.addEventListener("click", () => {
-    if (!definitionCanReview()) return;
-    state.definitionDraft.step = "review"; renderAll();
-  });
-  els.definitionReviewBack.addEventListener("click", () => {
-    state.definitionDraft.new_label = clean(els.definitionNewLabel.value);
-    state.definitionDraft.step = "partition"; renderAll();
-  });
-  els.definitionNewLabel.addEventListener("input", () => {
-    if (state.definitionDraft) state.definitionDraft.new_label = els.definitionNewLabel.value;
-    persistProjectLocally();
-  });
-  els.definitionSave.addEventListener("click", saveDefinition);
-}
+function startDefinition(role) { return definitionWorkflowController.startDefinition(role); }
+function startEditSplit(groupId = null) { return definitionWorkflowController.startEditSplit(groupId); }
+function cancelDefinition() { return definitionWorkflowController.cancelDefinition(); }
+function definitionSources() { return definitionWorkflowController.definitionSources(); }
+function continueDefinition() { return definitionWorkflowController.continueDefinition(); }
+function definitionResidualIds(source) { return definitionWorkflowController.definitionResidualIds(source); }
+function toggleDefinitionVariable(variableId, add = null) { return definitionWorkflowController.toggleDefinitionVariable(variableId, add); }
+function affectedDefinitionManualEdges() { return definitionWorkflowController.affectedDefinitionManualEdges(); }
+function definitionCanReview() { return definitionWorkflowController.definitionCanReview(); }
+function definitionNeighbors() { return definitionWorkflowController.definitionNeighbors(); }
+function renderDefinition() { return definitionWorkflowController.renderDefinition(); }
+function saveDefinition() { return definitionWorkflowController.saveDefinition(); }
+function installDefinitionHandlers() { return definitionWorkflowController.installDefinitionHandlers(); }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
 
@@ -1129,94 +638,17 @@ function selectActiveAnchor() { return groupEditorController.selectActiveAnchor(
 function finishSchemaChoice(loadSchema) { return groupEditorController.finishSchemaChoice(loadSchema); }
 // ─── Grouping set management ──────────────────────────────────────────────────
 
-function activeGroupingSet() {
-  return (state.data.grouping_sets || []).find((s) => s.grouping_set_id === state.project.active_grouping_set_id)
-    || (state.data.grouping_sets || [])[0];
-}
+function activeGroupingSet() { return groupingSetController.active(); }
 
-async function copyPermalink() {
-  if (state.interfaceMode === "dag2") return publicationController.share();
-  const schema = activeGroupingSet();
-  if (!schemaMatchesProject(schema, state.project)) return window.alert(CUSTOM_SCHEMA_INSTRUCTIONS);
-  const dataVersion = state.data?.snapshot?.snapshot_id;
-  if (!dataVersion) return window.alert("This dataset has no immutable snapshot ID, so an exact permalink cannot be created.");
-  const url = buildPermalink({ location: window.location, schemaUrl: groupingSchemaUrl(), dataVersion, state });
-  if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
-  else window.prompt("Copy this permalink:", url);
-}
+function copyPermalink() { return groupingSetController.copyPermalink(); }
 
-function currentWorkingGroupingSchema() {
-  const source = activeGroupingSet() || {};
-  const canonicalByVariableId = state.clusterOf;
-  const owners = new Map();
-  const groups = state.project.groups.filter(group => group.variable_ids?.length).map(group => {
-    const variable_ids = [...new Set(group.variable_ids.map(id => canonicalByVariableId.get(id) || id))].sort();
-    for (const id of variable_ids) {
-      const owner = owners.get(id);
-      if (owner && owner !== group.group_id) throw new Error(`Canonical variable ${id} belongs to both ${owner} and ${group.group_id}.`);
-      owners.set(id, group.group_id);
-    }
-    return {
-      group_id: group.group_id,
-      label: group.label || "",
-      notes: group.notes || "",
-      source: group.source || "project_export",
-      ...(Number.isFinite(group.similarity_coherence) ? { similarity_coherence: group.similarity_coherence } : {}),
-      variable_ids,
-    };
-  });
-  const rejected_variables = rejectedVariableEntries().map(entry => ({
-    variable_id: entry.variable_id,
-    member_variable_ids: [...new Set(entry.member_variable_ids || [])].sort(),
-    label: entry.label || "",
-    reason: entry.reason || "low_quality",
-    flagged_at: "",
-    previous_group_ids: [...new Set(entry.previous_group_ids || [])].sort(),
-  }));
-  return {
-    schema_version: GROUPING_FORMAT_VERSION,
-    grouping_set_id: source.grouping_set_id || state.project.active_grouping_set_id,
-    label: source.label || "Published working schema",
-    description: source.description || "Published working grouping schema.",
-    cache_compatibility: structuredClone(source.cache_compatibility || state.data.cache_compatibility || {}),
-    built_against: structuredClone(source.built_against || source.cache_compatibility || state.data.cache_compatibility || {}),
-    membership_unit: GROUPING_MEMBERSHIP_UNIT,
-    ...(source.migration_provenance ? { migration_provenance: structuredClone(source.migration_provenance) } : {}),
-    groups,
-    rejected_variables,
-    hidden_variable_ids: [...rejectedVariableIdSet()].sort(),
-  };
-}
+function currentWorkingGroupingSchema() { return groupingSetController.workingSchema(); }
 
 function renderGroupingSetControls() {
   setupGroupController.renderGroupingControls();
 }
 
-function applyActiveGroupingSet() {
-  const groupingSet = activeGroupingSet();
-  if (!groupingSet) return [];
-  if (state.interfaceMode === "dag2") {
-    applyProjectOperation(projectOps.replaceSchemaGroups(
-      state.project, groupingSet, state.clusterOf, state.clusterMembers,
-    ));
-    normalizeProjectDuplicateAssignments();
-    const iv = groupById(state.project.iv_group_id);
-    const dv = groupById(state.project.dv_group_id);
-    const anchorsReady = Boolean(iv?.variable_ids?.length && dv?.variable_ids?.length);
-    state.phase = anchorsReady ? "build" : "select_iv";
-    state.workflowMode = anchorsReady ? "group_review" : "setup";
-    state.changingAnchorSide = null;
-    if (!anchorsReady) {
-      state.selectedUoa = null;
-      state.uoaFilterEnabled = false;
-    }
-    return groupingSet.groups.map(group => group.group_id);
-  }
-  const result = projectOps.importSchemaGroups(state.project, groupingSet, state.linkLookup, nowIso());
-  applyProjectOperation(result.project);
-  if (!result.anchorsReady) state.filterDagByCausalRelevance = false;
-  return result.loadedGroupIds;
-}
+function applyActiveGroupingSet() { return groupingSetController.applyActive(); }
 
 function candidateInputs() {
   return { variables: state.variableById, similarityEdgeMap: state.similarityEdgeMap, linkLookup: state.linkLookup };
@@ -1250,30 +682,7 @@ function renderGroupList() {
 
 // ─── Grouping schema folder export ───────────────────────────────────────────
 
-async function exportGroupingFolder() {
-  const button = els.exportGroupingFolder;
-  button.disabled = true;
-  const originalLabel = button.textContent;
-  button.textContent = "Building ZIP…";
-  try {
-    const timestamp = nowIso();
-    const schema = currentWorkingGroupingSchema();
-    const folder = await writeGroupingSchemaFolder(schema);
-    const archive = makeZip([...folder].map(([name, data]) => ({ name, data })));
-    state.project.grouping_exports.push({
-      grouping_set_id: schema.grouping_set_id,
-      exported_at: timestamp,
-      format: `${GROUPING_FORMAT_VERSION}-folder`,
-    });
-    exportController.downloadBlob(new Blob([archive], { type: "application/zip" }), "grouping_schema.zip");
-  } catch (error) {
-    console.error("Could not export grouping schema folder", error);
-    window.alert(error?.message || "Could not export the grouping schema folder.");
-  } finally {
-    button.textContent = originalLabel;
-    button.disabled = false;
-  }
-}
+function exportGroupingFolder() { return groupingSetController.exportFolder(); }
 
 // ─── DAG / Link aggregation ───────────────────────────────────────────────────
 
@@ -1590,6 +999,18 @@ const uoaController = createUoaController({
   state, elements: els, visibleVariables, groupById, clusterRep, truncate, renderAll,
 });
 
+const toolbarPresenter = createToolbarPresenter({
+  state, elements: els, dagGroups, groupById, visibleVariables, uoaMatches,
+  clusterRep, rejectedVariableIdSet,
+});
+
+const definitionWorkflowController = createDefinitionWorkflowController({
+  state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll,
+  setMapMode, fitMap, groupById, persistProjectLocally, visibleVariables, searchVariables,
+  clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
+  takeSnapshot, addToUndoHistory, clean, truncate, resizeMap,
+});
+
 const projectController = createDagProjectController({
   state, storage: window.localStorage, storagePrefix: PROJECT_STORAGE_PREFIX,
   nowIso, invalidateMapCaches, renderAll, renderUndoRedo, renderActionHistory,
@@ -1665,6 +1086,20 @@ const publicationController = createPublicationController({
   },
   setPublicationState: publication => { state.project.publication = publication; },
   saveWorkingState: persistProjectLocally,
+});
+
+const groupingSetController = createGroupingSetController({
+  state, elements: els, publicationController, exportController,
+  rejectedVariableEntries, rejectedVariableIdSet, applyProjectOperation,
+  normalizeProjectDuplicateAssignments, groupById, nowIso,
+});
+
+const projectBootstrap = createProjectBootstrap({
+  state, initElements, installHandlers, installDefinitionHandlers, resizeMap,
+  restoreProjectLocally, initializeProject, loadLatestSchemaGroups,
+  normalizeProjectDuplicateAssignments, saveProjectLocally, publicationController,
+  renderAll, constrainMapTransform, drawMap, fitMap, dagNetworkController,
+  buildDuplicateClusters, linkKey, pairKey,
 });
 
 // Stable adapter names keep event wiring and browser smoke-test hooks simple.
