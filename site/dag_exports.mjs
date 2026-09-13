@@ -7,7 +7,19 @@ export const METHOD_DOI = "10.31235/osf.io/zr5vf_v1";
 export const METHOD_BIB_KEY = "dagbuilder";
 
 function isDoi(id) {
-  return typeof id === "string" && /^10\.\d{4,}\/\S+/.test(id.trim());
+  return typeof id === "string" && /^10\.\d{4,}\/\S+$/.test(id.trim());
+}
+
+export function escapeBibTexValue(value) {
+  const replacements = new Map([
+    ["\\", "{\\textbackslash}"], ["{", "\\{"], ["}", "\\}"],
+    ["#", "\\#"], ["%", "\\%"], ["&", "\\&"], ["_", "\\_"], ["$", "\\$"],
+    ["~", "{\\textasciitilde}"], ["^", "{\\textasciicircum}"],
+  ]);
+  return String(value ?? "")
+    .replace(/[\\{}#%&_$~^]/g, character => replacements.get(character))
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function makeBibKey(data, doi, usedKeys) {
@@ -21,7 +33,9 @@ function makeBibKey(data, doi, usedKeys) {
 }
 
 function makeBibEntry(data, doi, key) {
-  const authors = (data.author || []).map(a => [a.family, a.given].filter(Boolean).join(", ")).join(" and ");
+  const authors = (data.author || []).map(a => (
+    [a.family, a.given].filter(Boolean).map(escapeBibTexValue).join(", ")
+  )).join(" and ");
   const year = data.published?.["date-parts"]?.[0]?.[0] || data["published-online"]?.["date-parts"]?.[0]?.[0] || "";
   const title = (data.title || [])[0] || "";
   const journal = (data["container-title"] || [])[0] || "";
@@ -32,14 +46,14 @@ function makeBibEntry(data, doi, key) {
   return [
     `@${type}{${key},`,
     authors   ? `  author  = {${authors}},`  : null,
-    title     ? `  title   = {${title}},`    : null,
-    journal   ? `  journal = {${journal}},`  : null,
-    year      ? `  year    = {${year}},`     : null,
-    volume    ? `  volume  = {${volume}},`   : null,
-    issue     ? `  number  = {${issue}},`    : null,
-    pages     ? `  pages   = {${pages}},`    : null,
-    doi       ? `  doi     = {${doi}},`      : null,
-    doi       ? `  url     = {https://doi.org/${doi}},` : null,
+    title     ? `  title   = {${escapeBibTexValue(title)}},`    : null,
+    journal   ? `  journal = {${escapeBibTexValue(journal)}},`  : null,
+    year      ? `  year    = {${escapeBibTexValue(year)}},`     : null,
+    volume    ? `  volume  = {${escapeBibTexValue(volume)}},`   : null,
+    issue     ? `  number  = {${escapeBibTexValue(issue)}},`    : null,
+    pages     ? `  pages   = {${escapeBibTexValue(pages)}},`    : null,
+    doi       ? `  doi     = {${escapeBibTexValue(doi)}},`      : null,
+    doi       ? `  url     = {${escapeBibTexValue(`https://doi.org/${doi}`)}},` : null,
     "}",
   ].filter(Boolean).join("\n");
 }
@@ -63,7 +77,7 @@ export function buildBibText(dois, metadataByDoi) {
   const methodData = metadataByDoi.get(METHOD_DOI);
   const methodEntry = methodData
     ? makeBibEntry(methodData, METHOD_DOI, METHOD_BIB_KEY)
-    : `@misc{${METHOD_BIB_KEY},\n  doi = {${METHOD_DOI}},\n  url = {https://doi.org/${METHOD_DOI}},\n}`;
+    : `@misc{${METHOD_BIB_KEY},\n  doi = {${escapeBibTexValue(METHOD_DOI)}},\n  url = {${escapeBibTexValue(`https://doi.org/${METHOD_DOI}`)}},\n}`;
 
   const paperEntries = dois.map(doi => {
     const data = metadataByDoi.get(doi);
@@ -73,7 +87,7 @@ export function buildBibText(dois, metadataByDoi) {
       while (usedKeys.has(k)) k = base + String.fromCharCode(suffix++);
       usedKeys.add(k);
       keyMap.set(doi, k);
-      return `% Could not fetch: ${doi}\n@misc{${k},\n  doi = {${doi}},\n  url = {https://doi.org/${doi}},\n}`;
+      return `% Could not fetch: ${doi}\n@misc{${k},\n  doi = {${escapeBibTexValue(doi)}},\n  url = {${escapeBibTexValue(`https://doi.org/${doi}`)}},\n}`;
     }
     const key = makeBibKey(data, doi, usedKeys);
     keyMap.set(doi, key);

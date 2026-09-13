@@ -33,9 +33,11 @@ for (const scenario of ['normal', 'empty', 'bidirectional', 'missing-group', 'sv
     const before = structuredClone({ input, metadata });
     const expected = await legacyExports(input, metadata, timestamp, svg);
     const bibliography = exports.buildBibText(exports.collectAllDagDois(input), metadata);
-    assert.deepEqual(bibliography, expected.bibliography);
-    assert.deepEqual(exports.buildMarkdownFiles(input, bibliography, svg), expected.md);
-    assert.deepEqual(exports.buildLatexFiles(input, bibliography, svg), expected.tex);
+    assert.deepEqual(bibliography.keyMap, expected.bibliography.keyMap);
+    const expectedMd = expected.md.map(file => file.name === 'references.bib' ? { ...file, data: bibliography.bibText } : file);
+    const expectedTex = expected.tex.map(file => file.name === 'references.bib' ? { ...file, data: bibliography.bibText } : file);
+    assert.deepEqual(exports.buildMarkdownFiles(input, bibliography, svg), expectedMd);
+    assert.deepEqual(exports.buildLatexFiles(input, bibliography, svg), expectedTex);
     assert.deepEqual(exports.buildWorkingMapPayload(input, timestamp), expected.working);
     assert.deepEqual(exports.buildProjectPayload(input, timestamp), expected.payload);
     assert.deepEqual({ input, metadata }, before);
@@ -52,6 +54,36 @@ test('citation collisions follow DOI order independently of metadata arrival ord
   assert.equal(a.keyMap.get(dois[0]), 'smith2020');
   assert.equal(a.keyMap.get(dois[1]), 'smith2020b');
   assert.match(a.bibText, /@misc\{dagbuilder,/);
+});
+
+test('BibTeX fields escape control characters without changing author separators', () => {
+  const doi = '10.1234/value_with-special';
+  const metadata = new Map([[doi, {
+    author: [{ family: 'O{Neil}', given: 'A&B' }, { family: 'Back\\Slash', given: 'C' }],
+    published: { 'date-parts': [[2024]] },
+    title: ['Cost_50% {draft}\nnext #1'],
+    'container-title': ['Money & Markets'], volume: '2_1', issue: '$3', page: '1~2',
+    type: 'journal-article',
+  }]]);
+  const { bibText } = exports.buildBibText([doi], metadata);
+  assert.match(bibText, /author  = \{O\\\{Neil\\\}, A\\&B and Back\{\\textbackslash\}Slash, C\}/);
+  assert.match(bibText, /title   = \{Cost\\_50\\% \\\{draft\\\} next \\#1\}/);
+  assert.match(bibText, /journal = \{Money \\& Markets\}/);
+  assert.match(bibText, /volume  = \{2\\_1\}/);
+  assert.match(bibText, /number  = \{\\\$3\}/);
+  assert.match(bibText, /pages   = \{1\{\\textasciitilde\}2\}/);
+  assert.match(bibText, /doi     = \{10\.1234\/value\\_with-special\}/);
+});
+
+test('DOI collection rejects identifiers containing trailing injected content', () => {
+  const input = {
+    visibleLinks: [{ a_to_b_raw_link_ids: ['safe', 'unsafe'], b_to_a_raw_link_ids: [] }],
+    rawLinksById: new Map([
+      ['safe', { paper_id: '10.1234/safe_doi' }],
+      ['unsafe', { paper_id: '10.1234/valid\n@misc{injected}' }],
+    ]),
+  };
+  assert.deepEqual(exports.collectAllDagDois(input), ['10.1234/safe_doi']);
 });
 
 test('project serialization owns its format and save timestamp', () => {
