@@ -3,7 +3,7 @@ import { PRODUCTION_APP_ORIGIN } from "./dag_data_config.mjs";
 import { loadGroupingSchemaFolder } from "./grouping_schema_loader.mjs";
 import { canonicalFolderHash } from "./grouping_schema_writer.mjs";
 import { buildPermalink } from "./dag_permalink.mjs";
-import { COMPILED_DAG_PATH, COMPILED_MANIFEST_PATH, sha256Hex, stableJsonBytes,
+import { COMPILED_DAG_PATH, sha256Hex, stableJsonBytes,
   validateCompiledArtifact } from "./compiled_dag.mjs";
 
 export const PUBLISHED_SCHEMA_BUCKET = "published-schemas";
@@ -75,8 +75,11 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
   let compiledDag = null;
   let compiledFallbackReason = null;
   try {
+    if (!publication.compiled_manifest_path || !publication.compiler_version) {
+      throw new Error("Published schema has no compiled DAG artifact.");
+    }
     const [manifestResponse, dagResponse] = await Promise.all([
-      cachingFetch(new URL(publication.compiled_manifest_path || COMPILED_MANIFEST_PATH, baseUrl)),
+      cachingFetch(new URL(publication.compiled_manifest_path, baseUrl)),
       cachingFetch(new URL(COMPILED_DAG_PATH, baseUrl)),
     ]);
     if (!manifestResponse.ok || !dagResponse.ok) throw new Error("Published schema has no compiled DAG artifact.");

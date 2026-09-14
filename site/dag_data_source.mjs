@@ -59,12 +59,6 @@ export class ParquetManifestDagDataSource {
     if (!publicationId) {
       this.groupingSet = await loadGroupingSchema(this.schemaUrl);
       this.loadedPublication = null;
-    } else {
-      const manifestEvidenceIds = new Set([this.manifest.snapshot_id,
-        this.manifest.cache_compatibility?.record_signature, this.manifest.record_signature].filter(Boolean));
-      if (this.loadedPublication.evidence_snapshot && !manifestEvidenceIds.has(this.loadedPublication.evidence_snapshot)) {
-        throw new Error("Legacy publication evidence snapshot does not match the current evidence manifest.");
-      }
     }
 
     this.onStatus("Starting query engine…");
