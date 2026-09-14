@@ -21,3 +21,24 @@ test("R2 evidence is the sole configured evidence source", () => {
   assert.match(evidenceManifestUrl({ href: "https://viewer.example/" }),
     /^https:\/\/data\.epistemicinfra\.org\/evidence\/snapshots\//);
 });
+
+test("permalinks and publications select their matching immutable evidence snapshot", () => {
+  const snapshot = "295d1e544255dacd869bfb09e8546cd020ace7b06a976280658e66c28af5f230";
+  const expected = `https://data.epistemicinfra.org/evidence/snapshots/${snapshot}/manifest.json`;
+  assert.equal(evidenceManifestUrl({ href: `https://viewer.example/?data_version=${snapshot}` }), expected);
+  assert.equal(evidenceManifestUrl({ href: "https://viewer.example/" }, snapshot), expected);
+});
+
+test("a permalink data_version takes precedence over the publication fallback", () => {
+  const permalinkSnapshot = "295d1e544255dacd869bfb09e8546cd020ace7b06a976280658e66c28af5f230";
+  const publicationSnapshot = "0cbb5b3bf27fbcde88e82cf5d810b8ad6c2cfbe9fdfea1b60be8f1e500a9b4ac";
+  assert.equal(
+    evidenceManifestUrl({ href: `https://viewer.example/?data_version=${permalinkSnapshot}` }, publicationSnapshot),
+    `https://data.epistemicinfra.org/evidence/snapshots/${permalinkSnapshot}/manifest.json`,
+  );
+});
+
+test("invalid snapshot parameters cannot alter the evidence path", () => {
+  const normal = evidenceManifestUrl({ href: "https://viewer.example/" });
+  assert.equal(evidenceManifestUrl({ href: "https://viewer.example/?data_version=../../private" }), normal);
+});

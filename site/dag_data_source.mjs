@@ -43,6 +43,9 @@ export class ParquetManifestDagDataSource {
       const loaded = await loadPublishedSchema(publicationId);
       this.groupingSet = loaded.schema;
       this.loadedPublication = loaded.publication;
+      // Detail rows must come from the same immutable evidence snapshot that
+      // produced the compiled DAG, rather than whichever snapshot is the app default.
+      this.manifestUrl = evidenceManifestUrl(globalThis.location, loaded.publication.evidence_snapshot);
       if (loaded.compiledDag && !this.skipCompiledOnce) {
         this.compiledPublishedLoad = loaded;
         return;

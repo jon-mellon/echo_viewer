@@ -1,5 +1,7 @@
 export const PRODUCTION_EVIDENCE_MANIFEST =
   "https://data.epistemicinfra.org/evidence/snapshots/0cbb5b3bf27fbcde88e82cf5d810b8ad6c2cfbe9fdfea1b60be8f1e500a9b4ac/manifest.json";
+export const PRODUCTION_EVIDENCE_SNAPSHOT_BASE =
+  "https://data.epistemicinfra.org/evidence/snapshots/";
 
 export const PRODUCTION_APP_ORIGIN = "https://echo.epistemicinfra.org";
 
@@ -22,11 +24,19 @@ export function isLocalDevelopment(location = globalThis.location) {
   return Boolean(location && ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname));
 }
 
-/** A local URL may opt into another snapshot; deployed builds always use R2. */
-export function evidenceManifestUrl(location = globalThis.location) {
+/** Resolve immutable evidence snapshots on R2; local development may use an explicit manifest. */
+export function evidenceManifestUrl(location = globalThis.location, evidenceSnapshot = "") {
   if (isLocalDevelopment(location)) {
     const override = new URL(location.href).searchParams.get("evidence_manifest");
     if (override) return new URL(override, location.origin).href;
+  }
+  // A permalink's explicit snapshot is the reproducibility contract. The
+  // publication binding is only a fallback for shorter ?schema= links.
+  const requested = (location ? new URL(location.href).searchParams.get("data_version") : "")
+    || evidenceSnapshot
+    || "";
+  if (/^[0-9a-f]{64}$/i.test(requested)) {
+    return `${PRODUCTION_EVIDENCE_SNAPSHOT_BASE}${requested.toLowerCase()}/manifest.json`;
   }
   return PRODUCTION_EVIDENCE_MANIFEST;
 }
