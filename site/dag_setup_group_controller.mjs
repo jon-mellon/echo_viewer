@@ -3,6 +3,18 @@ import * as searchModel from "./dag_search.mjs";
 import * as workflow from "./dag_workflow.mjs";
 import { h, replaceChildren } from "./dom_builder.mjs";
 
+export function dag2AnchorPickerIsActive(state, side, groupById) {
+  const iv = groupById(state.project?.iv_group_id);
+  const dv = groupById(state.project?.dv_group_id);
+  const ivSet = Boolean(iv?.variable_ids?.length);
+  const dvSet = Boolean(dv?.variable_ids?.length);
+  const changingIv = state.changingAnchorSide === "iv";
+  const changingDv = state.changingAnchorSide === "dv";
+  return side === "iv"
+    ? !ivSet || changingIv
+    : ivSet && (!dvSet || changingDv) && !changingIv;
+}
+
 export function createDagSetupGroupController({
   state, elements, escapeHtml, normalized, truncate, groupById,
   assignGroupAsAnchor, setMapMode, renderAll, roleLabels, dagProjectView, startDefinition,
@@ -120,7 +132,10 @@ export function createDagSetupGroupController({
   function renderSetupPicker(side) {
     const container = side === "dv" ? elements.dvGroupPicker : elements.ivGroupPicker;
     if (!container) return;
-    if (state.definitionDraft || state.workflowMode !== "setup" || state.phase !== `select_${side}`) {
+    const pickerIsActive = state.interfaceMode === "dag2"
+      ? dag2AnchorPickerIsActive(state, side, groupById)
+      : state.workflowMode === "setup" && state.phase === `select_${side}`;
+    if (state.definitionDraft || !pickerIsActive) {
       container.hidden = true; container.replaceChildren(); return;
     }
     const input = side === "dv" ? elements.dvInput : elements.ivInput;
