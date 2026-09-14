@@ -69,6 +69,16 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     finishStartupLoading();
+    if (state.data.published_schema_ready) {
+      const revision = state.compiledDagRevision || 0;
+      void state.data.published_schema_ready.then(({ schema }) => {
+        if ((state.compiledDagRevision || 0) !== revision) return;
+        state.data.grouping_sets = [schema];
+        loadLatestSchemaGroups();
+        normalizeProjectDuplicateAssignments();
+        renderAll();
+      }).catch(error => console.error("Could not finish loading the published schema.", error));
+    }
   }
 
   async function loadDagData(layoutSource = "") {

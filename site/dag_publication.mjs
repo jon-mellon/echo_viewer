@@ -7,7 +7,7 @@ import { createCompiledArtifacts, evidenceSnapshotForSchema, fullCompileDag,
   COMPILED_DAG_PATH, COMPILED_MANIFEST_PATH, DAG_COMPILER_VERSION } from "/compiled_dag.mjs";
 
 export const CANONICAL_BASELINE_ID = "a0118906-2366-4cc8-8809-bafdf3860c23";
-export const CANONICAL_BASELINE_HASH = "6732ed0bb2bce913c8b6611903f6c5d12ebccf3d5dc4f020887f5422515d7dfb";
+export const CANONICAL_BASELINE_HASH = "0afd5f28c1b5456c47cfba84467bea1d62c6dc923a5851281a98d461f60066b4";
 
 export function formatSupabaseError(error) {
   if (!error) return "Unknown Supabase error";

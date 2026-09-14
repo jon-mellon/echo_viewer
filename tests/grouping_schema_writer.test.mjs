@@ -4,7 +4,7 @@ import { webcrypto } from "node:crypto";
 import { canonicalFolderHash, writeGroupingSchemaFolder } from "../site/grouping_schema_writer.mjs";
 
 const schema = {
-  schema_version: "groupings-v2",
+  schema_version: "groupings-v3",
   grouping_set_id: "stable-schema",
   label: "Stable schema",
   description: "Fixture",
@@ -37,11 +37,13 @@ test("folder manifest lists every reconstruction artifact and emits normalized T
   const files = await writeGroupingSchemaFolder(schema, webcrypto);
   const decode = path => new TextDecoder().decode(files.get(path));
   const manifest = JSON.parse(decode("manifest.json"));
-  assert.equal(manifest.format_version, "groupings-v2");
-  assert.deepEqual(manifest.group_files, ["groups/a.yaml", "groups/z.yaml"]);
-  assert.deepEqual(manifest.membership_shards, ["memberships/0000.tsv", "memberships/0001.tsv"]);
+  assert.equal(manifest.format_version, "groupings-v3");
+  assert.equal(manifest.groups_file, "groups.tsv");
+  assert.deepEqual(manifest.group_membership_files,
+    { a: "memberships/a.tsv", z: "memberships/z.tsv" });
   assert.equal(manifest.rejected_file, "rejected.tsv");
-  assert.equal(decode("memberships/0000.tsv"), "variable_id\tgroup_id\nv000001\ta\nv000002\ta\n");
+  assert.equal(decode("memberships/a.tsv"), "variable_id\nv000001\nv000002\n");
+  assert.match(decode("groups.tsv"), /^group_id\tmetadata\n/);
   assert.ok([...files.values()].every(bytes => new TextDecoder().decode(bytes).endsWith("\n")));
 });
 

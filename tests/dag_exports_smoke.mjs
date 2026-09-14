@@ -85,7 +85,7 @@ try {
   for (const [method, name, schema] of [
     ['exportProject', 'dag_project.json', 'dag-builder-project-v1'],
     ['exportWorkingMap', 'working_causal_map.json', 'working-causal-map-v1'],
-    ['exportReusableGroupingSet', 'grouping_set.json', 'groupings-v2'],
+    ['exportReusableGroupingSet', 'grouping_set.json', 'groupings-v3'],
   ]) {
     const event = page.waitForEvent('download');
     await page.evaluate(method => exportTest[method](), method);

@@ -86,6 +86,12 @@ async function mapWithConcurrency(items, concurrency, operation) {
  * @returns {Promise<GroupingSchema>}
  */
 export async function loadGroupingSchemaFolder(baseUrl, fetchImpl = fetch) {
+  const staged = await loadGroupingSchemaStructure(baseUrl, fetchImpl);
+  return staged.loadComplete();
+}
+
+/** Load schema/group metadata first, then allow memberships to be prioritized by group. */
+export async function loadGroupingSchemaStructure(baseUrl, fetchImpl = fetch) {
   const base = new URL(baseUrl, globalThis.location?.href || "http://localhost/");
   if (!base.pathname.endsWith("/")) base.pathname += "/";
   const manifestUrl = new URL("manifest.json", base);
@@ -104,37 +110,69 @@ export async function loadGroupingSchemaFolder(baseUrl, fetchImpl = fetch) {
   if (present.has("built_against")) schema.built_against = manifest.built_against || {};
   if (present.has("migration_provenance")) schema.migration_provenance = manifest.provenance || {};
 
+  if (!manifest.groups_file || !manifest.group_membership_files) {
+    throw new Error("Grouping schema manifest is missing per-group membership files.");
+  }
   const groups = new Map();
-  await mapWithConcurrency(manifest.group_files || [], 6, async (relative) => {
-    const group = parseYamlMapping(await fetchText(new URL(relative, base), fetchImpl), relative);
-    if (!group.group_id || groups.has(group.group_id)) throw new Error(`Invalid or duplicate group_id in ${relative}.`);
-    group.variable_ids = [];
-    groups.set(group.group_id, group);
-  });
-  const owners = new Map();
-  const shardRows = await mapWithConcurrency(manifest.membership_shards || [], 6, async (relative) => (
-    parseTsv(await fetchText(new URL(relative, base), fetchImpl), relative)
-  ));
-  for (const row of shardRows.flat()) {
-    if (!groups.has(row.group_id)) throw new Error(`Membership for ${row.variable_id} references unknown group ${row.group_id}.`);
-    if (owners.has(row.variable_id)) throw new Error(`Duplicate membership for ${row.variable_id}.`);
-    owners.set(row.variable_id, row.group_id);
-    groups.get(row.group_id).variable_ids.push(row.variable_id);
+  const groupRows = parseTsv(await fetchText(new URL(manifest.groups_file, base), fetchImpl), manifest.groups_file);
+  for (const row of groupRows) {
+    if (!row.group_id || groups.has(row.group_id)) throw new Error(`Invalid or duplicate group_id in ${manifest.groups_file}.`);
+    let metadata;
+    try {
+      metadata = JSON.parse(row.metadata || "{}");
+    } catch {
+      throw new Error(`Invalid group metadata for ${row.group_id} in ${manifest.groups_file}.`);
+    }
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+      throw new Error(`Invalid group metadata for ${row.group_id} in ${manifest.groups_file}.`);
+    }
+    groups.set(row.group_id, { group_id: row.group_id, ...metadata, variable_ids: [] });
+  }
+  const membershipEntries = Object.entries(manifest.group_membership_files);
+  if (membershipEntries.length !== groups.size || membershipEntries.some(([groupId]) => !groups.has(groupId))) {
+    throw new Error("Grouping schema membership file map does not match groups.tsv.");
+  }
+  const owners = new Map(), loadedGroups = new Set();
+  async function loadMemberships(groupIds) {
+    const wanted = [...new Set(groupIds)].filter(groupId => groups.has(groupId) && !loadedGroups.has(groupId));
+    const membershipRows = await mapWithConcurrency(wanted, 6, async groupId => {
+      const relative = manifest.group_membership_files[groupId];
+      return { groupId, rows: parseTsv(await fetchText(new URL(relative, base), fetchImpl), relative) };
+    });
+    for (const { groupId, rows } of membershipRows) {
+      const variableIds = [];
+      for (const row of rows) {
+        if (!row.variable_id) throw new Error(`Empty variable_id in membership file for ${groupId}.`);
+        if (owners.has(row.variable_id)) throw new Error(`Duplicate membership for ${row.variable_id}.`);
+        owners.set(row.variable_id, groupId);
+        variableIds.push(row.variable_id);
+      }
+      groups.get(groupId).variable_ids = variableIds.sort();
+      loadedGroups.add(groupId);
+    }
+    return schema;
   }
   schema.groups = [...groups.values()].sort((a, b) => a.group_id.localeCompare(b.group_id));
-  for (const group of schema.groups) group.variable_ids.sort();
-
-  schema.rejected_variables = [];
-  if (manifest.rejected_file) {
-    const rows = parseTsv(
-      await fetchText(new URL(manifest.rejected_file, base), fetchImpl), manifest.rejected_file,
-    );
-    schema.rejected_variables = rows.map((row) => {
-      for (const column of LIST_COLUMNS) row[column] = JSON.parse(row[column] || "[]");
-      return row;
-    });
+  let rejectionPromise = null;
+  async function loadRejected() {
+    if (!rejectionPromise) rejectionPromise = (async () => {
+      schema.rejected_variables = [];
+      if (manifest.rejected_file) {
+        const rows = parseTsv(await fetchText(new URL(manifest.rejected_file, base), fetchImpl), manifest.rejected_file);
+        schema.rejected_variables = rows.map(row => {
+          for (const column of LIST_COLUMNS) row[column] = JSON.parse(row[column] || "[]");
+          return row;
+        });
+      }
+      return schema.rejected_variables;
+    })();
+    return rejectionPromise;
   }
-  return validateGroupingSchema(schema);
+  async function loadComplete() {
+    await Promise.all([loadMemberships(membershipEntries.map(([groupId]) => groupId)), loadRejected()]);
+    return validateGroupingSchema(schema);
+  }
+  return { schema, manifest, loadMemberships, loadRejected, loadComplete, loadedGroups };
 }
 
 /**

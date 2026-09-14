@@ -1,8 +1,10 @@
 import { supabase } from "./supabase_client.mjs";
 import { PRODUCTION_APP_ORIGIN } from "./dag_data_config.mjs";
-import { loadGroupingSchemaFolder } from "./grouping_schema_loader.mjs";
+import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
+import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contracts.mjs";
 import { canonicalFolderHash } from "./grouping_schema_writer.mjs";
 import { buildPermalink } from "./dag_permalink.mjs";
+import { deriveDagView } from "./dag_view.mjs";
 import { COMPILED_DAG_PATH, sha256Hex, stableJsonBytes,
   validateCompiledArtifact } from "./compiled_dag.mjs";
 
@@ -47,31 +49,35 @@ export async function lookupPublishedSchema(publicationId, client = supabase) {
 export async function loadPublishedSchema(publicationId, client = supabase, fetchImpl = globalThis.fetch) {
   const publication = await lookupPublishedSchema(publicationId, client);
   const baseUrl = publicSchemaBaseUrl(client, publication.storage_prefix);
-  const files = new Map();
-  const cachingFetch = async (url, options) => {
+  const memory = new Map();
+  const cacheName = `echo-published-${publication.content_hash}`;
+  const cachingFetch = async (url, options = {}) => {
     const absolute = new URL(url).href;
-    const relative = absolute.slice(new URL(baseUrl).href.length);
-    if (!files.has(relative)) {
-      let response;
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        response = await fetchImpl(absolute, options);
-        if (response.status !== 429) break;
-        const retryAfter = Number(response.headers.get("retry-after"));
-        const delay = Number.isFinite(retryAfter) && retryAfter > 0
-          ? retryAfter * 1000
-          : 250 * (2 ** attempt);
-        await new Promise(resolve => setTimeout(resolve, delay));
+    if (!memory.has(absolute)) {
+      const browserCache = globalThis.caches ? await globalThis.caches.open(cacheName) : null;
+      const cached = browserCache ? await browserCache.match(absolute) : null;
+      if (cached) memory.set(absolute, new Uint8Array(await cached.arrayBuffer()));
+      else {
+        let response;
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          response = await fetchImpl(absolute, options);
+          if (response.status !== 429) break;
+          const retryAfter = Number(response.headers.get("retry-after"));
+          const delay = Number.isFinite(retryAfter) && retryAfter > 0
+            ? retryAfter * 1000
+            : 250 * (2 ** attempt);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        if (!response.ok) return response;
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        memory.set(absolute, bytes);
+        if (browserCache) await browserCache.put(absolute, new Response(bytes, {
+          status: 200, headers: { "content-type": response.headers?.get?.("content-type") || "application/octet-stream" },
+        }));
       }
-      if (!response.ok) return response;
-      files.set(relative, new Uint8Array(await response.arrayBuffer()));
     }
-    return new Response(files.get(relative), { status: 200 });
+    return new Response(memory.get(absolute), { status: 200 });
   };
-  const schema = await loadGroupingSchemaFolder(baseUrl, cachingFetch);
-  const downloadedHash = await canonicalFolderHash(files);
-  if (downloadedHash !== publication.content_hash) {
-    throw new Error(`Published schema hash mismatch: registry ${publication.content_hash}, downloaded ${downloadedHash}.`);
-  }
   let compiledDag = null;
   let compiledFallbackReason = null;
   try {
@@ -93,5 +99,57 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
   } catch (error) {
     compiledFallbackReason = error instanceof Error ? error.message : String(error);
   }
-  return { schema, publication, compiledDag, compiledFallbackReason };
+  if (!compiledDag) {
+    throw new Error(`Published schema has no valid compiled DAG: ${compiledFallbackReason}`);
+  }
+  const schema = {
+    schema_version: GROUPING_FORMAT_VERSION,
+    grouping_set_id: publication.id,
+    label: publication.title || "Published grouping schema",
+    description: publication.description || "",
+    membership_unit: GROUPING_MEMBERSHIP_UNIT,
+    built_against: { record_signature: publication.evidence_snapshot },
+    cache_compatibility: { record_signature: publication.evidence_snapshot },
+    groups: compiledDag.nodes.map(node => ({ group_id: node.group_id, label: node.label,
+      variable_ids: [] })),
+    rejected_variables: [],
+  };
+  const schemaReady = (async () => {
+    const schemaFiles = new Map();
+    const schemaFetch = async (url, options) => {
+      const response = await cachingFetch(url, options);
+      if (response.ok) {
+        const relative = new URL(url).href.slice(new URL(baseUrl).href.length);
+        schemaFiles.set(relative, new Uint8Array(await response.clone().arrayBuffer()));
+      }
+      return response;
+    };
+    const staged = await loadGroupingSchemaStructure(baseUrl, schemaFetch);
+    const parameters = new URL(globalThis.location?.href || "http://localhost/").searchParams;
+    const bool = (key, fallback) => parameters.has(key) ? parameters.get(key) === "1" : fallback;
+    const ivId = parameters.get("iv"), dvId = parameters.get("dv");
+    const displayed = parameters.get("p") === "1" && ivId && dvId
+      ? [...deriveDagView({
+          groups: schema.groups,
+          links: compiledDag.edges,
+          ivId,
+          dvId,
+          maxPathLength: Math.max(1, Math.min(99, Number(parameters.get("path")) || 1)),
+          excludeBottlenecked: bool("bottle", true),
+          filterByCausalRelevance: bool("causal", true),
+          showConfoundersOnly: bool("conf", false),
+          showCollidersOnly: bool("coll", false),
+          hideIrrelevantDiagnosticLinks: bool("paths", true),
+        }).componentGroupIds]
+      : [ivId, dvId].filter(Boolean);
+    await staged.loadMemberships(displayed);
+    const priorityReady = structuredClone(staged.schema);
+    const complete = await staged.loadComplete();
+    const downloadedHash = await canonicalFolderHash(schemaFiles);
+    if (downloadedHash !== publication.content_hash) {
+      throw new Error(`Published schema hash mismatch: registry ${publication.content_hash}, downloaded ${downloadedHash}.`);
+    }
+    return { schema: complete, priorityReady };
+  })();
+  return { schema, schemaReady, publication, compiledDag, compiledFallbackReason };
 }

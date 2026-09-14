@@ -1,6 +1,5 @@
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contracts.mjs";
 export { GROUPING_FORMAT_VERSION } from "./app_contracts.mjs";
-const SHARD_SIZE = 1000;
 const SCHEMA_KEYS = ["schema_version", "grouping_set_id", "label", "description"];
 const REJECTED_COLUMNS = [
   "variable_id", "member_variable_ids", "label", "reason", "flagged_at", "previous_group_ids",
@@ -43,18 +42,12 @@ function stableJson(value) {
 
 function groupFilename(groupId) {
   if (!groupId) throw new Error("Every published group must have a non-empty group_id.");
-  return `${encodeURIComponent(groupId).replace(/[!'()*]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)}.yaml`;
+  return `${encodeURIComponent(groupId).replace(/[!'()*]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)}.tsv`;
 }
 
 async function sha256Hex(bytes, cryptoApi) {
   const digest = await cryptoApi.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function shardName(variableId, cryptoApi) {
-  const match = /^v(\d+)$/.exec(variableId);
-  if (match) return `${String(Math.floor(Number(match[1]) / SHARD_SIZE)).padStart(4, "0")}.tsv`;
-  return `h${(await sha256Hex(new TextEncoder().encode(variableId), cryptoApi)).slice(0, 4)}.tsv`;
 }
 
 function validateSchema(schema) {
@@ -89,27 +82,18 @@ export async function writeGroupingSchemaFolder(schema, cryptoApi = globalThis.c
   schemaValues.schema_version = GROUPING_FORMAT_VERSION;
   textFiles.set("schema.yaml", mapping(schemaValues, SCHEMA_KEYS));
 
-  const groupFiles = [];
-  const memberships = new Map();
+  const groupRows = [];
+  const groupMembershipFiles = {};
   for (const group of [...schema.groups].sort((left, right) => compareText(left.group_id, right.group_id))) {
-    const relative = `groups/${groupFilename(group.group_id)}`;
-    groupFiles.push(relative);
     const definition = Object.fromEntries(Object.entries(group).filter(([key]) => key !== "variable_ids"));
-    textFiles.set(relative, mapping(definition, ["group_id", "label", "notes", "similarity_coherence"]));
-    for (const variableId of [...new Set(group.variable_ids)].sort()) {
-      const filename = await shardName(variableId, cryptoApi);
-      if (!memberships.has(filename)) memberships.set(filename, []);
-      memberships.get(filename).push({ variable_id: variableId, group_id: group.group_id });
-    }
+    delete definition.group_id;
+    groupRows.push({ group_id: group.group_id, metadata: stableJson(definition).trimEnd() });
+    const relative = `memberships/${groupFilename(group.group_id)}`;
+    groupMembershipFiles[group.group_id] = relative;
+    const rows = [...new Set(group.variable_ids)].sort(compareText).map(variable_id => ({ variable_id }));
+    textFiles.set(relative, tsv(rows, ["variable_id"]));
   }
-
-  const membershipShards = [];
-  for (const filename of [...memberships.keys()].sort()) {
-    const relative = `memberships/${filename}`;
-    membershipShards.push(relative);
-    const rows = memberships.get(filename).sort((left, right) => compareText(left.variable_id, right.variable_id));
-    textFiles.set(relative, tsv(rows, ["variable_id", "group_id"]));
-  }
+  textFiles.set("groups.tsv", tsv(groupRows, ["group_id", "metadata"]));
 
   let rejectedFile = null;
   if (schema.rejected_variables?.length) {
@@ -129,13 +113,8 @@ export async function writeGroupingSchemaFolder(schema, cryptoApi = globalThis.c
   const manifest = {
     format_version: GROUPING_FORMAT_VERSION,
     schema_file: "schema.yaml",
-    group_files: groupFiles,
-    membership_shards: membershipShards,
-    membership_sharding: {
-      indexed_id_pattern: "^v([0-9]+)$",
-      indexed_id_shard_size: SHARD_SIZE,
-      fallback: "h + first 4 lowercase hex characters of SHA-256(variable_id)",
-    },
+    groups_file: "groups.tsv",
+    group_membership_files: groupMembershipFiles,
     membership_unit: schema.membership_unit,
     rejected_file: rejectedFile,
     compatibility: schema.cache_compatibility || {},

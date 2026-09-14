@@ -7,8 +7,8 @@ const source = await readFile(new URL("../site/published_schema_loader.mjs", imp
 test("publication loader resolves the registry before loading the public folder", () => {
   assert.match(source, /from\("published_schemas"\)/);
   assert.match(source, /\.eq\("id", publicationId\)/);
-  assert.match(source, /loadGroupingSchemaFolder\(baseUrl, cachingFetch\)/);
-  assert.match(source, /canonicalFolderHash\(files\)/);
+  assert.match(source, /loadGroupingSchemaStructure\(baseUrl, schemaFetch\)/);
+  assert.match(source, /canonicalFolderHash\(schemaFiles\)/);
   assert.match(source, /Published schema hash mismatch/);
 });
 
