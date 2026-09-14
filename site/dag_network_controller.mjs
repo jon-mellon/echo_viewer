@@ -278,8 +278,11 @@ function highlightConfounderPaths(groupId) {
 
 let _dagRenderWorker = null;
 let _dagRenderRequest = 0;
+let _dagRenderedPromise = Promise.resolve();
 
 function renderDag() {
+  let resolveRendered;
+  _dagRenderedPromise = new Promise(resolve => { resolveRendered = resolve; });
   clearLogicalDagEdgeHover();
   clearConfounderPathHover();
   const groups = dagVisibleGroups();
@@ -308,6 +311,7 @@ function renderDag() {
   if (typeof Worker === "undefined") {
     const { layout, routes } = computeDagRender(input);
     applyDagRender(groups, layout, routes);
+    resolveRendered();
     return;
   }
   const worker = new Worker(new URL("./dag_layout_worker.mjs", import.meta.url), { type: "module" });
@@ -322,6 +326,7 @@ function renderDag() {
     worker.terminate();
     if (_dagRenderWorker === worker) _dagRenderWorker = null;
     applyDagRender(groups, layout, event.data.routes);
+    resolveRendered();
   });
   worker.addEventListener("error", () => {
     if (requestId !== _dagRenderRequest) return;
@@ -329,6 +334,7 @@ function renderDag() {
     if (_dagRenderWorker === worker) _dagRenderWorker = null;
     const { layout, routes } = computeDagRender(input);
     applyDagRender(groups, layout, routes);
+    resolveRendered();
   }, { once: true });
   worker.postMessage({ requestId, input });
 }
@@ -450,6 +456,7 @@ function edgeHoverText(link) {
     clampNumber, visNetworkOptions, dagStudyArrowCorridor, routedDagData,
     routedDagDataFromRoutes, dagVisibleGroups, renderDag, minimumDagScale,
     highlightConfounderPaths, clearConfounderPathHover, clearLogicalDagEdgeHover,
+    whenRendered: () => _dagRenderedPromise,
     getNetwork: () => _visNetwork, getNodes: () => _visNodes, getEdges: () => _visEdges,
     getPathLaneSegments: () => _dagPathLaneSegments,
     zoomIn: () => _visNetwork?.moveTo({ scale: _visNetwork.getScale() * 1.3 }),

@@ -58,6 +58,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     }
     setStartupStage("Rendering graph…");
     renderAll();
+    await dagNetworkController.whenRendered?.();
     if (state.permalinkMapViewport) {
       constrainMapTransform();
       drawMap();
