@@ -901,12 +901,22 @@ function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 
 function renderEdgeInspector() {
   const selected = (state.project?.links || []).find(edge => edge.edge_id === state.selectedEdgeId);
-  const missing = [...(selected?.a_to_b_raw_link_ids || []), ...(selected?.b_to_a_raw_link_ids || [])]
-    .filter(id => !state.rawLinksById.has(id));
-  if (missing.length && !state.pendingEdgeEvidence) {
+  const rawIds = [...new Set([...(selected?.a_to_b_raw_link_ids || []), ...(selected?.b_to_a_raw_link_ids || [])])];
+  const missing = rawIds.filter(id => !state.rawLinksById.has(id));
+  const loadedVariableIds = () => [...new Set(rawIds.flatMap(id => {
+    const link = state.rawLinksById.get(id);
+    return link ? [link.source_variable_id, link.target_variable_id] : [];
+  }).filter(Boolean))];
+  const missingVariables = loadedVariableIds().filter(id => !state.variableById.has(id));
+  if ((missing.length || missingVariables.length) && !state.pendingEdgeEvidence) {
     state.pendingEdgeEvidence = true;
-    void dagDataSource.loadRawLinksByIds(missing).then(links => {
+    void (missing.length ? dagDataSource.loadRawLinksByIds(missing) : Promise.resolve([])).then(async links => {
       for (const link of links) state.rawLinksById.set(link.raw_causal_link_id, link);
+      const variableIds = loadedVariableIds().filter(id => !state.variableById.has(id));
+      if (variableIds.length) {
+        const variables = await dagDataSource.loadVariableMetadata(variableIds, state.variableLayoutSource);
+        for (const variable of variables) state.variableById.set(variable.variable_id, variable);
+      }
       state.pendingEdgeEvidence = false;
       inspectorController.renderEdge();
       inspectorController.renderProvenance();
