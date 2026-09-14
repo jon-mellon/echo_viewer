@@ -9,6 +9,8 @@ export function createDagAppState(interfaceMode = "classic") {
     variables: [], variableById: new Map(), clusterOf: new Map(), clusterMembers: new Map(),
     rawLinks: [], rawLinksById: new Map(), linkLookup: new Map(), similarityEdgeMap: new Map(),
     compiledDag: null, compiledDagValid: false,
+    publishedSchemaHydrating: false, publishedSchemaHydrated: true, publishedSchemaLoadFailed: false,
+    publishedMembershipReadyGroups: new Set(),
     project: null,
     seeds: { iv: new Set(), dv: new Set() },
     searchMatches: { iv: [], dv: [] },

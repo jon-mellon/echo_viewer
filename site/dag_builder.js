@@ -601,6 +601,13 @@ function seedLabel(side) { return groupEditorController.seedLabel(side); }
 // Event handlers retain group references through edits. Apply pure results while
 // preserving those identities; snapshots deliberately replace them on undo.
 function applyProjectOperation(next) {
+  if (state.publishedSchemaHydrating || state.publishedSchemaLoadFailed) {
+    if (els.publicationStatus) {
+      els.publicationStatus.textContent = "Group memberships are still loading. Editing will unlock when they are ready.";
+      els.publicationStatus.classList.add("publication-error");
+    }
+    return false;
+  }
   const oldProject = state.project;
   const asSchema = project => ({ groups: (project?.groups || []).map(group => ({
     group_id: group.group_id, label: group.label || "", variable_ids: [...(group.variable_ids || [])],
@@ -697,7 +704,15 @@ function renderGroupEditor() {
       console.warn("Could not lazily load group variable metadata.", error);
     });
   }
-  return groupEditorController.renderGroupEditor();
+  const result = groupEditorController.renderGroupEditor();
+  if ((state.publishedSchemaHydrating || state.publishedSchemaLoadFailed) && els.groupEditorSection) {
+    els.groupEditorSection.querySelectorAll("input, textarea, select, button").forEach(control => {
+      if (control === els.cancelGroupEdit || control === els.zoomGroup) return;
+      control.disabled = true;
+      control.title = "Editing unlocks when all published-schema memberships have loaded.";
+    });
+  }
+  return result;
 }
 function renderGroupSeedSearch() { return groupEditorController.renderGroupSeedSearch(); }
 function renderNeighborSuggestions(group) { return groupEditorController.renderNeighborSuggestions(group); }
@@ -1184,6 +1199,7 @@ const publicationController = createPublicationController({
   },
   getWorkingSchema: currentWorkingGroupingSchema,
   getCompiledDag: () => state.compiledDagValid && !state.compiledDagUpdating ? state.compiledDag : null,
+  canPublish: () => !state.publishedSchemaHydrating && !state.publishedSchemaLoadFailed,
   getCompileInput: async () => {
     if (state.compiledDagValid && !state.compiledDagUpdating) {
       return { project: dagProjectView(), linkLookup: state.linkLookup, rawLinksById: state.rawLinksById };

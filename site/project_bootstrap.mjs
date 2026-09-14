@@ -71,14 +71,36 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     finishStartupLoading();
     if (state.data.load_published_schema) {
       const revision = state.compiledDagRevision || 0;
-      void state.data.load_published_schema().then(({ schema }) => {
-        if ((state.compiledDagRevision || 0) !== revision) return;
+      state.publishedSchemaHydrating = true;
+      state.publishedSchemaHydrated = false;
+      state.publishedSchemaLoadFailed = false;
+      state.publishedMembershipReadyGroups = new Set();
+      publicationController.setSchemaReady?.(false);
+      const applyLoadedSchema = schema => {
         state.data.grouping_sets = [schema];
         state.data.default_grouping_set_id = schema.grouping_set_id;
         loadLatestSchemaGroups();
         normalizeProjectDuplicateAssignments();
         renderAll();
-      }).catch(error => console.error("Could not finish loading the published schema.", error));
+      };
+      void state.data.load_published_schema({ onPriorityReady: ({ schema, groupIds }) => {
+        if ((state.compiledDagRevision || 0) !== revision) return;
+        state.publishedMembershipReadyGroups = new Set(groupIds);
+        applyLoadedSchema(schema);
+      } }).then(({ schema }) => {
+        if ((state.compiledDagRevision || 0) !== revision) return;
+        state.publishedMembershipReadyGroups = new Set(schema.groups.map(group => group.group_id));
+        state.publishedSchemaHydrating = false;
+        state.publishedSchemaHydrated = true;
+        state.publishedSchemaLoadFailed = false;
+        publicationController.setSchemaReady?.(true);
+        applyLoadedSchema(schema);
+      }).catch(error => {
+        state.publishedSchemaHydrating = false;
+        state.publishedSchemaLoadFailed = true;
+        publicationController.setSchemaLoadFailed?.();
+        console.error("Could not finish loading the published schema.", error);
+      });
     }
   }
 

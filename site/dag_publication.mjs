@@ -121,6 +121,7 @@ export function createPublicationController({
   saveWorkingState,
   getCompiledDag = () => null,
   getCompileInput = () => null,
+  canPublish = () => true,
   client = supabase,
   cryptoApi = globalThis.crypto,
   navigatorApi = globalThis.navigator,
@@ -216,6 +217,10 @@ export function createPublicationController({
 
   async function publish() {
     if (busy) return null;
+    if (!canPublish()) {
+      showStatus(elements.status, "Please wait for group memberships to finish loading before publishing.", true);
+      return null;
+    }
     busy = true;
     elements.publish.disabled = true;
     try {
@@ -258,7 +263,7 @@ export function createPublicationController({
       return null;
     } finally {
       busy = false;
-      elements.publish.disabled = false;
+      elements.publish.disabled = !canPublish();
     }
   }
 
@@ -305,5 +310,15 @@ export function createPublicationController({
     void refreshAuthVisibility();
   }
 
-  return { initialize, publish, share, currentCanonical, refreshAuthVisibility, refreshPublicationState, workingCopyChanged };
+  function setSchemaReady(ready) {
+    elements.publish.disabled = !ready || busy;
+    if (!ready) showStatus(elements.status, "Loading group memberships… Editing and publishing will unlock when ready.");
+  }
+
+  function setSchemaLoadFailed() {
+    elements.publish.disabled = true;
+    showStatus(elements.status, "Group memberships could not be verified. Editing and publishing remain disabled.", true);
+  }
+
+  return { initialize, publish, share, currentCanonical, refreshAuthVisibility, refreshPublicationState, workingCopyChanged, setSchemaReady, setSchemaLoadFailed };
 }

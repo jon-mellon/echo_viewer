@@ -114,7 +114,7 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
       member_count: node.member_count, variable_ids: [] })),
     rejected_variables: [],
   };
-  const loadSchema = async () => {
+  const loadSchema = async ({ onPriorityReady = () => {} } = {}) => {
     const schemaFiles = new Map();
     const schemaFetch = async (url, options) => {
       const response = await cachingFetch(url, options);
@@ -144,6 +144,7 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
       : [ivId, dvId].filter(Boolean);
     await staged.loadMemberships(displayed);
     const priorityReady = structuredClone(staged.schema);
+    await onPriorityReady({ schema: priorityReady, groupIds: displayed });
     const complete = await staged.loadComplete();
     const downloadedHash = await canonicalFolderHash(schemaFiles);
     if (downloadedHash !== publication.content_hash) {

@@ -164,7 +164,13 @@ export function createDagSetupGroupController({
       h("span", { className: "group-row-meta", textContent: `${item.variableCount} vars` })),
     item.roleLabels.length ? h("div", { className: "role-list" }, item.roleLabels.map(label => h("span", { className: "role-pill", textContent: label }))) : null,
     h("div", { className: "group-row-footer" }, h("span", { className: "group-role-label", textContent: item.anchorLabel }),
-      h("button", { className: "action-button group-open-btn", type: "button", dataset: { action: "open" }, textContent: "Open" })))));
+      h("button", { className: "action-button group-open-btn", type: "button", dataset: { action: "open" },
+        disabled: state.publishedSchemaLoadFailed || (state.publishedSchemaHydrating && !state.publishedMembershipReadyGroups.has(item.groupId)),
+        title: state.publishedSchemaLoadFailed ? "This published schema could not be verified"
+          : state.publishedSchemaHydrating && !state.publishedMembershipReadyGroups.has(item.groupId)
+            ? "This group's memberships are still loading" : "",
+        textContent: state.publishedSchemaLoadFailed ? "Unavailable"
+          : state.publishedSchemaHydrating && !state.publishedMembershipReadyGroups.has(item.groupId) ? "Loading…" : "Open" })))));
     elements.groupList.querySelectorAll("button").forEach(button => button.addEventListener("click", () => {
       const group = groupById(button.closest(".group-row").dataset.groupId);
       if (!group) return;
