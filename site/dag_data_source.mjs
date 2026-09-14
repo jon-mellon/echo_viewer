@@ -32,6 +32,7 @@ export class ParquetManifestDagDataSource {
     this.schemaUrl = schemaUrl;
     this.manifestUrl = manifestUrl;
     this.onStatus = onStatus;
+    this.registeredRelations = new Set();
   }
 
   async initialize() {
@@ -55,6 +56,8 @@ export class ParquetManifestDagDataSource {
     if (!response.ok) throw new Error(`Could not load DAG snapshot manifest ${manifestUrl.href}: HTTP ${response.status}`);
     this.manifest = await response.json();
     const files = manifestFileEntries(this.manifest.files);
+    this.manifestBaseUrl = manifestUrl;
+    this.manifestEntries = files;
     this.onStatus("Loading grouping schema…");
     if (!publicationId) {
       this.groupingSet = await loadGroupingSchema(this.schemaUrl);
@@ -71,13 +74,8 @@ export class ParquetManifestDagDataSource {
     );
     await database.instantiate(mainModule);
     this.connection = await database.connect();
-    for (const [index, { relation, sqlIdentifier, file }] of files.entries()) {
-      this.onStatus(`Preparing evidence tables (${index + 1} of ${files.length})…`);
-      const url = new URL(file.url, manifestUrl).href.replaceAll("'", "''");
-      await this.connection.query(
-        `CREATE VIEW ${sqlIdentifier} AS SELECT * FROM read_parquet('${url}')`,
-      );
-    }
+    if (!this.lazyEvidenceInit) await this.ensureRelations(files.map(file => file.relation));
+    this.lazyEvidenceInit = false;
   }
 
   async load(layoutSource = "") {
@@ -154,17 +152,24 @@ export class ParquetManifestDagDataSource {
 
   async loadVariableMetadata(variableIds, layoutSource = "") {
     await this.ensureEvidenceConnection();
+    await this.ensureRelations(["build_metadata", "variable_occurrences", "variable_layouts", "canonical_identities"]);
     if (!variableIds?.length) return [];
+    let selectedLayoutSource = layoutSource;
+    if (!selectedLayoutSource) {
+      const metadata = await queryRows(this.connection, "SELECT metadata_json FROM build_metadata");
+      selectedLayoutSource = JSON.parse(metadata[0].metadata_json).layout.default_source;
+    }
     const placeholders = variableIds.map(() => "?").join(",");
     return queryRows(this.connection, `SELECT o.*, i.canonical_variable_id, l.map_x, l.map_y
       FROM variable_occurrences o JOIN variable_layouts l USING (variable_id)
       JOIN canonical_identities i USING (variable_id, layout_source)
       WHERE l.layout_source = ? AND o.variable_id IN (${placeholders}) ORDER BY o.index`,
-      [layoutSource || this.manifest?.layout?.default_source || "", ...variableIds]);
+      [selectedLayoutSource, ...variableIds]);
   }
 
   async loadIncidentRawLinks(variableIds) {
     await this.ensureEvidenceConnection();
+    await this.ensureRelations(["causal_link_occurrences"]);
     if (!variableIds?.length) return [];
     const placeholders = variableIds.map(() => "?").join(",");
     return queryRows(this.connection, `SELECT * FROM causal_link_occurrences
@@ -174,11 +179,13 @@ export class ParquetManifestDagDataSource {
 
   async loadAllRawLinks() {
     await this.ensureEvidenceConnection();
+    await this.ensureRelations(["causal_link_occurrences"]);
     return queryRows(this.connection, "SELECT * FROM causal_link_occurrences");
   }
 
   async loadRawLinksByIds(rawLinkIds) {
     await this.ensureEvidenceConnection();
+    await this.ensureRelations(["causal_link_occurrences"]);
     if (!rawLinkIds?.length) return [];
     const placeholders = rawLinkIds.map(() => "?").join(",");
     return queryRows(this.connection, `SELECT * FROM causal_link_occurrences
@@ -187,6 +194,7 @@ export class ParquetManifestDagDataSource {
 
   async loadNeighbors(variableIds) {
     await this.ensureEvidenceConnection();
+    await this.ensureRelations(["variable_neighbors"]);
     if (!variableIds?.length) return [];
     const placeholders = variableIds.map(() => "?").join(",");
     return queryRows(this.connection, `SELECT * FROM variable_neighbors
@@ -195,13 +203,33 @@ export class ParquetManifestDagDataSource {
 
   async ensureEvidenceConnection() {
     if (this.connection) return;
+    if (this.evidenceInitialization) return this.evidenceInitialization;
     // A compiled publication intentionally deferred R2/DuckDB setup until detail
     // or editing asks for a narrowly filtered relation.
-    const saved = this.compiledPublishedLoad;
-    this.compiledPublishedLoad = null;
-    this.skipCompiledOnce = true;
-    await this.initialize();
-    this.compiledPublishedLoad = saved;
+    this.evidenceInitialization = (async () => {
+      const saved = this.compiledPublishedLoad;
+      this.compiledPublishedLoad = null;
+      this.skipCompiledOnce = true;
+      this.lazyEvidenceInit = true;
+      try {
+        await this.initialize();
+      } finally {
+        this.compiledPublishedLoad = saved;
+        this.evidenceInitialization = null;
+      }
+    })();
+    return this.evidenceInitialization;
+  }
+
+  async ensureRelations(relations) {
+    for (const relation of relations) {
+      if (this.registeredRelations.has(relation)) continue;
+      const entry = this.manifestEntries?.find(item => item.relation === relation);
+      if (!entry) throw new Error(`Evidence manifest does not define relation ${relation}.`);
+      const url = new URL(entry.file.url, this.manifestBaseUrl).href.replaceAll("'", "''");
+      await this.connection.query(`CREATE VIEW ${entry.sqlIdentifier} AS SELECT * FROM read_parquet('${url}')`);
+      this.registeredRelations.add(relation);
+    }
   }
 }
 
