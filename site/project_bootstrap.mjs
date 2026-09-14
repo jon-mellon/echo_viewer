@@ -74,6 +74,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       void state.data.load_published_schema().then(({ schema }) => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.data.grouping_sets = [schema];
+        state.data.default_grouping_set_id = schema.grouping_set_id;
         loadLatestSchemaGroups();
         normalizeProjectDuplicateAssignments();
         renderAll();
