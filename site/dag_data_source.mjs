@@ -2,7 +2,7 @@ import * as duckdb from "./vendor/duckdb/duckdb-browser.mjs";
 import { evidenceManifestUrl, groupingSchemaUrl, schemaPublicationId } from "./dag_data_config.mjs";
 import { manifestFileEntries } from "./dag_manifest.mjs";
 import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
-import { loadPublishedSchema } from "./published_schema_loader.mjs";
+import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication-v2";
 
 function plainRows(result) {
   return result.toArray().map((row) => {

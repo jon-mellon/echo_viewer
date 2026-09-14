@@ -41,6 +41,10 @@ export function computePaletteAssignment(groups, variables, palette) {
     variable.variable_id,
     { x: variable.map_x, y: variable.map_y },
   ]));
+  // Compiled publications hydrate memberships before they lazily load any R2
+  // variable coordinates. Preserve the deterministic group-id fallback until
+  // coordinates exist instead of assigning every group palette slot zero.
+  if (!worldById.size) return new Map();
   const radii = eligible.map((group) => {
     const points = group.variable_ids.map((id) => worldById.get(id)).filter(Boolean);
     if (!points.length) return 0;

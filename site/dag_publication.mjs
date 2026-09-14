@@ -313,6 +313,7 @@ export function createPublicationController({
   function setSchemaReady(ready) {
     elements.publish.disabled = !ready || busy;
     if (!ready) showStatus(elements.status, "Loading group memberships… Editing and publishing will unlock when ready.");
+    else showStatus(elements.status, "Loaded the public schema. Editing and publishing are ready.");
   }
 
   function setSchemaLoadFailed() {

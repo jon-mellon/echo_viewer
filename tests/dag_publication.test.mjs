@@ -61,3 +61,7 @@ test("published state distinguishes private working-copy changes", () => {
   assert.match(source, /Private working copy/);
   assert.match(source, /workingCopyChanged/);
 });
+
+test("completed schema hydration replaces the loading status", () => {
+  assert.match(source, /Loaded the public schema\. Editing and publishing are ready\./);
+});

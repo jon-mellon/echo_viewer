@@ -54,6 +54,7 @@ test("visual status preserves group precedence and palette assignment is determi
     [...computePaletteAssignment(groups, [{ variable_id: "b", map_x: 0, map_y: 0 }], palette).entries()],
     [["assigned", 0]],
   );
+  assert.deepEqual([...computePaletteAssignment(groups, [], palette).entries()], []);
 });
 
 test("point models contain visual decisions without canvas state", () => {
