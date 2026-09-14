@@ -40,3 +40,8 @@ export function evidenceManifestUrl(location = globalThis.location, evidenceSnap
   }
   return PRODUCTION_EVIDENCE_MANIFEST;
 }
+
+export function evidenceSnapshotIdFromManifestUrl(manifestUrl) {
+  const match = String(manifestUrl || "").match(/\/snapshots\/([0-9a-f]{64})\/manifest\.json(?:[?#]|$)/i);
+  return match?.[1]?.toLowerCase() || "";
+}

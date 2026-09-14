@@ -1,5 +1,6 @@
 import * as duckdb from "./vendor/duckdb/duckdb-browser.mjs";
-import { evidenceManifestUrl, groupingSchemaUrl, schemaPublicationId } from "./dag_data_config.mjs";
+import { evidenceManifestUrl, evidenceSnapshotIdFromManifestUrl, groupingSchemaUrl,
+  PRODUCTION_EVIDENCE_MANIFEST, schemaPublicationId } from "./dag_data_config.mjs";
 import { manifestFileEntries } from "./dag_manifest.mjs";
 import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
 import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication-v2";
@@ -43,9 +44,14 @@ export class ParquetManifestDagDataSource {
       const loaded = await loadPublishedSchema(publicationId);
       this.groupingSet = loaded.schema;
       this.loadedPublication = loaded.publication;
-      // Detail rows must come from the same immutable evidence snapshot that
-      // produced the compiled DAG, rather than whichever snapshot is the app default.
-      this.manifestUrl = evidenceManifestUrl(globalThis.location, loaded.publication.evidence_snapshot);
+      const permalinkVersion = new URL(globalThis.location?.href || "http://localhost/")
+        .searchParams.get("data_version") || "";
+      // Early publication permalinks accidentally wrote the evidence record
+      // signature as data_version. Preserve those links while newly generated
+      // links use the actual immutable snapshot-directory ID.
+      if (permalinkVersion && permalinkVersion === loaded.publication.evidence_snapshot) {
+        this.manifestUrl = PRODUCTION_EVIDENCE_MANIFEST;
+      }
       if (loaded.compiledDag && !this.skipCompiledOnce) {
         this.compiledPublishedLoad = loaded;
         return;
@@ -93,7 +99,7 @@ export class ParquetManifestDagDataSource {
         load_published_schema: this.compiledPublishedLoad.loadSchema || null,
         variables: [], raw_causal_links: [], similarity_edges: [],
         layout: { active_source: layoutSource || "", default_source: "" },
-        snapshot: { snapshot_id: publication.evidence_snapshot },
+        snapshot: { snapshot_id: evidenceSnapshotIdFromManifestUrl(this.manifestUrl) },
         load_metrics: { raw_r2_bytes_before_render: 0, raw_r2_rows_before_render: 0 },
       };
     }

@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  DEFAULT_SCHEMA_PUBLICATION_ID, evidenceManifestUrl, groupingSchemaUrl, schemaPublicationId,
+  DEFAULT_SCHEMA_PUBLICATION_ID, evidenceManifestUrl, evidenceSnapshotIdFromManifestUrl,
+  groupingSchemaUrl, schemaPublicationId,
 } from "../site/dag_data_config.mjs";
 
 test("the grouping schema defaults to the canonical Supabase publication", () => {
@@ -41,4 +42,12 @@ test("a permalink data_version takes precedence over the publication fallback", 
 test("invalid snapshot parameters cannot alter the evidence path", () => {
   const normal = evidenceManifestUrl({ href: "https://viewer.example/" });
   assert.equal(evidenceManifestUrl({ href: "https://viewer.example/?data_version=../../private" }), normal);
+});
+
+test("the permalink generator can recover the immutable directory ID from a manifest URL", () => {
+  const snapshot = "0cbb5b3bf27fbcde88e82cf5d810b8ad6c2cfbe9fdfea1b60be8f1e500a9b4ac";
+  assert.equal(evidenceSnapshotIdFromManifestUrl(
+    `https://data.epistemicinfra.org/evidence/snapshots/${snapshot}/manifest.json`,
+  ), snapshot);
+  assert.equal(evidenceSnapshotIdFromManifestUrl("https://example.test/manifest.json"), "");
 });
