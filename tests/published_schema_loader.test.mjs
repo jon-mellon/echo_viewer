@@ -12,6 +12,12 @@ test("publication loader resolves the registry before loading the public folder"
   assert.match(source, /Published schema hash mismatch/);
 });
 
+test("publication cache identity includes the compiled manifest binding", () => {
+  assert.match(source, /echo-published-v2-/);
+  assert.match(source, /publication\.content_hash/);
+  assert.match(source, /publication\.compiled_manifest_hash/);
+});
+
 test("publication permalink is independent of the storage URL", () => {
   assert.match(source, /buildPermalink\(\{/);
   assert.match(source, /dataVersion: state\.data\?\.snapshot\?\.snapshot_id/);

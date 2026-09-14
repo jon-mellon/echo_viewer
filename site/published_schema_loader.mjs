@@ -50,7 +50,10 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
   const publication = await lookupPublishedSchema(publicationId, client);
   const baseUrl = publicSchemaBaseUrl(client, publication.storage_prefix);
   const memory = new Map();
-  const cacheName = `echo-published-${publication.content_hash}`;
+  // Include the compiled manifest binding and a cache-layout revision. This keeps
+  // an artifact cached during a publication cutover from poisoning later loads
+  // after the registry has reached its final immutable state.
+  const cacheName = `echo-published-v2-${publication.content_hash}-${publication.compiled_manifest_hash || "uncompiled"}`;
   const cachingFetch = async (url, options = {}) => {
     const absolute = new URL(url).href;
     if (!memory.has(absolute)) {
