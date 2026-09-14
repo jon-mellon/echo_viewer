@@ -25,11 +25,13 @@ import { deriveDagView, excludedForConnectivity } from "/dag_view.mjs";
 import { createDagNetworkController } from "/dag_network_controller.mjs";
 import { createDagEventController } from "/dag_event_controller.mjs";
 import { createUoaController } from "/uoa_controller.mjs";
-import { createToolbarPresenter } from "/toolbar_presenter.mjs";
+import { createToolbarController } from "/toolbar_controller.mjs";
 import { createDefinitionWorkflowController } from "/definition_workflow_controller.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
 import { createGroupingSetController } from "/grouping_set_controller.mjs";
 import { createProjectBootstrap } from "/project_bootstrap.mjs";
+import { dagDataSource } from "/dag_data_source.mjs";
+import { incrementCompiledDag } from "/compiled_dag.mjs";
 import { escapeHtml } from "/text_utils.mjs";
 import { h, replaceChildren, safeUrl } from "/dom_builder.mjs";
 
@@ -381,11 +383,11 @@ function rebuildProject() {
   renderCoordinator.rebuildProject();
 }
 
-function renderMapToolbarToggles() { return toolbarPresenter.render(); }
+function renderMapToolbarToggles() { return toolbarController.render(); }
 
-function assignmentCoverage() { return toolbarPresenter.assignmentCoverage(); }
+function assignmentCoverage() { return toolbarController.assignmentCoverage(); }
 
-function renderAssignmentCoverage() { return toolbarPresenter.renderAssignmentCoverage(); }
+function renderAssignmentCoverage() { return toolbarController.renderAssignmentCoverage(); }
 
 // ─── Mode UI rendering ────────────────────────────────────────────────────────
 
@@ -599,7 +601,58 @@ function seedLabel(side) { return groupEditorController.seedLabel(side); }
 // Event handlers retain group references through edits. Apply pure results while
 // preserving those identities; snapshots deliberately replace them on undo.
 function applyProjectOperation(next) {
+  const oldProject = state.project;
+  const asSchema = project => ({ groups: (project?.groups || []).map(group => ({
+    group_id: group.group_id, label: group.label || "", variable_ids: [...(group.variable_ids || [])],
+    ...(Number.isFinite(group.similarity_coherence) ? { similarity_coherence: group.similarity_coherence } : {}),
+  })) });
+  const oldSchema = asSchema(oldProject);
   projectController.applyOperation(next);
+  if (state.compiledDagValid && state.compiledDag && oldProject) {
+    const newSchema = asSchema(next);
+    const owner = schema => new Map(schema.groups.flatMap(group => group.variable_ids.map(id => [id, group.group_id])));
+    const before = owner(oldSchema), after = owner(newSchema);
+    const changedIds = [...new Set([...before.keys(), ...after.keys()])]
+      .filter(id => before.get(id) !== after.get(id));
+    const revision = (state.compiledDagRevision || 0) + 1;
+    state.compiledDagRevision = revision;
+    if (!changedIds.length && !state.compiledDagUpdating) {
+      state.compiledDag = incrementCompiledDag({ compiledDag: state.compiledDag, oldSchema, newSchema,
+        incidentRawLinks: [], project: next });
+    } else {
+      state.compiledDagUpdating = true;
+      state.compiledUpdateBaseSchema ||= oldSchema;
+      state.compiledUpdateTargetSchema = newSchema;
+      state.compiledUpdateChangedIds ||= new Set();
+      for (const id of changedIds) state.compiledUpdateChangedIds.add(id);
+      const batchedIds = [...state.compiledUpdateChangedIds];
+      const batchBaseSchema = state.compiledUpdateBaseSchema;
+      void dagDataSource.loadIncidentRawLinks(batchedIds).then(incidentRawLinks => {
+        if (state.compiledDagRevision !== revision) return;
+        for (const link of incidentRawLinks) {
+          if (!state.rawLinksById.has(link.raw_causal_link_id)) state.rawLinks.push(link);
+          state.rawLinksById.set(link.raw_causal_link_id, link);
+          const key = linkKey(link.source_variable_id, link.target_variable_id);
+          if (!state.linkLookup.has(key)) state.linkLookup.set(key, []);
+          if (!state.linkLookup.get(key).includes(link.raw_causal_link_id)) state.linkLookup.get(key).push(link.raw_causal_link_id);
+        }
+        state.compiledDag = incrementCompiledDag({ compiledDag: state.compiledDag, oldSchema: batchBaseSchema,
+          newSchema: state.compiledUpdateTargetSchema, incidentRawLinks, project: state.project });
+        state.compiledUpdateBaseSchema = null;
+        state.compiledUpdateTargetSchema = null;
+        state.compiledUpdateChangedIds = null;
+        state.compiledDagUpdating = false;
+        renderAll();
+      }).catch(error => {
+        state.compiledDagUpdating = false;
+        state.compiledDagValid = false;
+        state.compiledUpdateBaseSchema = null;
+        state.compiledUpdateTargetSchema = null;
+        state.compiledUpdateChangedIds = null;
+        console.warn("Incremental DAG update failed; a full local recomputation is required.", error);
+      });
+    }
+  }
 }
 
 function ensureGroup(group) { return groupEditorController.ensureGroup(group); }
@@ -613,7 +666,39 @@ function activeGroup() {
 }
 function createCustomGroup() { return groupEditorController.createCustomGroup(); }
 function closeGroupEditor() { return groupEditorController.closeGroupEditor(); }
-function renderGroupEditor() { return groupEditorController.renderGroupEditor(); }
+function renderGroupEditor() {
+  const group = state.project?.groups?.find(item => item.group_id === state.activeGroupId);
+  const missing = (group?.variable_ids || []).filter(id => !state.variableById.has(id));
+  if (missing.length && !state.pendingVariableMetadata) {
+    state.pendingVariableMetadata = true;
+    void Promise.all([
+      dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource),
+      dagDataSource.loadNeighbors(missing),
+    ]).then(([variables, neighbors]) => {
+      const neighborsByVariable = new Map();
+      for (const row of neighbors) {
+        if (!neighborsByVariable.has(row.variable_id)) neighborsByVariable.set(row.variable_id, []);
+        neighborsByVariable.get(row.variable_id).push({ variable_id: row.neighbor_variable_id,
+          index: row.neighbor_index, cosine_similarity: row.cosine_similarity,
+          llm_rank: row.llm_rank, embedding_rank: row.embedding_rank,
+          is_substantive_duplicate: row.is_substantive_duplicate });
+      }
+      for (const variable of variables) {
+        if (variable.field_preview_json) variable.field_preview = JSON.parse(variable.field_preview_json);
+        if (variable.metadata_blob_json) variable.metadata_blob = JSON.parse(variable.metadata_blob_json);
+        variable.similarity_neighbors = neighborsByVariable.get(variable.variable_id) || [];
+        state.variableById.set(variable.variable_id, variable);
+      }
+      state.variables = [...state.variableById.values()].sort((a, b) => Number(a.index || 0) - Number(b.index || 0));
+      state.pendingVariableMetadata = false;
+      renderAll();
+    }).catch(error => {
+      state.pendingVariableMetadata = false;
+      console.warn("Could not lazily load group variable metadata.", error);
+    });
+  }
+  return groupEditorController.renderGroupEditor();
+}
 function renderGroupSeedSearch() { return groupEditorController.renderGroupSeedSearch(); }
 function renderNeighborSuggestions(group) { return groupEditorController.renderNeighborSuggestions(group); }
 function addVariableToGroup(group, variableId) {
@@ -687,6 +772,10 @@ function exportGroupingFolder() { return groupingSetController.exportFolder(); }
 // ─── DAG / Link aggregation ───────────────────────────────────────────────────
 
 function aggregateGroupLinks() {
+  if (state.compiledDagValid && state.compiledDag) {
+    state.project.links = structuredClone(state.compiledDag.edges || []);
+    return;
+  }
   state.project.links = deriveGroupLinks({
     project: dagProjectView(), linkLookup: state.linkLookup, rawLinksById: state.rawLinksById,
   });
@@ -796,6 +885,21 @@ function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 // ─── Edge inspector + provenance ──────────────────────────────────────────────
 
 function renderEdgeInspector() {
+  const selected = (state.project?.links || []).find(edge => edge.edge_id === state.selectedEdgeId);
+  const missing = [...(selected?.a_to_b_raw_link_ids || []), ...(selected?.b_to_a_raw_link_ids || [])]
+    .filter(id => !state.rawLinksById.has(id));
+  if (missing.length && !state.pendingEdgeEvidence) {
+    state.pendingEdgeEvidence = true;
+    void dagDataSource.loadRawLinksByIds(missing).then(links => {
+      for (const link of links) state.rawLinksById.set(link.raw_causal_link_id, link);
+      state.pendingEdgeEvidence = false;
+      inspectorController.renderEdge();
+      inspectorController.renderProvenance();
+    }).catch(error => {
+      state.pendingEdgeEvidence = false;
+      console.warn("Could not lazily load aggregate-edge evidence.", error);
+    });
+  }
   inspectorController.renderEdge();
 }
 
@@ -999,7 +1103,7 @@ const uoaController = createUoaController({
   state, elements: els, visibleVariables, groupById, clusterRep, truncate, renderAll,
 });
 
-const toolbarPresenter = createToolbarPresenter({
+const toolbarController = createToolbarController({
   state, elements: els, dagGroups, groupById, visibleVariables, uoaMatches,
   clusterRep, rejectedVariableIdSet,
 });
@@ -1008,7 +1112,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll,
   setMapMode, fitMap, groupById, persistProjectLocally, visibleVariables, searchVariables,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
-  takeSnapshot, addToUndoHistory, clean, truncate, resizeMap,
+  takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
 });
 
 const projectController = createDagProjectController({
@@ -1078,6 +1182,14 @@ const publicationController = createPublicationController({
     get share() { return els.copyPermalink; },
   },
   getWorkingSchema: currentWorkingGroupingSchema,
+  getCompiledDag: () => state.compiledDagValid && !state.compiledDagUpdating ? state.compiledDag : null,
+  getCompileInput: async () => {
+    if (state.compiledDagValid && !state.compiledDagUpdating) {
+      return { project: dagProjectView(), linkLookup: state.linkLookup, rawLinksById: state.rawLinksById };
+    }
+    const rawLinks = await dagDataSource.loadAllRawLinks();
+    return { project: dagProjectView(), rawLinks };
+  },
   getPublicationState: () => state.project?.publication || null,
   getPermalinkState: () => {
     const network = dagNetworkController.getNetwork();

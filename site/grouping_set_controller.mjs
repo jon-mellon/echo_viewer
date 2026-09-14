@@ -4,10 +4,12 @@ import { buildPermalink, CUSTOM_SCHEMA_INSTRUCTIONS, schemaMatchesProject } from
 import { writeGroupingSchemaFolder } from "./grouping_schema_writer.mjs";
 import { makeZip } from "./dag_export_zip.mjs";
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contracts.mjs";
+import { createGroupingSetPresenter } from "./grouping_set_presenter.mjs";
 
 export function createGroupingSetController({ state, elements, publicationController, exportController,
   rejectedVariableEntries, rejectedVariableIdSet, applyProjectOperation, normalizeProjectDuplicateAssignments,
   groupById, nowIso }) {
+  const presenter = createGroupingSetPresenter({ elements });
   function active() {
     return (state.data.grouping_sets || []).find(set => set.grouping_set_id === state.project.active_grouping_set_id)
       || (state.data.grouping_sets || [])[0];
@@ -82,10 +84,7 @@ export function createGroupingSetController({ state, elements, publicationContro
   }
 
   async function exportFolder() {
-    const button = elements.exportGroupingFolder;
-    button.disabled = true;
-    const originalLabel = button.textContent;
-    button.textContent = "Building ZIP…";
+    const originalLabel = presenter.beginExport();
     try {
       const timestamp = nowIso();
       const schema = workingSchema();
@@ -96,10 +95,9 @@ export function createGroupingSetController({ state, elements, publicationContro
       exportController.downloadBlob(new Blob([archive], { type: "application/zip" }), "grouping_schema.zip");
     } catch (error) {
       console.error("Could not export grouping schema folder", error);
-      window.alert(error?.message || "Could not export the grouping schema folder.");
+      presenter.showExportError(error);
     } finally {
-      button.textContent = originalLabel;
-      button.disabled = false;
+      presenter.endExport(originalLabel);
     }
   }
 

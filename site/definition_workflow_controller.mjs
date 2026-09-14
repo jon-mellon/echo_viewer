@@ -1,11 +1,10 @@
 import * as projectOps from "./dag_project.mjs";
-import * as searchModel from "./dag_search.mjs";
-import { h, replaceChildren } from "./dom_builder.mjs";
+import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
   invalidateMapCaches, renderAll, setMapMode, fitMap, groupById, persistProjectLocally,
   visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
-  applyProjectOperation, takeSnapshot, addToUndoHistory, clean, truncate, resizeMap }) {
+  applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap }) {
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv"].includes(role)) return;
     state.definitionDraft = {
@@ -133,123 +132,34 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       || Number(b.cosine_similarity || 0) - Number(a.cosine_similarity || 0)).slice(0, 12);
   }
 
-  function renderDefinition() {
-    const draft = state.definitionDraft;
-    const wasSpatial = document.body.classList.contains("defining-variable");
-    const isSpatial = Boolean(draft && draft.step !== "sources");
-    document.body.classList.toggle("defining-variable", isSpatial);
-    // The map is display:none in the normal DAG2 layout, so its initial canvas
-    // backing store is 1x1. Resize only after the browser has laid out the
-    // temporary spatial workspace, including when a saved draft is resumed.
-    if (isSpatial && !wasSpatial) requestAnimationFrame(() => {
-      resizeMap();
-      fitMap(draft.eligible_variable_ids);
-    });
-    els.definitionBlock.hidden = !draft;
-    if (!draft) return;
-    els.definitionTitle.textContent = draft.mode === "edit" ? "Edit split"
-      : `Define new ${draft.role.toUpperCase()}`;
-    els.definitionSourcesStep.hidden = draft.step !== "sources";
-    els.definitionPartitionStep.hidden = draft.step !== "partition";
-    els.definitionReviewStep.hidden = draft.step !== "review";
-    els.definitionBack.hidden = draft.mode === "edit";
-    if (draft.step === "sources") {
-      const query = normalized(els.definitionSourceSearch.value);
-      const selected = new Set(draft.source_group_ids);
-      const groups = (state.project.groups || []).map((group, index) =>
-        searchModel.anchorGroupSearchMatch(group, query, index, state.variableById))
-        .filter(item => item.group.variable_ids?.length && item.matches).slice(0, 60);
-      replaceChildren(els.definitionSourceList, groups.map(({ group, variableMatch }) =>
-        h("div", { className: "definition-source-row" }, h("label", {},
-          h("span", { className: "definition-source-main" }, h("strong", { textContent: group.label || group.group_id }),
-            h("span", { textContent: `${new Set(group.variable_ids.map(clusterRep)).size} canonical` })),
-          variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched: ${truncate(variableMatch, 72)}` }) : null),
-        h("input", { type: "checkbox", dataset: { sourceId: group.group_id }, checked: selected.has(group.group_id) }))));
-      els.definitionSourceList.querySelectorAll("input[data-source-id]").forEach(input => input.addEventListener("change", () => {
-        const ids = new Set(draft.source_group_ids);
-        if (input.checked) ids.add(input.dataset.sourceId); else ids.delete(input.dataset.sourceId);
-        draft.source_group_ids = [...ids];
-        renderDefinition(); persistProjectLocally();
-      }));
-      const count = definitionSources().reduce((sum, group) =>
-        sum + new Set(group.variable_ids.map(clusterRep)).size, 0);
-      els.definitionContinue.disabled = !selected.size;
-      els.definitionContinue.textContent = selected.size
-        ? `Continue with ${selected.size} categories (${count} variables)` : "Choose categories to continue";
-    } else if (draft.step === "partition") {
-      const residualText = definitionSources().map(source =>
-        `${source.label}: ${definitionResidualIds(source).length} leftover`).join(" · ");
-      els.definitionCounts.textContent = `${draft.new_variable_ids.length} in new variable · ${residualText}`;
-      els.definitionReview.disabled = !definitionCanReview();
-      const selectedIds = new Set(draft.new_variable_ids);
-      const matches = searchVariables(els.definitionVariableSearch.value, visibleVariables().length)
-        .filter(variable => !selectedIds.has(clusterRep(variable.variable_id)))
-        .slice(0, 30);
-      replaceChildren(els.definitionVariableResults, matches.map(variable => {
-        const id = clusterRep(variable.variable_id);
-        return h("button", { className: "result-button", type: "button", dataset: { variableId: id } },
-          h("strong", { textContent: variable.display_label || variable.concept_label || id }),
-          h("span", { textContent: truncate(variable.raw_variable_text || variable.concept_label, 90) }),
-          h("span", { textContent: "In leftover — click to add" }));
-      }));
-      els.definitionVariableResults.querySelectorAll("button[data-variable-id]").forEach(button =>
-        button.addEventListener("click", () => toggleDefinitionVariable(button.dataset.variableId)));
-      replaceChildren(els.definitionSelectedVariables, draft.new_variable_ids.length
-        ? draft.new_variable_ids.map(id => {
-          const variable = clusterDisplayVariable(id) || state.variableById.get(id);
-          return h("button", { className: "definition-selected-variable", type: "button", dataset: { selectedVariableId: id }, title: "Remove from new group" },
-            h("span", { textContent: variable?.display_label || variable?.concept_label || id }), h("b", { textContent: "×" }));
-        })
-        : h("div", { className: "small-note", textContent: "No variables picked yet. Click a point, search result, or draw around variables." }));
-      els.definitionSelectedVariables.querySelectorAll("button[data-selected-variable-id]").forEach(button =>
-        button.addEventListener("click", () => toggleDefinitionVariable(button.dataset.selectedVariableId, false)));
-      const neighbors = definitionNeighbors();
-      els.definitionAddNeighbors.disabled = !neighbors.length;
-      replaceChildren(els.definitionNeighborResults, neighbors.map(neighbor => {
-        const variable = clusterDisplayVariable(neighbor.variable_id) || state.variableById.get(neighbor.variable_id);
-        return h("button", { className: "result-button", type: "button", dataset: { neighborId: neighbor.variable_id } },
-          h("strong", { textContent: variable?.display_label || variable?.concept_label || neighbor.variable_id }),
-          h("span", { textContent: `LLM rank ${neighbor.llm_rank || ""}; cosine ${Number(neighbor.cosine_similarity || 0).toFixed(3)}` }));
-      }));
-      els.definitionNeighborResults.querySelectorAll("button[data-neighbor-id]").forEach(button =>
-        button.addEventListener("click", () => toggleDefinitionVariable(button.dataset.neighborId, true)));
-    } else {
-      els.definitionNewLabel.value = draft.new_label || "";
-      replaceChildren(els.definitionReviewVariables, draft.new_variable_ids.map(id => {
-        const variable = clusterDisplayVariable(id) || state.variableById.get(id);
-        return h("div", { className: "definition-review-variable", textContent: variable?.display_label || variable?.concept_label || id });
-      }));
-      replaceChildren(els.definitionResidualLabels, definitionSources().map(source => {
-        const inputId = `residual_${source.group_id}`;
-        return h("div", { className: "definition-residual-row" },
-          h("label", { className: "dag-label", htmlFor: inputId, textContent: `Leftover from ${source.label || source.group_id} (${definitionResidualIds(source).length})` }),
-          h("input", { id: inputId, className: "search-input", dataset: { residualId: source.group_id }, value: draft.residual_labels[source.group_id] || "" }));
-      }));
-      els.definitionResidualLabels.querySelectorAll("input[data-residual-id]").forEach(input =>
-        input.addEventListener("input", () => { draft.residual_labels[input.dataset.residualId] = input.value; persistProjectLocally(); }));
-      const affected = draft.mode === "edit" ? [] : affectedDefinitionManualEdges();
-      replaceChildren(els.definitionManualReview, affected.length ? [h("h3", { textContent: "Review affected manual records" }),
-        affected.map(edge => h("div", { className: "definition-manual-row" },
-          h("div", { textContent: `${groupById(edge.source_group_id)?.label || edge.source_group_id} → ${groupById(edge.target_group_id)?.label || edge.target_group_id}` }),
-          h("select", { className: "select-input", dataset: { manualId: edge.edge_id } },
-            h("option", { value: "keep", textContent: "Keep with leftover" }), h("option", { value: "move", textContent: "Move to new variable" }),
-            h("option", { value: "remove", textContent: "Remove" }))))] : []);
-      els.definitionManualReview.querySelectorAll("select[data-manual-id]").forEach(select => {
-        select.value = draft.manual_edge_dispositions[select.dataset.manualId] || "keep";
-        select.addEventListener("change", () => { draft.manual_edge_dispositions[select.dataset.manualId] = select.value; persistProjectLocally(); });
-      });
-      els.definitionSave.textContent = draft.mode === "edit" ? "Update split"
-        : `Save and use as ${draft.role.toUpperCase()}`;
-    }
+  function setSourceSelection(sourceId, selected) {
+    const ids = new Set(state.definitionDraft?.source_group_ids || []);
+    if (selected) ids.add(sourceId); else ids.delete(sourceId);
+    state.definitionDraft.source_group_ids = [...ids];
+    persistProjectLocally();
+    renderDefinition();
   }
+
+  function setResidualLabel(groupId, label) {
+    if (!state.definitionDraft) return;
+    state.definitionDraft.residual_labels[groupId] = label;
+    persistProjectLocally();
+  }
+
+  function setManualDisposition(edgeId, disposition) {
+    if (!state.definitionDraft) return;
+    state.definitionDraft.manual_edge_dispositions[edgeId] = disposition;
+    persistProjectLocally();
+  }
+
+  function renderDefinition() { return presenter.render(); }
 
   function saveDefinition() {
     const draft = state.definitionDraft;
     if (!draft) return;
-    draft.new_label = clean(els.definitionNewLabel.value);
-    for (const input of els.definitionResidualLabels.querySelectorAll("input[data-residual-id]")) {
-      draft.residual_labels[input.dataset.residualId] = clean(input.value);
-    }
+    draft.new_label = clean(draft.new_label);
+    draft.residual_labels = Object.fromEntries(Object.entries(draft.residual_labels)
+      .map(([groupId, label]) => [groupId, clean(label)]));
     try {
       for (const snap of draft.source_snapshot) {
         const current = groupById(snap.group_id);
@@ -281,7 +191,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       setMapMode("select");
       renderAll();
     } catch (error) {
-      els.definitionValidation.textContent = error?.message || String(error);
+      presenter.showValidationError(error);
     }
   }
 
@@ -316,6 +226,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     });
     els.definitionSave.addEventListener("click", saveDefinition);
   }
+
+  const presenter = createDefinitionWorkflowPresenter({
+    state, elements: els, normalized, clusterRep, truncate, definitionSources,
+    definitionResidualIds, definitionCanReview, searchVariables, visibleVariables,
+    clusterDisplayVariable, definitionNeighbors, affectedDefinitionManualEdges,
+    groupById, resizeMap, fitMap, onSourceSelection: setSourceSelection,
+    onToggleVariable: toggleDefinitionVariable, onResidualLabel: setResidualLabel,
+    onManualDisposition: setManualDisposition,
+  });
 
   return { startDefinition, startEditSplit, cancelDefinition, definitionSources, continueDefinition,
     definitionResidualIds, toggleDefinitionVariable, affectedDefinitionManualEdges,

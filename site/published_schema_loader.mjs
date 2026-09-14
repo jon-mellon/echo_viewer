@@ -3,6 +3,8 @@ import { PRODUCTION_APP_ORIGIN } from "./dag_data_config.mjs";
 import { loadGroupingSchemaFolder } from "./grouping_schema_loader.mjs";
 import { canonicalFolderHash } from "./grouping_schema_writer.mjs";
 import { buildPermalink } from "./dag_permalink.mjs";
+import { COMPILED_DAG_PATH, COMPILED_MANIFEST_PATH, sha256Hex, stableJsonBytes,
+  validateCompiledArtifact } from "./compiled_dag.mjs";
 
 export const PUBLISHED_SCHEMA_BUCKET = "published-schemas";
 
@@ -35,7 +37,7 @@ export async function lookupPublishedSchema(publicationId, client = supabase) {
   if (!client) throw new Error("Supabase is not configured.");
   if (!/^[0-9a-f-]{36}$/i.test(publicationId)) throw new Error("Invalid schema publication ID.");
   const { data, error } = await client.from("published_schemas")
-    .select("id, owner_id, content_hash, storage_prefix, parent_schema_id, title, description, evidence_snapshot")
+    .select("id, owner_id, content_hash, storage_prefix, parent_schema_id, title, description, evidence_snapshot, compiled_manifest_path, compiled_manifest_hash, compiler_version")
     .eq("id", publicationId)
     .single();
   if (error) throw error;
@@ -70,5 +72,23 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
   if (downloadedHash !== publication.content_hash) {
     throw new Error(`Published schema hash mismatch: registry ${publication.content_hash}, downloaded ${downloadedHash}.`);
   }
-  return { schema, publication };
+  let compiledDag = null;
+  let compiledFallbackReason = null;
+  try {
+    const [manifestResponse, dagResponse] = await Promise.all([
+      cachingFetch(new URL(publication.compiled_manifest_path || COMPILED_MANIFEST_PATH, baseUrl)),
+      cachingFetch(new URL(COMPILED_DAG_PATH, baseUrl)),
+    ]);
+    if (!manifestResponse.ok || !dagResponse.ok) throw new Error("Published schema has no compiled DAG artifact.");
+    const manifest = await manifestResponse.json();
+    const dag = await dagResponse.json();
+    if (publication.compiled_manifest_hash
+        && await sha256Hex(stableJsonBytes(manifest)) !== publication.compiled_manifest_hash) {
+      throw new Error("Compiled manifest registry hash mismatch.");
+    }
+    compiledDag = await validateCompiledArtifact({ publication, manifest, dag });
+  } catch (error) {
+    compiledFallbackReason = error instanceof Error ? error.message : String(error);
+  }
+  return { schema, publication, compiledDag, compiledFallbackReason };
 }

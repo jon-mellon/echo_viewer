@@ -35,7 +35,20 @@ export class ParquetManifestDagDataSource {
   }
 
   async initialize() {
-    if (this.connection) return;
+    if (this.connection || this.compiledPublishedLoad) return;
+    const publicationId = schemaPublicationId();
+    if (publicationId) {
+      this.onStatus("Loading published schema and compiled DAG…");
+      const loaded = await loadPublishedSchema(publicationId);
+      this.groupingSet = loaded.schema;
+      this.loadedPublication = loaded.publication;
+      if (loaded.compiledDag && !this.skipCompiledOnce) {
+        this.compiledPublishedLoad = loaded;
+        return;
+      }
+      this.skipCompiledOnce = false;
+      this.onStatus(`Compiled DAG unavailable (${loaded.compiledFallbackReason}); loading legacy evidence…`);
+    }
     const manifestUrl = new URL(this.manifestUrl, window.location.href);
     this.onStatus("Loading evidence manifest…");
     const response = await fetch(manifestUrl, { cache: "no-store" });
@@ -43,14 +56,15 @@ export class ParquetManifestDagDataSource {
     this.manifest = await response.json();
     const files = manifestFileEntries(this.manifest.files);
     this.onStatus("Loading grouping schema…");
-    const publicationId = schemaPublicationId();
-    if (publicationId) {
-      const loaded = await loadPublishedSchema(publicationId);
-      this.groupingSet = loaded.schema;
-      this.loadedPublication = loaded.publication;
-    } else {
+    if (!publicationId) {
       this.groupingSet = await loadGroupingSchema(this.schemaUrl);
       this.loadedPublication = null;
+    } else {
+      const manifestEvidenceIds = new Set([this.manifest.snapshot_id,
+        this.manifest.cache_compatibility?.record_signature, this.manifest.record_signature].filter(Boolean));
+      if (this.loadedPublication.evidence_snapshot && !manifestEvidenceIds.has(this.loadedPublication.evidence_snapshot)) {
+        throw new Error("Legacy publication evidence snapshot does not match the current evidence manifest.");
+      }
     }
 
     this.onStatus("Starting query engine…");
@@ -74,6 +88,19 @@ export class ParquetManifestDagDataSource {
 
   async load(layoutSource = "") {
     await this.initialize();
+    if (this.compiledPublishedLoad) {
+      const { schema, publication, compiledDag } = this.compiledPublishedLoad;
+      return {
+        grouping_sets: [schema], default_grouping_set_id: schema.grouping_set_id,
+        publication_source: { publication_id: publication.id, content_hash: publication.content_hash,
+          parent_publication_id: publication.parent_schema_id, storage_prefix: publication.storage_prefix },
+        compiled_dag: compiledDag,
+        variables: [], raw_causal_links: [], similarity_edges: [],
+        layout: { active_source: layoutSource || "", default_source: "" },
+        snapshot: { snapshot_id: publication.evidence_snapshot },
+        load_metrics: { raw_r2_bytes_before_render: 0, raw_r2_rows_before_render: 0 },
+      };
+    }
     this.onStatus("Querying variables and relationships…");
     const metadata = await queryRows(this.connection, "SELECT metadata_json FROM build_metadata");
     const payload = JSON.parse(metadata[0].metadata_json);
@@ -129,6 +156,58 @@ export class ParquetManifestDagDataSource {
       snapshot_id: this.manifest.snapshot_id,
     };
     return payload;
+  }
+
+  async loadVariableMetadata(variableIds, layoutSource = "") {
+    await this.ensureEvidenceConnection();
+    if (!variableIds?.length) return [];
+    const placeholders = variableIds.map(() => "?").join(",");
+    return queryRows(this.connection, `SELECT o.*, i.canonical_variable_id, l.map_x, l.map_y
+      FROM variable_occurrences o JOIN variable_layouts l USING (variable_id)
+      JOIN canonical_identities i USING (variable_id, layout_source)
+      WHERE l.layout_source = ? AND o.variable_id IN (${placeholders}) ORDER BY o.index`,
+      [layoutSource || this.manifest?.layout?.default_source || "", ...variableIds]);
+  }
+
+  async loadIncidentRawLinks(variableIds) {
+    await this.ensureEvidenceConnection();
+    if (!variableIds?.length) return [];
+    const placeholders = variableIds.map(() => "?").join(",");
+    return queryRows(this.connection, `SELECT * FROM causal_link_occurrences
+      WHERE source_variable_id IN (${placeholders}) OR target_variable_id IN (${placeholders})`,
+      [...variableIds, ...variableIds]);
+  }
+
+  async loadAllRawLinks() {
+    await this.ensureEvidenceConnection();
+    return queryRows(this.connection, "SELECT * FROM causal_link_occurrences");
+  }
+
+  async loadRawLinksByIds(rawLinkIds) {
+    await this.ensureEvidenceConnection();
+    if (!rawLinkIds?.length) return [];
+    const placeholders = rawLinkIds.map(() => "?").join(",");
+    return queryRows(this.connection, `SELECT * FROM causal_link_occurrences
+      WHERE raw_causal_link_id IN (${placeholders})`, rawLinkIds);
+  }
+
+  async loadNeighbors(variableIds) {
+    await this.ensureEvidenceConnection();
+    if (!variableIds?.length) return [];
+    const placeholders = variableIds.map(() => "?").join(",");
+    return queryRows(this.connection, `SELECT * FROM variable_neighbors
+      WHERE variable_id IN (${placeholders}) ORDER BY variable_id, display_rank`, variableIds);
+  }
+
+  async ensureEvidenceConnection() {
+    if (this.connection) return;
+    // A compiled publication intentionally deferred R2/DuckDB setup until detail
+    // or editing asks for a narrowly filtered relation.
+    const saved = this.compiledPublishedLoad;
+    this.compiledPublishedLoad = null;
+    this.skipCompiledOnce = true;
+    await this.initialize();
+    this.compiledPublishedLoad = saved;
   }
 }
 

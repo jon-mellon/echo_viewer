@@ -3,6 +3,8 @@ import { canonicalFolderHash, writeGroupingSchemaFolder } from "/grouping_schema
 import { PUBLISHED_SCHEMA_BUCKET, publicationPermalink } from "/published_schema_loader.mjs";
 import { ensureAnonymousPublicationUser } from "/dag_anonymous_auth.mjs";
 import { setSafeUrl } from "/dom_builder.mjs";
+import { createCompiledArtifacts, evidenceSnapshotForSchema, fullCompileDag,
+  COMPILED_DAG_PATH, COMPILED_MANIFEST_PATH, DAG_COMPILER_VERSION } from "/compiled_dag.mjs";
 
 export const CANONICAL_BASELINE_ID = "a0118906-2366-4cc8-8809-bafdf3860c23";
 export const CANONICAL_BASELINE_HASH = "6732ed0bb2bce913c8b6611903f6c5d12ebccf3d5dc4f020887f5422515d7dfb";
@@ -25,9 +27,10 @@ function contentType(path) {
 
 async function findOwnedPublication(client, ownerId, contentHash) {
   const { data, error } = await client.from("published_schemas")
-    .select("id, owner_id, content_hash, storage_prefix, parent_schema_id")
+    .select("id, owner_id, content_hash, storage_prefix, parent_schema_id, compiler_version, compiled_manifest_path")
     .eq("owner_id", ownerId)
     .eq("content_hash", contentHash)
+    .eq("compiler_version", DAG_COMPILER_VERSION)
     .limit(1);
   if (error) throw error;
   return data?.[0] || null;
@@ -41,6 +44,8 @@ export async function canonicalizeWorkingSchema(schema, cryptoApi = globalThis.c
 export async function publishWorkingSchema({
   schema,
   previousPublication,
+  compiledDag = null,
+  compileInput = null,
   client = supabase,
   cryptoApi = globalThis.crypto,
   onProgress = () => {},
@@ -52,7 +57,14 @@ export async function publishWorkingSchema({
 
   const publicationId = cryptoApi.randomUUID();
   const storagePrefix = `${user.id}/${publicationId}`;
-  const entries = [...canonical.files.entries()].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+  const evidenceSnapshot = evidenceSnapshotForSchema(schema);
+  const dag = compiledDag || fullCompileDag({ schema, ...(compileInput || {}) });
+  const compiled = await createCompiledArtifacts({ publicationId, schemaHash: canonical.contentHash,
+    evidenceSnapshot, dag, cryptoApi });
+  const files = new Map(canonical.files);
+  files.set(COMPILED_DAG_PATH, compiled.dagBytes);
+  files.set(COMPILED_MANIFEST_PATH, compiled.manifestBytes);
+  const entries = [...files.entries()].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
   for (const [index, [path, bytes]] of entries.entries()) {
     onProgress(index + 1, entries.length, path);
     const type = contentType(path);
@@ -63,9 +75,6 @@ export async function publishWorkingSchema({
   }
 
   const parentSchemaId = previousPublication?.publication_id || CANONICAL_BASELINE_ID;
-  const evidenceSnapshot = schema.built_against?.record_signature
-    || schema.cache_compatibility?.record_signature
-    || "working-schema";
   const row = {
     id: publicationId,
     owner_id: user.id,
@@ -75,6 +84,12 @@ export async function publishWorkingSchema({
     evidence_snapshot: evidenceSnapshot,
     storage_prefix: storagePrefix,
     parent_schema_id: parentSchemaId,
+    compiled_manifest_path: COMPILED_MANIFEST_PATH,
+    compiled_manifest_hash: await (async () => {
+      const digest = await cryptoApi.subtle.digest("SHA-256", compiled.manifestBytes);
+      return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+    })(),
+    compiler_version: compiled.manifest.compiler_version,
   };
   const { error: insertError } = await client.from("published_schemas").insert(row);
   if (insertError) throw insertError;
@@ -104,6 +119,8 @@ export function createPublicationController({
   getPermalinkState,
   setPublicationState,
   saveWorkingState,
+  getCompiledDag = () => null,
+  getCompileInput = () => null,
   client = supabase,
   cryptoApi = globalThis.crypto,
   navigatorApi = globalThis.navigator,
@@ -214,6 +231,8 @@ export function createPublicationController({
       const result = await publishWorkingSchema({
         schema: getWorkingSchema(),
         previousPublication: getPublicationState(),
+        compiledDag: getCompiledDag(),
+        compileInput: await getCompileInput(),
         client,
         cryptoApi,
         onProgress: (current, total, path) => showStatus(elements.status, `Uploading ${current}/${total}: ${path}`),

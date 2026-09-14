@@ -1,6 +1,6 @@
 import { h, replaceChildren } from "./dom_builder.mjs";
 
-export function createToolbarPresenter({ state, elements, dagGroups, groupById, visibleVariables,
+export function createToolbarPresenter({ state, elements, groupById, visibleVariables,
   uoaMatches, clusterRep, rejectedVariableIdSet }) {
   function assignmentCoverage() {
     const uoaActive = state.uoaFilterEnabled && state.selectedUoa;
@@ -26,7 +26,7 @@ export function createToolbarPresenter({ state, elements, dagGroups, groupById, 
     elements.variableAssignmentCounts.title = `${coverage.total.toLocaleString()} variables${scope} represented by ${coverage.plottedNodes.toLocaleString()} plotted nodes${rejected}`;
   }
 
-  function render() {
+  function render(anchorsReady) {
     const layoutSources = state.data?.layout?.sources || [];
     replaceChildren(elements.variableLayoutSelect, layoutSources.map(source =>
       h("option", { value: source.source, textContent: source.label || source.source })));
@@ -38,9 +38,6 @@ export function createToolbarPresenter({ state, elements, dagGroups, groupById, 
       element.classList.toggle("active", active);
       element.setAttribute("aria-pressed", active ? "true" : "false");
     }
-    const visibleGroupIds = new Set(dagGroups().map(group => group.group_id));
-    const anchorsReady = visibleGroupIds.has(state.project?.iv_group_id) && visibleGroupIds.has(state.project?.dv_group_id);
-    if (!anchorsReady) { state.showConfoundersOnly = false; state.showCollidersOnly = false; }
     const confounderCount = state.confounderGroupIds?.size || 0;
     elements.toggleConfoundersOnly.disabled = !anchorsReady;
     elements.toggleConfoundersOnly.classList.toggle("active", state.showConfoundersOnly);

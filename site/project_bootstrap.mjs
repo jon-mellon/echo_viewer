@@ -1,32 +1,20 @@
 import { dagDataSource } from "./dag_data_source.mjs";
 import { schemaPublicationId } from "./dag_data_config.mjs";
 import { applyPermalink, permalinkInput } from "./dag_permalink.mjs";
+import { createProjectBootstrapPresenter } from "./project_bootstrap_presenter.mjs";
 
 export function createProjectBootstrap({ state, initElements, installHandlers, installDefinitionHandlers,
   resizeMap, restoreProjectLocally, initializeProject, loadLatestSchemaGroups,
   normalizeProjectDuplicateAssignments, saveProjectLocally, publicationController, renderAll,
   constrainMapTransform, drawMap, fitMap, dagNetworkController, buildDuplicateClusters,
   linkKey, pairKey }) {
-  function setStartupStage(message) {
-    const stage = document.getElementById("startupLoadingStage");
-    if (stage) stage.textContent = message;
-    window.dispatchEvent(new CustomEvent("startupstage", { detail: message }));
-  }
-
-  function finishStartupLoading() {
-    document.getElementById("startupLoading")?.setAttribute("hidden", "");
-  }
+  const presenter = createProjectBootstrapPresenter({});
+  const setStartupStage = message => presenter.setStartupStage(message);
+  const finishStartupLoading = () => presenter.finishStartupLoading();
 
   async function init() {
     dagDataSource.onStatus = setStartupStage;
-    document.body.classList.toggle("dag2-mode", state.interfaceMode === "dag2");
-    if (state.interfaceMode === "dag2") {
-      document.title = "DAG Builder 2";
-      document.querySelector(".panel-header h1").textContent = "DAG Builder 2";
-      document.getElementById("uoaReset").textContent = "Clear";
-      const exportSection = document.getElementById("exportSection");
-      document.querySelector(".dag-left-panel")?.append(exportSection);
-    }
+    presenter.configureInterface(state.interfaceMode);
     initElements();
     installHandlers();
     installDefinitionHandlers();
@@ -37,7 +25,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     setStartupStage("Preparing workspace…");
     const restored = permalink || publicationId ? false : restoreProjectLocally();
     if (restored && state.definitionDraft && state.interfaceMode === "dag2"
-        && !window.confirm("Resume the unfinished variable definition? Press Cancel to discard it.")) {
+        && !presenter.confirmResumeDefinition()) {
       state.definitionDraft = null;
       saveProjectLocally();
     }
@@ -93,6 +81,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     state.variableById = new Map(state.variables.map((v) => [v.variable_id, v]));
     buildDuplicateClusters();
     state.rawLinks = state.data.raw_causal_links || [];
+    state.compiledDag = state.data.compiled_dag || null;
+    state.compiledDagValid = Boolean(state.compiledDag);
     state.rawLinksById = new Map(state.rawLinks.map((l) => [l.raw_causal_link_id, l]));
     state.linkLookup = new Map();
     for (const link of state.rawLinks) {
