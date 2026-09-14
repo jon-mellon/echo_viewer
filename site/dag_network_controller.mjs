@@ -440,6 +440,9 @@ function attachDagNetworkHandlers(network) {
       setMapMode("select");
       renderAll();
     },
+    zoomToPoint(position) {
+      network.moveTo({ position, scale: network.getScale() * 1.3 });
+    },
     selectEdge(id) {
       state.selectedEdgeId = id;
       selectEdge();

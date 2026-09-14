@@ -19,18 +19,22 @@ test("network events use live state and dispose only their own listeners", () =>
     isDiagnosticCandidate: () => diagnostic, hasGroup: id => id === "g",
     logicalEdgeId: id => id === "segment" ? "logical" : id,
     focusGroup: id => calls.push(["focus", id]), openGroup: id => calls.push(["open", id]),
+    zoomToPoint: position => calls.push(["zoomAt", position]),
     selectEdge: id => calls.push(["edge", id]),
   });
   handlers.get("zoom")();
   handlers.get("selectNode")({ nodes: ["bend"] });
   handlers.get("selectNode")({ nodes: ["g"] });
   handlers.get("doubleClick")({ nodes: ["g"] });
+  handlers.get("doubleClick")({ nodes: [], edges: [], pointer: { canvas: { x: 42, y: -7 } } });
+  handlers.get("doubleClick")({ nodes: [], edges: ["segment"], pointer: { canvas: { x: 1, y: 2 } } });
   handlers.get("selectEdge")({ edges: ["segment"] });
   handlers.get("hoverNode")({ node: "g" });
   diagnostic = true;
   handlers.get("hoverNode")({ node: "g" });
   listeners.get("mouseleave")();
-  assert.deepEqual(calls, [["zoom", 0.5], ["focus", "g"], ["open", "g"], ["edge", "logical"],
+  assert.deepEqual(calls, [["zoom", 0.5], ["focus", "g"], ["open", "g"],
+    ["zoomAt", { x: 42, y: -7 }], ["edge", "logical"],
     "clearPath", ["paths", "g"], "clearEdge", "clearPath"]);
   detach();
   assert.equal(handlers.size, 0);

@@ -70,7 +70,13 @@ export function attachDagInteractions(network, element, actions) {
     },
     doubleClick(event) {
       const id = event.nodes?.[0];
-      if (id && actions.hasGroup(id)) actions.openGroup(id);
+      if (id && actions.hasGroup(id)) {
+        actions.openGroup(id);
+        return;
+      }
+      if (!event.nodes?.length && !event.edges?.length && event.pointer?.canvas) {
+        actions.zoomToPoint(event.pointer.canvas);
+      }
     },
     selectEdge(event) {
       const id = actions.logicalEdgeId(event.edges[0]);
