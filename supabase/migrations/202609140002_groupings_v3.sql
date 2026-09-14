@@ -33,11 +33,4 @@ begin
     and content_hash = 'dbfbf2193e74897ed0895ab5fe557ac44daec7cf5d242a3e8f113f191d033685';
   get diagnostics changed = row_count;
   if changed <> 1 then raise exception 'Second revised publication was not in the expected pre-conversion state'; end if;
-
-  -- This row was a storage-policy smoke test, not a valid schema bundle.
-  delete from public.published_schemas
-  where id = '39597a22-39ba-4d9c-8904-dd803220ab35'
-    and content_hash = '9da59d0c557df0ef53fbeec274a48cc19ed90cca3d7ef145e924ae54497ccfea';
-  get diagnostics changed = row_count;
-  if changed <> 1 then raise exception 'Invalid test publication was not in the expected state'; end if;
 end $$;

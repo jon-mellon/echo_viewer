@@ -111,10 +111,10 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
     built_against: { record_signature: publication.evidence_snapshot },
     cache_compatibility: { record_signature: publication.evidence_snapshot },
     groups: compiledDag.nodes.map(node => ({ group_id: node.group_id, label: node.label,
-      variable_ids: [] })),
+      member_count: node.member_count, variable_ids: [] })),
     rejected_variables: [],
   };
-  const schemaReady = (async () => {
+  const loadSchema = async () => {
     const schemaFiles = new Map();
     const schemaFetch = async (url, options) => {
       const response = await cachingFetch(url, options);
@@ -150,6 +150,6 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
       throw new Error(`Published schema hash mismatch: registry ${publication.content_hash}, downloaded ${downloadedHash}.`);
     }
     return { schema: complete, priorityReady };
-  })();
-  return { schema, schemaReady, publication, compiledDag, compiledFallbackReason };
+  };
+  return { schema, loadSchema, publication, compiledDag, compiledFallbackReason };
 }

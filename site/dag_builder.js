@@ -958,7 +958,8 @@ function addDecision(type, payload) {
 // ─── Group helpers ─────────────────────────────────────────────────────────────
 
 function dagGroups() {
-  return dagProjectView().groups.filter((g) => g.variable_ids?.length);
+  return dagProjectView().groups.filter((g) => g.variable_ids?.length
+    || (state.compiledDagValid && Number(g.member_count) > 0));
 }
 
 function dagProjectView() {

@@ -40,11 +40,11 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     label: wrapDagLabel(group.label, maxChars),
     title: isConfounder || isCollider
       ? undefined
-      : `${escapeHtml(group.label)}${roleTag} · ${group.variable_ids.length} variables${mediatorTag}`,
+      : `${escapeHtml(group.label)}${roleTag} · ${group.variable_ids.length || group.member_count || 0} variables${mediatorTag}`,
     x: layoutPoint?.x || 0,
     y: layoutPoint?.y || 0,
     fixed: { x: true, y: true },
-    mass: 1 + Math.min(3, Math.sqrt(group.variable_ids.length || 1) / 6),
+    mass: 1 + Math.min(3, Math.sqrt(group.variable_ids.length || group.member_count || 1) / 6),
     color: {
       background: color,
       border: isSelected ? "#b83b5e" : isConfounder ? "#7f1d1d" : isCollider ? "#4c1d95" : isPathMediator ? "#374151" : "#fbfcfa",

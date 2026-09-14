@@ -87,7 +87,7 @@ export class ParquetManifestDagDataSource {
         publication_source: { publication_id: publication.id, content_hash: publication.content_hash,
           parent_publication_id: publication.parent_schema_id, storage_prefix: publication.storage_prefix },
         compiled_dag: compiledDag,
-        published_schema_ready: this.compiledPublishedLoad.schemaReady || null,
+        load_published_schema: this.compiledPublishedLoad.loadSchema || null,
         variables: [], raw_causal_links: [], similarity_edges: [],
         layout: { active_source: layoutSource || "", default_source: "" },
         snapshot: { snapshot_id: publication.evidence_snapshot },

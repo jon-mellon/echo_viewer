@@ -69,9 +69,9 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     finishStartupLoading();
-    if (state.data.published_schema_ready) {
+    if (state.data.load_published_schema) {
       const revision = state.compiledDagRevision || 0;
-      void state.data.published_schema_ready.then(({ schema }) => {
+      void state.data.load_published_schema().then(({ schema }) => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.data.grouping_sets = [schema];
         loadLatestSchemaGroups();
