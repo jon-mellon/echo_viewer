@@ -140,11 +140,17 @@ export class ParquetManifestDagDataSource {
 
   async loadRawLinksByIds(rawLinkIds) {
     await this.ensureEvidenceConnection();
-    // IDs alone carry no shard ownership, so this uncommon lookup necessarily
-    // spans the source projection. Incident queries remain shard-local.
-    await this.ensureBrowserRelation("causal_link_occurrences");
     if (!rawLinkIds?.length) return [];
     const placeholders = rawLinkIds.map(() => "?").join(",");
+    const canonicalUrl = this.canonicalEvidenceRelationUrl("causal_link_occurrences");
+    if (canonicalUrl) {
+      const url = canonicalUrl.replaceAll("'", "''");
+      return queryRows(this.connection, `SELECT * FROM read_parquet('${url}')
+        WHERE raw_causal_link_id IN (${placeholders})`, rawLinkIds);
+    }
+    // Older browser manifests did not advertise their canonical snapshot.
+    // IDs carry no shard ownership, so those layouts must scan every source shard.
+    await this.ensureBrowserRelation("causal_link_occurrences");
     return queryRows(this.connection, `SELECT * FROM causal_link_occurrences
       WHERE raw_causal_link_id IN (${placeholders})`, rawLinkIds);
   }
@@ -206,6 +212,13 @@ export class ParquetManifestDagDataSource {
       this.variableLayoutsReady = null;
       throw error;
     }
+  }
+
+  canonicalEvidenceRelationUrl(relation) {
+    const legacyManifest = this.manifest?.identity?.legacy_manifest;
+    const file = this.manifest?.identity?.legacy_relation_integrity?.[relation]?.url;
+    if (!legacyManifest || !file || !this.manifestBaseUrl) return "";
+    return new URL(file, new URL(`/${legacyManifest}`, this.manifestBaseUrl)).href;
   }
 
   browserShardIds(variableIds) {

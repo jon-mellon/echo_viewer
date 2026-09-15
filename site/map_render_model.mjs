@@ -33,6 +33,15 @@ export function colorDistance(a, b) {
   return Math.sqrt(dr * dr + dg * dg + db * db);
 }
 
+function stablePaletteIndex(groupId, paletteLength) {
+  if (!paletteLength) return -1;
+  let hash = 5381;
+  for (let i = 0; i < groupId.length; i += 1) {
+    hash = ((hash << 5) + hash + groupId.charCodeAt(i)) & 0x7fffffff;
+  }
+  return hash % paletteLength;
+}
+
 export function computePaletteAssignment(groups, variables, palette) {
   const eligible = (groups || []).filter(
     (group) => group.type !== "iv" && group.type !== "dv" && group.variable_ids?.length,
@@ -80,6 +89,15 @@ export function computePaletteAssignment(groups, variables, palette) {
     const neighborColors = adjacency[index]
       .map((isAdjacent, neighbor) => (isAdjacent ? colors[neighbor] : -1))
       .filter((color) => color >= 0);
+    // Published schemas can be edited before all member coordinates have been
+    // hydrated. Those groups (and genuinely isolated groups) have no colored
+    // neighbors. Giving every one of them candidate zero makes the entire DAG
+    // turn green after any edit invalidates the palette cache. Use the same
+    // stable group-id fallback as groupColor until spatial adjacency is known.
+    if (!neighborColors.length) {
+      colors[index] = stablePaletteIndex(eligible[index].group_id, palette.length);
+      continue;
+    }
     let bestIndex = -1;
     let bestScore = -1;
     for (let candidate = 0; candidate < palette.length; candidate += 1) {
@@ -103,11 +121,7 @@ export function groupColor(group, { activeGroupId, groupColors, palette, palette
   if (group.group_id === activeGroupId) return groupColors.active;
   const index = paletteAssignment?.get(group.group_id);
   if (index !== undefined) return palette[index];
-  let hash = 5381;
-  for (let i = 0; i < group.group_id.length; i += 1) {
-    hash = ((hash << 5) + hash + group.group_id.charCodeAt(i)) & 0x7fffffff;
-  }
-  return palette[hash % palette.length];
+  return palette[stablePaletteIndex(group.group_id, palette.length)];
 }
 
 export function labelPriority(item) {

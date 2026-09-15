@@ -52,13 +52,13 @@ test("render coordination preserves rebuild order, comparison precedence and fin
   coordinator.rebuildProject();
   assert.deepEqual(calls.slice(0, 3).map(c => c[0]), ["buildCandidateQueue", "aggregateGroupLinks", "computeVisibleLinks"]);
   assert.equal(calls.at(-1)[0], "saveProjectLocally");
-  assert.ok(calls.some(c => c[0] === "renderEdgeInspector"));
+  assert.ok(calls.some(c => c[0] === "renderSelectedEdge"));
   calls.length = 0; comparing = true;
   coordinator.renderAll();
   assert.deepEqual(calls.filter(c => c[0] === "renderSearch"), [["renderSearch", "iv"], ["renderSearch", "dv"]]);
-  assert.equal(calls.some(c => c[0] === "renderEdgeInspector"), false);
+  assert.equal(calls.some(c => c[0] === "renderSelectedEdge"), false);
   assert.equal(calls.at(-1)[0], "saveProjectLocally");
   calls.length = 0;
   coordinator.selectEdge();
-  assert.deepEqual(calls.map(c => c[0]), ["renderDag", "renderEdgeInspector", "renderProvenance"]);
+  assert.deepEqual(calls.map(c => c[0]), ["renderDag", "renderSelectedEdge"]);
 });

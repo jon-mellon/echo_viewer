@@ -10,8 +10,7 @@ export function createRenderCoordinator(view) {
     view.renderManualEdgeControls();
     view.renderDag();
     if (!view.renderVariableComparison()) {
-      view.renderEdgeInspector();
-      view.renderProvenance();
+      view.renderSelectedEdge();
     }
     view.renderExportStatus();
     view.renderMapModeControls();
@@ -39,8 +38,7 @@ export function createRenderCoordinator(view) {
   }
   function selectEdge() {
     view.renderDag();
-    view.renderEdgeInspector();
-    view.renderProvenance();
+    view.renderSelectedEdge();
   }
   return { renderAll, rebuildProject, selectEdge };
 }

@@ -57,6 +57,20 @@ test("visual status preserves group precedence and palette assignment is determi
   assert.deepEqual([...computePaletteAssignment(groups, [], palette).entries()], []);
 });
 
+test("palette assignment distributes groups whose coordinates are not hydrated", () => {
+  const groups = ["g1", "g2", "g3"].map((group_id) => ({
+    group_id,
+    type: "custom",
+    variable_ids: [`member-${group_id}`],
+  }));
+  const partialVariables = [{ variable_id: "unrelated", map_x: 0, map_y: 0 }];
+
+  assert.deepEqual(
+    [...computePaletteAssignment(groups, partialVariables, palette).values()],
+    [1, 2, 0],
+  );
+});
+
 test("point models contain visual decisions without canvas state", () => {
   const variables = [{ variable_id: "a", map_x: 10, map_y: 20, cluster_size: 4, uoa: "x" }];
   const points = buildMapPointModels({

@@ -364,7 +364,7 @@ function installDagHandlers() {
 const renderCoordinator = createRenderCoordinator({
   buildCandidateQueue, aggregateGroupLinks, computeVisibleLinks, renderGroupList,
   renderRejectedVariablesPanel, renderManualEdgeControls, renderDag, renderVariableComparison,
-  renderEdgeInspector, renderProvenance, renderExportStatus, renderMapModeControls,
+  renderSelectedEdge, renderExportStatus, renderMapModeControls,
   renderMapToolbarToggles, renderUndoRedo, drawMap, saveProjectLocally,
   renderModeUI, renderAnchorBar, renderStatus, renderUoaStep, renderUoaFilterBar,
   renderSearch, renderSetupGroupPickers, renderSeedRows, renderGroupingSetControls,
@@ -906,7 +906,7 @@ function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 
 // ─── Edge inspector + provenance ──────────────────────────────────────────────
 
-function renderEdgeInspector() {
+function renderSelectedEdge() {
   const selected = (state.project?.links || []).find(edge => edge.edge_id === state.selectedEdgeId);
   const rawIds = [...new Set([...(selected?.a_to_b_raw_link_ids || []), ...(selected?.b_to_a_raw_link_ids || [])])];
   const missing = rawIds.filter(id => !state.rawLinksById.has(id));
@@ -925,8 +925,7 @@ function renderEdgeInspector() {
         for (const variable of variables) state.variableById.set(variable.variable_id, variable);
       }
       state.pendingEdgeEvidence = false;
-      renderEdgeInspector();
-      renderProvenance();
+      renderSelectedEdge();
     }).catch(error => {
       state.pendingEdgeEvidence = false;
       console.warn("Could not lazily load aggregate-edge evidence.", error);
@@ -935,10 +934,6 @@ function renderEdgeInspector() {
     });
   }
   inspectorController.renderEdge();
-}
-
-
-function renderProvenance() {
   inspectorController.renderProvenance();
 }
 
