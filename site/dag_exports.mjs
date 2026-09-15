@@ -220,7 +220,7 @@ function texEscape(s) {
   }).join("");
 }
 
-export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null) {
+export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, graphImageBytes = null) {
   const { project, visibleLinks } = input;
   const groupById = id => project.groups.find(group => group.group_id === id);
   const hasGraph = (visibleLinks || []).length > 0;
@@ -242,7 +242,8 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null) {
     ``,
     `## Causal Graph`,
     ``,
-    svgStr ? `![Causal DAG](dag.svg)`
+    graphImageBytes ? `![Causal DAG](dag-graph.png)`
+      : svgStr ? `![Causal DAG](dag.svg)`
       : hasGraph ? `*(Graph figure export is not yet available — the causal structure is listed in the Causal Links table below.)*`
         : `*(No DAG to display — create groups and add edges first.)*`,
     ``,
@@ -262,10 +263,11 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null) {
 
   const files = [{ name: "dag.md", data: md }, { name: "references.bib", data: bibText }];
   if (svgStr) files.push({ name: "dag.svg", data: svgStr });
+  if (graphImageBytes) files.push({ name: "dag-graph.png", data: graphImageBytes });
   return files;
 }
 
-export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null) {
+export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graphImageBytes = null) {
   const { project, visibleLinks } = input;
   const groupById = id => project.groups.find(group => group.group_id === id);
   const hasGraph = (visibleLinks || []).length > 0;
@@ -283,7 +285,6 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null) {
     `\\usepackage{natbib}`,
     `\\setlength{\\emergencystretch}{3em}`,
     `% To compile: pdflatex dag.tex && bibtex dag && pdflatex dag.tex && pdflatex dag.tex`,
-    `% To include the graph, convert dag.svg to dag-graph.pdf first (e.g. via Inkscape or rsvg-convert)`,
     ``,
     `\\title{Working Causal Map}`,
     `\\author{}`,
@@ -300,8 +301,10 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null) {
     ``,
     `\\section{Causal Graph}`,
     ``,
-    svgStr
-      ? `\\IfFileExists{dag-graph.pdf}{%\n\\begin{figure}[h]\n\\centering\n\\includegraphics[width=\\textwidth]{dag-graph.pdf}\n\\caption{Working causal map: ${texEscape(ivLabel)} $\\rightarrow$ ${texEscape(dvLabel)}}\n\\end{figure}\n}{%\n\\textit{Convert dag.svg to dag-graph.pdf to include the graph figure; the causal structure is also listed below.}%\n}`
+    graphImageBytes
+      ? `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=\\textwidth,height=0.72\\textheight,keepaspectratio]{dag-graph.png}\n\\caption{Working causal map: ${texEscape(ivLabel)} $\\rightarrow$ ${texEscape(dvLabel)}}\n\\end{figure}`
+      : svgStr
+        ? `\\textit{The causal graph image could not be rendered; the causal structure is listed below.}`
       : ((visibleLinks || []).length
         ? `\\textit{Graph figure export is not yet available; the causal structure is listed in the Causal Links table below.}`
         : `\\textit{No DAG to display --- create groups and add edges first.}`),
@@ -326,6 +329,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null) {
 
   const files = [{ name: "dag.tex", data: tex }, { name: "references.bib", data: bibText }];
   if (svgStr) files.push({ name: "dag.svg", data: svgStr });
+  if (graphImageBytes) files.push({ name: "dag-graph.png", data: graphImageBytes });
   return files;
 }
 

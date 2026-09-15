@@ -1235,6 +1235,15 @@ const exportController = createDagExportController({
   state, elements: els, rejectedVariableEntries, rejectedVariableIdSet,
   projectPayload, aggregateGroupLinks, computeVisibleLinks, nowIso,
   getPublicPermalink: async () => (await publicationController?.publicPermalink())?.permalink || null,
+  getDagPngBytes: async () => {
+    const canvas = els.dagNetwork?.querySelector("canvas");
+    if (!canvas) return null;
+    const blob = await new Promise((resolve, reject) => canvas.toBlob(
+      result => result ? resolve(result) : reject(new Error("Could not render the causal map image.")),
+      "image/png",
+    ));
+    return new Uint8Array(await blob.arrayBuffer());
+  },
   ensureEvidenceLoaded: async () => {
     while (state.compiledDagUpdatePromise) {
       const pending = state.compiledDagUpdatePromise;

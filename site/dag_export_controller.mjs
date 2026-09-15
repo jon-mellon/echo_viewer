@@ -8,6 +8,7 @@ export function createDagExportController({
   state, elements, rejectedVariableEntries, rejectedVariableIdSet,
   projectPayload, aggregateGroupLinks, computeVisibleLinks, nowIso,
   getDagSvgString = () => null,
+  getDagPngBytes = async () => null,
   ensureEvidenceLoaded = async () => {},
   getPublicPermalink = async () => null,
   fetchImpl = (...args) => fetch(...args),
@@ -170,9 +171,11 @@ export function createDagExportController({
       const total = requestedDois(input).requested.length;
       setEnrichmentProgress(0, total);
       const bibliography = await fetchBibliography(input, setEnrichmentProgress);
+      const svg = getDagSvgString();
+      const graphImage = input.visibleLinks?.length ? await getDagPngBytes() : null;
       const files = format === "md"
-        ? exportData.buildMarkdownFiles(input, bibliography, getDagSvgString())
-        : exportData.buildLatexFiles(input, bibliography, getDagSvgString());
+        ? exportData.buildMarkdownFiles(input, bibliography, svg, graphImage)
+        : exportData.buildLatexFiles(input, bibliography, svg, graphImage);
       downloadBlob(new Blob([makeZip(files)], { type: "application/zip" }),
         format === "md" ? "causal_map.zip" : "causal_map_latex.zip");
     } finally {

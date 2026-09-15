@@ -40,7 +40,7 @@ for (const scenario of ['normal', 'empty', 'bidirectional', 'missing-group', 'sv
     assert.deepEqual(latex.find(file => file.name === 'references.bib'), { name: 'references.bib', data: bibliography.bibText });
     assert.deepEqual(latex.map(file => file.name), expected.tex.map(file => file.name));
     assert.doesNotMatch(latex[0].data, /[→↔]/);
-    if (svg) assert.match(latex[0].data, /\\IfFileExists\{dag-graph\.pdf\}/);
+    if (svg) assert.match(latex[0].data, /causal graph image could not be rendered/);
     assert.deepEqual(exports.buildWorkingMapPayload(input, timestamp), expected.working);
     assert.deepEqual(exports.buildProjectPayload(input, timestamp), expected.payload);
     assert.deepEqual({ input, metadata }, before);
@@ -110,6 +110,24 @@ test('document exports include the public permalink when supplied', () => {
   assert.match(latex, /Public causal map: \\url\{https:\/\/viewer\.example\/\?p=1&schema=published\}/);
   assert.match(latex, /\\usepackage\{xurl\}/);
   assert.match(latex, /p\{0\.22\\textwidth\}p\{0\.22\\textwidth\}cp\{0\.38\\textwidth\}/);
+});
+
+test('LaTeX export embeds a rendered causal-map image in the archive', () => {
+  const { input, metadata } = fixture();
+  const bibliography = exports.buildBibText(exports.collectAllDagDois(input), metadata);
+  const png = new Uint8Array([137, 80, 78, 71]);
+  const files = exports.buildLatexFiles(input, bibliography, null, png);
+  assert.match(files[0].data, /\\includegraphics\[width=\\textwidth,height=0\.72\\textheight,keepaspectratio\]\{dag-graph\.png\}/);
+  assert.deepEqual(files.find(file => file.name === 'dag-graph.png')?.data, png);
+});
+
+test('Markdown export embeds and references the rendered causal-map image', () => {
+  const { input, metadata } = fixture();
+  const bibliography = exports.buildBibText(exports.collectAllDagDois(input), metadata);
+  const png = new Uint8Array([137, 80, 78, 71]);
+  const files = exports.buildMarkdownFiles(input, bibliography, null, png);
+  assert.match(files[0].data, /!\[Causal DAG\]\(dag-graph\.png\)/);
+  assert.deepEqual(files.find(file => file.name === 'dag-graph.png')?.data, png);
 });
 
 test('DOI collection rejects identifiers containing trailing injected content', () => {
