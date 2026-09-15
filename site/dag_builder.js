@@ -914,6 +914,13 @@ function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 
 // ─── Edge inspector + provenance ──────────────────────────────────────────────
 
+let pendingEdgeEvidencePromise = null;
+
+function renderSelectedEdgePanels() {
+  inspectorController.renderEdge();
+  inspectorController.renderProvenance();
+}
+
 function renderSelectedEdge() {
   const selected = (state.project?.links || []).find(edge => edge.edge_id === state.selectedEdgeId);
   const rawIds = [...new Set([...(selected?.a_to_b_raw_link_ids || []), ...(selected?.b_to_a_raw_link_ids || [])])];
@@ -923,26 +930,28 @@ function renderSelectedEdge() {
     return link ? [link.source_variable_id, link.target_variable_id] : [];
   }).filter(Boolean))];
   const missingVariables = loadedVariableIds().filter(id => !state.variableById.has(id));
-  if ((missing.length || missingVariables.length) && !state.pendingEdgeEvidence) {
+  if ((missing.length || missingVariables.length) && !pendingEdgeEvidencePromise) {
     state.pendingEdgeEvidence = true;
-    void (missing.length ? dagDataSource.loadRawLinksByIds(missing) : Promise.resolve([])).then(async links => {
+    const load = (missing.length ? dagDataSource.loadRawLinksByIds(missing) : Promise.resolve([])).then(async links => {
       for (const link of links) state.rawLinksById.set(link.raw_causal_link_id, link);
       const variableIds = loadedVariableIds().filter(id => !state.variableById.has(id));
       if (variableIds.length) {
         const variables = await dagDataSource.loadVariableMetadata(variableIds, state.variableLayoutSource);
         for (const variable of variables) state.variableById.set(variable.variable_id, variable);
       }
-      state.pendingEdgeEvidence = false;
-      renderSelectedEdge();
     }).catch(error => {
-      state.pendingEdgeEvidence = false;
       console.warn("Could not lazily load aggregate-edge evidence.", error);
-      inspectorController.renderEdge();
-      inspectorController.renderProvenance();
+    }).finally(() => {
+      if (pendingEdgeEvidencePromise !== load) return;
+      pendingEdgeEvidencePromise = null;
+      state.pendingEdgeEvidence = false;
+      // Refresh the live selection even if another render happened while the
+      // evidence query was in flight.
+      renderSelectedEdge();
     });
+    pendingEdgeEvidencePromise = load;
   }
-  inspectorController.renderEdge();
-  inspectorController.renderProvenance();
+  renderSelectedEdgePanels();
 }
 
 function dismissEvidencePane() {

@@ -61,11 +61,15 @@ export function attachDagInteractions(network, element, actions) {
     // Ignore a late blur for an old edge after a newer hover has already won.
     blurEdge: event => actions.clearEdgeHover(event.edge),
     hoverNode(event) {
-      actions.highlightNodeEdges(event.node);
-      if (actions.isDiagnosticCandidate(event.node)) actions.highlightPaths(event.node);
-      else actions.clearPathHover();
+      if (actions.isDiagnosticCandidate(event.node)) {
+        actions.clearEdgeHover();
+        actions.highlightPaths(event.node);
+      } else {
+        actions.clearPathHover();
+        actions.highlightNodeEdges(event.node);
+      }
     },
-    blurNode: () => { actions.clearEdgeHover(); actions.clearPathHover(); },
+    blurNode: () => { actions.clearPathHover(); actions.clearEdgeHover(); },
     selectNode(event) {
       const id = event.nodes[0];
       if (id && actions.hasGroup(id)) {
@@ -91,7 +95,7 @@ export function attachDagInteractions(network, element, actions) {
       if (id) actions.selectEdge(id);
     },
   };
-  const leave = () => { actions.clearEdgeHover(); actions.clearPathHover(); };
+  const leave = () => { actions.clearPathHover(); actions.clearEdgeHover(); };
   for (const [name, handler] of Object.entries(handlers)) network.on(name, handler);
   element.addEventListener("mouseleave", leave);
   return () => {
