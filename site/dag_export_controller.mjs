@@ -8,6 +8,7 @@ export function createDagExportController({
   state, elements, rejectedVariableEntries, rejectedVariableIdSet,
   projectPayload, aggregateGroupLinks, computeVisibleLinks, nowIso,
   getDagSvgString = () => null,
+  ensureEvidenceLoaded = async () => {},
   fetchImpl = (...args) => fetch(...args),
   alertImpl = message => window.alert(message),
 }) {
@@ -74,6 +75,11 @@ export function createDagExportController({
     for (const doi of requested) void fetchCrossRef(doi);
   }
 
+  async function prepareExportInput() {
+    await ensureEvidenceLoaded();
+    return captureInput();
+  }
+
   async function fetchBibliography(input, onProgress = () => {}) {
     const { dois, requested } = requestedDois(input);
     let completed = 0;
@@ -122,12 +128,24 @@ export function createDagExportController({
   }
 
   async function exportBib() {
-    const input = captureInput();
+    setBusy(true);
+    let input;
+    try {
+      [elements.exportBib, elements.exportMd, elements.exportTex].forEach(button => {
+        button.textContent = "Loading evidence…";
+      });
+      input = await prepareExportInput();
+    } catch (error) {
+      alertImpl(error?.message || "Could not load evidence for export.");
+      return;
+    } finally {
+      if (!input) setBusy(false);
+    }
     if (!exportData.collectAllDagDois(input).length && !input.visibleLinks?.length) {
       alertImpl("No links in the DAG yet.");
+      setBusy(false);
       return;
     }
-    setBusy(true);
     try {
       const total = requestedDois(input).requested.length;
       setEnrichmentProgress(0, total);
@@ -139,9 +157,12 @@ export function createDagExportController({
   }
 
   async function exportDocument(format) {
-    const input = captureInput();
     setBusy(true);
     try {
+      [elements.exportBib, elements.exportMd, elements.exportTex].forEach(button => {
+        button.textContent = "Loading evidence…";
+      });
+      const input = await prepareExportInput();
       const total = requestedDois(input).requested.length;
       setEnrichmentProgress(0, total);
       const bibliography = await fetchBibliography(input, setEnrichmentProgress);
@@ -168,6 +189,7 @@ export function createDagExportController({
 
   return {
     captureInput,
+    prepareExportInput,
     exportBib,
     exportMd: () => exportDocument("md"),
     exportTex: () => exportDocument("tex"),

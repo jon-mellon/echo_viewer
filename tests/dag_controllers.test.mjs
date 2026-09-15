@@ -75,6 +75,31 @@ test("export controller snapshots mutable viewer data at its boundary", () => {
   assert.equal(captured.project.groups[0].label, "Before");
 });
 
+test("export controller waits for lazy evidence before taking its snapshot", async () => {
+  const state = createDagAppState();
+  state.data = { cache_compatibility: {} };
+  state.project = { groups: [] };
+  state.visibleLinks = [{ a_to_b_raw_link_ids: ["r1"] }];
+  let release;
+  const evidenceReady = new Promise(resolve => { release = resolve; });
+  const controller = createDagExportController({
+    state, elements: { exportBib: {}, exportMd: {}, exportTex: {} },
+    rejectedVariableEntries: () => [], rejectedVariableIdSet: () => new Set(),
+    projectPayload: () => ({}), aggregateGroupLinks() {}, computeVisibleLinks() {}, nowIso: () => "",
+    ensureEvidenceLoaded: async () => {
+      await evidenceReady;
+      state.rawLinksById.set("r1", { raw_causal_link_id: "r1", paper_id: "10.1234/loaded" });
+    },
+  });
+  let settled = false;
+  const pending = controller.prepareExportInput().then(input => { settled = true; return input; });
+  await Promise.resolve();
+  assert.equal(settled, false);
+  release();
+  const input = await pending;
+  assert.equal(input.rawLinksById.get("r1").paper_id, "10.1234/loaded");
+});
+
 test("inspector controller resolves selected edges without owning graph state", () => {
   const state = createDagAppState();
   state.project = { links: [{ edge_id: "e1" }] }; state.selectedEdgeId = "e1";

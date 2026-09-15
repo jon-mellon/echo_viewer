@@ -119,12 +119,13 @@ export class ParquetManifestDagDataSource {
     await this.ensureEvidenceConnection();
     if (!variableIds?.length) return [];
     if (!this.browserShardIds(variableIds).length) return [];
-    await this.ensureBrowserRelation("variable_occurrences", variableIds);
     await this.ensureVariableLayouts();
     const selectedLayoutSource = layoutSource || this.defaultVariableLayoutSource;
     const placeholders = variableIds.map(() => "?").join(",");
+    const urls = this.browserUrls(this.browserLayout.variables, variableIds)
+      .map(url => `'${url.replaceAll("'", "''")}'`).join(",");
     return queryRows(this.connection, `SELECT o.*, l.map_x, l.map_y
-      FROM variable_occurrences o JOIN variable_layouts l USING (variable_id)
+      FROM read_parquet([${urls}]) o JOIN variable_layouts l USING (variable_id)
       WHERE l.layout_source = ? AND o.variable_id IN (${placeholders}) ORDER BY o.index`,
     [selectedLayoutSource, ...variableIds]);
   }
@@ -163,9 +164,10 @@ export class ParquetManifestDagDataSource {
     await this.ensureEvidenceConnection();
     if (!variableIds?.length) return [];
     if (!this.browserShardIds(variableIds).length) return [];
-    await this.ensureBrowserRelation("variable_neighbors", variableIds);
     const placeholders = variableIds.map(() => "?").join(",");
-    return queryRows(this.connection, `SELECT * FROM variable_neighbors
+    const urls = this.browserUrls(this.browserLayout.neighbors, variableIds)
+      .map(url => `'${url.replaceAll("'", "''")}'`).join(",");
+    return queryRows(this.connection, `SELECT * FROM read_parquet([${urls}])
       WHERE variable_id IN (${placeholders}) ORDER BY variable_id, display_rank`, variableIds);
   }
 

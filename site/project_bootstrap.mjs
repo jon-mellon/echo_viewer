@@ -99,6 +99,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         publicationController.setSchemaReady?.(true);
         applyLoadedSchema(schema);
       }).catch(error => {
+        if ((state.compiledDagRevision || 0) !== revision) return;
         state.publishedSchemaHydrating = false;
         state.publishedSchemaLoadFailed = true;
         publicationController.setSchemaLoadFailed?.();

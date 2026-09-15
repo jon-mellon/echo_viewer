@@ -6,8 +6,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails = async () => {} }) {
+  let hydrationRevision = 0;
+
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv"].includes(role)) return;
+    hydrationRevision += 1;
     state.definitionDraft = {
       role, step: "sources", source_group_ids: [], source_snapshot: [],
       eligible_variable_ids: [], new_variable_ids: [], new_label: "",
@@ -25,7 +28,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     const { splitId, newGroup, residuals } = context;
     const eligible = [...new Set([...newGroup.variable_ids, ...residuals.flatMap(group => group.variable_ids)]
       .map(clusterRep))];
-    state.definitionDraft = {
+    const revision = ++hydrationRevision;
+    const draft = state.definitionDraft = {
       mode: "edit", split_id: splitId, existing_new_group_id: newGroup.group_id,
       role: ["iv", "dv"].includes(newGroup.type) ? newGroup.type : null,
       step: "partition", source_group_ids: residuals.map(group => group.group_id),
@@ -40,6 +44,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.activeGroupId = null;
     state.selectedVariableIds = new Set(state.definitionDraft.new_variable_ids);
     await hydrateVariableDetails(eligible);
+    if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     invalidateMapCaches();
     setMapMode("select");
     renderAll();
@@ -47,6 +52,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   }
 
   function cancelDefinition() {
+    hydrationRevision += 1;
     state.definitionDraft = null;
     state.selectedVariableIds.clear();
     state.selectedVariableId = null;
@@ -64,6 +70,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     const draft = state.definitionDraft;
     const sources = definitionSources();
     if (!draft || !sources.length) return;
+    const revision = ++hydrationRevision;
     draft.source_snapshot = sources.map(group => ({ group_id: group.group_id, label: group.label,
       variable_ids: [...group.variable_ids], updated_at: group.updated_at || null }));
     draft.eligible_variable_ids = [...new Set(sources.flatMap(group =>
@@ -76,6 +83,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.step = "partition";
     state.selectedVariableIds.clear();
     await hydrateVariableDetails(draft.eligible_variable_ids);
+    if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     invalidateMapCaches();
     setMapMode("select");
     renderAll();

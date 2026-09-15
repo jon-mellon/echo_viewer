@@ -634,7 +634,7 @@ function applyProjectOperation(next) {
       for (const id of changedIds) state.compiledUpdateChangedIds.add(id);
       const batchedIds = [...state.compiledUpdateChangedIds];
       const batchBaseSchema = state.compiledUpdateBaseSchema;
-      void dagDataSource.loadIncidentRawLinks(batchedIds).then(incidentRawLinks => {
+      const updatePromise = dagDataSource.loadIncidentRawLinks(batchedIds).then(incidentRawLinks => {
         if (state.compiledDagRevision !== revision) return;
         for (const link of incidentRawLinks) {
           if (!state.rawLinksById.has(link.raw_causal_link_id)) state.rawLinks.push(link);
@@ -651,13 +651,17 @@ function applyProjectOperation(next) {
         state.compiledDagUpdating = false;
         renderAll();
       }).catch(error => {
+        if (state.compiledDagRevision !== revision) return;
         state.compiledDagUpdating = false;
         state.compiledDagValid = false;
         state.compiledUpdateBaseSchema = null;
         state.compiledUpdateTargetSchema = null;
         state.compiledUpdateChangedIds = null;
         console.warn("Incremental DAG update failed; a full local recomputation is required.", error);
+      }).finally(() => {
+        if (state.compiledDagUpdatePromise === updatePromise) state.compiledDagUpdatePromise = null;
       });
+      state.compiledDagUpdatePromise = updatePromise;
     }
   }
 }
@@ -951,16 +955,21 @@ function addManualEdge() {
 
 // ─── Export / Import ──────────────────────────────────────────────────────────
 
+let importProjectRevision = 0;
+
 async function importProject(event) {
+  const revision = ++importProjectRevision;
   const file = event.target.files?.[0];
   event.target.value = "";
   if (!file) return;
   try {
     const payload = JSON.parse(await file.text());
+    if (revision !== importProjectRevision) return;
     applyLoadedProject(payload);
     const layoutSource = state.variableLayoutSource;
     if (layoutSource && layoutSource !== state.data.layout?.active_source) {
       await loadDagData(layoutSource);
+      if (revision !== importProjectRevision) return;
     }
     renderAll();
   } catch (error) {
@@ -1203,6 +1212,27 @@ const shellController = createDagShellController({
 const exportController = createDagExportController({
   state, elements: els, rejectedVariableEntries, rejectedVariableIdSet,
   projectPayload, aggregateGroupLinks, computeVisibleLinks, nowIso,
+  ensureEvidenceLoaded: async () => {
+    while (state.compiledDagUpdatePromise) {
+      const pending = state.compiledDagUpdatePromise;
+      await pending;
+      if (state.compiledDagUpdatePromise === pending) break;
+    }
+    aggregateGroupLinks();
+    computeVisibleLinks();
+    const rawIds = [...new Set((state.visibleLinks || []).flatMap(link => [
+      ...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || []),
+    ]))];
+    const missing = rawIds.filter(id => !state.rawLinksById.has(id));
+    if (!missing.length) return;
+    const links = await dagDataSource.loadRawLinksByIds(missing);
+    for (const link of links) {
+      state.rawLinksById.set(link.raw_causal_link_id, link);
+      if (!state.rawLinks.some(existing => existing.raw_causal_link_id === link.raw_causal_link_id)) {
+        state.rawLinks.push(link);
+      }
+    }
+  },
 });
 
 const publicationController = createPublicationController({
