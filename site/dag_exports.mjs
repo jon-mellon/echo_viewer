@@ -279,7 +279,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     `\\usepackage[utf8]{inputenc}`,
     `\\usepackage{graphicx}`,
     `\\usepackage{pdflscape}`,
-    `\\usepackage[margin=0.3in]{geometry}`,
+    `\\usepackage{geometry}`,
     `\\usepackage{booktabs}`,
     `\\usepackage{longtable}`,
     `\\usepackage{hyperref}`,
