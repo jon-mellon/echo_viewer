@@ -117,7 +117,8 @@ test('LaTeX export embeds a rendered causal-map image in the archive', () => {
   const bibliography = exports.buildBibText(exports.collectAllDagDois(input), metadata);
   const png = new Uint8Array([137, 80, 78, 71]);
   const files = exports.buildLatexFiles(input, bibliography, null, png);
-  assert.match(files[0].data, /\\begin\{landscape\}[\s\S]*\\thispagestyle\{empty\}[\s\S]*\\section\*\{Causal Graph\}[\s\S]*\\includegraphics\[width=\\linewidth,height=0\.82\\textheight,keepaspectratio\]\{dag-graph\.png\}[\s\S]*\\end\{landscape\}/);
+  assert.match(files[0].data, /\\begin\{landscape\}[\s\S]*\\thispagestyle\{empty\}[\s\S]*\\makebox\[\\linewidth\]\[c\]\{\\includegraphics\[width=1\.12\\linewidth,height=0\.98\\textheight,keepaspectratio\]\{dag-graph\.png\}\}[\s\S]*\\end\{landscape\}/);
+  assert.doesNotMatch(files[0].data, /Causal Graph|Working causal map:/);
   assert.deepEqual(files.find(file => file.name === 'dag-graph.png')?.data, png);
 });
 
