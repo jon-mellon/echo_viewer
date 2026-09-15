@@ -28,6 +28,8 @@ test("compact permalink round trip preserves reproducible view settings", () => 
   assert.equal(applyPermalink(params, restored), true);
   assert.equal(params.get("data_version"), "snapshot-7");
   assert.equal(params.get("schema_url"), "/config/schema/");
+  assert.equal(params.has("uoa"), false);
+  assert.equal(params.has("uf"), false);
   assert.equal(restored.project.iv_group_id, "cause");
   assert.equal(restored.project.dv_group_id, "outcome");
   assert.equal(restored.project.groups[0].type, "iv");
@@ -36,6 +38,8 @@ test("compact permalink round trip preserves reproducible view settings", () => 
   assert.deepEqual([...restored.seeds.dv], ["v2"]);
   assert.equal(restored.showConfoundersOnly, true);
   assert.equal(restored.confounderMaxPathLength, 4);
+  assert.equal(restored.selectedUoa, null);
+  assert.equal(restored.uoaFilterEnabled, false);
   assert.equal(restored.selectedVariableId, "v1");
 });
 

@@ -104,7 +104,6 @@ function initElements() {
     "modeSwitcher",
     // Setup section
     "setupSection", "currentStepTitle",
-    "uoaSearchBlock", "uoaChips", "uoaFilterBar", "uoaSelectedLabel", "uoaFilterToggle", "uoaReset",
     "dvSearchBlock", "ivSearchBlock",
     "dvInput", "dvInputLabel", "dvDefineNew", "dvSeeds", "dvResults", "dvGroupPicker",
     "ivInput", "ivInputLabel", "ivDefineNew", "ivSeeds", "ivResults", "ivGroupPicker",

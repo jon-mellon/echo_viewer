@@ -22,9 +22,7 @@ test("abstract extraction DAG data loads and basic controls work", async ({ page
   expect(loaded.links).toBeGreaterThan(1500);
   expect(loaded.warnings).toBe(0);
 
-  await expect(page.locator("#uoaChips .uoa-chip").first()).toBeVisible();
-  await page.locator("#uoaChips .uoa-chip").first().click();
-  await expect(page.locator("#uoaFilterBar")).toBeVisible();
+  await expect(page.locator("#uoaFilterBar, #uoaSearchBlock")).toHaveCount(0);
 
   await page.locator("#dvInput").fill("health");
   await expect(page.locator("#dvResults .result-button").first()).toBeVisible();

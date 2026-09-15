@@ -1,6 +1,5 @@
 import * as projectOps from "./dag_project.mjs";
 import * as mapInteractions from "./map_interactions.mjs";
-import * as workflow from "./dag_workflow.mjs";
 
 export function createDagEventController({
   state, elements: els, dagNetwork,
@@ -20,21 +19,6 @@ export function createDagEventController({
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean, startEditSplit,
 }) {
 function installHandlers() {
-  // UOA filter toggle / reset
-  els.uoaFilterToggle.addEventListener("change", () => {
-    state.uoaFilterEnabled = els.uoaFilterToggle.checked;
-    const group = activeGroup();
-    if (group) renderNeighborSuggestions(group);
-    rebuildProject();
-  });
-  els.uoaReset.addEventListener("click", () => {
-    Object.assign(state, workflow.transition(state, {
-      type: "reset-uoa", nextPhase: state.interfaceMode === "dag2" ? "build" : undefined,
-      filterEnabled: state.interfaceMode === "dag2" ? false : undefined,
-    }));
-    renderAll();
-  });
-
   // IV/DV search
   els.ivInput.addEventListener("input", () => {
     renderSearch("iv");

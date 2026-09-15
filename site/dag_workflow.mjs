@@ -6,7 +6,7 @@ export function restoreWorkflowMode(mode, phase) {
 }
 
 export function missingAnchorWorkflow(selectedUoa) {
-  return { phase: selectedUoa ? "select_dv" : "select_uoa", workflowMode: "setup" };
+  return { phase: "select_dv", workflowMode: "setup" };
 }
 
 export function transition(state, event) {

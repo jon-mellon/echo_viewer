@@ -27,8 +27,7 @@ try {
   assert.equal(loaded.links > 1500, true, `Expected >1500 links, got ${loaded.links}`);
   assert.equal(loaded.warnings, 0, `Expected no warnings, got ${loaded.warnings}`);
 
-  await page.locator("#uoaChips .uoa-chip").first().click();
-  await page.waitForSelector("#uoaFilterBar:not([hidden])");
+  assert.equal(await page.locator("#uoaFilterBar, #uoaSearchBlock").count(), 0);
 
   await page.locator("#dvInput").fill("health");
   await page.waitForSelector("#dvResults .result-button");

@@ -24,6 +24,7 @@ export function createUoaPresenter({ state, elements, visibleVariables, matches,
   }
 
   function renderFilterBar() {
+    if (!elements.uoaFilterBar) return;
     if (!state.selectedUoa) {
       elements.uoaFilterBar.hidden = true;
       return;

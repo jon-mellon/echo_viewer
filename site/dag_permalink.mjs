@@ -4,7 +4,6 @@ const booleanFields = {
   causal: "filterDagByCausalRelevance", conf: "showConfoundersOnly",
   coll: "showCollidersOnly", bottle: "excludeBottleneckedConfounders",
   paths: "hideIrrelevantConfounderLinks", vl: "showVariableLabels", gl: "showGroupLabels",
-  uf: "uoaFilterEnabled",
 };
 
 export function permalinkInput(location = globalThis.location) {
@@ -33,7 +32,7 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state }) {
     p: PERMALINK_VERSION, schema_url: schemaUrl, data_version: dataVersion,
     iv: state.project.iv_group_id, dv: state.project.dv_group_id,
     mode: state.workflowMode, layout: state.dagLayoutMode, vlayout: state.variableLayoutSource,
-    uoa: state.selectedUoa || "", path: String(state.confounderMaxPathLength),
+    path: String(state.confounderMaxPathLength),
     selected_group: state.activeGroupId || "", selected_variable: state.selectedVariableId || "",
     selected_edge: state.selectedEdgeId || "", sort: state.groupListSort || "",
     fs: state.fullscreenPanel || "",
@@ -71,7 +70,8 @@ export function applyPermalink(params, state) {
   state.workflowMode = params.get("mode") || "dag";
   state.dagLayoutMode = ["auto", "hierarchical", "organic"].includes(params.get("layout")) ? params.get("layout") : "auto";
   state.variableLayoutSource = params.get("vlayout") || state.variableLayoutSource;
-  state.selectedUoa = params.get("uoa") || null;
+  state.selectedUoa = null;
+  state.uoaFilterEnabled = false;
   state.confounderMaxPathLength = Math.max(1, Math.min(99, Number(params.get("path")) || 1));
   for (const [parameter, field] of Object.entries(booleanFields)) if (params.has(parameter)) state[field] = params.get(parameter) === "1";
   state.activeGroupId = resolveGroup(params.get("selected_group")) || null;

@@ -66,24 +66,8 @@
         <!-- SETUP mode: IV/DV selection and schema choice -->
         <section id="setupSection" class="panel-section">
           <div class="section-title">
-            <h2 id="currentStepTitle">Select unit of analysis</h2>
+            <h2 id="currentStepTitle">Select independent variable</h2>
             <span id="dagStatusBadge" class="status-pill">Setup</span>
-          </div>
-
-          <!-- UOA filter bar — shown after UOA is chosen -->
-          <div id="uoaFilterBar" class="uoa-filter-bar" hidden>
-            <span class="uoa-filter-label">UOA: <strong id="uoaSelectedLabel"></strong></span>
-            <label class="toggle-label">
-              <input type="checkbox" id="uoaFilterToggle" checked>
-              Filter
-            </label>
-            <button id="uoaReset" class="text-button" type="button">Change</button>
-          </div>
-
-          <!-- UOA step -->
-          <div id="uoaSearchBlock" class="search-block">
-            <label class="dag-label">Unit of analysis</label>
-            <div id="uoaChips" class="uoa-chips"></div>
           </div>
 
           <div id="dvSearchBlock" class="search-block">

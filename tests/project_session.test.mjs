@@ -33,7 +33,7 @@ test("storage round-trip preserves settings and normalizes legacy project fields
   assert.equal(result.project.groups[0].status, undefined);
   assert.equal(payload.groups[0].status, "rejected");
   assert.equal(result.workflowMode, "group_review");
-  assert.equal(result.selectedUoa, "people");
+  assert.equal(result.selectedUoa, null);
   assert.equal(result.uoaFilterEnabled, false);
   assert.equal(result.changingAnchorSide, "iv");
   assert.equal(result.variableLayoutSource, "custom");
@@ -57,7 +57,7 @@ test("missing, incompatible and malformed storage is explicit", () => {
   assert.throws(() => readProject({ getItem: () => "{" }, "k"), SyntaxError);
   assert.throws(() => writeProject({ setItem() { throw new Error("quota"); } }, "k", {}), /quota/);
   const restored = restoreProjectPayload({ schema_version: "dag-builder-project-v1" }, {}, "default");
-  assert.equal(restored.phase, "select_uoa");
+  assert.equal(restored.phase, "select_dv");
   assert.equal(restored.variableLayoutSource, "default");
   assert.equal(restored.dagLayoutMode, "auto");
   assert.deepEqual(restored.project.groups, []);

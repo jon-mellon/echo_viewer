@@ -14,7 +14,6 @@ export function createProjectBootstrapPresenter({ windowApi = window, documentAp
     if (interfaceMode !== "dag2") return;
     documentApi.title = "DAG Builder 2";
     documentApi.querySelector(".panel-header h1").textContent = "DAG Builder 2";
-    documentApi.getElementById("uoaReset").textContent = "Clear";
     documentApi.querySelector(".dag-left-panel")?.append(documentApi.getElementById("exportSection"));
   }
 

@@ -61,8 +61,9 @@ export function restoreProjectPayload(payload, defaults, currentLayoutSource) {
       .filter(key => Object.hasOwn(serialized, key))
       .map(key => [key, serialized[key]]),
   );
-  const selectedUoa = serialized.selectedUoa || null;
-  const phase = serialized.phase || (selectedUoa ? "select_dv" : "select_uoa");
+  const selectedUoa = null;
+  const persistedPhase = serialized.phase === "select_uoa" ? "select_dv" : serialized.phase;
+  const phase = persistedPhase || "select_dv";
   return {
     project: {
       ...projectDefaults, ...persistedProject,
@@ -75,7 +76,7 @@ export function restoreProjectPayload(payload, defaults, currentLayoutSource) {
       carve_outs: Array.isArray(serialized.carve_outs) ? serialized.carve_outs : [],
     },
     selectedUoa,
-    uoaFilterEnabled: serialized.uoaFilterEnabled !== false,
+    uoaFilterEnabled: false,
     phase,
     workflowMode: restoreWorkflowMode(serialized.workflowMode, phase),
     changingAnchorSide: ["iv", "dv"].includes(serialized.changingAnchorSide) ? serialized.changingAnchorSide : null,

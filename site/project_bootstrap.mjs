@@ -22,6 +22,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     const permalink = permalinkInput();
     const publicationId = schemaPublicationId();
     await loadDagData(permalink?.get("vlayout") || "");
+    state.selectedUoa = null;
+    state.uoaFilterEnabled = false;
     setStartupStage("Preparing workspace…");
     const restored = permalink || publicationId ? false : restoreProjectLocally();
     if (restored && state.definitionDraft && state.interfaceMode === "dag2"

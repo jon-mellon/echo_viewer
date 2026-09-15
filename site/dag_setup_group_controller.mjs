@@ -62,7 +62,6 @@ export function createDagSetupGroupController({
 
   function hint() {
     const hints = {
-      select_uoa: "Choose the unit of analysis for your study. Variables will be filtered to match. You can change this at any time.",
       select_dv: "Search the existing groups for the outcome, or choose Define new group to build a new dependent-variable group from raw variables.",
       define_dv: "Use Draw + / Draw − to adjust the dependent-variable group boundary. Confirm when the group is substantively correct.",
       select_iv: "Search the existing groups for the independent variable, or choose Define new group to build a new group from raw variables.",
@@ -85,7 +84,6 @@ export function createDagSetupGroupController({
           : "Only canonical variables from the selected categories are available in the spatial view.";
         elements.ivSearchBlock.hidden = true;
         elements.dvSearchBlock.hidden = true;
-        elements.uoaSearchBlock.hidden = true;
         elements.schemaChoice.hidden = true;
         return;
       }
@@ -95,17 +93,16 @@ export function createDagSetupGroupController({
       const changingDv = state.changingAnchorSide === "dv";
       elements.currentStepTitle.textContent = !ivSet || changingIv
         ? "Select independent variable"
-        : !dvSet || changingDv ? "Select dependent variable" : "Optional UOA filter";
+        : !dvSet || changingDv ? "Select dependent variable" : "Working causal map";
       elements.dagStatusBadge.textContent = ivSet && dvSet ? "Ready" : ivSet ? "Select DV" : "Select IV";
       elements.dagStatusBadge.className = `status-pill${ivSet && dvSet ? " muted" : ""}`;
       elements.workflowHint.textContent = !ivSet || changingIv
         ? "Choose the independent-variable group from the default schema."
         : !dvSet || changingDv
           ? "Choose the dependent-variable group."
-          : "The overall DAG is ready. Optionally limit groups and evidence to a unit of analysis.";
+          : "The overall DAG is ready.";
       elements.ivSearchBlock.hidden = ivSet && !changingIv;
       elements.dvSearchBlock.hidden = !ivSet || (dvSet && !changingDv) || changingIv;
-      elements.uoaSearchBlock.hidden = !(ivSet && dvSet) || changingIv || changingDv;
       elements.schemaChoice.hidden = true;
       return;
     }
@@ -114,16 +111,15 @@ export function createDagSetupGroupController({
       elements.dagStatusBadge.className = "status-pill muted";
       return;
     }
-    const labels = { select_uoa: "UOA", select_dv: "Select DV", define_dv: "Define DV", select_iv: "Select IV",
+    const labels = { select_dv: "Select DV", define_dv: "Define DV", select_iv: "Select IV",
       define_iv: "Define IV", schema_choice: "Schema", build: "Build map" };
-    const titles = { select_uoa: "Select unit of analysis", select_dv: "Select dependent variable",
+    const titles = { select_dv: "Select dependent variable",
       define_dv: "Define dependent-variable group", select_iv: "Select independent variable",
       define_iv: "Define independent-variable group", schema_choice: "Load candidate grouping schema?", build: "Build causal map" };
     elements.currentStepTitle.textContent = titles[state.phase] || "Build causal map";
     elements.dagStatusBadge.textContent = labels[state.phase] || "Build";
     elements.dagStatusBadge.className = "status-pill";
     elements.workflowHint.textContent = hint();
-    elements.uoaSearchBlock.hidden = state.phase !== "select_uoa";
     elements.dvSearchBlock.hidden = state.phase !== "select_dv";
     elements.ivSearchBlock.hidden = state.phase !== "select_iv";
     elements.schemaChoice.hidden = state.phase !== "schema_choice";
