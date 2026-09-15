@@ -56,9 +56,12 @@ export function attachDagInteractions(network, element, actions) {
     zoom: constrainViewport,
     dragging: constrainViewport,
     dragEnd: constrainViewport,
-    beforeDrawing: context => actions.drawPathLanes(context),
+    // Highlight lanes are clipped to node boundaries, so painting them last
+    // keeps the complete exposed path visible without crossing node interiors.
+    afterDrawing: context => actions.drawPathLanes(context),
     hoverEdge: event => actions.highlightEdge(event.edge),
-    blurEdge: () => actions.clearEdgeHover(),
+    // Ignore a late blur for an old edge after a newer hover has already won.
+    blurEdge: event => actions.clearEdgeHover(event.edge),
     hoverNode(event) {
       if (actions.isDiagnosticCandidate(event.node)) actions.highlightPaths(event.node);
       else actions.clearPathHover();
@@ -66,7 +69,13 @@ export function attachDagInteractions(network, element, actions) {
     blurNode: () => actions.clearPathHover(),
     selectNode(event) {
       const id = event.nodes[0];
-      if (id && actions.hasGroup(id)) actions.focusGroup(id);
+      if (id && actions.hasGroup(id)) {
+        actions.focusGroup(id);
+        // Clicking a node focuses its associated content; it is not a lasting
+        // graph-selection mode. Clear vis.js's otherwise persistent burgundy
+        // selection treatment once that click has been handled.
+        network.unselectAll();
+      }
     },
     doubleClick(event) {
       const id = event.nodes?.[0];

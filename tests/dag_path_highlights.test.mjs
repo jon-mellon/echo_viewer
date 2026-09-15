@@ -48,6 +48,35 @@ test("polyline helpers separate overlapping runs and place clear arrowheads", ()
   assert.ok(marker.point.x < 76);
 });
 
+test("arrow marker relaxes its node halo for tightly spaced highlighted links", () => {
+  const marker = highlights.highlightedArrowMarker(
+    [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+    false,
+    [
+      { x: -10, y: -10, w: 52, h: 20 },
+      { x: 58, y: -10, w: 52, h: 20 },
+    ],
+    1,
+  );
+
+  assert.ok(marker);
+  assert.ok(marker.point.x > 42 && marker.point.x < 58);
+});
+
+test("highlight lanes share node-clipped geometry for strokes and arrows", () => {
+  const clipped = highlights.clipPathLaneToNodes(
+    [{ x: 0, y: 0 }, { x: 50, y: 40 }, { x: 100, y: 0 }],
+    [
+      { x: -20, y: -10, w: 40, h: 20 },
+      { x: 80, y: -10, w: 40, h: 20 },
+    ],
+  );
+
+  assert.notDeepEqual(clipped[0], { x: 0, y: 0 });
+  assert.notDeepEqual(clipped.at(-1), { x: 100, y: 0 });
+  assert.equal(clipped.length, 3);
+});
+
 test("lane renderer produces separated strokes and arrow canvas commands", () => {
   const { context, commands } = recorder();
   const rendered = highlights.drawPathLanes(context, {

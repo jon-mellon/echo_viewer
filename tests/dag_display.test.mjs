@@ -39,18 +39,32 @@ test("display records preserve node roles, selection, edge styles and descriptio
   for (const direction_type of ["A_TO_B", "B_TO_A", "BIDIRECTIONAL"]) {
     for (const is_manual of [false, true]) for (const is_target_relation of [false, true]) {
       const link = { edge_id: "edge", group_a: "iv", group_b: "dv", direction_type,
-        is_manual, is_target_relation, a_to_b_paper_table_keys: ["p1", "p2"], b_to_a_paper_table_keys: ["p2"] };
+        is_manual, is_target_relation,
+        a_to_b_raw_link_ids: ["test-1", "test-2"], b_to_a_raw_link_ids: ["test-2", "test-3"],
+        a_to_b_paper_table_keys: ["p1", "p2"], b_to_a_paper_table_keys: ["p2"] };
       for (const selected of [null, "edge"]) {
         state.selectedEdgeId = selected;
         assert.deepEqual(plain(display.edgeVisualData(link, selected)), plain(legacy.edgeVisualData(link)));
       }
-      assert.equal(display.edgeHoverText(link, groups), legacy.edgeHoverText(link));
+      const hover = display.edgeHoverText(link, groups);
+      assert.match(hover, /Supporting tests: 3$/);
+      assert.doesNotMatch(hover, /Papers\/tables:|p1|p2/);
       link.a_to_b_paper_table_keys = [];
       link.b_to_a_paper_table_keys = [];
-      assert.equal(display.edgeHoverText(link, groups), legacy.edgeHoverText(link));
+      assert.equal(display.edgeHoverText(link, groups), hover);
     }
   }
   assert.deepEqual(groups, before);
+});
+
+test("edge descriptions use singular supporting-test grammar and tolerate missing evidence arrays", () => {
+  const groups = [
+    { group_id: "a", label: "A" },
+    { group_id: "b", label: "B" },
+  ];
+  const base = { group_a: "a", group_b: "b", direction_type: "A_TO_B" };
+  assert.match(display.edgeHoverText({ ...base, a_to_b_raw_link_ids: ["only"] }, groups), /Supporting test: 1$/);
+  assert.match(display.edgeHoverText(base, groups), /Supporting tests: 0$/);
 });
 
 test("paper/table labels omit missing internal key parts", () => {

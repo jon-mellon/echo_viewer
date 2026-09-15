@@ -1,4 +1,4 @@
-import { expandBox, pointInsideBox, simplifyRoute } from "./dag_routing_geometry.mjs";
+import { expandBox, pointInsideBox, routePointForNode, simplifyRoute } from "./dag_routing_geometry.mjs";
 import { pairKey, pathPairKeys } from "./edge_keys.mjs";
 export { pathPairKeys } from "./edge_keys.mjs";
 
@@ -215,12 +215,37 @@ export function separateHighlightRuns(points, occupied, scale, side) {
 export function highlightedArrowMarker(points, atStart, boxes, scale) {
   const length = polylineLength(points);
   if (!length) return null;
-  for (let distance = 10 / scale; distance < length; distance += 2 / scale) {
-    const marker = pointAlongPolyline(points, atStart ? distance / length : 1 - distance / length);
-    if (boxes.some(box => pointInsideBox(marker.point, expandBox(box, 12 / scale)))) continue;
-    return { point: marker.point, angle: marker.angle + (atStart ? Math.PI : 0) };
+  // Prefer generous clearance, but progressively relax it for short edges. A
+  // fixed halo can cover the entire gap between nearby nodes and suppress the
+  // arrow even though the highlighted link itself is visible.
+  for (const padding of [12, 8, 4, 0]) {
+    for (let distance = 10 / scale; distance < length; distance += 2 / scale) {
+      const marker = pointAlongPolyline(points, atStart ? distance / length : 1 - distance / length);
+      if (boxes.some(box => pointInsideBox(marker.point, expandBox(box, padding / scale)))) continue;
+      return { point: marker.point, angle: marker.angle + (atStart ? Math.PI : 0) };
+    }
   }
   return null;
+}
+
+export function clipPathLaneToNodes(points, boxes) {
+  if (points.length < 2) return points;
+  const clipped = points.map(point => ({ ...point }));
+  const clipEndpoint = (endpointIndex, adjacentIndex) => {
+    const endpoint = clipped[endpointIndex];
+    const box = boxes.find(candidate => pointInsideBox(endpoint, candidate));
+    if (box) {
+      const centeredBox = {
+        ...box,
+        cx: box.cx ?? box.x + box.w / 2,
+        cy: box.cy ?? box.y + box.h / 2,
+      };
+      clipped[endpointIndex] = routePointForNode(centeredBox, clipped[adjacentIndex]);
+    }
+  };
+  clipEndpoint(0, 1);
+  clipEndpoint(clipped.length - 1, clipped.length - 2);
+  return simplifyRoute(clipped);
 }
 
 function drawPathLaneArrow(context, point, angle, color, scale) {
@@ -261,7 +286,8 @@ export function drawPathLanes(context, { segments = [], positions = {}, boxes = 
       segment = edgeSegments.find(item => item.from === segment.to);
     }
     if (points.some(point => !point) || points.length < 2) continue;
-    const routed = separateHighlightRuns(points, occupied, scale, first.role === "iv" ? -1 : 1);
+    const separated = separateHighlightRuns(points, occupied, scale, first.role === "iv" ? -1 : 1);
+    const routed = clipPathLaneToNodes(separated, boxes);
     occupied.push(...routed.slice(0, -1).map((point, index) => [point, routed[index + 1]]));
     rendered.push({ points: routed, color: first.color,
       to: edgeSegments.some(item => item.arrows?.to?.enabled),

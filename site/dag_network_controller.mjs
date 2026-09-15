@@ -34,7 +34,7 @@ function visNetworkOptions(p = {}) {
     interaction: {
       selectConnectedEdges: false,
       hover: true,
-      tooltipDelay: 250,
+      tooltipDelay: 0,
       navigationButtons: false,
       keyboard: false,
     },
@@ -213,7 +213,9 @@ function clearConfounderPathHover() {
   _visNetwork?.redraw();
 }
 
-function clearLogicalDagEdgeHover() {
+function clearLogicalDagEdgeHover(segmentId = null) {
+  const logicalEdgeId = segmentId == null ? null : (_dagEdgeSegments.get(segmentId) || segmentId);
+  if (logicalEdgeId && logicalEdgeId !== _dagHoveredLogicalEdgeId) return;
   if (!_dagEdgeHoverBaseline || !_visEdges) return;
   _visEdges.update(_dagEdgeHoverBaseline);
   _dagEdgeHoverBaseline = null;
@@ -222,9 +224,11 @@ function clearLogicalDagEdgeHover() {
 
 function highlightLogicalDagEdge(segmentId) {
   const logicalEdgeId = _dagEdgeSegments.get(segmentId) || segmentId;
-  if (logicalEdgeId === STUDY_DESIGN_EDGE_ID) return;
   if (!logicalEdgeId || _dagHoveredLogicalEdgeId === logicalEdgeId || !_visEdges) return;
   clearLogicalDagEdgeHover();
+  // The study edge uses its permanent green treatment, but entering it must
+  // still retire any evidence-edge hover that supplied the previous popover.
+  if (logicalEdgeId === STUDY_DESIGN_EDGE_ID) return;
 
   const segmentIds = _visEdges.getIds().filter(
     (edgeId) => (_dagEdgeSegments.get(edgeId) || edgeId) === logicalEdgeId

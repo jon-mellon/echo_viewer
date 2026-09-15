@@ -87,10 +87,11 @@ export function edgeHoverText(link, groups) {
   const lines = [`${sourceLabel} ${arrow} ${targetLabel}`];
   if (link.is_target_relation) lines.push("Target relation");
   if (link.is_manual) lines.push("Manual edge");
-  const keys = [...new Set([...link.a_to_b_paper_table_keys, ...link.b_to_a_paper_table_keys]
-    .map(displayPaperTableKey).filter(Boolean))].slice(0, 8);
-  if (keys.length) { lines.push("Papers/tables:"); lines.push(...keys); }
-  else if (!link.is_manual) lines.push("No provenance.");
+  const supportingTests = new Set([
+    ...(link.a_to_b_raw_link_ids || []),
+    ...(link.b_to_a_raw_link_ids || []),
+  ]).size;
+  lines.push(`Supporting test${supportingTests === 1 ? "" : "s"}: ${supportingTests}`);
   return lines.join("\n");
 }
 
