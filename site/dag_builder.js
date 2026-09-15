@@ -6,6 +6,7 @@ import { aggregateGroupLinks as deriveGroupLinks, rawLinksBetween as lookupRawLi
 
 import * as exportData from "/dag_exports.mjs";
 import { createDagExportController } from "/dag_export_controller.mjs";
+import { renderDagPng } from "/dag_export_image.mjs";
 import * as mapGeometry from "/map_geometry.mjs";
 import { createRenderCoordinator } from "/render_coordinator.mjs";
 import * as candidates from "/dag_candidates.mjs";
@@ -1235,15 +1236,7 @@ const exportController = createDagExportController({
   state, elements: els, rejectedVariableEntries, rejectedVariableIdSet,
   projectPayload, aggregateGroupLinks, computeVisibleLinks, nowIso,
   getPublicPermalink: async () => (await publicationController?.publicPermalink())?.permalink || null,
-  getDagPngBytes: async () => {
-    const canvas = els.dagNetwork?.querySelector("canvas");
-    if (!canvas) return null;
-    const blob = await new Promise((resolve, reject) => canvas.toBlob(
-      result => result ? resolve(result) : reject(new Error("Could not render the causal map image.")),
-      "image/png",
-    ));
-    return new Uint8Array(await blob.arrayBuffer());
-  },
+  getDagPngBytes: () => renderDagPng(dagNetworkController.getNetwork(), els.dagNetwork),
   ensureEvidenceLoaded: async () => {
     while (state.compiledDagUpdatePromise) {
       const pending = state.compiledDagUpdatePromise;

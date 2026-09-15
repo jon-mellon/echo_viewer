@@ -278,6 +278,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     `\\documentclass{article}`,
     `\\usepackage[utf8]{inputenc}`,
     `\\usepackage{graphicx}`,
+    `\\usepackage{pdflscape}`,
     `\\usepackage{booktabs}`,
     `\\usepackage{longtable}`,
     `\\usepackage{hyperref}`,
@@ -299,10 +300,10 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     `This causal map was constructed using the DAG Builder method \\citep{${METHOD_BIB_KEY}}.`,
     ...(input.permalink ? [``, `\\noindent Public causal map: \\url{${String(input.permalink).replace(/[\r\n]/g, "")}}`] : []),
     ``,
-    `\\section{Causal Graph}`,
+    graphImageBytes ? `` : `\\section{Causal Graph}`,
     ``,
     graphImageBytes
-      ? `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=\\textwidth,height=0.72\\textheight,keepaspectratio]{dag-graph.png}\n\\caption{Working causal map: ${texEscape(ivLabel)} $\\rightarrow$ ${texEscape(dvLabel)}}\n\\end{figure}`
+      ? `\\clearpage\n\\begin{landscape}\n\\thispagestyle{empty}\n\\section{Causal Graph}\n\\begin{center}\n\\includegraphics[width=\\linewidth,height=0.75\\textheight,keepaspectratio]{dag-graph.png}\\par\n\\medskip\n\\textbf{Figure:} Working causal map: ${texEscape(ivLabel)} $\\rightarrow$ ${texEscape(dvLabel)}\n\\end{center}\n\\clearpage\n\\end{landscape}`
       : svgStr
         ? `\\textit{The causal graph image could not be rendered; the causal structure is listed below.}`
       : ((visibleLinks || []).length
