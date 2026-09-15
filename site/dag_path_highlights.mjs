@@ -88,7 +88,7 @@ export function buildPathHighlightModel({
     edgeUpdates.push({
       id: edge.id,
       color: { color: palette.color, highlight: palette.color, hover: palette.color,
-        inherit: false, opacity: 0.08 },
+        inherit: false, opacity: 0 },
       width: 0.7,
       dashes: false,
       arrows: {
@@ -244,21 +244,6 @@ function drawPathLaneArrow(context, point, angle, color, scale) {
   context.restore();
 }
 
-export function clipPathLanesAroundNodes(context, boxes, scale) {
-  if (!boxes.length) return;
-  const padding = 1.5 / scale;
-  const expanded = boxes.map(box => expandBox(box, padding));
-  const margin = 10000 / scale;
-  const left = Math.min(...expanded.map(box => box.x)) - margin;
-  const top = Math.min(...expanded.map(box => box.y)) - margin;
-  const right = Math.max(...expanded.map(box => box.x + box.w)) + margin;
-  const bottom = Math.max(...expanded.map(box => box.y + box.h)) + margin;
-  context.beginPath();
-  context.rect(left, top, right - left, bottom - top);
-  for (const box of expanded) context.rect(box.x, box.y, box.w, box.h);
-  context.clip("evenodd");
-}
-
 export function drawPathLanes(context, { segments = [], positions = {}, boxes = [], scale = 1, ivId, dvId }) {
   const occupied = [];
   const iv = positions[ivId], dv = positions[dvId];
@@ -288,9 +273,6 @@ export function drawPathLanes(context, { segments = [], positions = {}, boxes = 
       from: edgeSegments.some(item => item.arrows?.from?.enabled) });
   }
   context.save();
-  // Lanes paint above ordinary edges so no portion is washed out, while an
-  // even-odd mask preserves nodes and their borders as opaque foreground.
-  clipPathLanesAroundNodes(context, boxes, scale);
   context.lineCap = "round";
   context.lineJoin = "round";
   for (const casing of [true, false]) {

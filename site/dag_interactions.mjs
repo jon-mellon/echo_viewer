@@ -56,7 +56,7 @@ export function attachDagInteractions(network, element, actions) {
     zoom: constrainViewport,
     dragging: constrainViewport,
     dragEnd: constrainViewport,
-    afterDrawing: context => actions.drawPathLanes(context),
+    beforeDrawing: context => actions.drawPathLanes(context),
     hoverEdge: event => actions.highlightEdge(event.edge),
     // Ignore a late blur for an old edge after a newer hover has already won.
     blurEdge: event => actions.clearEdgeHover(event.edge),

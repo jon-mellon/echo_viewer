@@ -33,6 +33,7 @@ function visNetworkOptions(p = {}) {
   return {
     interaction: {
       selectConnectedEdges: false,
+      hoverConnectedEdges: false,
       hover: true,
       tooltipDelay: 0,
       navigationButtons: false,

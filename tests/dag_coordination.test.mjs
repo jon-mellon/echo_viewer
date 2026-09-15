@@ -2,6 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { attachDagInteractions } from "../site/dag_interactions.mjs";
 import { createRenderCoordinator } from "../site/render_coordinator.mjs";
+import { createDagNetworkController } from "../site/dag_network_controller.mjs";
+
+test("node hover cannot apply a partial physical-segment highlight", () => {
+  const controller = createDagNetworkController({});
+  const interaction = controller.visNetworkOptions().interaction;
+  assert.equal(interaction.hoverConnectedEdges, false);
+  assert.equal(interaction.selectConnectedEdges, false);
+});
 
 test("network events use live state and dispose only their own listeners", () => {
   const handlers = new Map(), listeners = new Map(), calls = [];

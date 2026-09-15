@@ -30,6 +30,7 @@ test("highlight model classifies path edges, dims others and preserves inputs", 
   assert.deepEqual(model.laneSegments.map(item => item.role), ["iv", "dv"]);
   assert.equal(model.laneSegments[0].arrows.to.enabled, true);
   assert.equal(model.laneSegments[0].arrows.from.enabled, false);
+  assert.equal(model.edgeUpdates.find(item => item.id === "to_iv").color.opacity, 0);
   assert.equal(model.edgeUpdates.find(item => item.id === "other").color.opacity, 0.07);
   assert.equal(model.nodeUpdates.find(item => item.id === "x").opacity, 0.16);
   assert.equal(model.nodeUpdates.find(item => item.id === "c").borderWidth, 5);
@@ -74,13 +75,4 @@ test("lane renderer produces separated strokes and arrow canvas commands", () =>
   assert.equal(rendered.length, 1);
   assert.equal(commands.filter(command => command[0] === "stroke").length, 2);
   assert.ok(commands.some(command => command[0] === "fill"));
-  assert.ok(commands.some(command => command[0] === "clip" && command[1] === "evenodd"));
-});
-
-test("foreground lane mask cuts node interiors out of the shared canvas geometry", () => {
-  const { context, commands } = recorder();
-  highlights.clipPathLanesAroundNodes(context, [{ x: 10, y: 20, w: 40, h: 30 }], 1);
-
-  assert.equal(commands.filter(command => command[0] === "rect").length, 2);
-  assert.deepEqual(commands.at(-1), ["clip", "evenodd"]);
 });
