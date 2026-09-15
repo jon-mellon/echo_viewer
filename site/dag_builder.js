@@ -363,7 +363,8 @@ function installDagHandlers() {
 
 const renderCoordinator = createRenderCoordinator({
   buildCandidateQueue, aggregateGroupLinks, computeVisibleLinks, renderGroupList,
-  renderRejectedVariablesPanel, renderManualEdgeControls, renderDag, renderVariableComparison,
+  renderRejectedVariablesPanel, renderManualEdgeControls, renderDag, refreshDagEdgeSelection,
+  renderVariableComparison,
   renderSelectedEdge, renderExportStatus, renderMapModeControls,
   renderMapToolbarToggles, renderUndoRedo, drawMap, saveProjectLocally,
   renderModeUI, renderAnchorBar, renderStatus, renderUoaStep, renderUoaFilterBar,
@@ -902,6 +903,7 @@ function highlightConfounderPaths(id) { return dagNetworkController.highlightCon
 function clearConfounderPathHover() { return dagNetworkController.clearConfounderPathHover(); }
 function clearLogicalDagEdgeHover() { return dagNetworkController.clearLogicalDagEdgeHover(); }
 function renderDag() { return dagNetworkController.renderDag(); }
+function refreshDagEdgeSelection() { return dagNetworkController.refreshEdgeSelection(); }
 function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 
 // ─── Edge inspector + provenance ──────────────────────────────────────────────

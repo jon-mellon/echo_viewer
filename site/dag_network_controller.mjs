@@ -97,6 +97,23 @@ function edgeVisualData(link) {
   return dagDisplay.edgeVisualData(link, state.selectedEdgeId);
 }
 
+function refreshEdgeSelection() {
+  if (!_visEdges) return;
+  // Selecting an edge only changes its presentation. Recomputing and reapplying
+  // the full layout here can make vis.js move nodes while it is still completing
+  // the click event, especially for routed edges with synthetic bend nodes.
+  clearLogicalDagEdgeHover();
+  const linksById = new Map((state.project?.links || []).map(link => [link.edge_id, link]));
+  const updates = [];
+  for (const segmentId of _visEdges.getIds()) {
+    const logicalId = _dagEdgeSegments.get(segmentId) || segmentId;
+    const link = linksById.get(logicalId);
+    if (link) updates.push({ id: segmentId, ...edgeVisualData(link) });
+  }
+  if (updates.length) _visEdges.update(updates);
+  _visNetwork?.redraw();
+}
+
 function routedDagData(groups, links, layout) {
   const boxes = layout.boxes;
   const corridor = dagStudyArrowCorridor({
@@ -458,6 +475,7 @@ function edgeHoverText(link) {
   return {
     clampNumber, visNetworkOptions, dagStudyArrowCorridor, routedDagData,
     routedDagDataFromRoutes, dagVisibleGroups, renderDag, minimumDagScale,
+    refreshEdgeSelection,
     highlightConfounderPaths, clearConfounderPathHover, clearLogicalDagEdgeHover,
     whenRendered: () => _dagRenderedPromise,
     getNetwork: () => _visNetwork, getNodes: () => _visNodes, getEdges: () => _visEdges,

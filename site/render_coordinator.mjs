@@ -37,7 +37,7 @@ export function createRenderCoordinator(view) {
     rebuildProject();
   }
   function selectEdge() {
-    view.renderDag();
+    view.refreshDagEdgeSelection();
     view.renderSelectedEdge();
   }
   return { renderAll, rebuildProject, selectEdge };
