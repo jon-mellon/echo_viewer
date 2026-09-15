@@ -1,5 +1,40 @@
 // Owns cross-feature shell layout: fullscreen focus and draggable panel sizes.
 export function createDagShellController({ state, elements, resizeMap, fitMap, renderDag, getNetwork }) {
+  function installMobilePanelNavigation() {
+    const tabs = [...document.querySelectorAll("[data-mobile-panel]")];
+    if (!tabs.length) return;
+
+    const showPanel = panel => {
+      document.body.dataset.mobilePanel = panel;
+      for (const tab of tabs) {
+        const active = tab.dataset.mobilePanel === panel;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-pressed", active ? "true" : "false");
+      }
+      requestAnimationFrame(() => {
+        if (panel === "variables") {
+          resizeMap();
+          fitMap();
+        } else if (panel === "dag") {
+          renderDag();
+          setTimeout(() => getNetwork()?.fit({ animation: false, padding: 28 }), 50);
+        }
+      });
+    };
+
+    document.body.dataset.mobilePanel ||= "controls";
+    for (const tab of tabs) tab.addEventListener("click", () => showPanel(tab.dataset.mobilePanel));
+    if (document.body.dataset.mobilePanel === "variables" && !document.body.classList.contains("defining-variable")) {
+      document.body.dataset.mobilePanel = "controls";
+    }
+    new MutationObserver(() => {
+      if (document.body.dataset.mobilePanel === "variables" && !document.body.classList.contains("defining-variable")) {
+        showPanel("controls");
+      }
+    }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    showPanel(document.body.dataset.mobilePanel);
+  }
+
   function setFullscreen(panel) {
     state.fullscreenPanel = panel;
     document.body.classList.toggle("focus-variable-map", panel === "variable-map");
@@ -85,6 +120,7 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     }
     applyWidths();
     applyFooterHeight(footerHeight);
+    installMobilePanelNavigation();
   }
 
   return { setFullscreen, toggleFullscreen, installResizers };

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Variable DAG Builder</title>
-    <link rel="stylesheet" href="/styles.css?v=dag2-publication-v6">
+    <link rel="stylesheet" href="/styles.css?v=mobile-panels-v1">
   </head>
   <body class="dag-body password-locked">
     <div id="passwordGate" class="password-gate" role="dialog" aria-modal="true" aria-labelledby="passwordGateTitle">
@@ -352,8 +352,13 @@
       </aside>
 
     </main>
+    <nav class="mobile-panel-nav" aria-label="Viewer panels">
+      <button class="mobile-panel-tab active" type="button" data-mobile-panel="controls" aria-pressed="true">Setup</button>
+      <button class="mobile-panel-tab mobile-variable-tab" type="button" data-mobile-panel="variables" aria-pressed="false">Variables</button>
+      <button class="mobile-panel-tab" type="button" data-mobile-panel="dag" aria-pressed="false">Map</button>
+    </nav>
     <script src="/password_gate.js"></script>
     <script src="/visjs-min.js"></script>
-  <script type="module" src="/dag_builder.js?v=dag2-publication-v8"></script>
+  <script type="module" src="/dag_builder.js?v=mobile-panels-v1"></script>
   </body>
 </html>
