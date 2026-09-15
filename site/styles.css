@@ -2037,18 +2037,45 @@ h2 {
   .dag-ws-header {
     align-items: flex-start;
     flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
   }
 
   .dag-ws-controls {
+    width: 100%;
     justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 3px;
+    scrollbar-width: none;
+  }
+
+  .dag-ws-controls::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dag-ws-controls > * {
+    flex: 0 0 auto;
   }
 
   .dag-workspace {
-    --dag-footer-height: min(34vh, 240px);
+    --dag-footer-height: auto;
   }
 
   .dag-workspace-resizer {
     display: none;
+  }
+
+  .dag-ws-footer {
+    flex-basis: auto;
+    min-height: 0;
+    max-height: 24%;
+  }
+
+  .edge-inspector {
+    margin-top: 8px;
+    padding: 8px 10px;
   }
 }
 
