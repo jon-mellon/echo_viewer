@@ -126,8 +126,10 @@
 
 /**
  * @typedef {Object} EvidenceManifest
- * @property {string} schema_version
- * @property {Record<string, EvidenceManifestFile>} files
+ * @property {string} [schema_version]
+ * @property {Record<string, EvidenceManifestFile>} [files]
+ * @property {string} [layout_version]
+ * @property {string} [evidence_snapshot]
  * @property {string} [generated_at]
  * @property {string} [default_grouping_set_id]
  * @property {Record<string, JsonValue>} [cache_compatibility]

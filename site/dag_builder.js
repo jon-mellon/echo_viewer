@@ -30,7 +30,7 @@ import { createDefinitionWorkflowController } from "/definition_workflow_control
 import { createPublicationController } from "/dag_publication.mjs";
 import { createGroupingSetController } from "/grouping_set_controller.mjs";
 import { createProjectBootstrap } from "/project_bootstrap.mjs?v=compiled-first-v2";
-import { dagDataSource } from "/dag_data_source.mjs?v=publication-v2";
+import { dagDataSource } from "/dag_data_source.mjs?v=browser-v2";
 import { incrementCompiledDag } from "/compiled_dag.mjs";
 import { escapeHtml } from "/text_utils.mjs";
 import { h, replaceChildren, safeUrl } from "/dom_builder.mjs";

@@ -1,7 +1,7 @@
 import * as duckdb from "./vendor/duckdb/duckdb-browser.mjs";
 import { evidenceManifestUrl, evidenceSnapshotIdFromManifestUrl, groupingSchemaUrl,
   PRODUCTION_EVIDENCE_MANIFEST, schemaPublicationId } from "./dag_data_config.mjs";
-import { manifestFileEntries } from "./dag_manifest.mjs";
+import { browserV2ManifestLayout, browserV2ShardPath } from "./dag_manifest.mjs";
 import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
 import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication-v2";
 
@@ -33,7 +33,7 @@ export class ParquetManifestDagDataSource {
     this.schemaUrl = schemaUrl;
     this.manifestUrl = manifestUrl;
     this.onStatus = onStatus;
-    this.registeredRelations = new Set();
+    this.browserRelationScopes = new Map();
   }
 
   async initialize() {
@@ -57,20 +57,25 @@ export class ParquetManifestDagDataSource {
         return;
       }
       this.skipCompiledOnce = false;
-      this.onStatus(`Compiled DAG unavailable (${loaded.compiledFallbackReason}); loading legacy evidence…`);
+      this.onStatus(`Compiled DAG unavailable (${loaded.compiledFallbackReason}); checking browser-v2 evidence…`);
     }
     const manifestUrl = new URL(this.manifestUrl, window.location.href);
     this.onStatus("Loading evidence manifest…");
     const response = await fetch(manifestUrl, { cache: "no-store" });
     if (!response.ok) throw new Error(`Could not load DAG snapshot manifest ${manifestUrl.href}: HTTP ${response.status}`);
     this.manifest = await response.json();
-    const files = manifestFileEntries(this.manifest.files);
     this.manifestBaseUrl = manifestUrl;
-    this.manifestEntries = files;
+    this.browserLayout = browserV2ManifestLayout(this.manifest);
     this.onStatus("Loading grouping schema…");
     if (!publicationId) {
       this.groupingSet = await loadGroupingSchema(this.schemaUrl);
       this.loadedPublication = null;
+    }
+    const expectedSnapshot = this.loadedPublication?.evidence_snapshot
+      || this.groupingSet?.built_against?.record_signature
+      || this.groupingSet?.cache_compatibility?.record_signature;
+    if (!expectedSnapshot || expectedSnapshot !== this.manifest.evidence_snapshot) {
+      throw new Error(`Browser-v2 evidence snapshot ${this.manifest.evidence_snapshot} does not match the schema evidence snapshot ${expectedSnapshot || "(missing)"}.`);
     }
 
     this.onStatus("Starting query engine…");
@@ -83,7 +88,7 @@ export class ParquetManifestDagDataSource {
     );
     await database.instantiate(mainModule);
     this.connection = await database.connect();
-    if (!this.lazyEvidenceInit) await this.ensureRelations(files.map(file => file.relation));
+    await this.loadBrowserShardLookup();
     this.lazyEvidenceInit = false;
   }
 
@@ -103,99 +108,35 @@ export class ParquetManifestDagDataSource {
         load_metrics: { raw_r2_bytes_before_render: 0, raw_r2_rows_before_render: 0 },
       };
     }
-    this.onStatus("Querying variables and relationships…");
-    const metadata = await queryRows(this.connection, "SELECT metadata_json FROM build_metadata");
-    const payload = JSON.parse(metadata[0].metadata_json);
-    const selectedSource = layoutSource || payload.layout.default_source;
-    const variables = await queryRows(this.connection, `
-      SELECT o.*, i.canonical_variable_id, l.map_x, l.map_y
-      FROM variable_occurrences o
-      JOIN variable_layouts l USING (variable_id)
-      JOIN canonical_identities i USING (variable_id, layout_source)
-      WHERE l.layout_source = ? ORDER BY o.index
-    `, [selectedSource]);
-    const neighbors = await queryRows(
-      this.connection,
-      "SELECT * FROM variable_neighbors ORDER BY variable_id, display_rank",
-    );
-    const neighborsByVariable = new Map();
-    for (const row of neighbors) {
-      if (!neighborsByVariable.has(row.variable_id)) neighborsByVariable.set(row.variable_id, []);
-      neighborsByVariable.get(row.variable_id).push({
-        variable_id: row.neighbor_variable_id,
-        index: row.neighbor_index,
-        cosine_similarity: row.cosine_similarity,
-        llm_rank: row.llm_rank,
-        embedding_rank: row.embedding_rank,
-        is_substantive_duplicate: row.is_substantive_duplicate,
-      });
-    }
-    for (const variable of variables) {
-      variable.field_preview = JSON.parse(variable.field_preview_json);
-      variable.metadata_blob = JSON.parse(variable.metadata_blob_json);
-      variable.similarity_neighbors = neighborsByVariable.get(variable.variable_id) || [];
-      delete variable.field_preview_json;
-      delete variable.metadata_blob_json;
-      delete variable.layout_source;
-    }
-
-    payload.grouping_sets = [this.groupingSet];
-    payload.publication_source = this.loadedPublication ? {
-      publication_id: this.loadedPublication.id,
-      content_hash: this.loadedPublication.content_hash,
-      parent_publication_id: this.loadedPublication.parent_schema_id,
-      storage_prefix: this.loadedPublication.storage_prefix,
-    } : null;
-    payload.default_grouping_set_id = this.groupingSet.grouping_set_id;
-    payload.layout.active_source = selectedSource;
-    payload.variables = variables;
-    payload.raw_causal_links = await queryRows(this.connection, "SELECT * FROM causal_link_occurrences");
-    payload.similarity_edges = await queryRows(this.connection,
-      "SELECT source, target, weight, kind FROM similarity_edges WHERE layout_source = ?",
-      [selectedSource]);
-    payload.snapshot = {
-      schema_version: this.manifest.schema_version,
-      snapshot_id: this.manifest.snapshot_id,
-    };
-    return payload;
+    throw new Error("Browser-v2 requires a compiled published DAG for startup; full-snapshot reconstruction is not part of the retrieval layout.");
   }
 
   async loadVariableMetadata(variableIds, layoutSource = "") {
     await this.ensureEvidenceConnection();
-    await this.ensureRelations(["build_metadata", "variable_occurrences", "variable_layouts", "canonical_identities"]);
     if (!variableIds?.length) return [];
-    let selectedLayoutSource = layoutSource;
-    if (!selectedLayoutSource) {
-      const metadata = await queryRows(this.connection, "SELECT metadata_json FROM build_metadata");
-      selectedLayoutSource = JSON.parse(metadata[0].metadata_json).layout.default_source;
-    }
+    await this.ensureBrowserRelation("variable_occurrences", variableIds);
     const placeholders = variableIds.map(() => "?").join(",");
-    return queryRows(this.connection, `SELECT o.*, i.canonical_variable_id, l.map_x, l.map_y
-      FROM variable_occurrences o JOIN variable_layouts l USING (variable_id)
-      JOIN canonical_identities i USING (variable_id, layout_source)
-      WHERE l.layout_source = ? AND o.variable_id IN (${placeholders}) ORDER BY o.index`,
-      [selectedLayoutSource, ...variableIds]);
+    return queryRows(this.connection, `SELECT * FROM variable_occurrences
+      WHERE variable_id IN (${placeholders}) ORDER BY index`, variableIds);
   }
 
   async loadIncidentRawLinks(variableIds) {
     await this.ensureEvidenceConnection();
-    await this.ensureRelations(["causal_link_occurrences"]);
     if (!variableIds?.length) return [];
-    const placeholders = variableIds.map(() => "?").join(",");
-    return queryRows(this.connection, `SELECT * FROM causal_link_occurrences
-      WHERE source_variable_id IN (${placeholders}) OR target_variable_id IN (${placeholders})`,
-      [...variableIds, ...variableIds]);
+    return this.queryBrowserIncidentLinks(variableIds);
   }
 
   async loadAllRawLinks() {
     await this.ensureEvidenceConnection();
-    await this.ensureRelations(["causal_link_occurrences"]);
+    await this.ensureBrowserRelation("causal_link_occurrences");
     return queryRows(this.connection, "SELECT * FROM causal_link_occurrences");
   }
 
   async loadRawLinksByIds(rawLinkIds) {
     await this.ensureEvidenceConnection();
-    await this.ensureRelations(["causal_link_occurrences"]);
+    // IDs alone carry no shard ownership, so this uncommon lookup necessarily
+    // spans the source projection. Incident queries remain shard-local.
+    await this.ensureBrowserRelation("causal_link_occurrences");
     if (!rawLinkIds?.length) return [];
     const placeholders = rawLinkIds.map(() => "?").join(",");
     return queryRows(this.connection, `SELECT * FROM causal_link_occurrences
@@ -204,8 +145,8 @@ export class ParquetManifestDagDataSource {
 
   async loadNeighbors(variableIds) {
     await this.ensureEvidenceConnection();
-    await this.ensureRelations(["variable_neighbors"]);
     if (!variableIds?.length) return [];
+    await this.ensureBrowserRelation("variable_neighbors", variableIds);
     const placeholders = variableIds.map(() => "?").join(",");
     return queryRows(this.connection, `SELECT * FROM variable_neighbors
       WHERE variable_id IN (${placeholders}) ORDER BY variable_id, display_rank`, variableIds);
@@ -231,15 +172,57 @@ export class ParquetManifestDagDataSource {
     return this.evidenceInitialization;
   }
 
-  async ensureRelations(relations) {
-    for (const relation of relations) {
-      if (this.registeredRelations.has(relation)) continue;
-      const entry = this.manifestEntries?.find(item => item.relation === relation);
-      if (!entry) throw new Error(`Evidence manifest does not define relation ${relation}.`);
-      const url = new URL(entry.file.url, this.manifestBaseUrl).href.replaceAll("'", "''");
-      await this.connection.query(`CREATE VIEW ${entry.sqlIdentifier} AS SELECT * FROM read_parquet('${url}')`);
-      this.registeredRelations.add(relation);
+  async loadBrowserShardLookup() {
+    const url = new URL(this.browserLayout.lookup, this.manifestBaseUrl).href.replaceAll("'", "''");
+    const rows = await queryRows(this.connection, `SELECT variable_index, shard_id FROM read_parquet('${url}')`);
+    this.shardByVariableIndex = new Map(rows.map(row => [Number(row.variable_index), Number(row.shard_id)]));
+  }
+
+  browserShardIds(variableIds) {
+    const shards = new Set();
+    for (const variableId of variableIds || []) {
+      const match = String(variableId).match(/^v(\d+)$/);
+      const index = match ? Number(match[1]) : NaN;
+      const shard = this.shardByVariableIndex?.get(index);
+      if (shard == null) throw new Error(`No browser-v2 shard mapping for variable ${variableId}.`);
+      shards.add(shard);
     }
+    return [...shards].sort((a, b) => a - b);
+  }
+
+  browserUrls(pattern, variableIds) {
+    const shardIds = variableIds ? this.browserShardIds(variableIds)
+      : Array.from({ length: this.manifest.shards.count }, (_, index) => index);
+    return shardIds.map(shard => new URL(browserV2ShardPath(pattern, shard), this.manifestBaseUrl).href);
+  }
+
+  async ensureBrowserRelation(relation, variableIds = null) {
+    const suffix = variableIds ? this.browserShardIds(variableIds).join("_") : "all";
+    if (this.browserRelationScopes.get(relation) === suffix) return;
+    const patterns = {
+      variable_occurrences: this.browserLayout.variables,
+      variable_neighbors: this.browserLayout.neighbors,
+      causal_link_occurrences: this.browserLayout.causal_links_by_source,
+    };
+    const pattern = patterns[relation];
+    if (!pattern) throw new Error(`Unknown browser-v2 relation ${relation}.`);
+    const urls = this.browserUrls(pattern, variableIds).map(url => `'${url.replaceAll("'", "''")}'`).join(",");
+    await this.connection.query(`CREATE OR REPLACE VIEW "${relation}" AS SELECT * FROM read_parquet([${urls}])`);
+    this.browserRelationScopes.set(relation, suffix);
+  }
+
+  async queryBrowserIncidentLinks(variableIds) {
+    const placeholders = variableIds.map(() => "?").join(",");
+    const sourceUrls = this.browserUrls(this.browserLayout.causal_links_by_source, variableIds)
+      .map(url => `'${url.replaceAll("'", "''")}'`).join(",");
+    const targetUrls = this.browserUrls(this.browserLayout.causal_links_by_target, variableIds)
+      .map(url => `'${url.replaceAll("'", "''")}'`).join(",");
+    return queryRows(this.connection, `SELECT * EXCLUDE (projection_order) FROM (
+      SELECT *, 1 projection_order FROM read_parquet([${sourceUrls}]) WHERE source_variable_id IN (${placeholders})
+      UNION ALL
+      SELECT *, 2 projection_order FROM read_parquet([${targetUrls}]) WHERE target_variable_id IN (${placeholders})
+    ) QUALIFY row_number() OVER (PARTITION BY raw_causal_link_id ORDER BY projection_order) = 1`,
+    [...variableIds, ...variableIds]);
   }
 }
 

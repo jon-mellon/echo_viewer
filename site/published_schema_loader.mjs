@@ -87,12 +87,12 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
     if (!publication.compiled_manifest_path || !publication.compiler_version) {
       throw new Error("Published schema has no compiled DAG artifact.");
     }
-    const [manifestResponse, dagResponse] = await Promise.all([
-      cachingFetch(new URL(publication.compiled_manifest_path, baseUrl)),
-      cachingFetch(new URL(COMPILED_DAG_PATH, baseUrl)),
-    ]);
-    if (!manifestResponse.ok || !dagResponse.ok) throw new Error("Published schema has no compiled DAG artifact.");
+    const manifestResponse = await cachingFetch(new URL(publication.compiled_manifest_path, baseUrl));
+    if (!manifestResponse.ok) throw new Error("Published schema has no compiled DAG artifact.");
     const manifest = await manifestResponse.json();
+    const dagPath = manifest.artifacts?.dag?.path || COMPILED_DAG_PATH;
+    const dagResponse = await cachingFetch(new URL(dagPath, baseUrl));
+    if (!dagResponse.ok) throw new Error("Published schema has no compiled DAG artifact.");
     const dag = await dagResponse.json();
     if (publication.compiled_manifest_hash
         && await sha256Hex(stableJsonBytes(manifest)) !== publication.compiled_manifest_hash) {

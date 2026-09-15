@@ -1,7 +1,7 @@
 export const PRODUCTION_EVIDENCE_MANIFEST =
-  "https://data.epistemicinfra.org/evidence/snapshots/0cbb5b3bf27fbcde88e82cf5d810b8ad6c2cfbe9fdfea1b60be8f1e500a9b4ac/manifest.json";
+  "https://data.epistemicinfra.org/evidence/layouts/browser-v2/0cbb5b3bf27fbcde88e82cf5d810b8ad6c2cfbe9fdfea1b60be8f1e500a9b4ac/manifest.json";
 export const PRODUCTION_EVIDENCE_SNAPSHOT_BASE =
-  "https://data.epistemicinfra.org/evidence/snapshots/";
+  "https://data.epistemicinfra.org/evidence/layouts/browser-v2/";
 
 export const PRODUCTION_APP_ORIGIN = "https://echo.epistemicinfra.org";
 
@@ -42,6 +42,6 @@ export function evidenceManifestUrl(location = globalThis.location, evidenceSnap
 }
 
 export function evidenceSnapshotIdFromManifestUrl(manifestUrl) {
-  const match = String(manifestUrl || "").match(/\/snapshots\/([0-9a-f]{64})\/manifest\.json(?:[?#]|$)/i);
+  const match = String(manifestUrl || "").match(/\/(?:snapshots|layouts\/browser-v2)\/([0-9a-f]{64})\/manifest\.json(?:[?#]|$)/i);
   return match?.[1]?.toLowerCase() || "";
 }
