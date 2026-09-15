@@ -24,6 +24,7 @@ test("network events use live state and dispose only their own listeners", () =>
     minimumScale: () => 0.5, contentBounds: () => ({ left: -100, right: 100, top: -50, bottom: 50 }),
     drawPathLanes: () => calls.push("draw"),
     highlightEdge: id => calls.push(["hover", id]), clearEdgeHover: id => calls.push(["clearEdge", id]),
+    highlightNodeEdges: id => calls.push(["nodeEdges", id]),
     clearPathHover: () => calls.push("clearPath"), highlightPaths: id => calls.push(["paths", id]),
     isDiagnosticCandidate: () => diagnostic, hasGroup: id => id === "g",
     logicalEdgeId: id => id === "segment" ? "logical" : id,
@@ -45,7 +46,8 @@ test("network events use live state and dispose only their own listeners", () =>
   listeners.get("mouseleave")();
   assert.deepEqual(calls, [["zoom", 0.5], ["focus", "g"], "unselect", ["open", "g"],
     ["zoomAt", { x: 42, y: -7 }], ["edge", "logical"], ["clearEdge", "old-segment"],
-    "clearPath", ["paths", "g"], ["clearEdge", undefined], "clearPath"]);
+    ["nodeEdges", "g"], "clearPath", ["nodeEdges", "g"], ["paths", "g"],
+    ["clearEdge", undefined], "clearPath"]);
   detach();
   assert.equal(handlers.size, 0);
   assert.equal(listeners.size, 0);

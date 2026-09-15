@@ -22,7 +22,7 @@ let _dagHoverBaseline = null;
 let _dagHoveredConfounderId = null;
 let _dagPathLaneSegments = [];
 let _dagEdgeHoverBaseline = null;
-let _dagHoveredLogicalEdgeId = null;
+let _dagHoveredLogicalEdgeIds = new Set();
 
 function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -216,30 +216,31 @@ function clearConfounderPathHover() {
 
 function clearLogicalDagEdgeHover(segmentId = null) {
   const logicalEdgeId = segmentId == null ? null : (_dagEdgeSegments.get(segmentId) || segmentId);
-  if (logicalEdgeId && logicalEdgeId !== _dagHoveredLogicalEdgeId) return;
+  if (logicalEdgeId && !_dagHoveredLogicalEdgeIds.has(logicalEdgeId)) return;
   if (!_dagEdgeHoverBaseline || !_visEdges) return;
   _visEdges.update(_dagEdgeHoverBaseline);
   _dagEdgeHoverBaseline = null;
-  _dagHoveredLogicalEdgeId = null;
+  _dagHoveredLogicalEdgeIds = new Set();
 }
 
-function highlightLogicalDagEdge(segmentId) {
-  const logicalEdgeId = _dagEdgeSegments.get(segmentId) || segmentId;
-  if (!logicalEdgeId || _dagHoveredLogicalEdgeId === logicalEdgeId || !_visEdges) return;
+function highlightLogicalDagEdges(logicalEdgeIds) {
+  const nextIds = new Set([...logicalEdgeIds].filter(Boolean));
+  const unchanged = nextIds.size === _dagHoveredLogicalEdgeIds.size
+    && [...nextIds].every(id => _dagHoveredLogicalEdgeIds.has(id));
+  if (unchanged || !_visEdges) return;
   clearLogicalDagEdgeHover();
-  // The study edge uses its permanent green treatment, but entering it must
-  // still retire any evidence-edge hover that supplied the previous popover.
-  if (logicalEdgeId === STUDY_DESIGN_EDGE_ID) return;
+  nextIds.delete(STUDY_DESIGN_EDGE_ID);
+  if (!nextIds.size) return;
 
   const segmentIds = _visEdges.getIds().filter(
-    (edgeId) => (_dagEdgeSegments.get(edgeId) || edgeId) === logicalEdgeId
+    (edgeId) => nextIds.has(_dagEdgeSegments.get(edgeId) || edgeId)
   );
   if (!segmentIds.length) return;
   _dagEdgeHoverBaseline = _visEdges.get(segmentIds).map((edge) => ({
     ...edge,
     shadow: edge.shadow || false,
   }));
-  _dagHoveredLogicalEdgeId = logicalEdgeId;
+  _dagHoveredLogicalEdgeIds = nextIds;
 
   for (const edge of _dagEdgeHoverBaseline) {
     const hoverColor = "#9a5a0a";
@@ -256,6 +257,17 @@ function highlightLogicalDagEdge(segmentId) {
       shadow: { enabled: true, color: "rgba(154,90,10,0.32)", size: 7, x: 0, y: 0 },
     });
   }
+}
+
+function highlightLogicalDagEdge(segmentId) {
+  highlightLogicalDagEdges([_dagEdgeSegments.get(segmentId) || segmentId]);
+}
+
+function highlightConnectedDagEdges(nodeId) {
+  if (!_visNetwork) return;
+  const logicalIds = _visNetwork.getConnectedEdges(nodeId)
+    .map(edgeId => _dagEdgeSegments.get(edgeId) || edgeId);
+  highlightLogicalDagEdges(logicalIds);
 }
 
 function highlightConfounderPaths(groupId) {
@@ -440,6 +452,7 @@ function attachDagNetworkHandlers(network) {
     },
     drawPathLanes: drawConfounderPathLanes,
     highlightEdge: highlightLogicalDagEdge,
+    highlightNodeEdges: highlightConnectedDagEdges,
     clearEdgeHover: clearLogicalDagEdgeHover,
     clearPathHover: clearConfounderPathHover,
     highlightPaths: highlightConfounderPaths,
@@ -482,6 +495,7 @@ function edgeHoverText(link) {
     routedDagDataFromRoutes, dagVisibleGroups, renderDag, minimumDagScale,
     refreshEdgeSelection,
     highlightConfounderPaths, clearConfounderPathHover, clearLogicalDagEdgeHover,
+    highlightConnectedDagEdges,
     whenRendered: () => _dagRenderedPromise,
     getNetwork: () => _visNetwork, getNodes: () => _visNodes, getEdges: () => _visEdges,
     getPathLaneSegments: () => _dagPathLaneSegments,

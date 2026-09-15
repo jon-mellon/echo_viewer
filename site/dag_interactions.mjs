@@ -61,10 +61,11 @@ export function attachDagInteractions(network, element, actions) {
     // Ignore a late blur for an old edge after a newer hover has already won.
     blurEdge: event => actions.clearEdgeHover(event.edge),
     hoverNode(event) {
+      actions.highlightNodeEdges(event.node);
       if (actions.isDiagnosticCandidate(event.node)) actions.highlightPaths(event.node);
       else actions.clearPathHover();
     },
-    blurNode: () => actions.clearPathHover(),
+    blurNode: () => { actions.clearEdgeHover(); actions.clearPathHover(); },
     selectNode(event) {
       const id = event.nodes[0];
       if (id && actions.hasGroup(id)) {
