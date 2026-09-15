@@ -50,6 +50,20 @@ export function browserV2ManifestLayout(manifest) {
   return paths;
 }
 
+/** Bind a physical browser layout to the logical evidence records used by a schema. */
+/** @param {{manifest: Record<string, any>, manifestUrl: string, metadata: Record<string, any>, expectedRecordSignature: string}} input */
+export function validateBrowserV2EvidenceBinding({ manifest, manifestUrl, metadata, expectedRecordSignature }) {
+  const physicalId = String(manifestUrl || "").match(/\/layouts\/browser-v2\/([0-9a-f]{64})\/manifest\.json(?:[?#]|$)/i)?.[1]?.toLowerCase();
+  if (physicalId && physicalId !== String(manifest?.evidence_snapshot || "").toLowerCase()) {
+    throw new Error(`Browser-v2 manifest snapshot ${manifest?.evidence_snapshot || "(missing)"} does not match its URL snapshot ${physicalId}.`);
+  }
+  const recordSignature = metadata?.cache_compatibility?.record_signature || "";
+  if (!expectedRecordSignature || recordSignature !== expectedRecordSignature) {
+    throw new Error(`Browser-v2 evidence record signature ${recordSignature || "(missing)"} does not match the schema evidence record signature ${expectedRecordSignature || "(missing)"}.`);
+  }
+  return true;
+}
+
 /** @param {string} pattern @param {number} shardId */
 export function browserV2ShardPath(pattern, shardId) {
   if (!Number.isInteger(shardId) || shardId < 0) throw new Error(`Invalid browser-v2 shard ID: ${shardId}.`);

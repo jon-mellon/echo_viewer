@@ -1,7 +1,8 @@
 import * as duckdb from "./vendor/duckdb/duckdb-browser.mjs";
 import { evidenceManifestUrl, evidenceSnapshotIdFromManifestUrl, groupingSchemaUrl,
   PRODUCTION_EVIDENCE_MANIFEST, schemaPublicationId } from "./dag_data_config.mjs";
-import { browserV2ManifestLayout, browserV2ShardPath } from "./dag_manifest.mjs";
+import { browserV2ManifestLayout, browserV2ShardPath,
+  validateBrowserV2EvidenceBinding } from "./dag_manifest.mjs";
 import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
 import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication-v2";
 
@@ -71,12 +72,9 @@ export class ParquetManifestDagDataSource {
       this.groupingSet = await loadGroupingSchema(this.schemaUrl);
       this.loadedPublication = null;
     }
-    const expectedSnapshot = this.loadedPublication?.evidence_snapshot
+    const expectedRecordSignature = this.loadedPublication?.evidence_snapshot
       || this.groupingSet?.built_against?.record_signature
       || this.groupingSet?.cache_compatibility?.record_signature;
-    if (!expectedSnapshot || expectedSnapshot !== this.manifest.evidence_snapshot) {
-      throw new Error(`Browser-v2 evidence snapshot ${this.manifest.evidence_snapshot} does not match the schema evidence snapshot ${expectedSnapshot || "(missing)"}.`);
-    }
 
     this.onStatus("Starting query engine…");
     const mainModule = new URL("./vendor/duckdb/duckdb-eh.wasm", import.meta.url).href;
@@ -89,6 +87,12 @@ export class ParquetManifestDagDataSource {
     await database.instantiate(mainModule);
     this.connection = await database.connect();
     await this.loadBrowserShardLookup();
+    validateBrowserV2EvidenceBinding({
+      manifest: this.manifest,
+      manifestUrl: this.manifestBaseUrl.href,
+      metadata: await this.loadBuildMetadata(),
+      expectedRecordSignature,
+    });
     this.lazyEvidenceInit = false;
   }
 
@@ -194,15 +198,12 @@ export class ParquetManifestDagDataSource {
   async ensureVariableLayouts() {
     if (this.variableLayoutsReady) return this.variableLayoutsReady;
     this.variableLayoutsReady = (async () => {
-      const legacyManifest = this.manifest?.identity?.legacy_manifest;
-      if (!legacyManifest) throw new Error("Browser-v2 evidence manifest does not identify its layout source.");
-      const legacyBase = new URL(`/${legacyManifest}`, this.manifestBaseUrl);
-      const quote = url => new URL(url, legacyBase).href.replaceAll("'", "''");
-      const metadata = await queryRows(this.connection,
-        `SELECT metadata_json FROM read_parquet('${quote("build_metadata.parquet")}')`);
-      const payload = JSON.parse(metadata[0]?.metadata_json || "{}");
+      const payload = await this.loadBuildMetadata();
       this.defaultVariableLayoutSource = payload.layout?.default_source || payload.layout?.active_source;
       if (!this.defaultVariableLayoutSource) throw new Error("Evidence snapshot has no default variable layout.");
+      const legacyManifest = this.manifest.identity.legacy_manifest;
+      const legacyBase = new URL(`/${legacyManifest}`, this.manifestBaseUrl);
+      const quote = url => new URL(url, legacyBase).href.replaceAll("'", "''");
       await this.connection.query(`CREATE OR REPLACE VIEW variable_layouts AS
         SELECT * FROM read_parquet('${quote("variable_layouts.parquet")}')`);
     })();
@@ -212,6 +213,16 @@ export class ParquetManifestDagDataSource {
       this.variableLayoutsReady = null;
       throw error;
     }
+  }
+
+  async loadBuildMetadata() {
+    if (this.buildMetadata) return this.buildMetadata;
+    const url = this.canonicalEvidenceRelationUrl("build_metadata");
+    if (!url) throw new Error("Browser-v2 evidence manifest does not identify its build metadata.");
+    const rows = await queryRows(this.connection,
+      `SELECT metadata_json FROM read_parquet('${url.replaceAll("'", "''")}')`);
+    this.buildMetadata = JSON.parse(rows[0]?.metadata_json || "{}");
+    return this.buildMetadata;
   }
 
   canonicalEvidenceRelationUrl(relation) {
