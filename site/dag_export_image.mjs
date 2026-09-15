@@ -44,8 +44,10 @@ export async function renderDagPng(network, container, documentApi = document) {
     const context = output.getContext("2d");
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, output.width, output.height);
-    const destination = fitDagImage(sw, sh);
-    context.drawImage(source, sx, sy, sw, sh, destination.x, destination.y, destination.width, destination.height);
+    // The export canvas has a deliberate fixed 4:3 aspect ratio. Fill it
+    // completely so the document export does not letterbox the DAG with
+    // large unused margins when the on-screen graph has a wider aspect ratio.
+    context.drawImage(source, sx, sy, sw, sh, 0, 0, DAG_EXPORT_WIDTH, DAG_EXPORT_HEIGHT);
     return new Uint8Array(await (await canvasBlob(output)).arrayBuffer());
   } finally {
     network.moveTo({ scale: prior.scale, position: prior.position, animation: false });

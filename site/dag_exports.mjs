@@ -279,6 +279,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     `\\usepackage[utf8]{inputenc}`,
     `\\usepackage{graphicx}`,
     `\\usepackage{pdflscape}`,
+    `\\usepackage[margin=0.3in]{geometry}`,
     `\\usepackage{booktabs}`,
     `\\usepackage{longtable}`,
     `\\usepackage{hyperref}`,
@@ -303,7 +304,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     graphImageBytes ? `` : `\\section{Causal Graph}`,
     ``,
     graphImageBytes
-      ? `\\clearpage\n\\begin{landscape}\n\\thispagestyle{empty}\n\\noindent\\makebox[\\linewidth][c]{\\includegraphics[width=1.12\\linewidth,height=0.98\\textheight,keepaspectratio]{dag-graph.png}}\n\\clearpage\n\\end{landscape}`
+      ? `\\clearpage\n\\begin{landscape}\n\\newgeometry{margin=0.3in,landscape}\n\\thispagestyle{empty}\n\\centering\\includegraphics[width=\\textwidth,height=\\textheight,keepaspectratio]{dag-graph.png}\n\\clearpage\n\\restoregeometry\n\\end{landscape}`
       : svgStr
         ? `\\textit{The causal graph image could not be rendered; the causal structure is listed below.}`
       : ((visibleLinks || []).length
