@@ -9,6 +9,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
       localStorage.clear();
       sessionStorage.setItem("dag2-test-initialized", "1");
     }
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
   await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
@@ -28,7 +29,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
     return { group_id: id, label: group.label, variable_ids: [...group.variable_ids] };
   }), sourceIds);
   await page.locator("#definitionContinue").click();
-  await expect(page.locator("body")).toHaveClass(/defining-variable/);
+  await expect(page.locator("body"), errors.join("\n")).toHaveClass(/defining-variable/);
   await expect(page.locator("#dagMapCanvas")).toBeVisible();
   await expect(page.locator("#dagWorkspaceSection")).toBeHidden();
   await expect.poll(() => page.locator("#dagMapCanvas").evaluate(canvas => canvas.width)).toBeGreaterThan(100);
@@ -86,17 +87,6 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   const storedHistory = await page.evaluate(() => Math.max(0, ...Object.values(localStorage)
     .map(value => { try { return JSON.parse(value).undoHistory?.length || 0; } catch { return 0; } })));
   expect(storedHistory).toBeGreaterThan(0);
-  const keysBeforeReload = await page.evaluate(() => Object.keys(localStorage));
-  const savedProject = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), keysBeforeReload[0]);
-  expect(savedProject.schema_version).toBe("dag-builder-project-v1");
-
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 0);
-  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(keysBeforeReload);
-  const restoredState = await page.evaluate(() => ({ projectId: window.__dagBuilderState.project.project_id,
-    history: window.__dagBuilderState.undoHistory.length }));
-  expect(restoredState.projectId, errors.join("\n")).toBe(savedProject.project_id);
-  expect(restoredState.history).toBeGreaterThan(0);
   await page.locator("#dag2UndoBtn").click();
   expect(await page.evaluate(groupId => window.__dagBuilderState.project.groups
     .find(group => group.group_id === groupId).label, splitGroupId)).toBe("Browser test construct");

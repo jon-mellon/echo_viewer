@@ -114,6 +114,7 @@ export class ParquetManifestDagDataSource {
   async loadVariableMetadata(variableIds, layoutSource = "") {
     await this.ensureEvidenceConnection();
     if (!variableIds?.length) return [];
+    if (!this.browserShardIds(variableIds).length) return [];
     await this.ensureBrowserRelation("variable_occurrences", variableIds);
     const placeholders = variableIds.map(() => "?").join(",");
     return queryRows(this.connection, `SELECT * FROM variable_occurrences
@@ -123,6 +124,7 @@ export class ParquetManifestDagDataSource {
   async loadIncidentRawLinks(variableIds) {
     await this.ensureEvidenceConnection();
     if (!variableIds?.length) return [];
+    if (!this.browserShardIds(variableIds).length) return [];
     return this.queryBrowserIncidentLinks(variableIds);
   }
 
@@ -146,6 +148,7 @@ export class ParquetManifestDagDataSource {
   async loadNeighbors(variableIds) {
     await this.ensureEvidenceConnection();
     if (!variableIds?.length) return [];
+    if (!this.browserShardIds(variableIds).length) return [];
     await this.ensureBrowserRelation("variable_neighbors", variableIds);
     const placeholders = variableIds.map(() => "?").join(",");
     return queryRows(this.connection, `SELECT * FROM variable_neighbors
@@ -184,8 +187,7 @@ export class ParquetManifestDagDataSource {
       const match = String(variableId).match(/^v(\d+)$/);
       const index = match ? Number(match[1]) : NaN;
       const shard = this.shardByVariableIndex?.get(index);
-      if (shard == null) throw new Error(`No browser-v2 shard mapping for variable ${variableId}.`);
-      shards.add(shard);
+      if (shard != null) shards.add(shard);
     }
     return [...shards].sort((a, b) => a - b);
   }

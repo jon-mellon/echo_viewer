@@ -4,7 +4,8 @@ import { createDefinitionWorkflowPresenter } from "./definition_workflow_present
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
   invalidateMapCaches, renderAll, setMapMode, fitMap, groupById, persistProjectLocally,
   visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
-  applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap }) {
+  applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
+  hydrateVariableDetails = async () => {} }) {
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv"].includes(role)) return;
     state.definitionDraft = {
@@ -18,7 +19,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     els.definitionSourceSearch.focus();
   }
 
-  function startEditSplit(groupId = null) {
+  async function startEditSplit(groupId = null) {
     const context = projectOps.editableSplitContext(state.project, groupId ? groupId : activeGroup());
     if (!context) return;
     const { splitId, newGroup, residuals } = context;
@@ -38,6 +39,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     };
     state.activeGroupId = null;
     state.selectedVariableIds = new Set(state.definitionDraft.new_variable_ids);
+    await hydrateVariableDetails(eligible);
     invalidateMapCaches();
     setMapMode("select");
     renderAll();
@@ -58,7 +60,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     return (state.project?.groups || []).filter(group => ids.has(group.group_id));
   }
 
-  function continueDefinition() {
+  async function continueDefinition() {
     const draft = state.definitionDraft;
     const sources = definitionSources();
     if (!draft || !sources.length) return;
@@ -73,6 +75,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       .map(edge => [edge.edge_id, "keep"]));
     draft.step = "partition";
     state.selectedVariableIds.clear();
+    await hydrateVariableDetails(draft.eligible_variable_ids);
     invalidateMapCaches();
     setMapMode("select");
     renderAll();

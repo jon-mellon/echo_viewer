@@ -673,30 +673,38 @@ function activeGroup() {
 }
 function createCustomGroup() { return groupEditorController.createCustomGroup(); }
 function closeGroupEditor() { return groupEditorController.closeGroupEditor(); }
+async function hydrateVariableDetails(variableIds) {
+  const missing = [...new Set(variableIds || [])].filter(id => !state.variableById.has(id));
+  if (!missing.length) return;
+  const [variables, neighbors] = await Promise.all([
+    dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource),
+    dagDataSource.loadNeighbors(missing),
+  ]);
+  const neighborsByVariable = new Map();
+  for (const row of neighbors) {
+    if (!neighborsByVariable.has(row.variable_id)) neighborsByVariable.set(row.variable_id, []);
+    neighborsByVariable.get(row.variable_id).push({ variable_id: row.neighbor_variable_id,
+      index: row.neighbor_index, cosine_similarity: row.cosine_similarity,
+      llm_rank: row.llm_rank, embedding_rank: row.embedding_rank,
+      is_substantive_duplicate: row.is_substantive_duplicate });
+  }
+  for (const variable of variables) {
+    if (variable.field_preview_json) variable.field_preview = JSON.parse(variable.field_preview_json);
+    if (variable.metadata_blob_json) variable.metadata_blob = JSON.parse(variable.metadata_blob_json);
+    variable.similarity_neighbors = neighborsByVariable.get(variable.variable_id) || [];
+    state.variableById.set(variable.variable_id, variable);
+  }
+  state.variables = [...state.variableById.values()].sort((a, b) => Number(a.index || 0) - Number(b.index || 0));
+  buildDuplicateClusters();
+  invalidateMapCaches();
+}
+
 function renderGroupEditor() {
   const group = state.project?.groups?.find(item => item.group_id === state.activeGroupId);
   const missing = (group?.variable_ids || []).filter(id => !state.variableById.has(id));
   if (missing.length && !state.pendingVariableMetadata) {
     state.pendingVariableMetadata = true;
-    void Promise.all([
-      dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource),
-      dagDataSource.loadNeighbors(missing),
-    ]).then(([variables, neighbors]) => {
-      const neighborsByVariable = new Map();
-      for (const row of neighbors) {
-        if (!neighborsByVariable.has(row.variable_id)) neighborsByVariable.set(row.variable_id, []);
-        neighborsByVariable.get(row.variable_id).push({ variable_id: row.neighbor_variable_id,
-          index: row.neighbor_index, cosine_similarity: row.cosine_similarity,
-          llm_rank: row.llm_rank, embedding_rank: row.embedding_rank,
-          is_substantive_duplicate: row.is_substantive_duplicate });
-      }
-      for (const variable of variables) {
-        if (variable.field_preview_json) variable.field_preview = JSON.parse(variable.field_preview_json);
-        if (variable.metadata_blob_json) variable.metadata_blob = JSON.parse(variable.metadata_blob_json);
-        variable.similarity_neighbors = neighborsByVariable.get(variable.variable_id) || [];
-        state.variableById.set(variable.variable_id, variable);
-      }
-      state.variables = [...state.variableById.values()].sort((a, b) => Number(a.index || 0) - Number(b.index || 0));
+    void hydrateVariableDetails(missing).then(() => {
       state.pendingVariableMetadata = false;
       renderAll();
     }).catch(error => {
@@ -1139,6 +1147,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   setMapMode, fitMap, groupById, persistProjectLocally, visibleVariables, searchVariables,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
   takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
+  hydrateVariableDetails,
 });
 
 const projectController = createDagProjectController({

@@ -33,4 +33,5 @@ test("publication permalink is independent of the storage URL", () => {
   assert.match(source, /dataVersion: state\.data\?\.snapshot\?\.snapshot_id/);
   assert.match(source, /url\.searchParams\.delete\("schema_url"\)/);
   assert.match(source, /url\.searchParams\.set\("schema", publicationId\)/);
+  assert.match(source, /const hasView = Boolean\(anchor\("iv"\)/);
 });
