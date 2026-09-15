@@ -1,4 +1,4 @@
-import { expandBox, pointInsideBox, routePointForNode, simplifyRoute } from "./dag_routing_geometry.mjs";
+import { expandBox, pointInsideBox, simplifyRoute } from "./dag_routing_geometry.mjs";
 import { pairKey, pathPairKeys } from "./edge_keys.mjs";
 export { pathPairKeys } from "./edge_keys.mjs";
 
@@ -228,26 +228,6 @@ export function highlightedArrowMarker(points, atStart, boxes, scale) {
   return null;
 }
 
-export function clipPathLaneToNodes(points, boxes) {
-  if (points.length < 2) return points;
-  const clipped = points.map(point => ({ ...point }));
-  const clipEndpoint = (endpointIndex, adjacentIndex) => {
-    const endpoint = clipped[endpointIndex];
-    const box = boxes.find(candidate => pointInsideBox(endpoint, candidate));
-    if (box) {
-      const centeredBox = {
-        ...box,
-        cx: box.cx ?? box.x + box.w / 2,
-        cy: box.cy ?? box.y + box.h / 2,
-      };
-      clipped[endpointIndex] = routePointForNode(centeredBox, clipped[adjacentIndex]);
-    }
-  };
-  clipEndpoint(0, 1);
-  clipEndpoint(clipped.length - 1, clipped.length - 2);
-  return simplifyRoute(clipped);
-}
-
 function drawPathLaneArrow(context, point, angle, color, scale) {
   const length = 13 / scale;
   const halfWidth = 6.5 / scale;
@@ -262,6 +242,21 @@ function drawPathLaneArrow(context, point, angle, color, scale) {
   context.fillStyle = color;
   context.fill();
   context.restore();
+}
+
+export function clipPathLanesAroundNodes(context, boxes, scale) {
+  if (!boxes.length) return;
+  const padding = 1.5 / scale;
+  const expanded = boxes.map(box => expandBox(box, padding));
+  const margin = 10000 / scale;
+  const left = Math.min(...expanded.map(box => box.x)) - margin;
+  const top = Math.min(...expanded.map(box => box.y)) - margin;
+  const right = Math.max(...expanded.map(box => box.x + box.w)) + margin;
+  const bottom = Math.max(...expanded.map(box => box.y + box.h)) + margin;
+  context.beginPath();
+  context.rect(left, top, right - left, bottom - top);
+  for (const box of expanded) context.rect(box.x, box.y, box.w, box.h);
+  context.clip("evenodd");
 }
 
 export function drawPathLanes(context, { segments = [], positions = {}, boxes = [], scale = 1, ivId, dvId }) {
@@ -286,14 +281,16 @@ export function drawPathLanes(context, { segments = [], positions = {}, boxes = 
       segment = edgeSegments.find(item => item.from === segment.to);
     }
     if (points.some(point => !point) || points.length < 2) continue;
-    const separated = separateHighlightRuns(points, occupied, scale, first.role === "iv" ? -1 : 1);
-    const routed = clipPathLaneToNodes(separated, boxes);
+    const routed = separateHighlightRuns(points, occupied, scale, first.role === "iv" ? -1 : 1);
     occupied.push(...routed.slice(0, -1).map((point, index) => [point, routed[index + 1]]));
     rendered.push({ points: routed, color: first.color,
       to: edgeSegments.some(item => item.arrows?.to?.enabled),
       from: edgeSegments.some(item => item.arrows?.from?.enabled) });
   }
   context.save();
+  // Lanes paint above ordinary edges so no portion is washed out, while an
+  // even-odd mask preserves nodes and their borders as opaque foreground.
+  clipPathLanesAroundNodes(context, boxes, scale);
   context.lineCap = "round";
   context.lineJoin = "round";
   for (const casing of [true, false]) {

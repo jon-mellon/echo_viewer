@@ -63,20 +63,6 @@ test("arrow marker relaxes its node halo for tightly spaced highlighted links", 
   assert.ok(marker.point.x > 42 && marker.point.x < 58);
 });
 
-test("highlight lanes share node-clipped geometry for strokes and arrows", () => {
-  const clipped = highlights.clipPathLaneToNodes(
-    [{ x: 0, y: 0 }, { x: 50, y: 40 }, { x: 100, y: 0 }],
-    [
-      { x: -20, y: -10, w: 40, h: 20 },
-      { x: 80, y: -10, w: 40, h: 20 },
-    ],
-  );
-
-  assert.notDeepEqual(clipped[0], { x: 0, y: 0 });
-  assert.notDeepEqual(clipped.at(-1), { x: 100, y: 0 });
-  assert.equal(clipped.length, 3);
-});
-
 test("lane renderer produces separated strokes and arrow canvas commands", () => {
   const { context, commands } = recorder();
   const rendered = highlights.drawPathLanes(context, {
@@ -88,4 +74,13 @@ test("lane renderer produces separated strokes and arrow canvas commands", () =>
   assert.equal(rendered.length, 1);
   assert.equal(commands.filter(command => command[0] === "stroke").length, 2);
   assert.ok(commands.some(command => command[0] === "fill"));
+  assert.ok(commands.some(command => command[0] === "clip" && command[1] === "evenodd"));
+});
+
+test("foreground lane mask cuts node interiors out of the shared canvas geometry", () => {
+  const { context, commands } = recorder();
+  highlights.clipPathLanesAroundNodes(context, [{ x: 10, y: 20, w: 40, h: 30 }], 1);
+
+  assert.equal(commands.filter(command => command[0] === "rect").length, 2);
+  assert.deepEqual(commands.at(-1), ["clip", "evenodd"]);
 });

@@ -56,8 +56,6 @@ export function attachDagInteractions(network, element, actions) {
     zoom: constrainViewport,
     dragging: constrainViewport,
     dragEnd: constrainViewport,
-    // Highlight lanes are clipped to node boundaries, so painting them last
-    // keeps the complete exposed path visible without crossing node interiors.
     afterDrawing: context => actions.drawPathLanes(context),
     hoverEdge: event => actions.highlightEdge(event.edge),
     // Ignore a late blur for an old edge after a newer hover has already won.
