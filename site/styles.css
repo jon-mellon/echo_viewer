@@ -2236,3 +2236,20 @@ h2 {
   gap: 8px;
   margin-top: 20px;
 }
+
+.legal-link {
+  position: fixed;
+  z-index: 20001;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(6px, env(safe-area-inset-bottom));
+  padding: 2px 4px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+@media (max-width: 840px) {
+  .legal-link {
+    bottom: calc(64px + max(6px, env(safe-area-inset-bottom)));
+  }
+}
