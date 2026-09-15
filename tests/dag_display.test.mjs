@@ -52,3 +52,9 @@ test("display records preserve node roles, selection, edge styles and descriptio
   }
   assert.deepEqual(groups, before);
 });
+
+test("paper/table labels omit missing internal key parts", () => {
+  assert.equal(display.displayPaperTableKey("10.1000/example::unknown"), "10.1000/example");
+  assert.equal(display.displayPaperTableKey("unknown::table-2"), "Occurrence table-2");
+  assert.equal(display.displayPaperTableKey("unknown::unknown"), "");
+});

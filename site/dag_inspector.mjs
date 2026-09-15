@@ -1,4 +1,5 @@
 import { directedGroupLabels } from "./dag_exports.mjs";
+import { displayPaperTableKey } from "./dag_display.mjs";
 
 export function edgeInspector(link, project) {
   if (!link) return null;
@@ -22,7 +23,7 @@ export function studyInspector(project, rawLinksById) {
   const rawIds = [...new Set([...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])])];
   const keys = [...new Set(rawIds.map(id => {
     const raw = rawLinksById.get(id);
-    return raw ? `${raw.paper_id || "unknown"}::${raw.within_table_occurrence_id || "unknown"}` : "";
+    return raw ? displayPaperTableKey(`${raw.paper_id || "unknown"}::${raw.within_table_occurrence_id || "unknown"}`) : "";
   }).filter(Boolean))].slice(0, 8);
   return {
     sourceLabel: project.groups.find(g => g.group_id === project.iv_group_id)?.label || "IV",

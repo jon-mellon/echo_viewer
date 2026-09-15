@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Variable DAG Builder</title>
-    <link rel="stylesheet" href="/styles.css?v=mobile-panels-v2">
+    <link rel="stylesheet" href="/styles.css?v=mobile-panels-v3">
   </head>
   <body class="dag-body password-locked">
     <div id="passwordGate" class="password-gate" role="dialog" aria-modal="true" aria-labelledby="passwordGateTitle">
@@ -300,6 +300,9 @@
           </div>
           <div id="dagWorkspaceResizer" class="dag-workspace-resizer" title="Resize table viewer"></div>
           <div class="dag-ws-footer">
+            <div class="evidence-pane-header">
+              <button id="closeEvidencePane" class="text-button evidence-close" type="button" hidden aria-label="Close evidence pane">Close evidence</button>
+            </div>
             <!-- Edge inspector: appears when an edge is selected -->
             <div id="edgeInspector" class="edge-inspector empty">Select an edge to inspect its provenance</div>
             <!-- Provenance detail: appears when edge selected -->
@@ -359,6 +362,6 @@
     </nav>
     <script src="/password_gate.js"></script>
     <script src="/visjs-min.js"></script>
-  <script type="module" src="/dag_builder.js?v=mobile-panels-v1"></script>
+  <script type="module" src="/dag_builder.js?v=evidence-pane-v1"></script>
   </body>
 </html>

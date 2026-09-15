@@ -142,7 +142,7 @@ function initElements() {
     // Right: DAG workspace
     "dagWorkspaceSection", "dagNetwork", "dagWorkspaceResizer",
     "dagLayoutSelect", "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
-    "edgeInspector", "provenancePanel",
+    "edgeInspector", "provenancePanel", "closeEvidencePane",
     "addEdgeToggle", "addEdgeDrawer", "closeAddEdge",
     "manualSource", "manualTarget", "manualDirection", "manualNote", "addManualEdge",
     // Export
@@ -837,6 +837,8 @@ function renderVariableComparison() {
   );
 
   els.edgeInspector.className = "edge-inspector variable-comparison";
+  els.edgeInspector.hidden = false;
+  els.closeEvidencePane.hidden = false;
   els.provenancePanel.hidden = false;
   if (!rows.length) {
     replaceChildren(els.edgeInspector, h("strong", { textContent: "Variable comparison" }),
@@ -941,6 +943,16 @@ function renderSelectedEdge() {
   }
   inspectorController.renderEdge();
   inspectorController.renderProvenance();
+}
+
+function dismissEvidencePane() {
+  state.selectedEdgeId = null;
+  state.comparisonVariableIds = [];
+  state.selectedVariableIds.clear();
+  els.edgeInspector.hidden = true;
+  els.provenancePanel.hidden = true;
+  els.closeEvidencePane.hidden = true;
+  refreshDagEdgeSelection();
 }
 
 // ─── Manual edge form ─────────────────────────────────────────────────────────
@@ -1301,7 +1313,7 @@ const eventController = createDagEventController({
   showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean,
-  startEditSplit,
+  startEditSplit, dismissEvidencePane,
 });
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────

@@ -1452,6 +1452,19 @@ h2 {
   padding: 0 14px 8px;
 }
 
+.evidence-pane-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  background: var(--panel);
+}
+
+.evidence-close {
+  margin: 6px 0 0;
+}
+
 /* Group editor section also fills the panel when shown */
 #groupEditorSection {
   flex: 1;

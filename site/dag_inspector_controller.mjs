@@ -65,6 +65,8 @@ export function createDagInspectorController({
     if (!model) return;
     const { sourceLabel, targetLabel, rawIds, keys } = model;
     elements.edgeInspector.className = "edge-inspector";
+    elements.edgeInspector.hidden = false;
+    elements.closeEvidencePane.hidden = false;
     const papers = keys.length ? h("div", {}, "Papers/tables:", h("br"),
       keys.flatMap((key, index) => [index ? h("br") : null, document.createTextNode(key)])) : null;
     replaceChildren(elements.edgeInspector,
@@ -78,12 +80,15 @@ export function createDagInspectorController({
     const link = selectedEdge();
     if (!link) {
       elements.edgeInspector.className = "edge-inspector empty";
+      elements.edgeInspector.hidden = false;
       elements.edgeInspector.textContent = "Select an edge to inspect its provenance";
       return;
     }
     const model = inspector.edgeInspector(link, state.project);
     const sourcesLoading = edgeSourcesLoading(link);
     elements.edgeInspector.className = "edge-inspector";
+    elements.edgeInspector.hidden = false;
+    elements.closeEvidencePane.hidden = false;
     const reason = model.existingDecision?.display_status === "excluded" && model.existingDecision.exclude_reason
       ? h("div", { className: "small-note", style: { color: "#9b5c2e" } }, h("strong", { textContent: "Excluded:" }), ` ${model.existingDecision.exclude_reason}`) : null;
     const reasonRow = h("div", { id: "excludeReasonRow", className: "exclude-reason-row", hidden: true },

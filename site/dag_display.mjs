@@ -87,8 +87,18 @@ export function edgeHoverText(link, groups) {
   const lines = [`${sourceLabel} ${arrow} ${targetLabel}`];
   if (link.is_target_relation) lines.push("Target relation");
   if (link.is_manual) lines.push("Manual edge");
-  const keys = [...new Set([...link.a_to_b_paper_table_keys, ...link.b_to_a_paper_table_keys])].slice(0, 8);
+  const keys = [...new Set([...link.a_to_b_paper_table_keys, ...link.b_to_a_paper_table_keys]
+    .map(displayPaperTableKey).filter(Boolean))].slice(0, 8);
   if (keys.length) { lines.push("Papers/tables:"); lines.push(...keys); }
   else if (!link.is_manual) lines.push("No provenance.");
   return lines.join("\n");
+}
+
+export function displayPaperTableKey(key) {
+  const [paper, ...occurrenceParts] = String(key || "").split("::");
+  const occurrence = occurrenceParts.join("::");
+  if ((!paper || paper === "unknown") && (!occurrence || occurrence === "unknown")) return "";
+  if (!occurrence || occurrence === "unknown") return paper;
+  if (!paper || paper === "unknown") return `Occurrence ${occurrence}`;
+  return `${paper}::${occurrence}`;
 }

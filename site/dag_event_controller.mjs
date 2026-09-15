@@ -17,8 +17,10 @@ export function createDagEventController({
   showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean, startEditSplit,
+  dismissEvidencePane,
 }) {
 function installHandlers() {
+  els.closeEvidencePane.addEventListener("click", dismissEvidencePane);
   // IV/DV search
   els.ivInput.addEventListener("input", () => {
     renderSearch("iv");

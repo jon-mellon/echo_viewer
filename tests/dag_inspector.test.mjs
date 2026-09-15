@@ -29,7 +29,7 @@ test("inspectors deduplicate evidence, preserve direction and expose manual acti
   assert.deepEqual(provenance.rows[0].source, { concept: "Concept X", classifications: ["A"] });
   assert.deepEqual(provenance.rows[0].target, { concept: "y", classifications: ["B"] });
   assert.deepEqual(inspector.studyInspector(project, rawById), {
-    sourceLabel: "A", targetLabel: "B", rawIds: ["r", "missing"], keys: ["paper::unknown"],
+    sourceLabel: "A", targetLabel: "B", rawIds: ["r", "missing"], keys: ["paper"],
   });
   assert.deepEqual(project, before);
   assert.equal(inspector.edgeInspector(null, project), null);
