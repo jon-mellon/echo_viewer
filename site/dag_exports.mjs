@@ -131,7 +131,8 @@ export function buildLinksTable(fmt, { visibleLinks, project, rawLinksById }, ke
     } else {
       const cites = dois.map(d => `\\citep{${keyMap?.get(d.trim()) || d.trim().replace(/[^a-zA-Z0-9_.\-]/g, "_")}}`);
       const src = [...cites, ...manual].join("; ") || "---";
-      return `  ${texEscape(sourceLabel)} & ${texEscape(targetLabel)} & ${arrow} & ${src} \\\\`;
+      const texArrow = arrow === "↔" ? "$\\leftrightarrow$" : "$\\rightarrow$";
+      return `  ${texEscape(sourceLabel)} & ${texEscape(targetLabel)} & ${texArrow} & ${src} \\\\`;
     }
   });
 
@@ -197,7 +198,18 @@ export function buildExcludedLinksTable(fmt, project) {
 }
 
 function texEscape(s) {
-  return (s || "").replace(/[&%$#_{}~^\\]/g, m => `\\${m === "\\" ? "textbackslash{}" : m}`);
+  const greekLetters = "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi o pi rho sigma tau upsilon phi chi psi omega".split(" ");
+  const greek = new Map([..."αβγδεζηθικλμνξοπρστυφχψω"].map((character, index) =>
+    [character, `\\(${greekLetters[index] === "o" ? "o" : `\\${greekLetters[index]}`}\\)`]));
+  const replacements = new Map([
+    ["\\", "\\textbackslash{}"], ["{", "\\{"], ["}", "\\}"],
+    ["&", "\\&"], ["%", "\\%"], ["$", "\\$"], ["#", "\\#"], ["_", "\\_"],
+    ["~", "\\textasciitilde{}"], ["^", "\\textasciicircum{}"],
+    ["→", "$\\rightarrow$"], ["←", "$\\leftarrow$"], ["↔", "$\\leftrightarrow$"],
+    ["–", "---"], ["—", "---"], ["…", "\\ldots{}"], ["×", "$\\times$"],
+  ]);
+  return String(s ?? "").replace(/[\\{}&%$#_~^←→↔–—…×α-ω]/g,
+    character => replacements.get(character) || greek.get(character));
 }
 
 export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null) {
@@ -218,6 +230,7 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null) {
     `**DV:** ${dvLabel}`,
     ``,
     `*Constructed with DAG Builder [@${METHOD_BIB_KEY}].*`,
+    ...(input.permalink ? [``, `[View the public causal map](<${String(input.permalink).replace(/[\r\n]/g, "")}>)`] : []),
     ``,
     `## Causal Graph`,
     ``,
@@ -260,7 +273,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null) {
     `\\usepackage{hyperref}`,
     `\\usepackage{natbib}`,
     `% To compile: pdflatex dag.tex && bibtex dag && pdflatex dag.tex && pdflatex dag.tex`,
-    `% dag.svg must be converted to dag.pdf first (e.g. via Inkscape or rsvg-convert)`,
+    `% To include the graph, convert dag.svg to dag-graph.pdf first (e.g. via Inkscape or rsvg-convert)`,
     ``,
     `\\title{Working Causal Map}`,
     `\\author{}`,
@@ -273,11 +286,12 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null) {
     `\\textbf{DV:} ${texEscape(dvLabel)}`,
     ``,
     `This causal map was constructed using the DAG Builder method \\citep{${METHOD_BIB_KEY}}.`,
+    ...(input.permalink ? [``, `\\noindent Public causal map: \\url{${String(input.permalink).replace(/[\r\n]/g, "")}}`] : []),
     ``,
     `\\section{Causal Graph}`,
     ``,
     svgStr
-      ? `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=\\textwidth]{dag.pdf}\n\\caption{Working causal map: ${texEscape(ivLabel)} $\\rightarrow$ ${texEscape(dvLabel)}}\n\\end{figure}`
+      ? `\\IfFileExists{dag-graph.pdf}{%\n\\begin{figure}[h]\n\\centering\n\\includegraphics[width=\\textwidth]{dag-graph.pdf}\n\\caption{Working causal map: ${texEscape(ivLabel)} $\\rightarrow$ ${texEscape(dvLabel)}}\n\\end{figure}\n}{%\n\\textit{Convert dag.svg to dag-graph.pdf to include the graph figure; the causal structure is also listed below.}%\n}`
       : ((visibleLinks || []).length
         ? `\\textit{Graph figure export is not yet available; the causal structure is listed in the Causal Links table below.}`
         : `\\textit{No DAG to display --- create groups and add edges first.}`),

@@ -269,6 +269,28 @@ export function createPublicationController({
 
   async function share() {
     if (busy) return null;
+    const resolved = await publicPermalink();
+    if (!resolved) return null;
+    const { permalink, hasLocalChanges } = resolved;
+    try {
+      await copyText(permalink, navigatorApi, windowApi);
+      showShareCopied();
+      if (hasLocalChanges) {
+        showStatus(elements.status, "Copied a view permalink using the last published schema. Your current schema edits are still private. Choose Publish publicly to include them in shared views.");
+        elements.publish.focus();
+      } else {
+        showStatus(elements.status, "Copied a permalink to this view of the public schema.");
+      }
+      return permalink;
+    } catch (error) {
+      const message = `Could not share: ${formatSupabaseError(error)}`;
+      showStatus(elements.status, message, true);
+      console.error(message, error);
+      return null;
+    }
+  }
+
+  async function publicPermalink() {
     const published = getPublicationState();
     if (!published?.publication_id || !published?.content_hash) {
       showStatus(elements.status, "This schema is still private. Choose Publish publicly to create a public permalink.", true);
@@ -278,21 +300,11 @@ export function createPublicationController({
     try {
       const canonical = await currentCanonical();
       const permalink = stablePermalink(published);
-      if (canonical.contentHash !== published.content_hash) {
-        await copyText(permalink, navigatorApi, windowApi);
-        showShareCopied();
-        renderPublicationState(published, true);
-        showStatus(elements.status, "Copied a view permalink using the last published schema. Your current schema edits are still private. Choose Publish publicly to include them in shared views.");
-        elements.publish.focus();
-        return permalink;
-      }
-      await copyText(permalink, navigatorApi, windowApi);
-      showShareCopied();
-      renderPublicationState(published, false);
-      showStatus(elements.status, "Copied a permalink to this view of the public schema.");
-      return permalink;
+      const hasLocalChanges = canonical.contentHash !== published.content_hash;
+      renderPublicationState(published, hasLocalChanges);
+      return { permalink, hasLocalChanges };
     } catch (error) {
-      const message = `Could not share: ${formatSupabaseError(error)}`;
+      const message = `Could not create a public permalink: ${formatSupabaseError(error)}`;
       showStatus(elements.status, message, true);
       console.error(message, error);
       return null;
@@ -321,5 +333,5 @@ export function createPublicationController({
     showStatus(elements.status, "Group memberships could not be verified. Editing and publishing remain disabled.", true);
   }
 
-  return { initialize, publish, share, currentCanonical, refreshAuthVisibility, refreshPublicationState, workingCopyChanged, setSchemaReady, setSchemaLoadFailed };
+  return { initialize, publish, share, publicPermalink, currentCanonical, refreshAuthVisibility, refreshPublicationState, workingCopyChanged, setSchemaReady, setSchemaLoadFailed };
 }

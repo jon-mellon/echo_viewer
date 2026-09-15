@@ -100,6 +100,22 @@ test("export controller waits for lazy evidence before taking its snapshot", asy
   assert.equal(input.rawLinksById.get("r1").paper_id, "10.1234/loaded");
 });
 
+test("document export stops before evidence loading when no public permalink is available", async () => {
+  const state = createDagAppState();
+  state.data = { cache_compatibility: {} };
+  state.project = { groups: [] };
+  let evidenceLoads = 0;
+  const controller = createDagExportController({
+    state, elements: { exportBib: {}, exportMd: {}, exportTex: {} },
+    rejectedVariableEntries: () => [], rejectedVariableIdSet: () => new Set(),
+    projectPayload: () => ({}), aggregateGroupLinks() {}, computeVisibleLinks() {}, nowIso: () => "",
+    getPublicPermalink: async () => null,
+    ensureEvidenceLoaded: async () => { evidenceLoads += 1; },
+  });
+  await controller.exportMd();
+  assert.equal(evidenceLoads, 0);
+});
+
 test("inspector controller resolves selected edges without owning graph state", () => {
   const state = createDagAppState();
   state.project = { links: [{ edge_id: "e1" }] }; state.selectedEdgeId = "e1";

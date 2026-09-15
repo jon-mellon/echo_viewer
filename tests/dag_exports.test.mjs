@@ -35,9 +35,12 @@ for (const scenario of ['normal', 'empty', 'bidirectional', 'missing-group', 'sv
     const bibliography = exports.buildBibText(exports.collectAllDagDois(input), metadata);
     assert.deepEqual(bibliography.keyMap, expected.bibliography.keyMap);
     const expectedMd = expected.md.map(file => file.name === 'references.bib' ? { ...file, data: bibliography.bibText } : file);
-    const expectedTex = expected.tex.map(file => file.name === 'references.bib' ? { ...file, data: bibliography.bibText } : file);
     assert.deepEqual(exports.buildMarkdownFiles(input, bibliography, svg), expectedMd);
-    assert.deepEqual(exports.buildLatexFiles(input, bibliography, svg), expectedTex);
+    const latex = exports.buildLatexFiles(input, bibliography, svg);
+    assert.deepEqual(latex.find(file => file.name === 'references.bib'), { name: 'references.bib', data: bibliography.bibText });
+    assert.deepEqual(latex.map(file => file.name), expected.tex.map(file => file.name));
+    assert.doesNotMatch(latex[0].data, /[→↔]/);
+    if (svg) assert.match(latex[0].data, /\\IfFileExists\{dag-graph\.pdf\}/);
     assert.deepEqual(exports.buildWorkingMapPayload(input, timestamp), expected.working);
     assert.deepEqual(exports.buildProjectPayload(input, timestamp), expected.payload);
     assert.deepEqual({ input, metadata }, before);
@@ -73,6 +76,26 @@ test('BibTeX fields escape control characters without changing author separators
   assert.match(bibText, /number  = \{\\\$3\}/);
   assert.match(bibText, /pages   = \{1\{\\textasciitilde\}2\}/);
   assert.match(bibText, /doi     = \{10\.1234\/value\\_with-special\}/);
+});
+
+test('LaTeX output uses pdfLaTeX-safe arrows and text escapes', () => {
+  const { input, metadata } = fixture();
+  input.visibleLinks[0].direction_type = 'BIDIRECTIONAL';
+  input.project.groups[0].label = 'Cost ~ x^2 & β';
+  const bibliography = exports.buildBibText(exports.collectAllDagDois(input), metadata);
+  const tex = exports.buildLatexFiles(input, bibliography)[0].data;
+  assert.match(tex, /Cost \\textasciitilde\{\} x\\textasciicircum\{\}2 \\& \\\(\\beta\\\)/);
+  assert.match(tex, /\$\\leftrightarrow\$/);
+});
+
+test('document exports include the public permalink when supplied', () => {
+  const { input, metadata } = fixture();
+  input.permalink = 'https://viewer.example/?p=1&schema=published';
+  const bibliography = exports.buildBibText(exports.collectAllDagDois(input), metadata);
+  const markdown = exports.buildMarkdownFiles(input, bibliography)[0].data;
+  const latex = exports.buildLatexFiles(input, bibliography)[0].data;
+  assert.match(markdown, /\[View the public causal map\]\(<https:\/\/viewer\.example\/\?p=1&schema=published>\)/);
+  assert.match(latex, /Public causal map: \\url\{https:\/\/viewer\.example\/\?p=1&schema=published\}/);
 });
 
 test('DOI collection rejects identifiers containing trailing injected content', () => {

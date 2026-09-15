@@ -1230,9 +1230,11 @@ const shellController = createDagShellController({
   getNetwork: () => dagNetworkController.getNetwork(),
 });
 
+let publicationController;
 const exportController = createDagExportController({
   state, elements: els, rejectedVariableEntries, rejectedVariableIdSet,
   projectPayload, aggregateGroupLinks, computeVisibleLinks, nowIso,
+  getPublicPermalink: async () => (await publicationController?.publicPermalink())?.permalink || null,
   ensureEvidenceLoaded: async () => {
     while (state.compiledDagUpdatePromise) {
       const pending = state.compiledDagUpdatePromise;
@@ -1256,7 +1258,7 @@ const exportController = createDagExportController({
   },
 });
 
-const publicationController = createPublicationController({
+publicationController = createPublicationController({
   elements: {
     get publish() { return els.publishSchema; },
     get status() { return els.publicationStatus; },

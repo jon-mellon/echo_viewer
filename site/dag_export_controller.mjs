@@ -9,6 +9,7 @@ export function createDagExportController({
   projectPayload, aggregateGroupLinks, computeVisibleLinks, nowIso,
   getDagSvgString = () => null,
   ensureEvidenceLoaded = async () => {},
+  getPublicPermalink = async () => null,
   fetchImpl = (...args) => fetch(...args),
   alertImpl = message => window.alert(message),
 }) {
@@ -128,6 +129,7 @@ export function createDagExportController({
   }
 
   async function exportBib() {
+    if (!await getPublicPermalink()) return;
     setBusy(true);
     let input;
     try {
@@ -157,12 +159,14 @@ export function createDagExportController({
   }
 
   async function exportDocument(format) {
+    const permalink = await getPublicPermalink();
+    if (!permalink) return;
     setBusy(true);
     try {
       [elements.exportBib, elements.exportMd, elements.exportTex].forEach(button => {
         button.textContent = "Loading evidence…";
       });
-      const input = await prepareExportInput();
+      const input = { ...await prepareExportInput(), permalink };
       const total = requestedDois(input).requested.length;
       setEnrichmentProgress(0, total);
       const bibliography = await fetchBibliography(input, setEnrichmentProgress);
