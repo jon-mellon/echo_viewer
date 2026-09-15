@@ -1,7 +1,7 @@
 export const DAG_EXPORT_WIDTH = 1600;
-export const DAG_EXPORT_HEIGHT = 900;
+export const DAG_EXPORT_HEIGHT = 1200;
 
-export function fitDagImage(sourceWidth, sourceHeight, targetWidth = DAG_EXPORT_WIDTH, targetHeight = DAG_EXPORT_HEIGHT, padding = 48) {
+export function fitDagImage(sourceWidth, sourceHeight, targetWidth = DAG_EXPORT_WIDTH, targetHeight = DAG_EXPORT_HEIGHT, padding = 20) {
   const availableWidth = Math.max(1, targetWidth - 2 * padding);
   const availableHeight = Math.max(1, targetHeight - 2 * padding);
   const scale = Math.min(availableWidth / Math.max(1, sourceWidth), availableHeight / Math.max(1, sourceHeight));

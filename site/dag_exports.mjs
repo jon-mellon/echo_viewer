@@ -303,7 +303,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     graphImageBytes ? `` : `\\section{Causal Graph}`,
     ``,
     graphImageBytes
-      ? `\\clearpage\n\\begin{landscape}\n\\thispagestyle{empty}\n\\section{Causal Graph}\n\\begin{center}\n\\includegraphics[width=\\linewidth,height=0.75\\textheight,keepaspectratio]{dag-graph.png}\\par\n\\medskip\n\\textbf{Figure:} Working causal map: ${texEscape(ivLabel)} $\\rightarrow$ ${texEscape(dvLabel)}\n\\end{center}\n\\clearpage\n\\end{landscape}`
+      ? `\\clearpage\n\\begin{landscape}\n\\thispagestyle{empty}\n\\section*{Causal Graph}\n\\begin{center}\n\\includegraphics[width=\\linewidth,height=0.82\\textheight,keepaspectratio]{dag-graph.png}\\par\n\\smallskip\n\\small Working causal map: ${texEscape(ivLabel)} $\\rightarrow$ ${texEscape(dvLabel)}\n\\end{center}\n\\clearpage\n\\end{landscape}`
       : svgStr
         ? `\\textit{The causal graph image could not be rendered; the causal structure is listed below.}`
       : ((visibleLinks || []).length
