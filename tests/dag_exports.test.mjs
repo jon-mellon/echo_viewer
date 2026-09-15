@@ -78,6 +78,18 @@ test('BibTeX fields escape control characters without changing author separators
   assert.match(bibText, /doi     = \{10\.1234\/value\\_with-special\}/);
 });
 
+test('BibTeX metadata cannot emit Unicode that aborts pdfLaTeX', () => {
+  const doi = '10.1234/unicode';
+  const metadata = new Map([[doi, {
+    author: [{ family: 'García李', given: 'Łukasz' }],
+    title: ['Naïve β result — 研究'], type: 'journal-article',
+  }]]);
+  const { bibText } = exports.buildBibText([doi], metadata);
+  assert.doesNotMatch(bibText, /[^\x00-\x7F]/);
+  assert.match(bibText, /Garcia\?/);
+  assert.match(bibText, /Naive \? result \? \?\?/);
+});
+
 test('LaTeX output uses pdfLaTeX-safe arrows and text escapes', () => {
   const { input, metadata } = fixture();
   input.visibleLinks[0].direction_type = 'BIDIRECTIONAL';
@@ -96,6 +108,8 @@ test('document exports include the public permalink when supplied', () => {
   const latex = exports.buildLatexFiles(input, bibliography)[0].data;
   assert.match(markdown, /\[View the public causal map\]\(<https:\/\/viewer\.example\/\?p=1&schema=published>\)/);
   assert.match(latex, /Public causal map: \\url\{https:\/\/viewer\.example\/\?p=1&schema=published\}/);
+  assert.match(latex, /\\usepackage\{xurl\}/);
+  assert.match(latex, /p\{0\.22\\textwidth\}p\{0\.22\\textwidth\}cp\{0\.38\\textwidth\}/);
 });
 
 test('DOI collection rejects identifiers containing trailing injected content', () => {

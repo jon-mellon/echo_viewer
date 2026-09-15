@@ -8,6 +8,10 @@ import { escapeHtml } from "./text_utils.mjs";
 export const METHOD_DOI = "10.31235/osf.io/zr5vf_v1";
 export const METHOD_BIB_KEY = "dagbuilder";
 
+function normalizedLatexText(value) {
+  return String(value ?? "").normalize("NFKD").replace(/\p{M}/gu, "");
+}
+
 function isDoi(id) {
   return typeof id === "string" && /^10\.\d{4,}\/\S+$/.test(id.trim());
 }
@@ -18,7 +22,8 @@ export function escapeBibTexValue(value) {
     ["#", "\\#"], ["%", "\\%"], ["&", "\\&"], ["_", "\\_"], ["$", "\\$"],
     ["~", "{\\textasciitilde}"], ["^", "{\\textasciicircum}"],
   ]);
-  return String(value ?? "")
+  return normalizedLatexText(value)
+    .replace(/[^\x00-\x7F]/g, "?")
     .replace(/[\\{}#%&_$~^]/g, character => replacements.get(character))
     .replace(/\s+/g, " ")
     .trim();
@@ -144,7 +149,7 @@ export function buildLinksTable(fmt, { visibleLinks, project, rawLinksById }, ke
     ].join("\n") + "\n";
   } else {
     return [
-      "\\begin{longtable}{lllp{7cm}}",
+      "\\begin{longtable}{@{}p{0.22\\textwidth}p{0.22\\textwidth}cp{0.38\\textwidth}@{}}",
       "\\toprule",
       "Source & Target & Dir & Papers \\\\",
       "\\midrule",
@@ -185,7 +190,7 @@ export function buildExcludedLinksTable(fmt, project) {
     ].join("\n") + "\n";
   } else {
     return [
-      "\\begin{longtable}{llp{9cm}}",
+      "\\begin{longtable}{@{}p{0.23\\textwidth}p{0.23\\textwidth}p{0.48\\textwidth}@{}}",
       "\\toprule",
       "Source & Target & Reason for exclusion \\\\",
       "\\midrule",
@@ -204,12 +209,15 @@ function texEscape(s) {
   const replacements = new Map([
     ["\\", "\\textbackslash{}"], ["{", "\\{"], ["}", "\\}"],
     ["&", "\\&"], ["%", "\\%"], ["$", "\\$"], ["#", "\\#"], ["_", "\\_"],
-    ["~", "\\textasciitilde{}"], ["^", "\\textasciicircum{}"],
+    ["~", "\\textasciitilde{}"], ["^", "\\textasciicircum{}"], ["/", "/\\allowbreak{}"],
     ["→", "$\\rightarrow$"], ["←", "$\\leftarrow$"], ["↔", "$\\leftrightarrow$"],
     ["–", "---"], ["—", "---"], ["…", "\\ldots{}"], ["×", "$\\times$"],
   ]);
-  return String(s ?? "").replace(/[\\{}&%$#_~^←→↔–—…×α-ω]/g,
-    character => replacements.get(character) || greek.get(character));
+  return [...normalizedLatexText(s)].map(character => {
+    if (replacements.has(character)) return replacements.get(character);
+    if (greek.has(character)) return greek.get(character);
+    return character.charCodeAt(0) <= 0x7f ? character : "?";
+  }).join("");
 }
 
 export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null) {
@@ -271,7 +279,9 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null) {
     `\\usepackage{booktabs}`,
     `\\usepackage{longtable}`,
     `\\usepackage{hyperref}`,
+    `\\usepackage{xurl}`,
     `\\usepackage{natbib}`,
+    `\\setlength{\\emergencystretch}{3em}`,
     `% To compile: pdflatex dag.tex && bibtex dag && pdflatex dag.tex && pdflatex dag.tex`,
     `% To include the graph, convert dag.svg to dag-graph.pdf first (e.g. via Inkscape or rsvg-convert)`,
     ``,
