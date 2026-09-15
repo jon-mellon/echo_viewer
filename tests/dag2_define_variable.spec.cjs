@@ -34,6 +34,11 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await expect(page.locator("#dagWorkspaceSection")).toBeHidden();
   await expect.poll(() => page.locator("#dagMapCanvas").evaluate(canvas => canvas.width)).toBeGreaterThan(100);
   await expect.poll(() => page.locator("#dagMapCanvas").evaluate(canvas => canvas.height)).toBeGreaterThan(100);
+  expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids
+    .filter(id => {
+      const variable = window.__dagBuilderState.variableById.get(id);
+      return variable && Number.isFinite(variable.map_x) && Number.isFinite(variable.map_y);
+    }).length)).toBeGreaterThan(0);
 
   const canonicalId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
   await page.locator("#definitionVariableSearch").fill(canonicalId);

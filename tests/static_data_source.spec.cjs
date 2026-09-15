@@ -39,6 +39,8 @@ for (const route of ["/"]) {
     }});
     expect(state.variables).toHaveLength(1);
     expect(state.variables[0].variable_id).toBe("v000236");
+    expect(Number.isFinite(state.variables[0].map_x)).toBe(true);
+    expect(Number.isFinite(state.variables[0].map_y)).toBe(true);
     expect(state.neighbors.length).toBeGreaterThan(0);
     expect(new Set(state.links.map(link => link.raw_causal_link_id)).size).toBe(state.links.length);
     expect(state.links.every(link => link.source_variable_id === "v000236"
@@ -57,7 +59,8 @@ for (const route of ["/"]) {
     expect(uniqueParquetRequests.some(url => url.includes("/neighbors/shard-"))).toBe(true);
     expect(uniqueParquetRequests.some(url => url.includes("/causal-links/by-source/shard-"))).toBe(true);
     expect(uniqueParquetRequests.some(url => url.includes("/causal-links/by-target/shard-"))).toBe(true);
-    expect(uniqueParquetRequests.every(url => url.includes("/evidence/layouts/browser-v2/"))).toBe(true);
+    expect(uniqueParquetRequests.some(url => url.endsWith("/build_metadata.parquet"))).toBe(true);
+    expect(uniqueParquetRequests.some(url => url.endsWith("/variable_layouts.parquet"))).toBe(true);
     expect(errors.filter(error => !/favicon/i.test(error))).toEqual([]);
 
     const apiStatus = await page.evaluate(async () => (await fetch("/api/dag-data")).status);

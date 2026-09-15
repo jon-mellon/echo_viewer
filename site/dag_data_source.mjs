@@ -116,9 +116,13 @@ export class ParquetManifestDagDataSource {
     if (!variableIds?.length) return [];
     if (!this.browserShardIds(variableIds).length) return [];
     await this.ensureBrowserRelation("variable_occurrences", variableIds);
+    await this.ensureVariableLayouts();
+    const selectedLayoutSource = layoutSource || this.defaultVariableLayoutSource;
     const placeholders = variableIds.map(() => "?").join(",");
-    return queryRows(this.connection, `SELECT * FROM variable_occurrences
-      WHERE variable_id IN (${placeholders}) ORDER BY index`, variableIds);
+    return queryRows(this.connection, `SELECT o.*, l.map_x, l.map_y
+      FROM variable_occurrences o JOIN variable_layouts l USING (variable_id)
+      WHERE l.layout_source = ? AND o.variable_id IN (${placeholders}) ORDER BY o.index`,
+    [selectedLayoutSource, ...variableIds]);
   }
 
   async loadIncidentRawLinks(variableIds) {
@@ -179,6 +183,29 @@ export class ParquetManifestDagDataSource {
     const url = new URL(this.browserLayout.lookup, this.manifestBaseUrl).href.replaceAll("'", "''");
     const rows = await queryRows(this.connection, `SELECT variable_index, shard_id FROM read_parquet('${url}')`);
     this.shardByVariableIndex = new Map(rows.map(row => [Number(row.variable_index), Number(row.shard_id)]));
+  }
+
+  async ensureVariableLayouts() {
+    if (this.variableLayoutsReady) return this.variableLayoutsReady;
+    this.variableLayoutsReady = (async () => {
+      const legacyManifest = this.manifest?.identity?.legacy_manifest;
+      if (!legacyManifest) throw new Error("Browser-v2 evidence manifest does not identify its layout source.");
+      const legacyBase = new URL(`/${legacyManifest}`, this.manifestBaseUrl);
+      const quote = url => new URL(url, legacyBase).href.replaceAll("'", "''");
+      const metadata = await queryRows(this.connection,
+        `SELECT metadata_json FROM read_parquet('${quote("build_metadata.parquet")}')`);
+      const payload = JSON.parse(metadata[0]?.metadata_json || "{}");
+      this.defaultVariableLayoutSource = payload.layout?.default_source || payload.layout?.active_source;
+      if (!this.defaultVariableLayoutSource) throw new Error("Evidence snapshot has no default variable layout.");
+      await this.connection.query(`CREATE OR REPLACE VIEW variable_layouts AS
+        SELECT * FROM read_parquet('${quote("variable_layouts.parquet")}')`);
+    })();
+    try {
+      await this.variableLayoutsReady;
+    } catch (error) {
+      this.variableLayoutsReady = null;
+      throw error;
+    }
   }
 
   browserShardIds(variableIds) {

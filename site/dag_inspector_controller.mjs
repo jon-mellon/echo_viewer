@@ -10,6 +10,17 @@ export function createDagInspectorController({
 }) {
   const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
   const isDoi = id => typeof id === "string" && /^10\.\d{4,}\/\S+/.test(id.trim());
+  const edgeSourcesLoading = link => {
+    if (!link || !state.pendingEdgeEvidence) return false;
+    const rawIds = [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])];
+    return rawIds.some(id => !state.rawLinksById.has(id)) || rawIds.some(id => {
+      const raw = state.rawLinksById.get(id);
+      return raw && (!state.variableById.has(raw.source_variable_id) || !state.variableById.has(raw.target_variable_id));
+    });
+  };
+  const loadingSources = () => h("div", {
+    className: "edge-sources-loading", role: "status", ariaLive: "polite",
+  }, h("span", { className: "inline-spinner", ariaHidden: "true" }), h("span", { textContent: "Loading sources…" }));
 
   function handleEdgeAction(link, action, manualId, excludeReason) {
     if (action === "exclude" && excludeReason === undefined) {
@@ -71,6 +82,7 @@ export function createDagInspectorController({
       return;
     }
     const model = inspector.edgeInspector(link, state.project);
+    const sourcesLoading = edgeSourcesLoading(link);
     elements.edgeInspector.className = "edge-inspector";
     const reason = model.existingDecision?.display_status === "excluded" && model.existingDecision.exclude_reason
       ? h("div", { className: "small-note", style: { color: "#9b5c2e" } }, h("strong", { textContent: "Excluded:" }), ` ${model.existingDecision.exclude_reason}`) : null;
@@ -82,7 +94,8 @@ export function createDagInspectorController({
         h("button", { className: "text-button", type: "button", id: "excludeCancelBtn", textContent: "Cancel" })));
     replaceChildren(elements.edgeInspector,
       h("strong", { textContent: `${model.sourceLabel} ${model.arrow} ${model.targetLabel}` }),
-      h("div", { textContent: `${link.is_target_relation ? "Target relationship. " : ""}${link.edge_source}; ${model.rawCount ? `${model.rawCount} evidence record(s)` : "no provenance"}` }),
+      h("div", { textContent: `${link.is_target_relation ? "Target relationship. " : ""}${link.edge_source}; ${sourcesLoading ? "sources loading" : model.rawCount ? `${model.rawCount} evidence record(s)` : "no provenance"}` }),
+      sourcesLoading ? loadingSources() : null,
       model.manual.length ? h("div", { textContent: model.manual.map(edge => edge.user_note || "Manual edge").join("; ") }) : null, reason,
       h("div", { className: "edge-actions" }, model.actions.map(item => h("button", {
         className: "action-button", type: "button", dataset: { edgeAction: item.action, ...(item.manualId ? { manualId: item.manualId } : {}) }, textContent: item.label,
@@ -107,6 +120,10 @@ export function createDagInspectorController({
     const link = selectedEdge();
     if (!link) { elements.provenancePanel.hidden = true; return; }
     elements.provenancePanel.hidden = false;
+    if (edgeSourcesLoading(link)) {
+      replaceChildren(elements.provenancePanel, loadingSources());
+      return;
+    }
     const model = inspector.provenanceModel(link, state.project, state.rawLinksById, state.variableById);
     const manualNode = model.manual.length
       ? h("div", { className: "small-note" }, h("strong", { textContent: "Manual annotation" }), h("br"), model.manual.map(edge => edge.user_note || "Manual edge added by user.").join("; ")) : null;

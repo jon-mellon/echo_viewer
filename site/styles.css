@@ -1859,6 +1859,28 @@ h2 {
   color: var(--muted);
 }
 
+.edge-sources-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  color: var(--muted);
+}
+
+.inline-spinner {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  border: 2px solid #dbe3ee;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: startup-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inline-spinner { animation: none; border-top-color: #dbe3ee; background: var(--accent); }
+}
+
 /* ── DAG edge: selected highlight ── */
 
 .dag-edge.selected {

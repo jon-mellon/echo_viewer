@@ -925,11 +925,13 @@ function renderEdgeInspector() {
         for (const variable of variables) state.variableById.set(variable.variable_id, variable);
       }
       state.pendingEdgeEvidence = false;
-      inspectorController.renderEdge();
-      inspectorController.renderProvenance();
+      renderEdgeInspector();
+      renderProvenance();
     }).catch(error => {
       state.pendingEdgeEvidence = false;
       console.warn("Could not lazily load aggregate-edge evidence.", error);
+      inspectorController.renderEdge();
+      inspectorController.renderProvenance();
     });
   }
   inspectorController.renderEdge();
