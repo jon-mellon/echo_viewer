@@ -35,6 +35,7 @@ import { dagDataSource } from "/dag_data_source.mjs?v=browser-v2";
 import { incrementCompiledDag } from "/compiled_dag.mjs";
 import { escapeHtml } from "/text_utils.mjs";
 import { h, replaceChildren, safeUrl } from "/dom_builder.mjs";
+import { hydrateSearchResult, variableSearchCatalog } from "/variable_search_catalog.mjs";
 
 
 const ROLE_LABELS = {
@@ -479,6 +480,14 @@ function renderSearch(side) {
     renderSetupGroupPicker(side);
     return;
   }
+  if (query && state.variableSearchStatus !== "ready") {
+    state.searchMatches[side] = [];
+    replaceChildren(container, h("div", { className: "small-note", textContent:
+      state.variableSearchStatus === "error"
+        ? "Variable search could not be loaded."
+        : "Loading variable search…" }));
+    return;
+  }
   const matches = query ? searchVariables(query, 16) : [];
   state.searchMatches[side] = matches.map((v) => v.variable_id);
   replaceChildren(container, matches.map(v => h("button", { className: "result-button", type: "button", dataset: { side, variableId: v.variable_id } },
@@ -486,9 +495,11 @@ function renderSearch(side) {
     h("span", { textContent: truncate(v.raw_variable_text || v.concept_label, 110) }),
     h("span", { textContent: `${v.paper_id || "unknown paper"} ${selected.has(v.variable_id) ? "(selected)" : ""}` }))));
   container.querySelectorAll(".result-button").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const variableId = btn.dataset.variableId;
       if (!variableId) return;
+      btn.disabled = true;
+      if (!await hydrateSearchResult(variableId, hydrateVariableDetails, state.variableById)) return;
       if (selected.has(variableId)) selected.delete(variableId);
       else selected.add(variableId);
       state.selectedVariableId = variableId;
@@ -513,10 +524,32 @@ function fitSearchContext(side) {
 }
 
 function searchVariables(query, limit = 20) {
+  return variableSearchCatalog.searchVariables(query, limit, {
+    selectedUoa: state.selectedUoa,
+    uoaFilterEnabled: state.uoaFilterEnabled, uoaMatches,
+  });
+}
+
+function searchVisibleVariables(query, limit = 20) {
   return searchModel.searchVariables(query, {
     variables: visibleVariables(), selectedUoa: state.selectedUoa,
     uoaFilterEnabled: state.uoaFilterEnabled, uoaMatches,
   }, limit);
+}
+
+async function loadVariableSearchCatalog() {
+  state.variableSearchStatus = "loading";
+  state.variableSearchError = null;
+  try {
+    await variableSearchCatalog.load();
+    state.variableSearchStatus = "ready";
+  } catch (error) {
+    state.variableSearchStatus = "error";
+    state.variableSearchError = error;
+    console.error("Could not load variable search catalog.", error);
+  }
+  renderSearch("iv");
+  renderSearch("dv");
 }
 
 function groupedVariableIds(excludeGroupId = null) {
@@ -1173,7 +1206,8 @@ const toolbarController = createToolbarController({
 
 const definitionWorkflowController = createDefinitionWorkflowController({
   state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll,
-  setMapMode, fitMap, groupById, persistProjectLocally, visibleVariables, searchVariables,
+  setMapMode, fitMap, groupById, persistProjectLocally, visibleVariables,
+  searchVariables: searchVisibleVariables,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
   takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails,
@@ -1199,7 +1233,7 @@ const groupEditorController = createDagGroupEditorController({
   addToUndoHistory, renderAll, addDecision, setWorkflowMode, groupedVariableIds,
   searchVariables, clusterMemberIds, rejectedVariableIdSet, uoaMatches,
   fitSearchContext, applyActiveGroupingSet, rebuildProject, createDensityCandidateGroup,
-  escapeHtml, truncate,
+  escapeHtml, truncate, hydrateVariableDetails,
 });
 
 const mapUiController = createDagMapUiController({
@@ -1300,7 +1334,7 @@ const projectBootstrap = createProjectBootstrap({
   restoreProjectLocally, initializeProject, loadLatestSchemaGroups,
   normalizeProjectDuplicateAssignments, saveProjectLocally, publicationController,
   renderAll, constrainMapTransform, drawMap, fitMap, dagNetworkController,
-  buildDuplicateClusters, linkKey, pairKey,
+  buildDuplicateClusters, linkKey, pairKey, loadVariableSearchCatalog,
 });
 
 // Stable adapter names keep event wiring and browser smoke-test hooks simple.

@@ -3,6 +3,7 @@ import { h, replaceChildren } from "./dom_builder.mjs";
 import * as groupEditorModel from "./dag_group_editor.mjs";
 import * as searchModel from "./dag_search.mjs";
 import * as workflow from "./dag_workflow.mjs";
+import { hydrateSearchResult } from "./variable_search_catalog.mjs";
 
 export function createDagGroupEditorController({
   state, elements: els, applyProjectOperation, groupById, takeSnapshot,
@@ -10,7 +11,7 @@ export function createDagGroupEditorController({
   addToUndoHistory, renderAll, addDecision, setWorkflowMode, groupedVariableIds,
   searchVariables, clusterMemberIds, rejectedVariableIdSet, uoaMatches,
   fitSearchContext, applyActiveGroupingSet, rebuildProject, createDensityCandidateGroup,
-  escapeHtml, truncate,
+  escapeHtml, truncate, hydrateVariableDetails = async () => {},
 }) {
 function beginTargetGroup(side) {
   const isDv = side === "dv";
@@ -178,9 +179,11 @@ function renderGroupSeedSearch() {
   h("span", { textContent: truncate(v.raw_variable_text || v.concept_label, 100) }),
   h("span", { textContent: v.paper_id || "unknown paper" }))));
   els.groupSeedResults.querySelectorAll(".result-button").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const g = activeGroup();
       if (!g) return;
+      btn.disabled = true;
+      if (!await hydrateSearchResult(btn.dataset.variableId, hydrateVariableDetails, state.variableById)) return;
       const before = takeSnapshot();
       const had = new Set(g.variable_ids);
       addVariableToGroup(g, btn.dataset.variableId);

@@ -7,7 +7,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
   resizeMap, restoreProjectLocally, initializeProject, loadLatestSchemaGroups,
   normalizeProjectDuplicateAssignments, saveProjectLocally, publicationController, renderAll,
   constrainMapTransform, drawMap, fitMap, dagNetworkController, buildDuplicateClusters,
-  linkKey, pairKey }) {
+  linkKey, pairKey, loadVariableSearchCatalog = async () => {} }) {
   const presenter = createProjectBootstrapPresenter({});
   const setStartupStage = message => presenter.setStartupStage(message);
   const finishStartupLoading = () => presenter.finishStartupLoading();
@@ -72,6 +72,9 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     finishStartupLoading();
+    // Search is useful immediately after it arrives, but it is not on the
+    // critical path for rendering the compiled DAG.
+    void loadVariableSearchCatalog();
     if (state.data.load_published_schema) {
       const revision = state.compiledDagRevision || 0;
       state.publishedSchemaHydrating = true;

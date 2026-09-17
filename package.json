@@ -8,13 +8,14 @@
     "check:boundaries": "node scripts/check_feature_boundaries.mjs",
     "check:types": "tsc -p jsconfig.json",
     "test:controllers": "node --test tests/dag_controllers.test.mjs",
-    "test:graph": "node --test tests/compiled_dag.test.mjs tests/dag_graph.test.mjs tests/dag_graph_fixture.test.mjs tests/dag_routing.test.mjs tests/dag_layout.test.mjs tests/dag_project.test.mjs tests/dag_exports.test.mjs tests/dag_export_image.test.mjs tests/map_geometry.test.mjs tests/map_render_model.test.mjs tests/map_interactions.test.mjs tests/dag_interactions.test.mjs tests/project_session.test.mjs tests/map_canvas_renderer.test.mjs tests/variable_visibility.test.mjs tests/dag_workflow.test.mjs tests/dag_search.test.mjs tests/dag_display.test.mjs tests/dag_inspector.test.mjs tests/dag_candidates.test.mjs tests/dag_group_list.test.mjs tests/dag_coordination.test.mjs tests/dag_view.test.mjs tests/dag_path_highlights.test.mjs tests/dag_manifest.test.mjs tests/data_validation.test.mjs tests/dom_builder.test.mjs tests/supabase_auth.test.mjs tests/grouping_schema_writer.test.mjs tests/dag_publication.test.mjs tests/published_schema_loader.test.mjs",
+    "test:graph": "node --test tests/compiled_dag.test.mjs tests/dag_graph.test.mjs tests/dag_graph_fixture.test.mjs tests/dag_routing.test.mjs tests/dag_layout.test.mjs tests/dag_project.test.mjs tests/dag_exports.test.mjs tests/dag_export_image.test.mjs tests/map_geometry.test.mjs tests/map_render_model.test.mjs tests/map_interactions.test.mjs tests/dag_interactions.test.mjs tests/project_session.test.mjs tests/map_canvas_renderer.test.mjs tests/variable_visibility.test.mjs tests/dag_workflow.test.mjs tests/dag_search.test.mjs tests/variable_search_catalog.test.mjs tests/dag_display.test.mjs tests/dag_inspector.test.mjs tests/dag_candidates.test.mjs tests/dag_group_list.test.mjs tests/dag_coordination.test.mjs tests/dag_view.test.mjs tests/dag_path_highlights.test.mjs tests/dag_manifest.test.mjs tests/data_validation.test.mjs tests/dom_builder.test.mjs tests/supabase_auth.test.mjs tests/grouping_schema_writer.test.mjs tests/dag_publication.test.mjs tests/published_schema_loader.test.mjs",
     "test:dagitty": "node tests/ensure_dagitty.mjs && node --test tests/dagitty_parity.test.mjs",
     "test:refresh": "node tests/dag_refresh_smoke.mjs",
     "test:groups": "node tests/group_editing_smoke.mjs",
     "test:rejection-reload": "node tests/rejection_reload_smoke.mjs",
     "test:exports": "node tests/dag_exports_smoke.mjs",
-    "test:static-data": "playwright test tests/static_data_source.spec.cjs --workers=1"
+    "test:static-data": "playwright test tests/static_data_source.spec.cjs --workers=1",
+    "build:search-catalog": "node scripts/generate_variable_search_catalog.mjs"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "1.32.0",

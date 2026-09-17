@@ -12,6 +12,7 @@ export function createDagAppState(interfaceMode = "classic") {
     compiledDagUpdatePromise: null,
     publishedSchemaHydrating: false, publishedSchemaHydrated: true, publishedSchemaLoadFailed: false,
     publishedMembershipReadyGroups: new Set(),
+    variableSearchStatus: "idle", variableSearchError: null,
     project: null,
     seeds: { iv: new Set(), dv: new Set() },
     searchMatches: { iv: [], dv: [] },
