@@ -537,6 +537,14 @@ function searchVisibleVariables(query, limit = 20) {
   }, limit);
 }
 
+function searchAnchorGroups(project, side, query, variableById, limit = 12) {
+  const catalogMatches = query && state.variableSearchStatus === "ready"
+    ? variableSearchCatalog.searchVariables(query, variableSearchCatalog.records.length)
+    : [];
+  const searchRecordById = new Map(catalogMatches.map(record => [record.variable_id, record]));
+  return searchModel.searchAnchorGroups(project, side, query, variableById, limit, searchRecordById);
+}
+
 async function loadVariableSearchCatalog() {
   state.variableSearchStatus = "loading";
   state.variableSearchError = null;
@@ -1253,6 +1261,7 @@ const setupGroupController = createDagSetupGroupController({
   state, elements: els, escapeHtml, normalized, truncate, groupById,
   assignGroupAsAnchor, setMapMode, renderAll, roleLabels: ROLE_LABELS, dagProjectView, startDefinition,
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
+  searchAnchorGroups,
 });
 
 const dagNetworkController = createDagNetworkController({

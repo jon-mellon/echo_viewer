@@ -1,12 +1,12 @@
 // Search decisions only; callers supply visibility and unit-of-analysis policy.
 const normalized = value => String(value ?? "").trim().toLowerCase();
 
-export function anchorGroupSearchMatch(group, query, index, variableById) {
+export function anchorGroupSearchMatch(group, query, index, variableById, searchRecordById = null) {
   const labelMatches = !query || normalized(group.label || group.group_id).includes(query);
   let variableMatch = "";
   if (query && !labelMatches) {
     for (const variableId of group.variable_ids || []) {
-      const variable = variableById.get(variableId);
+      const variable = variableById.get(variableId) || searchRecordById?.get(variableId);
       if (!variable) continue;
       const fields = [
         variable.display_label,
@@ -87,9 +87,10 @@ export function groupNeighborSuggestions(group, {
     .slice(0, limit);
 }
 
-export function searchAnchorGroups(project, side, query, variableById, limit = 12) {
+export function searchAnchorGroups(project, side, query, variableById, limit = 12, searchRecordById = null) {
   return availableSetupAnchorGroups(project, side)
-    .map((group, index) => anchorGroupSearchMatch(group, normalized(query), index, variableById))
+    .map((group, index) => anchorGroupSearchMatch(group, normalized(query), index,
+      variableById, searchRecordById))
     .filter(result => result.matches)
     .sort((a, b) => Number(b.labelMatches) - Number(a.labelMatches) || a.index - b.index)
     .slice(0, limit);

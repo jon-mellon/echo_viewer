@@ -18,7 +18,7 @@ export function dag2AnchorPickerIsActive(state, side, groupById) {
 export function createDagSetupGroupController({
   state, elements, escapeHtml, normalized, truncate, groupById,
   assignGroupAsAnchor, setMapMode, renderAll, roleLabels, dagProjectView, startDefinition,
-  canEditSplit = () => false,
+  canEditSplit = () => false, searchAnchorGroups = searchModel.searchAnchorGroups,
 }) {
   function renderMode() {
     if (state.interfaceMode === "dag2") {
@@ -143,10 +143,18 @@ export function createDagSetupGroupController({
     input.placeholder = isNew ? (side === "dv" ? "Income, prejudice, labor-market outcome" : "Education, religiosity, parental status") : "Search group or constituent variable";
     if (isNew) { container.hidden = true; container.replaceChildren(); return; }
     const searchProject = dagProjectView ? dagProjectView() : state.project;
-    const groups = searchModel.searchAnchorGroups(searchProject, side, normalized(input.value), state.variableById);
+    const query = normalized(input.value);
+    const groups = searchAnchorGroups(searchProject, side, query, state.variableById);
     container.hidden = false;
     if (!groups.length) {
-      replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: "No matching existing groups" }));
+      const text = query && state.variableSearchStatus === "loading"
+        ? "Loading variable search…"
+        : query && state.publishedSchemaHydrating
+          ? "Loading group memberships…"
+          : query && state.variableSearchStatus === "error"
+            ? "Variable search unavailable"
+            : "No matching existing groups";
+      replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: text }));
       return;
     }
     const rows = groups.map(({ group, variableMatch }) => h("div", { className: "setup-group-picker-row" },
@@ -157,7 +165,12 @@ export function createDagSetupGroupController({
     rows.push(h("div", { className: "setup-group-picker-row define-new-row" },
       h("div", {}, h("strong", { textContent: "Define new variable…" }), h("span", { textContent: "Chop one or more existing categories in the spatial viewer" })),
       h("button", { className: "action-button", type: "button", dataset: { defineSide: side }, textContent: "Define" })));
-    replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: "Existing groups" }),
+    const title = query && state.variableSearchStatus === "loading"
+      ? "Existing groups · variable search loading…"
+      : query && state.variableSearchStatus === "error"
+        ? "Existing groups · variable search unavailable"
+        : "Existing groups";
+    replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: title }),
       h("div", { className: "setup-group-picker-list" }, rows));
     container.querySelectorAll("button[data-group-id]").forEach(button =>
       button.addEventListener("click", () => assignGroupAsAnchor(button.dataset.side, button.dataset.groupId)));

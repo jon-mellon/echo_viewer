@@ -77,3 +77,19 @@ test("search and suggestion ordering match pre-extraction behavior without mutat
   }, 14)), plain(legacy.groupNeighborSuggestions(groups[0], 14)));
   assert.deepEqual({ variables, groups }, before);
 });
+
+test("group search uses lightweight global records for unhydrated members", () => {
+  const project = { groups: [
+    { group_id: "education", label: "Education", variable_ids: ["v-degree"], type: null },
+    { group_id: "health", label: "Health", variable_ids: ["v-health"], type: null },
+  ], iv_group_id: null, dv_group_id: null };
+  const variableById = new Map();
+  const searchRecordById = new Map([["v-degree", {
+    variable_id: "v-degree", display_label: "Education level",
+    concept_label: "Educational attainment", raw_variable_text: "college degree completed",
+  }]]);
+  const results = search.searchAnchorGroups(project, "iv", "college", variableById, 12, searchRecordById);
+  assert.deepEqual(results.map(result => result.group.group_id), ["education"]);
+  assert.equal(results[0].variableMatch, "college degree completed");
+  assert.equal(variableById.size, 0);
+});
