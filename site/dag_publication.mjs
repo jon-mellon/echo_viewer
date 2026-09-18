@@ -163,8 +163,9 @@ export function createPublicationController({
       : hasLocalChanges ? "Public schema · Unpublished local changes" : "Public schema";
     elements.badge.classList.toggle("muted", !published?.publication_id);
     elements.badge.classList.toggle("warn", Boolean(published?.publication_id && hasLocalChanges));
-    elements.permalink.hidden = !permalink;
-    if (permalink) setSafeUrl(elements.permalink, "href", permalink);
+    elements.permalink.hidden = !permalink || hasLocalChanges;
+    if (permalink && !hasLocalChanges) setSafeUrl(elements.permalink, "href", permalink);
+    else elements.permalink.removeAttribute("href");
   }
 
   async function refreshPublicationState() {
@@ -271,16 +272,11 @@ export function createPublicationController({
     if (busy) return null;
     const resolved = await publicPermalink();
     if (!resolved) return null;
-    const { permalink, hasLocalChanges } = resolved;
+    const { permalink } = resolved;
     try {
       await copyText(permalink, navigatorApi, windowApi);
       showShareCopied();
-      if (hasLocalChanges) {
-        showStatus(elements.status, "Copied a view permalink using the last published schema. Your current schema edits are still private. Choose Publish publicly to include them in shared views.");
-        elements.publish.focus();
-      } else {
-        showStatus(elements.status, "Copied a permalink to this view of the public schema.");
-      }
+      showStatus(elements.status, "Copied a permalink to this view of the public schema.");
       return permalink;
     } catch (error) {
       const message = `Could not share: ${formatSupabaseError(error)}`;
@@ -302,7 +298,12 @@ export function createPublicationController({
       const permalink = stablePermalink(published);
       const hasLocalChanges = canonical.contentHash !== published.content_hash;
       renderPublicationState(published, hasLocalChanges);
-      return { permalink, hasLocalChanges };
+      if (hasLocalChanges) {
+        showStatus(elements.status, "This schema has unpublished changes. Publish them before creating a permalink.", true);
+        elements.publish.focus();
+        return null;
+      }
+      return { permalink, hasLocalChanges: false };
     } catch (error) {
       const message = `Could not create a public permalink: ${formatSupabaseError(error)}`;
       showStatus(elements.status, message, true);

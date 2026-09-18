@@ -20,10 +20,11 @@ test("registry insert follows every upload and preserves baseline lineage", () =
   assert.match(source, /parent_schema_id: parentSchemaId/);
 });
 
-test("share compares the current canonical hash and shares the last public version when stale", () => {
+test("share refuses to create a permalink while schema changes are unpublished", () => {
   assert.match(source, /canonical\.contentHash !== published\.content_hash/);
-  assert.match(source, /Copied a view permalink using the last published schema/);
-  assert.match(source, /Your current schema edits are still private/);
+  assert.match(source, /This schema has unpublished changes\. Publish them before creating a permalink\./);
+  assert.match(source, /if \(hasLocalChanges\) \{[\s\S]*?return null;/);
+  assert.doesNotMatch(source, /Copied a view permalink using the last published schema/);
   assert.match(source, /publicationPermalink\(published\.publication_id/);
   assert.match(source, /getPermalinkState\(\)/);
 });
@@ -60,6 +61,8 @@ test("published state distinguishes private working-copy changes", () => {
   assert.match(source, /Public schema · Unpublished local changes/);
   assert.match(source, /Private working copy/);
   assert.match(source, /workingCopyChanged/);
+  assert.match(source, /elements\.permalink\.hidden = !permalink \|\| hasLocalChanges/);
+  assert.match(source, /elements\.permalink\.removeAttribute\("href"\)/);
 });
 
 test("completed schema hydration replaces the loading status", () => {
