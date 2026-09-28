@@ -37,6 +37,8 @@ test("browser layouts bind physical snapshot IDs separately from logical record 
     expectedRecordSignature: signature,
   };
   assert.equal(validateBrowserV2EvidenceBinding(input), true);
+  assert.equal(validateBrowserV2EvidenceBinding({ ...input,
+    expectedRecordSignature: physical }), true);
   assert.throws(() => validateBrowserV2EvidenceBinding({ ...input,
     manifest: { evidence_snapshot: "c".repeat(64) } }), /URL snapshot/);
   assert.throws(() => validateBrowserV2EvidenceBinding({ ...input,

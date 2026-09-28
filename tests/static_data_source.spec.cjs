@@ -1,7 +1,7 @@
 const { test, expect } = require("playwright/test");
 
 const base = process.env.DAG_VIEWER_URL || "http://127.0.0.1:8767";
-const snapshotId = "0cbb5b3bf27fbcde88e82cf5d810b8ad6c2cfbe9fdfea1b60be8f1e500a9b4ac";
+const snapshotId = "af7c8a1d7b9abc2dee46fcff24112be2253eb2831cf256717a5e813da88ceda1";
 
 for (const route of ["/"]) {
   test(`${route} loads compiled startup and retrieves browser-v2 evidence shards`, async ({ page }) => {
@@ -26,9 +26,9 @@ for (const route of ["/"]) {
     const state = await page.evaluate(async () => {
       const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
       const [variables, neighbors, links] = await Promise.all([
-        dagDataSource.loadVariableMetadata(["v000236"]),
-        dagDataSource.loadNeighbors(["v000236"]),
-        dagDataSource.loadIncidentRawLinks(["v000236"]),
+        dagDataSource.loadVariableMetadata(["v1"]),
+        dagDataSource.loadNeighbors(["v1"]),
+        dagDataSource.loadIncidentRawLinks(["v1"]),
       ]);
       return {
       variables, neighbors, links,
@@ -38,15 +38,15 @@ for (const route of ["/"]) {
       loadingFinished: document.getElementById("startupLoading")?.hidden,
     }});
     expect(state.variables).toHaveLength(1);
-    expect(state.variables[0].variable_id).toBe("v000236");
+    expect(state.variables[0].variable_id).toBe("v1");
     expect(Number.isFinite(state.variables[0].map_x)).toBe(true);
     expect(Number.isFinite(state.variables[0].map_y)).toBe(true);
     expect(state.neighbors.length).toBeGreaterThan(0);
     expect(new Set(state.links.map(link => link.raw_causal_link_id)).size).toBe(state.links.length);
-    expect(state.links.every(link => link.source_variable_id === "v000236"
-      || link.target_variable_id === "v000236")).toBe(true);
+    expect(state.links.every(link => link.source_variable_id === "v1"
+      || link.target_variable_id === "v1")).toBe(true);
     expect(state.snapshotId).toBe(snapshotId);
-    expect(state.groupingCount).toBe(101);
+    expect(state.groupingCount).toBe(103);
     expect(state.startupStages).toEqual(expect.arrayContaining([
       "Loading published schema and compiled DAG…",
       "Preparing workspace…",

@@ -50,15 +50,20 @@ export function browserV2ManifestLayout(manifest) {
   return paths;
 }
 
-/** Bind a physical browser layout to the logical evidence records used by a schema. */
+/** Bind a physical browser layout to the evidence identifier used by a schema. */
 /** @param {{manifest: Record<string, any>, manifestUrl: string, metadata: Record<string, any>, expectedRecordSignature: string}} input */
 export function validateBrowserV2EvidenceBinding({ manifest, manifestUrl, metadata, expectedRecordSignature }) {
   const physicalId = String(manifestUrl || "").match(/\/layouts\/browser-v2\/([0-9a-f]{64})\/manifest\.json(?:[?#]|$)/i)?.[1]?.toLowerCase();
-  if (physicalId && physicalId !== String(manifest?.evidence_snapshot || "").toLowerCase()) {
+  const manifestSnapshot = String(manifest?.evidence_snapshot || "").toLowerCase();
+  if (physicalId && physicalId !== manifestSnapshot) {
     throw new Error(`Browser-v2 manifest snapshot ${manifest?.evidence_snapshot || "(missing)"} does not match its URL snapshot ${physicalId}.`);
   }
-  const recordSignature = metadata?.cache_compatibility?.record_signature || "";
-  if (!expectedRecordSignature || recordSignature !== expectedRecordSignature) {
+  const expected = String(expectedRecordSignature || "").toLowerCase();
+  const recordSignature = String(metadata?.cache_compatibility?.record_signature || "").toLowerCase();
+  // Published schemas historically stored either the immutable physical
+  // snapshot ID or the logical record signature in evidence_snapshot. Both
+  // identify this evidence build, but they need not be equal to each other.
+  if (!expected || (expected !== manifestSnapshot && expected !== recordSignature)) {
     throw new Error(`Browser-v2 evidence record signature ${recordSignature || "(missing)"} does not match the schema evidence record signature ${expectedRecordSignature || "(missing)"}.`);
   }
   return true;
