@@ -12,8 +12,8 @@ export function createProjectBootstrapPresenter({ windowApi = window, documentAp
   function configureInterface(interfaceMode) {
     documentApi.body.classList.toggle("dag2-mode", interfaceMode === "dag2");
     if (interfaceMode !== "dag2") return;
-    documentApi.title = "DAG Builder 2";
-    documentApi.querySelector(".panel-header h1").textContent = "DAG Builder 2";
+    documentApi.title = "ECHO";
+    documentApi.querySelector(".panel-header h1").textContent = "ECHO";
     documentApi.querySelector(".dag-left-panel")?.append(documentApi.getElementById("exportSection"));
   }
 

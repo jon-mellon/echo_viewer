@@ -13,7 +13,7 @@ page.on("pageerror", (error) => consoleErrors.push(error.message));
 
 try {
   await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
-  await page.waitForSelector("text=DAG Builder");
+  await page.waitForSelector("text=ECHO");
   await page.waitForFunction(() => window.__dagBuilderState?.variables?.length > 3000);
 
   const loaded = await page.evaluate(() => ({

@@ -8,7 +8,7 @@ test("abstract extraction DAG data loads and basic controls work", async ({ page
   page.on("pageerror", (error) => consoleErrors.push(error.message));
 
   await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("h1")).toContainText("DAG Builder");
+  await expect(page.locator("h1")).toContainText("ECHO");
 
   await page.waitForFunction(() => window.__dagBuilderState?.variables?.length > 3000);
   const loaded = await page.evaluate(() => ({
