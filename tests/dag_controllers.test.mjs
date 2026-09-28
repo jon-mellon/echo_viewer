@@ -5,6 +5,7 @@ import { createDagExportController } from "../site/dag_export_controller.mjs";
 import { createDagInspectorController } from "../site/dag_inspector_controller.mjs";
 import { createDagProjectController } from "../site/dag_project_controller.mjs";
 import { dag2AnchorPickerIsActive } from "../site/dag_setup_group_controller.mjs";
+import { createGroupingSetController } from "../site/grouping_set_controller.mjs";
 
 function memoryStorage() {
   const values = new Map();
@@ -37,6 +38,28 @@ test("DAG2 anchor picker follows missing anchors even when restored workflow fla
   restored.changingAnchorSide = "iv";
   assert.equal(dag2AnchorPickerIsActive(restored, "iv", groupById), true);
   assert.equal(dag2AnchorPickerIsActive(restored, "dv", groupById), false);
+});
+
+test("untouched published schema does not gain an empty hidden-variable field", () => {
+  const schema = {
+    schema_version: "groupings-v3", grouping_set_id: "published", label: "Published",
+    description: "Fixture", membership_unit: "canonical_variable",
+    cache_compatibility: { record_signature: "records" },
+    built_against: { record_signature: "records", snapshot_id: "snapshot" },
+    migration_provenance: { source: "fixture" },
+    groups: [{ group_id: "g1", label: "Group", notes: "Notes", source: "fixture", variable_ids: ["v1"] }],
+    rejected_variables: [],
+  };
+  const state = {
+    data: { grouping_sets: [schema] }, clusterOf: new Map(),
+    project: { active_grouping_set_id: "published", groups: schema.groups.map(group => ({ ...group })) },
+  };
+  const controller = createGroupingSetController({
+    state, elements: {}, publicationController: {}, exportController: {},
+    rejectedVariableEntries: () => [], rejectedVariableIdSet: () => new Set(),
+    applyProjectOperation() {}, normalizeProjectDuplicateAssignments() {}, groupById() {}, nowIso: () => "",
+  });
+  assert.deepEqual(controller.workingSchema(), schema);
 });
 
 test("project controller preserves live group identity and owns history transitions", () => {

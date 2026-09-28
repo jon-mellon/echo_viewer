@@ -56,6 +56,7 @@ export function createGroupingSetController({ state, elements, publicationContro
       flagged_at: entry.flagged_at || "",
       previous_group_ids: [...new Set(entry.previous_group_ids || [])].sort(),
     }));
+    const hidden_variable_ids = [...rejectedVariableIdSet()].sort();
     return {
       schema_version: GROUPING_FORMAT_VERSION,
       grouping_set_id: source.grouping_set_id || state.project.active_grouping_set_id,
@@ -65,7 +66,10 @@ export function createGroupingSetController({ state, elements, publicationContro
       built_against: structuredClone(source.built_against || source.cache_compatibility || state.data.cache_compatibility || {}),
       membership_unit: GROUPING_MEMBERSHIP_UNIT,
       ...(source.migration_provenance ? { migration_provenance: structuredClone(source.migration_provenance) } : {}),
-      groups, rejected_variables, hidden_variable_ids: [...rejectedVariableIdSet()].sort(),
+      groups, rejected_variables,
+      ...(Object.hasOwn(source, "hidden_variable_ids") || hidden_variable_ids.length
+        ? { hidden_variable_ids }
+        : {}),
     };
   }
 
