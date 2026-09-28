@@ -28,6 +28,13 @@ test("startup waits for the first compiled graph render before schema hydration"
   assert.ok(render >= 0 && render < ready && ready < finish && finish < hydrate);
 });
 
+test("completed hydration rechecks publication state after installing the full schema", () => {
+  const completion = bootstrapSource.indexOf("state.publishedSchemaHydrated = true");
+  const apply = bootstrapSource.indexOf("applyLoadedSchema(schema);", completion);
+  const refresh = bootstrapSource.indexOf("publicationController.refreshPublicationState?.();", completion);
+  assert.ok(completion >= 0 && completion < apply && apply < refresh);
+});
+
 test("publication permalink is independent of the storage URL", () => {
   assert.match(source, /buildPermalink\(\{/);
   assert.match(source, /dataVersion: state\.data\?\.snapshot\?\.snapshot_id/);

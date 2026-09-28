@@ -23,6 +23,7 @@ for (const route of ["/"]) {
     await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
       && document.getElementById("startupLoading")?.hidden, null,
       { timeout: 60000 });
+    await expect(page.locator("#schemaPublicationBadge")).toHaveText("Public schema", { timeout: 60000 });
     const state = await page.evaluate(async () => {
       const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
       const [variables, neighbors, links] = await Promise.all([
