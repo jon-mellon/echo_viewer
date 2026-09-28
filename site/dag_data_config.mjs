@@ -1,11 +1,11 @@
 export const PRODUCTION_EVIDENCE_MANIFEST =
-  "https://data.epistemicinfra.org/evidence/layouts/browser-v2/0cbb5b3bf27fbcde88e82cf5d810b8ad6c2cfbe9fdfea1b60be8f1e500a9b4ac/manifest.json";
+  "https://data.epistemicinfra.org/evidence/layouts/browser-v2/af7c8a1d7b9abc2dee46fcff24112be2253eb2831cf256717a5e813da88ceda1/manifest.json";
 export const PRODUCTION_EVIDENCE_SNAPSHOT_BASE =
   "https://data.epistemicinfra.org/evidence/layouts/browser-v2/";
 
 export const PRODUCTION_APP_ORIGIN = "https://echo.epistemicinfra.org";
 
-export const DEFAULT_SCHEMA_PUBLICATION_ID = "a0118906-2366-4cc8-8809-bafdf3860c23";
+export const DEFAULT_SCHEMA_PUBLICATION_ID = "a8e7d24e-24c0-4386-ba56-dca8108f6ea6";
 
 /** Allow a deployment or shared link to select any ordinary static schema URL. */
 export function groupingSchemaUrl(location = globalThis.location) {
