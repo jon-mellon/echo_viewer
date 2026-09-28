@@ -28,6 +28,7 @@ export function createGroupingSetController({ state, elements, publicationContro
 
   function workingSchema() {
     const source = active() || {};
+    const sourceGroups = new Map((source.groups || []).map(group => [group.group_id, group]));
     const owners = new Map();
     const groups = state.project.groups.filter(group => group.variable_ids?.length).map(group => {
       const variable_ids = [...new Set(group.variable_ids.map(id => state.clusterOf.get(id) || id))].sort();
@@ -37,16 +38,22 @@ export function createGroupingSetController({ state, elements, publicationContro
         owners.set(id, group.group_id);
       }
       return {
+        // Preserve metadata from the published schema so a freshly hydrated
+        // working copy hashes identically until the user actually edits it.
+        ...(sourceGroups.get(group.group_id) || {}),
         group_id: group.group_id, label: group.label || "", notes: group.notes || "",
         source: group.source || "project_export",
         ...(Number.isFinite(group.similarity_coherence) ? { similarity_coherence: group.similarity_coherence } : {}),
         variable_ids,
       };
     });
+    const sourceRejected = new Map((source.rejected_variables || []).map(entry => [entry.variable_id, entry]));
     const rejected_variables = rejectedVariableEntries().map(entry => ({
+      ...(sourceRejected.get(entry.variable_id) || {}),
       variable_id: entry.variable_id,
       member_variable_ids: [...new Set(entry.member_variable_ids || [])].sort(),
-      label: entry.label || "", reason: entry.reason || "low_quality", flagged_at: "",
+      label: entry.label || "", reason: entry.reason || "low_quality",
+      flagged_at: entry.flagged_at || "",
       previous_group_ids: [...new Set(entry.previous_group_ids || [])].sort(),
     }));
     return {
