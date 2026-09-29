@@ -5,6 +5,7 @@ import { createDagExportController } from "../site/dag_export_controller.mjs";
 import { createDagInspectorController } from "../site/dag_inspector_controller.mjs";
 import { createDagProjectController } from "../site/dag_project_controller.mjs";
 import { dag2AnchorPickerIsActive } from "../site/dag_setup_group_controller.mjs";
+import { createDagGroupEditorController } from "../site/dag_group_editor_controller.mjs";
 import { createGroupingSetController } from "../site/grouping_set_controller.mjs";
 
 function memoryStorage() {
@@ -38,6 +39,33 @@ test("DAG2 anchor picker follows missing anchors even when restored workflow fla
   restored.changingAnchorSide = "iv";
   assert.equal(dag2AnchorPickerIsActive(restored, "iv", groupById), true);
   assert.equal(dag2AnchorPickerIsActive(restored, "dv", groupById), false);
+});
+
+test("DAG2 advances after the second anchor is selected", () => {
+  const state = {
+    interfaceMode: "dag2", workflowMode: "setup", phase: "select_dv", changingAnchorSide: null,
+    project: {
+      iv_group_id: "iv", dv_group_id: null,
+      groups: [
+        { group_id: "iv", type: "iv", label: "Exposure", variable_ids: ["x"] },
+        { group_id: "dv", type: null, label: "Outcome", variable_ids: ["y"] },
+      ],
+    },
+  };
+  const groupById = id => state.project.groups.find(group => group.group_id === id);
+  let advances = 0;
+  const controller = createDagGroupEditorController({
+    state, elements: {}, groupById, takeSnapshot: () => ({}), nowIso: () => "2026-09-29T00:00:00Z",
+    clean: value => value, applyProjectOperation: project => { state.project = project; },
+    setMapMode() {}, addDecision() {}, addToUndoHistory() {}, fitMap() {}, renderAll() {},
+    onAnchorsReady: () => { advances += 1; },
+  });
+
+  controller.assignGroupAsAnchor("dv", "dv");
+
+  assert.equal(state.project.dv_group_id, "dv");
+  assert.equal(state.phase, "build");
+  assert.equal(advances, 1);
 });
 
 test("untouched published schema does not gain an empty hidden-variable field", () => {

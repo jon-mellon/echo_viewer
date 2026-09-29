@@ -1242,6 +1242,7 @@ const groupEditorController = createDagGroupEditorController({
   searchVariables, clusterMemberIds, rejectedVariableIdSet, uoaMatches,
   fitSearchContext, applyActiveGroupingSet, rebuildProject, createDensityCandidateGroup,
   escapeHtml, truncate, hydrateVariableDetails,
+  onAnchorsReady: () => shellController.showMobilePanel("dag"),
 });
 
 const mapUiController = createDagMapUiController({

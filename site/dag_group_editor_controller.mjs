@@ -11,8 +11,15 @@ export function createDagGroupEditorController({
   addToUndoHistory, renderAll, addDecision, setWorkflowMode, groupedVariableIds,
   searchVariables, clusterMemberIds, rejectedVariableIdSet, uoaMatches,
   fitSearchContext, applyActiveGroupingSet, rebuildProject, createDensityCandidateGroup,
-  escapeHtml, truncate, hydrateVariableDetails = async () => {},
+  escapeHtml, truncate, hydrateVariableDetails = async () => {}, onAnchorsReady = () => {},
 }) {
+function notifyWhenAnchorsReady() {
+  if (state.interfaceMode !== "dag2") return;
+  const iv = groupById(state.project?.iv_group_id);
+  const dv = groupById(state.project?.dv_group_id);
+  if (iv?.variable_ids?.length && dv?.variable_ids?.length) onAnchorsReady();
+}
+
 function beginTargetGroup(side) {
   const isDv = side === "dv";
   const groupId = `g_${side}_${Date.now()}`;
@@ -59,6 +66,7 @@ function assignGroupAsAnchor(side, sourceGroupId) {
     setMapMode("select");
     fitMap(source.variable_ids);
     renderAll();
+    notifyWhenAnchorsReady();
     return;
   }
   const before = takeSnapshot();
@@ -71,6 +79,7 @@ function assignGroupAsAnchor(side, sourceGroupId) {
   addToUndoHistory(`Use "${label}" as ${side.toUpperCase()}`, before);
   fitMap(variableIds);
   renderAll();
+  notifyWhenAnchorsReady();
 }
 
 function seedLabel(side) {
@@ -299,6 +308,7 @@ function selectActiveAnchor() {
   addDecision("anchor_selected", { group_id: group.group_id, variable_ids: group.variable_ids.slice() });
   addToUndoHistory(`Use "${group.label}" as ${group.type.toUpperCase()}`, before);
   renderAll();
+  notifyWhenAnchorsReady();
 }
 
 function resolveGroupMembershipConflicts(group) {

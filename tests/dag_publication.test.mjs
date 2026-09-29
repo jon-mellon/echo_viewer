@@ -61,6 +61,8 @@ test("published state distinguishes private working-copy changes", () => {
   assert.match(source, /Public schema · Unpublished local changes/);
   assert.match(source, /Private working copy/);
   assert.match(source, /workingCopyChanged/);
+  assert.match(source, /hasPublishableChanges = !published\?\.publication_id \|\| hasLocalChanges/);
+  assert.match(source, /elements\.publish\.hidden = !client \|\| !hasPublishableChanges/);
   assert.match(source, /elements\.permalink\.hidden = !permalink \|\| hasLocalChanges/);
   assert.match(source, /elements\.permalink\.removeAttribute\("href"\)/);
 });

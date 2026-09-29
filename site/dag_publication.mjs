@@ -131,6 +131,12 @@ export function createPublicationController({
   let statusRevision = 0;
   let statusTimer = null;
   let shareFeedbackTimer = null;
+  const initialPublication = getPublicationState();
+  let hasPublishableChanges = !(initialPublication?.publication_id && initialPublication?.content_hash);
+
+  function refreshPublishVisibility() {
+    elements.publish.hidden = !client || !hasPublishableChanges;
+  }
 
   async function currentCanonical() {
     return canonicalizeWorkingSchema(getWorkingSchema(), cryptoApi);
@@ -138,12 +144,12 @@ export function createPublicationController({
 
   async function refreshAuthVisibility() {
     if (!client) {
-      elements.publish.hidden = true;
+      refreshPublishVisibility();
       showStatus(elements.status, "Supabase publication is not configured.", true);
       return;
     }
     const { data, error } = await client.auth.getSession();
-    elements.publish.hidden = false;
+    refreshPublishVisibility();
     elements.publish.title = data?.session?.user
       ? "Create an immutable public version"
       : "Create an immutable public version; publishing will start a private anonymous session";
@@ -158,6 +164,8 @@ export function createPublicationController({
 
   function renderPublicationState(published, hasLocalChanges = false) {
     const permalink = stablePermalink(published);
+    hasPublishableChanges = !published?.publication_id || hasLocalChanges;
+    refreshPublishVisibility();
     elements.badge.textContent = !published?.publication_id
       ? "Private working copy"
       : hasLocalChanges ? "Public schema · Unpublished local changes" : "Public schema";

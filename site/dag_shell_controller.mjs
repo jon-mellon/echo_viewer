@@ -1,5 +1,13 @@
 // Owns cross-feature shell layout: fullscreen focus and draggable panel sizes.
 export function createDagShellController({ state, elements, resizeMap, fitMap, renderDag, getNetwork }) {
+  let showInstalledMobilePanel = null;
+
+  function showMobilePanel(panel) {
+    if (!window.matchMedia?.("(max-width: 840px)").matches || !showInstalledMobilePanel) return false;
+    showInstalledMobilePanel(panel);
+    return true;
+  }
+
   function installMobilePanelNavigation() {
     const tabs = [...document.querySelectorAll("[data-mobile-panel]")];
     if (!tabs.length) return;
@@ -21,6 +29,7 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
         }
       });
     };
+    showInstalledMobilePanel = showPanel;
 
     document.body.dataset.mobilePanel ||= "controls";
     for (const tab of tabs) tab.addEventListener("click", () => showPanel(tab.dataset.mobilePanel));
@@ -123,5 +132,5 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     installMobilePanelNavigation();
   }
 
-  return { setFullscreen, toggleFullscreen, installResizers };
+  return { setFullscreen, toggleFullscreen, installResizers, showMobilePanel };
 }
