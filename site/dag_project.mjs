@@ -120,7 +120,10 @@ export function replaceSchemaGroups(project, groupingSet, clusterOf, clusterMemb
   return { ...project, ...anchors, active_grouping_set_id: groupingSet.grouping_set_id,
     groups: groupingSet.groups.map(group => ({ ...withoutGroupReviewStatus(group),
       variable_ids: [...(group.variable_ids || [])], seed_variable_ids: [...(group.variable_ids || [])],
-      type: 'candidate', source_grouping_set_id: groupingSet.grouping_set_id, source_group_id: group.group_id })),
+      type: group.group_id === anchors.iv_group_id
+        ? 'iv'
+        : group.group_id === anchors.dv_group_id ? 'dv' : 'candidate',
+      source_grouping_set_id: groupingSet.grouping_set_id, source_group_id: group.group_id })),
     rejected_variables: visibility.schemaRejections(project, groupingSet, clusterOf, clusterMembers), carve_outs: [] };
 }
 

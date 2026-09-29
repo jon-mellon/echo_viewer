@@ -219,6 +219,19 @@ test('schema replacement preserves anchor source IDs and drops stale assignments
   assert.deepEqual({ project, schema }, before);
 });
 
+test('schema hydration preserves IV and DV roles used by anchor colors', () => {
+  const { project } = fixture();
+  const schema = { grouping_set_id: 'latest', groups: [
+    { group_id: 'z', variable_ids: ['v1'] },
+    { group_id: 'a', variable_ids: ['v2'] },
+    { group_id: 'c', variable_ids: ['v3'] },
+  ] };
+  const next = ops.replaceSchemaGroups(project, schema);
+  assert.equal(next.groups.find(group => group.group_id === 'z').type, 'iv');
+  assert.equal(next.groups.find(group => group.group_id === 'a').type, 'dv');
+  assert.equal(next.groups.find(group => group.group_id === 'c').type, 'candidate');
+});
+
 test('category splitting retains one source ID per leftover and moves reviewed manual records', () => {
   const { project } = fixture();
   project.groups[2].variable_ids.push('v4');
