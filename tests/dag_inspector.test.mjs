@@ -50,3 +50,45 @@ test("manual-only and absent evidence preserve empty provenance and comparison d
   assert.equal(comparison.sourceLabel, "X");
   assert.equal(comparison.targetLabel, "y");
 });
+
+test("diagnostic evidence puts the witness-path direction before reverse evidence", () => {
+  const link = { edge_id: "e", group_a: "a", group_b: "b", direction_type: "BIDIRECTIONAL",
+    a_to_b_raw_link_ids: ["forward", "shared"], b_to_a_raw_link_ids: ["reverse", "shared"],
+    manual_edge_ids: [] };
+  const project = { groups: [
+    { group_id: "a", label: "A", variable_ids: ["a1"] },
+    { group_id: "b", label: "B", variable_ids: ["b1"] },
+  ], manual_edges: [], link_decisions: {} };
+  const rawLinksById = new Map(["forward", "reverse", "shared"].map(id => [id, {
+    raw_causal_link_id: id, source_variable_id: "a1", target_variable_id: "b1",
+  }]));
+
+  const confounderView = {
+    showConfoundersOnly: true,
+    confounderPathsByGroup: new Map([["b", { toIv: ["b", "a"], toDv: ["b", "dv"] }]]),
+  };
+  assert.equal(inspector.diagnosticEvidenceDirection(link, confounderView), "B_TO_A");
+  assert.deepEqual(inspector.provenanceModel(
+    link, project, rawLinksById, new Map(), confounderView,
+  ).rows.map(row => row.raw.raw_causal_link_id), ["reverse", "shared", "forward"]);
+
+  const colliderView = {
+    showCollidersOnly: true,
+    colliderPathsByGroup: new Map([["b", { fromIv: ["a", "b"], fromDv: ["dv", "b"] }]]),
+  };
+  assert.equal(inspector.diagnosticEvidenceDirection(link, colliderView), "A_TO_B");
+  assert.deepEqual(inspector.provenanceModel(
+    link, project, rawLinksById, new Map(), colliderView,
+  ).rows.map(row => row.raw.raw_causal_link_id), ["forward", "shared", "reverse"]);
+});
+
+test("diagnostic evidence preserves stored order when an edge has no unique witness direction", () => {
+  const link = { group_a: "a", group_b: "b", a_to_b_raw_link_ids: ["forward"],
+    b_to_a_raw_link_ids: ["reverse"], manual_edge_ids: [] };
+  const project = { groups: [], manual_edges: [], link_decisions: {} };
+  const bothDirections = { showConfoundersOnly: true, confounderPathsByGroup: new Map([
+    ["one", { toIv: ["a", "b"] }], ["two", { toDv: ["b", "a"] }],
+  ]) };
+  assert.equal(inspector.diagnosticEvidenceDirection(link, bothDirections), null);
+  assert.deepEqual(inspector.edgeInspector(link, project, bothDirections).rawIds, ["forward", "reverse"]);
+});

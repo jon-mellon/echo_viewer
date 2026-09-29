@@ -9,6 +9,12 @@ export function createDagInspectorController({
   applyProjectOperation, addDecision, addToUndoHistory, rebuildProject, groupById, dagGroups,
 }) {
   const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
+  const diagnosticView = () => ({
+    showConfoundersOnly: state.showConfoundersOnly,
+    showCollidersOnly: state.showCollidersOnly,
+    confounderPathsByGroup: state.confounderPathsByGroup,
+    colliderPathsByGroup: state.colliderPathsByGroup,
+  });
   const isDoi = id => typeof id === "string" && /^10\.\d{4,}\/\S+/.test(id.trim());
   const edgeSourcesLoading = link => {
     if (!link || !state.pendingEdgeEvidence) return false;
@@ -84,7 +90,7 @@ export function createDagInspectorController({
       elements.edgeInspector.textContent = "Select an edge to inspect its provenance";
       return;
     }
-    const model = inspector.edgeInspector(link, state.project);
+    const model = inspector.edgeInspector(link, state.project, diagnosticView());
     const sourcesLoading = edgeSourcesLoading(link);
     elements.edgeInspector.className = "edge-inspector";
     elements.edgeInspector.hidden = false;
@@ -129,7 +135,9 @@ export function createDagInspectorController({
       replaceChildren(elements.provenancePanel, loadingSources());
       return;
     }
-    const model = inspector.provenanceModel(link, state.project, state.rawLinksById, state.variableById);
+    const model = inspector.provenanceModel(
+      link, state.project, state.rawLinksById, state.variableById, diagnosticView(),
+    );
     const manualNode = model.manual.length
       ? h("div", { className: "small-note" }, h("strong", { textContent: "Manual annotation" }), h("br"), model.manual.map(edge => edge.user_note || "Manual edge added by user.").join("; ")) : null;
     if (!model.rawIds.length) {
