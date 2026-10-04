@@ -224,7 +224,7 @@ try {
     ...(results.startup.longestTaskMs > (mobile ? 600 : 250)
       ? [`Startup ${results.startup.longestTaskMs} ms task exceeds ${mobile ? 600 : 250} ms`] : []),
     ...(results.startup.transferMB > 2.5 ? [`Startup transfer ${results.startup.transferMB} MB exceeds 2.5 MB`] : []),
-    ...(results.startup.cls > 0.1 ? [`Startup CLS ${results.startup.cls} exceeds 0.1`] : []),
+    ...(results.startup.cls > 0.05 ? [`Startup CLS ${results.startup.cls} exceeds 0.05`] : []),
     ...results.errors.map(error => `Browser error: ${error}`),
   ];
   if (results.budgetFailures.length && process.env.PROFILE_DISABLE_BUDGETS !== "1") process.exitCode = 1;

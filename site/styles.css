@@ -1302,6 +1302,9 @@ h2 {
   gap: 6px;
   margin-top: 8px;
   padding: 8px 10px;
+  height: min(45vh, 340px);
+  overflow-y: auto;
+  align-content: start;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fbfcfa;
@@ -2108,12 +2111,6 @@ h2 {
 }
 
 @media (max-width: 840px) {
-  .setup-group-picker {
-    height: min(45vh, 340px);
-    overflow-y: auto;
-    align-content: start;
-  }
-
   .dag-map-toolbar {
     left: 10px;
     right: 10px;
