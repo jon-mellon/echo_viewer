@@ -2,12 +2,18 @@ import * as projectOps from "./dag_project.mjs";
 import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
-  invalidateMapCaches, renderAll, setMapMode, fitMap, groupById, persistProjectLocally,
+  invalidateMapCaches, renderAll, drawMap = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
   visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails = async () => {}, prewarmEvidence = async () => {} }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
+  const renderDraft = ({ redrawMap = false } = {}) => {
+    // Definition steps change selection and map contents, not the project DAG.
+    // The DAG is hidden until cancel/save, where a full render is performed.
+    renderAll({ rebuild: false });
+    if (redrawMap) drawMap();
+  };
 
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv"].includes(role)) return;
@@ -23,7 +29,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     };
     state.selectedVariableIds.clear();
     invalidateMapCaches();
-    renderAll();
+    renderDraft();
     els.definitionSourceSearch.focus();
   }
 
@@ -52,7 +58,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     invalidateMapCaches();
     setMapMode("select");
-    renderAll();
+    renderDraft();
     fitMap(eligible);
   }
 
@@ -102,7 +108,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     invalidateMapCaches();
     setMapMode("select");
-    renderAll();
+    renderDraft();
     fitMap(draft.eligible_variable_ids);
   }
 
@@ -123,7 +129,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.selectedVariableIds = new Set(draft.new_variable_ids);
     state.selectedVariableId = id;
     invalidateMapCaches();
-    renderAll();
+    renderDraft({ redrawMap: true });
   }
 
   function affectedDefinitionManualEdges() {
@@ -242,19 +248,19 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       state.definitionDraft.new_variable_ids = [...selected];
       state.selectedVariableIds = new Set(selected);
       invalidateMapCaches();
-      renderAll();
+      renderDraft({ redrawMap: true });
     });
     els.definitionBack.addEventListener("click", () => {
       state.definitionDraft.step = "sources"; state.selectedVariableIds.clear();
-      invalidateMapCaches(); renderAll();
+      invalidateMapCaches(); renderDraft();
     });
     els.definitionReview.addEventListener("click", () => {
       if (!definitionCanReview()) return;
-      state.definitionDraft.step = "review"; renderAll();
+      state.definitionDraft.step = "review"; renderDraft();
     });
     els.definitionReviewBack.addEventListener("click", () => {
       state.definitionDraft.new_label = clean(els.definitionNewLabel.value);
-      state.definitionDraft.step = "partition"; renderAll();
+      state.definitionDraft.step = "partition"; renderDraft({ redrawMap: true });
     });
     els.definitionNewLabel.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_label = els.definitionNewLabel.value;
