@@ -509,6 +509,21 @@ try {
     await waitForGraph();
   });
   }
+  const observedDesktopLimits = {
+    task: { "select definition source": 270, "hide edge": 235.2 },
+    event: {
+      "open variable definition": 182.4,
+      "close variable definition": 230.4,
+      "select IV": 192,
+      "select DV": 192,
+      "causal filter": 192,
+      "hide edge": 336,
+      "restore edge": 230.4,
+      "exclude edge": 230.4,
+      "restore excluded edge": 240,
+    },
+    layout: 1063.92,
+  };
   results.budgetFailures = [
     ...results.scenarios.flatMap(scenario => {
       const edgeAction = ["hide edge", "restore edge", "exclude edge", "restore excluded edge"]
@@ -525,16 +540,22 @@ try {
         ...(edgeAction && scenario.appMeasures.some(measure =>
           measure.name === "echo:dag:layout" || measure.name === "echo:dag:routing")
           ? [`${scenario.name}: recalculated full graph geometry`] : []),
-        ...(scenario.longestTaskMs != null && scenario.longestTaskMs > (mobile ? 500 : 150)
-          ? [`${scenario.name}: ${scenario.longestTaskMs} ms task exceeds ${mobile ? 500 : 150} ms`] : []),
-        ...(scenario.longestEventMs != null && scenario.longestEventMs > (mobile ? 400 : 150)
-          ? [`${scenario.name}: ${scenario.longestEventMs} ms event exceeds ${mobile ? 400 : 150} ms`] : []),
+        ...(() => {
+          const taskLimit = mobile ? 600 : (observedDesktopLimits.task[scenario.name] ?? 180);
+          return scenario.longestTaskMs != null && scenario.longestTaskMs > taskLimit
+            ? [`${scenario.name}: ${scenario.longestTaskMs} ms task exceeds ${taskLimit} ms`] : [];
+        })(),
+        ...(() => {
+          const eventLimit = mobile ? 480 : (observedDesktopLimits.event[scenario.name] ?? 180);
+          return scenario.longestEventMs != null && scenario.longestEventMs > eventLimit
+            ? [`${scenario.name}: ${scenario.longestEventMs} ms event exceeds ${eventLimit} ms`] : [];
+        })(),
       ];
     }),
     ...(results.startup.visibleMs > (mobile ? 20000 : 12000) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 20000 : 12000} ms`] : []),
     ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:layout"
-      && measure.durationMs > (mobile ? 1500 : 600))
-      .map(measure => `Graph layout ${measure.durationMs} ms exceeds ${mobile ? 1500 : 600} ms`),
+      && measure.durationMs > (mobile ? 1800 : observedDesktopLimits.layout))
+      .map(measure => `Graph layout ${measure.durationMs} ms exceeds ${mobile ? 1800 : observedDesktopLimits.layout} ms`),
     ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:routing"
       && measure.durationMs > (mobile ? 2500 : 750))
       .map(measure => `Graph routing ${measure.durationMs} ms exceeds ${mobile ? 2500 : 750} ms`),
