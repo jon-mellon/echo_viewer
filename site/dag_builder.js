@@ -1007,6 +1007,7 @@ function renderSelectedEdge() {
 }
 
 function dismissEvidencePane() {
+  inspectorController.clearPendingExclude();
   state.selectedEdgeId = null;
   state.comparisonVariableIds = [];
   state.selectedVariableIds.clear();
@@ -1227,7 +1228,12 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   searchVariables: searchVisibleVariables,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
   takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
-  hydrateVariableDetails, prewarmEvidence: () => dagDataSource.ensureEvidenceConnection(),
+  hydrateVariableDetails, prewarmEvidence: async () => {
+    await dagDataSource.ensureEvidenceConnection();
+    // DuckDB fetches the remote layout metadata when it creates this view.
+    // Do that while the source picker is open instead of after Continue.
+    await dagDataSource.ensureVariableLayouts();
+  },
 });
 
 const projectController = createDagProjectController({

@@ -156,8 +156,10 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
       : [ivId, dvId].filter(Boolean);
     await staged.loadMemberships(displayed);
     const priorityStart = performance.now();
-    const priorityReady = structuredClone(staged.schema);
-    await onPriorityReady({ schema: priorityReady, groupIds: displayed });
+    // A plain viewer has no priority groups. Publishing an empty partial schema
+    // would briefly clear the compiled graph and force a second full layout.
+    const priorityReady = displayed.length ? structuredClone(staged.schema) : null;
+    if (priorityReady) await onPriorityReady({ schema: priorityReady, groupIds: displayed });
     performance.measure("echo:schema:priority", { start: loadingStart, end: performance.now() });
     const complete = await staged.loadComplete();
     performance.measure("echo:schema:memberships", { start: priorityStart, end: performance.now() });

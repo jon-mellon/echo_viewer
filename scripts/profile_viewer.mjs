@@ -585,6 +585,9 @@ try {
         ...(edgeAction && scenario.appMeasures.some(measure =>
           measure.name === "echo:dag:layout" || measure.name === "echo:dag:routing")
           ? [`${scenario.name}: recalculated full graph geometry`] : []),
+        ...(scenario.name === "select definition source" && scenario.appMeasures.some(measure =>
+          measure.name === "echo:dag:layout" || measure.name === "echo:dag:routing")
+          ? ["Definition source selection recalculated hidden graph geometry"] : []),
         ...(() => {
           const taskLimit = mobile ? 1326 : (observedDesktopLimits.task[scenario.name] ?? 397.8);
           return scenario.longestTaskMs != null && scenario.longestTaskMs > taskLimit
@@ -600,6 +603,8 @@ try {
       ];
     }),
     ...(results.startup.visibleMs > (mobile ? 44200 : 26520) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 44200 : 26520} ms`] : []),
+    ...(!permalink && results.startup.appMeasures.filter(measure => measure.name === "echo:dag:layout").length > 1
+      ? ["Startup recalculated graph layout during schema hydration"] : []),
     ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:layout"
       && measure.durationMs > (mobile ? 3978 : observedDesktopLimits.layout))
       .map(measure => `Graph layout ${measure.durationMs} ms exceeds ${mobile ? 3978 : observedDesktopLimits.layout} ms`),

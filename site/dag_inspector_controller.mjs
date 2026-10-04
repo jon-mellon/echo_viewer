@@ -10,6 +10,8 @@ export function createDagInspectorController({
   groupById, dagGroups,
 }) {
   const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
+  let pendingExclude = null;
+  const clearPendingExclude = () => { pendingExclude = null; };
   const diagnosticView = () => ({
     showConfoundersOnly: state.showConfoundersOnly,
     showCollidersOnly: state.showCollidersOnly,
@@ -32,6 +34,7 @@ export function createDagInspectorController({
   function handleEdgeAction(link, action, manualId, excludeReason) {
     if (!["exclude", "restore", "delete-manual"].includes(action)) return;
     if (action === "exclude" && excludeReason === undefined) {
+      pendingExclude = { edgeId: link.edge_id, reason: "" };
       const row = document.getElementById("excludeReasonRow");
       if (row) {
         row.hidden = false;
@@ -52,6 +55,7 @@ export function createDagInspectorController({
       addDecision("link_restored", { edge_id: link.edge_id });
       addToUndoHistory("Restored edge", before);
     } else if (action === "exclude") {
+      clearPendingExclude();
       applyProjectOperation(projectOps.setLinkDecision(state.project, link.edge_id, {
         edge_id: link.edge_id, display_status: "excluded",
         exclude_reason: excludeReason || "", timestamp: nowIso(),
@@ -88,14 +92,16 @@ export function createDagInspectorController({
       return;
     }
     const model = inspector.edgeInspector(link, state.project, diagnosticView());
+    if (pendingExclude && pendingExclude.edgeId !== link.edge_id) clearPendingExclude();
     const sourcesLoading = edgeSourcesLoading(link);
     elements.edgeInspector.className = "edge-inspector";
     elements.edgeInspector.hidden = false;
     elements.closeEvidencePane.hidden = false;
     const reason = model.existingDecision?.display_status === "excluded" && model.existingDecision.exclude_reason
       ? h("div", { className: "small-note", style: { color: "#9b5c2e" } }, h("strong", { textContent: "Excluded:" }), ` ${model.existingDecision.exclude_reason}`) : null;
-    const reasonRow = h("div", { id: "excludeReasonRow", className: "exclude-reason-row", hidden: true },
+    const reasonRow = h("div", { id: "excludeReasonRow", className: "exclude-reason-row", hidden: !pendingExclude },
       h("textarea", { id: "excludeReasonInput", className: "dag-textarea exclude-reason-input", rows: 2,
+        value: pendingExclude?.reason || "",
         placeholder: "Required: why is this link excluded? (methodological assumption, covariate balance, etc.)" }),
       h("div", { className: "exclude-reason-actions" },
         h("button", { className: "primary-button", type: "button", id: "excludeConfirmBtn", textContent: "Confirm exclusion" }),
@@ -113,6 +119,7 @@ export function createDagInspectorController({
     });
     const row = elements.edgeInspector.querySelector("#excludeReasonRow");
     const input = elements.edgeInspector.querySelector("#excludeReasonInput");
+    input.addEventListener("input", () => { if (pendingExclude) pendingExclude.reason = input.value; });
     elements.edgeInspector.querySelector("#excludeConfirmBtn")?.addEventListener("click", () => {
       const reason = input.value.trim();
       if (!reason) { input.focus(); input.classList.add("input-error"); return; }
@@ -120,7 +127,7 @@ export function createDagInspectorController({
       handleEdgeAction(link, "exclude", null, reason);
     });
     elements.edgeInspector.querySelector("#excludeCancelBtn")?.addEventListener("click", () => {
-      row.hidden = true; input.value = "";
+      row.hidden = true; input.value = ""; clearPendingExclude();
     });
   }
 
@@ -196,5 +203,5 @@ export function createDagInspectorController({
     elements.addEdgeToggle.classList.remove("active"); rebuildProject();
   }
 
-  return { renderEdge, renderProvenance, renderManualControls, addManualEdge, selectedEdge };
+  return { renderEdge, renderProvenance, renderManualControls, addManualEdge, selectedEdge, clearPendingExclude };
 }

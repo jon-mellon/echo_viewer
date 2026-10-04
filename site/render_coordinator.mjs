@@ -28,7 +28,7 @@ export function createRenderCoordinator(view) {
     view.renderUndoRedo();
     view.saveProjectLocally();
   }
-  function renderAll({ rebuild = true } = {}) {
+  function renderAll({ rebuild = true, reuseDagGeometry = false } = {}) {
     view.renderModeUI();
     view.renderAnchorBar();
     view.renderStatus();
@@ -43,7 +43,7 @@ export function createRenderCoordinator(view) {
     view.renderGroupEditor();
     view.renderDefinition?.();
     view.renderRightPanel();
-    if (rebuild) rebuildProject();
+    if (rebuild) rebuildProject({ reuseDagGeometry });
   }
   function selectEdge() {
     view.refreshDagEdgeSelection();

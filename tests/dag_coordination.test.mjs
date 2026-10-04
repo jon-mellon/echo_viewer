@@ -71,6 +71,9 @@ test("render coordination preserves rebuild order, comparison precedence and fin
   assert.equal(calls.some(c => c[0] === "renderSelectedEdge"), false);
   assert.equal(calls.at(-1)[0], "saveProjectLocally");
   calls.length = 0;
+  coordinator.renderAll({ reuseDagGeometry: true });
+  assert.deepEqual(calls.find(c => c[0] === "renderDag"), ["renderDag", { reuseGeometry: true }]);
+  calls.length = 0;
   coordinator.selectEdge();
   assert.deepEqual(calls.map(c => c[0]), ["refreshDagEdgeSelection", "renderSelectedEdge"]);
 });

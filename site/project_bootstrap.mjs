@@ -12,13 +12,6 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
   const setStartupStage = message => presenter.setStartupStage(message);
   const finishStartupLoading = () => presenter.finishStartupLoading();
 
-  function prepareDefinitionEvidenceWhenIdle() {
-    if (state.interfaceMode !== "dag2" || !["select_iv", "select_dv"].includes(state.phase)) return;
-    const prepare = () => { void dagDataSource.ensureEvidenceConnection().catch(() => {}); };
-    if (typeof requestIdleCallback === "function") requestIdleCallback(prepare, { timeout: 1500 });
-    else setTimeout(prepare, 0);
-  }
-
   async function init() {
     dagDataSource.onStatus = setStartupStage;
     presenter.configureInterface(state.interfaceMode);
@@ -99,7 +92,9 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.data.default_grouping_set_id = schema.grouping_set_id;
         loadLatestSchemaGroups();
         normalizeProjectDuplicateAssignments();
-        renderAll();
+        // Compiled nodes and routes already describe this publication. Hydrating
+        // memberships updates controls and metadata without changing geometry.
+        renderAll({ reuseDagGeometry: true });
       };
       void state.data.load_published_schema({ onPriorityReady: ({ schema, groupIds }) => {
         if ((state.compiledDagRevision || 0) !== revision) return;
@@ -114,7 +109,6 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         applyLoadedSchema(schema);
         publicationController.setSchemaReady?.(true);
         void publicationController.refreshPublicationState?.();
-        prepareDefinitionEvidenceWhenIdle();
       }).catch(error => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.publishedSchemaHydrating = false;
@@ -122,8 +116,6 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         publicationController.setSchemaLoadFailed?.();
         console.error("Could not finish loading the published schema.", error);
       });
-    } else {
-      prepareDefinitionEvidenceWhenIdle();
     }
   }
 

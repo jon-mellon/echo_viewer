@@ -79,6 +79,31 @@ test("map context menu changes a definition selection and closes with Escape", a
   await expect(page.locator("#dagMapContextMenu")).toBeHidden();
 });
 
+test("exclusion reason survives an evidence inspector refresh", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const edgeId = await page.evaluate(async () => {
+    const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
+    await whenDagRendered();
+    const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__");
+    inspectDagEdge(id);
+    return id;
+  });
+  expect(edgeId).toBeTruthy();
+  await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
+  await page.locator("#excludeReasonInput").fill("Check evidence before excluding");
+  await page.evaluate(async id => {
+    const { inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
+    inspectDagEdge(id);
+  }, edgeId);
+  await expect(page.locator("#excludeReasonRow")).toBeVisible();
+  await expect(page.locator("#excludeReasonInput")).toHaveValue("Check evidence before excluding");
+  await page.locator("#excludeConfirmBtn").click();
+  await expect.poll(() => page.evaluate(id =>
+    window.__dagBuilderState.project.link_decisions[id]?.display_status, edgeId)).toBe("excluded");
+});
+
 test("project export can be imported with its anchors intact", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);

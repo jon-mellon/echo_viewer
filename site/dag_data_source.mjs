@@ -145,17 +145,21 @@ export class ParquetManifestDagDataSource {
     await this.ensureEvidenceConnection();
     if (!variableIds?.length) return [];
     if (!this.browserShardIds(variableIds).length) return [];
+    const layoutStart = performance.now();
     await this.ensureVariableLayouts();
+    performance.measure("echo:evidence:variable-layouts", { start: layoutStart, end: performance.now() });
     const selectedLayoutSource = layoutSource || this.defaultVariableLayoutSource;
     const placeholders = variableIds.map(() => "?").join(",");
     const canonical = this.browserShardIds(variableIds).length >= CANONICAL_READ_SHARD_THRESHOLD
       ? this.canonicalEvidenceRelationUrl("variable_occurrences") : "";
     const urls = (canonical ? [canonical] : this.browserUrls(this.browserLayout.variables, variableIds))
       .map(url => `'${url.replaceAll("'", "''")}'`).join(",");
+    const queryStart = performance.now();
     const rows = await queryRows(this.connection, `SELECT o.*, l.map_x, l.map_y
       FROM read_parquet([${urls}]) o JOIN variable_layouts l USING (variable_id)
       WHERE l.layout_source = ? AND o.variable_id IN (${placeholders}) ORDER BY o.index`,
     [selectedLayoutSource, ...variableIds]);
+    performance.measure("echo:evidence:variables-query", { start: queryStart, end: performance.now() });
     performance.measure("echo:evidence:variables", { start, end: performance.now() });
     return rows;
   }
@@ -200,8 +204,10 @@ export class ParquetManifestDagDataSource {
       ? this.canonicalEvidenceRelationUrl("variable_neighbors") : "";
     const urls = (canonical ? [canonical] : this.browserUrls(this.browserLayout.neighbors, variableIds))
       .map(url => `'${url.replaceAll("'", "''")}'`).join(",");
+    const queryStart = performance.now();
     const rows = await queryRows(this.neighborConnection || this.connection, `SELECT * FROM read_parquet([${urls}])
       WHERE variable_id IN (${placeholders}) ORDER BY variable_id, display_rank`, variableIds);
+    performance.measure("echo:evidence:neighbors-query", { start: queryStart, end: performance.now() });
     performance.measure("echo:evidence:neighbors", { start, end: performance.now() });
     return rows;
   }
@@ -239,14 +245,18 @@ export class ParquetManifestDagDataSource {
   async ensureVariableLayouts() {
     if (this.variableLayoutsReady) return this.variableLayoutsReady;
     this.variableLayoutsReady = (async () => {
+      const metadataStart = performance.now();
       const payload = await this.loadBuildMetadata();
+      performance.measure("echo:evidence:variable-layouts-metadata", { start: metadataStart, end: performance.now() });
       this.defaultVariableLayoutSource = payload.layout?.default_source || payload.layout?.active_source;
       if (!this.defaultVariableLayoutSource) throw new Error("Evidence snapshot has no default variable layout.");
       const legacyManifest = this.manifest.identity.legacy_manifest;
       const legacyBase = new URL(`/${legacyManifest}`, this.manifestBaseUrl);
       const quote = url => new URL(url, legacyBase).href.replaceAll("'", "''");
+      const viewStart = performance.now();
       await this.connection.query(`CREATE OR REPLACE VIEW variable_layouts AS
         SELECT * FROM read_parquet('${quote("variable_layouts.parquet")}')`);
+      performance.measure("echo:evidence:variable-layouts-view", { start: viewStart, end: performance.now() });
     })();
     try {
       await this.variableLayoutsReady;
