@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { computeDagLayout } from '../site/dag_layout.mjs';
+import { computeDagLayout, dagNodeBoxes } from '../site/dag_layout.mjs';
 import { legacyLayout } from './fixtures/legacy_dag_layout.mjs';
 import { routeEdges } from '../site/dag_router.mjs';
 import { routesToVisData } from '../site/dag_vis_routing.mjs';
@@ -20,6 +20,19 @@ test('edge decisions reuse existing graph geometry and refresh link metadata', (
   assert.equal(reused.routes[0].points, route.points);
   assert.equal(reuseDagGeometry(geometry, groups, [{ edge_id: 'new' }]), null);
   assert.equal(reuseDagGeometry(geometry, [{ group_id: 'a' }], []), null);
+});
+
+test('cached label sizes update when a group label or font changes', () => {
+  const groups = [{ group_id: 'a', label: 'Short' }];
+  const layout = { positions: new Map([['a', { x: 0, y: 0 }]]),
+    params: { fontSize: 12, nodeMaxWidth: 185, hMargin: 10, vMargin: 6 } };
+  const short = dagNodeBoxes(groups, layout).get('a');
+  groups[0].label = 'A considerably longer label';
+  const long = dagNodeBoxes(groups, layout).get('a');
+  assert.ok(long.w > short.w || long.h > short.h);
+  layout.params.fontSize = 16;
+  const larger = dagNodeBoxes(groups, layout).get('a');
+  assert.ok(larger.h > long.h);
 });
 
 // Synthetic graphs exercise the small/large and auto-layout thresholds, with
@@ -65,6 +78,14 @@ for (const mode of ['auto', 'hierarchical', 'organic']) {
     });
   }
 }
+
+test('103-node startup layout preserves legacy positions after distance culling', () => {
+  const input = fixture(103, 'auto', 1100);
+  const actual = computeDagLayout(input);
+  const expected = legacyLayout(input);
+  assert.deepEqual(actual.positions, expected.positions);
+  assert.deepEqual(actual.boxes, expected.boxes);
+});
 
 test('layout, routing and adapter preserve every endpoint', () => {
   const input = fixture(8, 'organic');

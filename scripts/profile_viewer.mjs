@@ -532,6 +532,9 @@ try {
       ];
     }),
     ...(results.startup.visibleMs > (mobile ? 20000 : 12000) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 20000 : 12000} ms`] : []),
+    ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:layout"
+      && measure.durationMs > (mobile ? 1500 : 600))
+      .map(measure => `Graph layout ${measure.durationMs} ms exceeds ${mobile ? 1500 : 600} ms`),
     ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:routing"
       && measure.durationMs > (mobile ? 2500 : 750))
       .map(measure => `Graph routing ${measure.durationMs} ms exceeds ${mobile ? 2500 : 750} ms`),

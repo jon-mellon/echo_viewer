@@ -397,14 +397,20 @@ function relaxDagLayoutPositions(groups, links, positions, params, graphWidth, g
     for (const edge of directedEdges) {
       const a = positions.get(edge.from);
       const b = positions.get(edge.to);
+      const edgeMinX = Math.min(a.x, b.x);
+      const edgeMaxX = Math.max(a.x, b.x);
+      const edgeMinY = Math.min(a.y, b.y);
+      const edgeMaxY = Math.max(a.y, b.y);
       for (const id of ids) {
         if (id === edge.from || id === edge.to) continue;
         const p = positions.get(id);
         const box = boxes.get(id);
         if (!p || !box) continue;
+        const clearance = Math.max(box.w, box.h) * 0.62 + 20;
+        if (p.x < edgeMinX - clearance || p.x > edgeMaxX + clearance
+          || p.y < edgeMinY - clearance || p.y > edgeMaxY + clearance) continue;
         const { distance, closest, t } = distanceFromPointToSegment(p, a, b);
         if (t <= 0.08 || t >= 0.92) continue;
-        const clearance = Math.max(box.w, box.h) * 0.62 + 20;
         if (distance >= clearance) continue;
         let nx = p.x - closest.x;
         let ny = p.y - closest.y;
@@ -494,12 +500,26 @@ function dagLabelMetrics(label, layoutParams = {}) {
   };
 }
 
+const labelMetricsByParams = new WeakMap();
+
 export function dagNodeBoxes(groups, layout) {
   const boxes = new Map();
+  const params = layout.params || {};
+  let cached = labelMetricsByParams.get(params);
+  if (!cached) {
+    cached = new Map();
+    labelMetricsByParams.set(params, cached);
+  }
+  const metricsKey = `${params.nodeMaxWidth}|${params.fontSize}|${params.hMargin}|${params.vMargin}|`;
   for (const group of groups) {
     const point = layout.positions.get(group.group_id);
     if (!point) continue;
-    const metrics = dagLabelMetrics(group.label, layout.params);
+    const key = metricsKey + String(group.label || "");
+    let metrics = cached.get(key);
+    if (!metrics) {
+      metrics = dagLabelMetrics(group.label, params);
+      cached.set(key, metrics);
+    }
     boxes.set(group.group_id, {
       x: point.x - metrics.width / 2,
       y: point.y - metrics.height / 2,
@@ -511,4 +531,3 @@ export function dagNodeBoxes(groups, layout) {
   }
   return boxes;
 }
-
