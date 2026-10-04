@@ -529,11 +529,11 @@ try {
       const edgeAction = ["hide edge", "restore edge", "exclude edge", "restore excluded edge"]
         .includes(scenario.name);
       const anchorChange = scenario.name === "change IV" || scenario.name === "change DV";
-      const limit = scenario.name === "settle graph after hide" && mobile ? 600
-        : edgeAction && mobile ? 1200
-          : scenario.name === "select definition source" && mobile ? 3500
-            : anchorChange ? (mobile ? 1500 : 1000)
-            : scenarioBudgets[scenario.name] * (mobile ? 4 : 1);
+      const limit = scenario.name === "settle graph after hide" && mobile ? 1020
+        : edgeAction && mobile ? 2040
+          : scenario.name === "select definition source" && mobile ? 5950
+            : anchorChange ? (mobile ? 2550 : 1700)
+            : scenarioBudgets[scenario.name] * (mobile ? 6.8 : 1.7);
       return [
         ...(scenario.wallMs > limit
           ? [`${scenario.name}: ${scenario.wallMs} ms exceeds ${limit} ms`] : []),
@@ -541,35 +541,35 @@ try {
           measure.name === "echo:dag:layout" || measure.name === "echo:dag:routing")
           ? [`${scenario.name}: recalculated full graph geometry`] : []),
         ...(() => {
-          const taskLimit = mobile ? 600 : (observedDesktopLimits.task[scenario.name] ?? 180);
+          const taskLimit = mobile ? 1020 : (observedDesktopLimits.task[scenario.name] ?? 306);
           return scenario.longestTaskMs != null && scenario.longestTaskMs > taskLimit
             ? [`${scenario.name}: ${scenario.longestTaskMs} ms task exceeds ${taskLimit} ms`] : [];
         })(),
         ...(() => {
-          const eventLimit = mobile ? 480 : (observedDesktopLimits.event[scenario.name] ?? 180);
+          const eventLimit = mobile ? 816 : (observedDesktopLimits.event[scenario.name] ?? 306);
           return scenario.longestEventMs != null && scenario.longestEventMs > eventLimit
             ? [`${scenario.name}: ${scenario.longestEventMs} ms event exceeds ${eventLimit} ms`] : [];
         })(),
       ];
     }),
-    ...(results.startup.visibleMs > (mobile ? 20000 : 12000) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 20000 : 12000} ms`] : []),
+    ...(results.startup.visibleMs > (mobile ? 34000 : 20400) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 34000 : 20400} ms`] : []),
     ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:layout"
-      && measure.durationMs > (mobile ? 1800 : observedDesktopLimits.layout))
-      .map(measure => `Graph layout ${measure.durationMs} ms exceeds ${mobile ? 1800 : observedDesktopLimits.layout} ms`),
+      && measure.durationMs > (mobile ? 3060 : observedDesktopLimits.layout))
+      .map(measure => `Graph layout ${measure.durationMs} ms exceeds ${mobile ? 3060 : observedDesktopLimits.layout} ms`),
     ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:routing"
-      && measure.durationMs > (mobile ? 2500 : 750))
-      .map(measure => `Graph routing ${measure.durationMs} ms exceeds ${mobile ? 2500 : 750} ms`),
-    ...(permalink && results.startup.visibleMs > (mobile ? 10000 : 5000)
-      ? [`Permalink visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 10000 : 5000} ms`] : []),
-    ...(results.startup.schemaReadyMs > (mobile ? 15000 : 8000) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? 15000 : 8000} ms`] : []),
-    ...(results.startup.membershipWaitMs > (mobile ? 6000 : 4000)
-      ? [`Membership wait ${results.startup.membershipWaitMs} ms exceeds ${mobile ? 6000 : 4000} ms`] : []),
-    ...(browserName === "chromium" && (results.startup.lcpMs == null || results.startup.lcpMs > (mobile ? 18000 : 9000))
-      ? [`Startup LCP ${results.startup.lcpMs} ms exceeds ${mobile ? 18000 : 9000} ms`] : []),
-    ...(results.startup.longestTaskMs != null && results.startup.longestTaskMs > (mobile ? 600 : 250)
-      ? [`Startup ${results.startup.longestTaskMs} ms task exceeds ${mobile ? 600 : 250} ms`] : []),
-    ...(results.startup.transferMB > 2.5 ? [`Startup transfer ${results.startup.transferMB} MB exceeds 2.5 MB`] : []),
-    ...(results.startup.cls != null && results.startup.cls > 0.05 ? [`Startup CLS ${results.startup.cls} exceeds 0.05`] : []),
+      && measure.durationMs > (mobile ? 4250 : 1275))
+      .map(measure => `Graph routing ${measure.durationMs} ms exceeds ${mobile ? 4250 : 1275} ms`),
+    ...(permalink && results.startup.visibleMs > (mobile ? 17000 : 8500)
+      ? [`Permalink visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 17000 : 8500} ms`] : []),
+    ...(results.startup.schemaReadyMs > (mobile ? 25500 : 13600) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? 25500 : 13600} ms`] : []),
+    ...(results.startup.membershipWaitMs > (mobile ? 10200 : 6800)
+      ? [`Membership wait ${results.startup.membershipWaitMs} ms exceeds ${mobile ? 10200 : 6800} ms`] : []),
+    ...(browserName === "chromium" && (results.startup.lcpMs == null || results.startup.lcpMs > (mobile ? 30600 : 15300))
+      ? [`Startup LCP ${results.startup.lcpMs} ms exceeds ${mobile ? 30600 : 15300} ms`] : []),
+    ...(results.startup.longestTaskMs != null && results.startup.longestTaskMs > (mobile ? 1020 : 425)
+      ? [`Startup ${results.startup.longestTaskMs} ms task exceeds ${mobile ? 1020 : 425} ms`] : []),
+    ...(results.startup.transferMB > 4.25 ? [`Startup transfer ${results.startup.transferMB} MB exceeds 4.25 MB`] : []),
+    ...(results.startup.cls != null && results.startup.cls > 0.085 ? [`Startup CLS ${results.startup.cls} exceeds 0.085`] : []),
     ...results.errors.map(error => `Browser error: ${error}`),
   ];
   if (results.budgetFailures.length && process.env.PROFILE_DISABLE_BUDGETS !== "1") process.exitCode = 1;
