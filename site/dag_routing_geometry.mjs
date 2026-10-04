@@ -78,6 +78,10 @@ export function routeOverlapPenalty(points, occupiedRoutes) {
   for (let index = 0; index < points.length - 1; index += 1) {
     const a = points[index];
     const b = points[index + 1];
+    const minX = Math.min(a.x, b.x) - 16;
+    const maxX = Math.max(a.x, b.x) + 16;
+    const minY = Math.min(a.y, b.y) - 16;
+    const maxY = Math.max(a.y, b.y) + 16;
     const length = Math.hypot(b.x - a.x, b.y - a.y);
     if (length < 1) continue;
     const ux = (b.x - a.x) / length;
@@ -86,6 +90,9 @@ export function routeOverlapPenalty(points, occupiedRoutes) {
       for (let other = 0; other < route.length - 1; other += 1) {
         const c = route[other];
         const d = route[other + 1];
+        // Segments farther apart than the overlap radius cannot contribute.
+        if (Math.max(c.x, d.x) < minX || Math.min(c.x, d.x) > maxX
+          || Math.max(c.y, d.y) < minY || Math.min(c.y, d.y) > maxY) continue;
         const otherLength = Math.hypot(d.x - c.x, d.y - c.y);
         if (otherLength < 1) continue;
         const parallel = Math.abs(ux * (d.y - c.y) - uy * (d.x - c.x)) / otherLength;

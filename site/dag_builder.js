@@ -2,7 +2,7 @@
 
 import * as projectOps from "/dag_project.mjs";
 import { aggregateGroupLinks as deriveGroupLinks, rawLinksBetween as lookupRawLinks,
-  paperTableKeys as lookupPaperTableKeys, linkKey, pairKey } from "/dag_link_aggregation.mjs";
+  paperTableKeys as lookupPaperTableKeys, applyLinkDecisions, linkKey, pairKey } from "/dag_link_aggregation.mjs";
 
 import * as exportData from "/dag_exports.mjs";
 import { createDagExportController } from "/dag_export_controller.mjs";
@@ -844,7 +844,7 @@ function exportGroupingFolder() { return groupingSetController.exportFolder(); }
 
 function aggregateGroupLinks() {
   if (state.compiledDagValid && state.compiledDag) {
-    state.project.links = structuredClone(state.compiledDag.edges || []);
+    state.project.links = applyLinkDecisions(state.compiledDag.edges || [], state.project.link_decisions);
     return;
   }
   state.project.links = deriveGroupLinks({
@@ -1231,6 +1231,7 @@ const projectController = createDagProjectController({
 const inspectorController = createDagInspectorController({
   state, elements: els, escapeHtml, truncate, nowIso, takeSnapshot,
   applyProjectOperation, addDecision, addToUndoHistory, rebuildProject, groupById, dagGroups,
+  hideRenderedEdge: edgeId => dagNetworkController.hideRenderedEdge(edgeId),
 });
 
 const mapViewController = createDagMapViewController({
@@ -1271,6 +1272,25 @@ const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
   drawMap, setMapMode, renderAll, selectEdge: () => renderCoordinator.selectEdge(),
 });
+
+// Programmatic edge selection keeps browser regression tests on the same
+// inspector path as a graph click, without depending on canvas coordinates.
+export function inspectDagEdge(edgeId) {
+  state.selectedEdgeId = edgeId;
+  renderCoordinator.selectEdge();
+}
+
+export function whenDagRendered() {
+  return dagNetworkController.whenRendered();
+}
+
+export function isDagEdgeRendered(edgeId) {
+  return dagNetworkController.isEdgeRendered(edgeId);
+}
+
+export function renderedDagEdgeIds() {
+  return dagNetworkController.renderedEdgeIds();
+}
 
 const shellController = createDagShellController({
   state, elements: els, resizeMap, fitMap, renderDag,

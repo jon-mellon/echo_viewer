@@ -1,6 +1,7 @@
 test-results/
 profile-results/
 profile-results-mobile/
+profile-results-firefox/
 node_modules/
 tests/dagitty_cache/
 .DS_Store

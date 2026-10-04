@@ -1,14 +1,17 @@
-import { chromium } from "playwright";
+import { chromium, firefox } from "playwright";
 import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const url = process.env.PROFILE_URL || "http://127.0.0.1:8767/";
 const mobile = process.env.PROFILE_DEVICE === "mobile";
-const output = process.env.PROFILE_OUTPUT || (mobile ? "profile-results-mobile" : "profile-results");
+const browserName = process.env.PROFILE_BROWSER === "firefox" ? "firefox" : "chromium";
+if (mobile && browserName === "firefox") throw new Error("Mobile CPU throttling requires Chromium.");
+const output = process.env.PROFILE_OUTPUT || (browserName === "firefox" ? "profile-results-firefox"
+  : mobile ? "profile-results-mobile" : "profile-results");
 const local = !process.env.PROFILE_URL;
 const started = new Date().toISOString();
-const results = { started, url, device: mobile ? "mobile" : "desktop", scenarios: [], errors: [] };
+const results = { started, url, browser: browserName, device: mobile ? "mobile" : "desktop", scenarios: [], errors: [] };
 const scenarioBudgets = {
   "open variable definition": 750,
   "select definition source": 4000,
@@ -22,6 +25,8 @@ const scenarioBudgets = {
   "DAG layout: auto": 750,
   "DAG zoom": 500,
   "causal filter": 1000,
+  "hide edge": 750,
+  "settle graph after hide": 5000,
 };
 let server, browser, context, page, cdp;
 
@@ -37,6 +42,7 @@ async function waitForServer() {
 async function snapshot() {
   return page.evaluate(() => ({
     at: performance.now(),
+    supported: window.__profile.supported,
     longTasks: [...window.__profile.longTasks],
     events: [...window.__profile.events],
     frameGaps: [...window.__profile.frameGaps],
@@ -68,9 +74,9 @@ async function measure(name, action) {
   const measures = after.measures.filter(entry => entry.startTime >= before.at);
   results.scenarios.push({ name, wallMs: Date.now() - startedAt,
     browserMs: round(after.at - before.at),
-    longTaskMs: round(longTasks.reduce((sum, entry) => sum + entry.duration, 0)),
-    longestTaskMs: round(Math.max(0, ...longTasks.map(entry => entry.duration))),
-    longestEventMs: round(Math.max(0, ...events.map(entry => entry.duration))),
+    longTaskMs: after.supported.longtask ? round(longTasks.reduce((sum, entry) => sum + entry.duration, 0)) : null,
+    longestTaskMs: after.supported.longtask ? round(Math.max(0, ...longTasks.map(entry => entry.duration))) : null,
+    longestEventMs: after.supported.event ? round(Math.max(0, ...events.map(entry => entry.duration))) : null,
     maxFrameGapMs: round(Math.max(0, ...frameGaps.map(entry => entry.ms))),
     requestCount: resources.length,
     transferMB: round(resources.reduce((sum, entry) => sum + entry.transferSize, 0) / 1048576),
@@ -87,7 +93,7 @@ try {
     server = spawn("python3", ["-m", "http.server", "8767", "--directory", "site"], { stdio: "ignore" });
     await waitForServer();
   }
-  browser = await chromium.launch({ headless: true });
+  browser = await (browserName === "firefox" ? firefox : chromium).launch({ headless: true });
   context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 }
     : { width: 1365, height: 900 }, deviceScaleFactor: 1,
   isMobile: mobile, hasTouch: mobile });
@@ -97,7 +103,10 @@ try {
   page.on("console", message => { if (message.type() === "error") results.errors.push(message.text()); });
   await page.addInitScript(() => {
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
-    const profile = window.__profile = { longTasks: [], events: [], frameGaps: [], layoutShifts: [], lcp: null, cls: 0 };
+    const supportedTypes = PerformanceObserver.supportedEntryTypes || [];
+    const supported = Object.fromEntries(["longtask", "event", "largest-contentful-paint", "layout-shift"]
+      .map(type => [type, supportedTypes.includes(type)]));
+    const profile = window.__profile = { supported, longTasks: [], events: [], frameGaps: [], layoutShifts: [], lcp: null, cls: 0 };
     for (const type of ["longtask", "event", "largest-contentful-paint", "layout-shift"]) {
       try {
         new PerformanceObserver(list => {
@@ -125,10 +134,12 @@ try {
     }
     requestAnimationFrame(frame);
   });
-  cdp = await context.newCDPSession(page);
-  if (mobile) await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
-  await cdp.send("Profiler.enable");
-  await cdp.send("Profiler.start");
+  if (browserName === "chromium") {
+    cdp = await context.newCDPSession(page);
+    if (mobile) await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+    await cdp.send("Profiler.enable");
+    await cdp.send("Profiler.start");
+  }
   const startupAt = Date.now();
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
@@ -140,12 +151,16 @@ try {
   results.startup = {
     visibleMs,
     schemaReadyMs: Date.now() - startupAt,
+    membershipWaitMs: Date.now() - startupAt - visibleMs,
     domContentLoadedMs: round(startup.navigation?.domContentLoadedEventEnd ?? 0),
     lcpMs: startup.lcp == null ? null : round(startup.lcp),
-    cls: Math.round(startup.cls * 1000) / 1000,
+    cls: startup.supported["layout-shift"] ? Math.round(startup.cls * 1000) / 1000 : null,
     layoutShifts: startup.layoutShifts,
-    longTaskMs: round(startup.longTasks.reduce((sum, entry) => sum + entry.duration, 0)),
-    longestTaskMs: round(Math.max(0, ...startup.longTasks.map(entry => entry.duration))),
+    longTaskMs: startup.supported.longtask
+      ? round(startup.longTasks.reduce((sum, entry) => sum + entry.duration, 0)) : null,
+    longestTaskMs: startup.supported.longtask
+      ? round(Math.max(0, ...startup.longTasks.map(entry => entry.duration))) : null,
+    appMeasures: startup.measures.map(entry => ({ name: entry.name, durationMs: round(entry.duration) })),
     resourceCount: startup.resources.length,
     transferMB: round(startup.resources.reduce((sum, entry) => sum + entry.transferSize, 0) / 1048576),
     largestResources: startup.resources.sort((a, b) => b.transferSize - a.transferSize).slice(0, 8)
@@ -208,32 +223,63 @@ try {
   await measure("causal filter", async () => {
     await page.locator("#toggleCausalFilter").click();
   });
+  const edgeId = await page.evaluate(async () => {
+    const { whenDagRendered, renderedDagEdgeIds } = await import("/dag_builder.js?v=evidence-pane-v1");
+    await whenDagRendered();
+    return renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__");
+  });
+  if (!edgeId) throw new Error("No evidence edge is visible to test Hide");
+  await page.evaluate(async id => {
+    const { inspectDagEdge, isDagEdgeRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
+    if (!isDagEdgeRendered(id)) throw new Error("Chosen evidence edge is not rendered");
+    inspectDagEdge(id);
+  }, edgeId);
+  await measure("hide edge", async () => {
+    await page.locator('#edgeInspector button[data-edge-action="hide"]').click();
+    await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "hidden", edgeId);
+    await page.waitForFunction(async id => {
+      const { isDagEdgeRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
+      return !isDagEdgeRendered(id);
+    }, edgeId);
+  });
+  await measure("settle graph after hide", async () => {
+    await page.evaluate(async id => {
+      const { whenDagRendered, isDagEdgeRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
+      await whenDagRendered();
+      if (isDagEdgeRendered(id)) throw new Error("Hidden edge returned after graph rebuild");
+    }, edgeId);
+  });
   results.budgetFailures = [
     ...results.scenarios.flatMap(scenario => [
       ...(scenario.wallMs > scenarioBudgets[scenario.name] * (mobile ? 4 : 1)
         ? [`${scenario.name}: ${scenario.wallMs} ms exceeds ${scenarioBudgets[scenario.name] * (mobile ? 4 : 1)} ms`] : []),
-      ...(scenario.longestTaskMs > (mobile ? 500 : 150)
+      ...(scenario.longestTaskMs != null && scenario.longestTaskMs > (mobile ? 500 : 150)
         ? [`${scenario.name}: ${scenario.longestTaskMs} ms task exceeds ${mobile ? 500 : 150} ms`] : []),
-      ...(scenario.longestEventMs > (mobile ? 400 : 150)
+      ...(scenario.longestEventMs != null && scenario.longestEventMs > (mobile ? 400 : 150)
         ? [`${scenario.name}: ${scenario.longestEventMs} ms event exceeds ${mobile ? 400 : 150} ms`] : []),
     ]),
     ...(results.startup.visibleMs > (mobile ? 20000 : 12000) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 20000 : 12000} ms`] : []),
-    ...(results.startup.schemaReadyMs > (mobile ? 30000 : 20000) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? 30000 : 20000} ms`] : []),
-    ...(results.startup.lcpMs == null || results.startup.lcpMs > (mobile ? 18000 : 9000)
+    ...(results.startup.schemaReadyMs > (mobile ? 15000 : 8000) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? 15000 : 8000} ms`] : []),
+    ...(results.startup.membershipWaitMs > (mobile ? 6000 : 4000)
+      ? [`Membership wait ${results.startup.membershipWaitMs} ms exceeds ${mobile ? 6000 : 4000} ms`] : []),
+    ...(browserName === "chromium" && (results.startup.lcpMs == null || results.startup.lcpMs > (mobile ? 18000 : 9000))
       ? [`Startup LCP ${results.startup.lcpMs} ms exceeds ${mobile ? 18000 : 9000} ms`] : []),
-    ...(results.startup.longestTaskMs > (mobile ? 600 : 250)
+    ...(results.startup.longestTaskMs != null && results.startup.longestTaskMs > (mobile ? 600 : 250)
       ? [`Startup ${results.startup.longestTaskMs} ms task exceeds ${mobile ? 600 : 250} ms`] : []),
     ...(results.startup.transferMB > 2.5 ? [`Startup transfer ${results.startup.transferMB} MB exceeds 2.5 MB`] : []),
-    ...(results.startup.cls > 0.05 ? [`Startup CLS ${results.startup.cls} exceeds 0.05`] : []),
+    ...(results.startup.cls != null && results.startup.cls > 0.05 ? [`Startup CLS ${results.startup.cls} exceeds 0.05`] : []),
     ...results.errors.map(error => `Browser error: ${error}`),
   ];
   if (results.budgetFailures.length && process.env.PROFILE_DISABLE_BUDGETS !== "1") process.exitCode = 1;
-  const cpu = await cdp.send("Profiler.stop");
-  await writeFile(join(output, "cpu-profile.cpuprofile"), JSON.stringify(cpu.profile));
+  if (cdp) {
+    const cpu = await cdp.send("Profiler.stop");
+    await writeFile(join(output, "cpu-profile.cpuprofile"), JSON.stringify(cpu.profile));
+  }
   results.finished = new Date().toISOString();
   await writeFile(join(output, "summary.json"), JSON.stringify(results, null, 2));
-  console.log(JSON.stringify({ device: results.device, startup: { visibleMs: results.startup.visibleMs,
-    schemaReadyMs: results.startup.schemaReadyMs, transferMB: results.startup.transferMB,
+  console.log(JSON.stringify({ browser: results.browser, device: results.device, startup: { visibleMs: results.startup.visibleMs,
+    schemaReadyMs: results.startup.schemaReadyMs, membershipWaitMs: results.startup.membershipWaitMs,
+    transferMB: results.startup.transferMB,
     cls: results.startup.cls },
   scenarios: results.scenarios.map(scenario => ({ name: scenario.name, wallMs: scenario.wallMs,
     longestTaskMs: scenario.longestTaskMs })), budgetFailures: results.budgetFailures }, null, 2));

@@ -18,9 +18,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox
       - run: npm run profile
       - run: PROFILE_DEVICE=mobile npm run profile
+      - run: PROFILE_BROWSER=firefox npm run profile
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -28,4 +29,5 @@ jobs:
           path: |
             profile-results/
             profile-results-mobile/
+            profile-results-firefox/
           retention-days: 1

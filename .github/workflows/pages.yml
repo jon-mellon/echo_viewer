@@ -32,11 +32,13 @@ jobs:
       - name: Run unit and architecture checks
         run: npm test
       - name: Install profiling browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
       - name: Enforce performance budgets
         run: npm run profile
       - name: Enforce mobile performance budgets
         run: PROFILE_DEVICE=mobile npm run profile
+      - name: Enforce Firefox performance budgets
+        run: PROFILE_BROWSER=firefox npm run profile
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -44,6 +46,7 @@ jobs:
           path: |
             profile-results/
             profile-results-mobile/
+            profile-results-firefox/
           if-no-files-found: ignore
           retention-days: 1
       - name: Configure GitHub Pages

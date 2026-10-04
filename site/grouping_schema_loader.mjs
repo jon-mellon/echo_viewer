@@ -135,7 +135,7 @@ export async function loadGroupingSchemaStructure(baseUrl, fetchImpl = fetch) {
   const owners = new Map(), loadedGroups = new Set();
   async function loadMemberships(groupIds) {
     const wanted = [...new Set(groupIds)].filter(groupId => groups.has(groupId) && !loadedGroups.has(groupId));
-    const membershipRows = await mapWithConcurrency(wanted, 6, async groupId => {
+    const membershipRows = await mapWithConcurrency(wanted, 16, async groupId => {
       const relative = manifest.group_membership_files[groupId];
       return { groupId, rows: parseTsv(await fetchText(new URL(relative, base), fetchImpl), relative) };
     });

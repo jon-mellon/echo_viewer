@@ -352,6 +352,10 @@ function renderDag() {
   _dagRenderWorker = worker;
   worker.addEventListener("message", (event) => {
     if (event.data.requestId !== _dagRenderRequest) return;
+    const timingEnd = performance.now();
+    for (const [phase, duration] of Object.entries(event.data.timings || {})) {
+      performance.measure(`echo:dag:${phase}`, { start: timingEnd - duration, end: timingEnd });
+    }
     const layout = {
       ...event.data.layout,
       positions: new Map(event.data.layout.positions),
@@ -497,6 +501,14 @@ function edgeHoverText(link) {
     highlightConfounderPaths, clearConfounderPathHover, clearLogicalDagEdgeHover,
     highlightConnectedDagEdges,
     whenRendered: () => _dagRenderedPromise,
+    renderedEdgeIds: () => [...new Set((_visEdges?.getIds() || []).map(id => _dagEdgeSegments.get(id) || id))],
+    isEdgeRendered: edgeId => Boolean(_visEdges?.getIds().some(id => (_dagEdgeSegments.get(id) || id) === edgeId)),
+    hideRenderedEdge(edgeId) {
+      if (!_visEdges) return;
+      const ids = _visEdges.getIds().filter(id => (_dagEdgeSegments.get(id) || id) === edgeId);
+      if (ids.length) _visEdges.remove(ids);
+      _visNetwork?.redraw();
+    },
     getNetwork: () => _visNetwork, getNodes: () => _visNodes, getEdges: () => _visEdges,
     getPathLaneSegments: () => _dagPathLaneSegments,
     zoomIn: () => _visNetwork?.moveTo({ scale: _visNetwork.getScale() * 1.3 }),

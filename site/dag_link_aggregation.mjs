@@ -8,6 +8,14 @@ import { pairKey } from "./edge_keys.mjs";
 export const linkKey = (sourceId, targetId) => `${sourceId}->${targetId}`;
 export const edgeKey = (a, b) => `${a}__${b}`;
 
+export function applyLinkDecisions(links, decisions = {}) {
+  return links.map(link => {
+    const decision = decisions[link.edge_id] || null;
+    return { ...link, display_status: decision?.display_status || link.display_status || "active_by_default",
+      user_decision: decision || link.user_decision || null };
+  });
+}
+
 /**
  * @param {{project: Project, linkLookup: Map<string, string[]>, rawLinksById: Map<string, *>}} input
  * @returns {AggregatedLink[]}

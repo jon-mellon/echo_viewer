@@ -21,7 +21,9 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     resizeMap();
     const permalink = permalinkInput();
     const publicationId = schemaPublicationId();
+    const dataStart = performance.now();
     await loadDagData(permalink?.get("vlayout") || "");
+    performance.measure("echo:startup:data", { start: dataStart, end: performance.now() });
     state.selectedUoa = null;
     state.uoaFilterEnabled = false;
     setStartupStage("Preparing workspace…");
@@ -59,8 +61,10 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       await loadDagData(restoredLayoutSource);
     }
     setStartupStage("Rendering graph…");
+    const renderStart = performance.now();
     renderAll();
     await dagNetworkController.whenRendered?.();
+    performance.measure("echo:startup:graph", { start: renderStart, end: performance.now() });
     if (state.permalinkMapViewport) {
       constrainMapTransform();
       drawMap();

@@ -122,6 +122,7 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
     rejected_variables: [],
   };
   const loadSchema = async ({ onPriorityReady = () => {} } = {}) => {
+    const loadingStart = performance.now();
     const schemaFiles = new Map();
     const schemaFetch = async (url, options) => {
       const response = await cachingFetch(url, options);
@@ -132,6 +133,7 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
       return response;
     };
     const staged = await loadGroupingSchemaStructure(baseUrl, schemaFetch);
+    performance.measure("echo:schema:structure", { start: loadingStart, end: performance.now() });
     const parameters = new URL(globalThis.location?.href || "http://localhost/").searchParams;
     const bool = (key, fallback) => parameters.has(key) ? parameters.get(key) === "1" : fallback;
     const ivId = parameters.get("iv"), dvId = parameters.get("dv");
@@ -150,10 +152,15 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
         }).componentGroupIds]
       : [ivId, dvId].filter(Boolean);
     await staged.loadMemberships(displayed);
+    const priorityStart = performance.now();
     const priorityReady = structuredClone(staged.schema);
     await onPriorityReady({ schema: priorityReady, groupIds: displayed });
+    performance.measure("echo:schema:priority", { start: loadingStart, end: performance.now() });
     const complete = await staged.loadComplete();
+    performance.measure("echo:schema:memberships", { start: priorityStart, end: performance.now() });
+    const integrityStart = performance.now();
     const downloadedHash = await canonicalFolderHash(schemaFiles);
+    performance.measure("echo:schema:integrity", { start: integrityStart, end: performance.now() });
     if (downloadedHash !== publication.content_hash) {
       throw new Error(`Published schema hash mismatch: registry ${publication.content_hash}, downloaded ${downloadedHash}.`);
     }
