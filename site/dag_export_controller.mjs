@@ -2,6 +2,12 @@ import * as exportData from "./dag_exports.mjs";
 import { makeZip } from "./dag_export_zip.mjs";
 import { setSafeUrl } from "./dom_builder.mjs";
 
+export const MAX_REFERENCE_ENRICHMENTS = 24;
+
+export function referenceEnrichmentRequests(dois) {
+  return [...new Set([exportData.METHOD_DOI, ...dois.slice(0, MAX_REFERENCE_ENRICHMENTS)])];
+}
+
 // Browser-side export orchestration. Pure serialization stays in dag_exports;
 // this controller owns metadata I/O, snapshots, busy state, and downloads.
 export function createDagExportController({
@@ -69,7 +75,7 @@ export function createDagExportController({
 
   function requestedDois(input) {
     const dois = exportData.collectAllDagDois(input);
-    return { dois, requested: [...new Set([exportData.METHOD_DOI, ...dois])] };
+    return { dois, requested: referenceEnrichmentRequests(dois) };
   }
 
   function warmBibliography(input = captureInput()) {

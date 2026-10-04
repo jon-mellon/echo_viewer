@@ -33,6 +33,8 @@ jobs:
         run: npm test
       - name: Install profiling browser
         run: npx playwright install --with-deps chromium firefox
+      - name: Check browser workflows
+        run: npm run test:browser
       - name: Enforce performance budgets
         run: npm run profile
       - name: Enforce mobile performance budgets

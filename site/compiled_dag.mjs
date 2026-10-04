@@ -150,6 +150,10 @@ export function incrementCompiledDag({ compiledDag, oldSchema, newSchema, incide
     ...edge,
     a_to_b_raw_link_ids: (edge.a_to_b_raw_link_ids || []).filter(id => !incidentIds.has(id)),
     b_to_a_raw_link_ids: (edge.b_to_a_raw_link_ids || []).filter(id => !incidentIds.has(id)),
+    manual_edge_ids: [],
+    manual_a_to_b_exists: false,
+    manual_b_to_a_exists: false,
+    is_manual: false,
   }]));
   const additions = fullCompileDag({ schema: newSchema, project, rawLinks: incident }).edges;
   for (const addition of additions) {
@@ -158,6 +162,10 @@ export function incrementCompiledDag({ compiledDag, oldSchema, newSchema, incide
     else {
       current.a_to_b_raw_link_ids.push(...addition.a_to_b_raw_link_ids);
       current.b_to_a_raw_link_ids.push(...addition.b_to_a_raw_link_ids);
+      current.manual_edge_ids = addition.manual_edge_ids;
+      current.manual_a_to_b_exists = addition.manual_a_to_b_exists;
+      current.manual_b_to_a_exists = addition.manual_b_to_a_exists;
+      current.is_manual = addition.is_manual;
     }
   }
   const edges = [...edgesById.values()].flatMap(edge => {

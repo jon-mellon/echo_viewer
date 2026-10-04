@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDagAppState } from "../site/dag_app_state.mjs";
-import { createDagExportController } from "../site/dag_export_controller.mjs";
+import { createDagExportController, MAX_REFERENCE_ENRICHMENTS,
+  referenceEnrichmentRequests } from "../site/dag_export_controller.mjs";
+import { buildBibText, METHOD_DOI } from "../site/dag_exports.mjs";
 import { createDagInspectorController } from "../site/dag_inspector_controller.mjs";
 import { createDagProjectController } from "../site/dag_project_controller.mjs";
 import { dag2AnchorPickerIsActive } from "../site/dag_setup_group_controller.mjs";
@@ -141,6 +143,15 @@ test("export controller snapshots mutable viewer data at its boundary", () => {
   const captured = controller.captureInput();
   state.project.groups[0].label = "After";
   assert.equal(captured.project.groups[0].label, "Before");
+});
+
+test("large bibliography exports retain every DOI while bounding metadata requests", () => {
+  const dois = Array.from({ length: 2107 }, (_, index) => `10.1234/paper-${index}`);
+  const requested = referenceEnrichmentRequests(dois);
+  assert.equal(requested[0], METHOD_DOI);
+  assert.ok(requested.length <= MAX_REFERENCE_ENRICHMENTS + 1);
+  const bibliography = buildBibText(dois, new Map()).bibText;
+  assert.match(bibliography, /10\.1234\/paper-2106/);
 });
 
 test("export controller waits for lazy evidence before taking its snapshot", async () => {

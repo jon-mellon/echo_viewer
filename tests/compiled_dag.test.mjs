@@ -73,6 +73,22 @@ test("rename updates nodes without evidence", () => {
   assert.equal(incremental(renamed, []).nodes[0].label, "Renamed");
 });
 
+test("manual edges appear and disappear in an incrementally updated published graph", () => {
+  const compiled = fullCompileDag({ schema: base, rawLinks: raw });
+  const manual = { edge_id: "manual-1", source_group_id: "a", target_group_id: "c",
+    direction: "bidirectional", deleted: false };
+  const added = incrementCompiledDag({ compiledDag: compiled, oldSchema: base, newSchema: base,
+    incidentRawLinks: [], project: { manual_edges: [manual] } });
+  const edge = added.edges.find(item => item.manual_edge_ids?.includes(manual.edge_id));
+  assert.ok(edge);
+  assert.equal(edge.is_manual, true);
+  assert.equal(edge.direction_type, "BIDIRECTIONAL");
+  const removed = incrementCompiledDag({ compiledDag: added, oldSchema: base, newSchema: base,
+    incidentRawLinks: [], project: { manual_edges: [{ ...manual, deleted: true }] } });
+  assert.equal(removed.edges.some(item => item.manual_edge_ids?.includes(manual.edge_id)), false);
+  assert.equal(removed.edges.find(item => item.edge_id === edge.edge_id)?.is_manual, false);
+});
+
 test("compiled binding rejects snapshot and compiler mismatches", async () => {
   const dag = fullCompileDag({ schema: base, rawLinks: raw });
   const publication = { id: "pub", content_hash: "schema", evidence_snapshot: "snapshot" };

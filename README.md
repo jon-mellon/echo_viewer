@@ -13,15 +13,22 @@ python3 -m http.server --directory site
 
 ## Performance profiling
 
-Run `npm run profile` to start a local preview and exercise startup, variable
-definition and map zoom, group search, IV/DV selection, DAG layout changes,
-DAG zoom, and the causal filter in Chromium.
+Run `npm run profile` to start a local preview and measure startup, definition
+entry, group search, IV/DV selection and changes, map controls and gestures,
+DAG layouts and filters, edge Hide/Exclude/Restore, manual edges, undo/redo,
+fullscreen, history, and project/schema downloads in Chromium.
 Run `PROFILE_DEVICE=mobile npm run profile` for the same flows at a 390-pixel
 viewport with 4× CPU throttling. Run `PROFILE_BROWSER=firefox npm run profile`
 to check the same interactions in Firefox. Run `PROFILE_SCENARIO=permalink npm run profile`
 to time the published permalink's graph and full group-membership load; combine
 it with `PROFILE_DEVICE=mobile` or `PROFILE_BROWSER=firefox` for those browsers.
 All six suites run on every pull request and before a GitHub Pages deployment.
+`npm run test:browser` additionally checks the password gate, definition
+Back/Cancel/Save/edit flows, public link sharing, project import/export, and
+bibliography, Markdown, and LaTeX downloads. It runs in the same required jobs.
+Document exports enrich at most 24 paper references through Crossref so a
+large DAG does not wait for thousands of rate limited requests; every DOI remains
+in the exported bibliography.
 Each run writes a summary and Playwright trace to its browser-specific results
 directory. Chromium also writes a CPU profile. Open that profile in Chrome
 DevTools Performance, or inspect a trace with

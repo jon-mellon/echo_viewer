@@ -31,6 +31,35 @@ const scenarioBudgets = {
   "causal filter": 1000,
   "hide edge": 750,
   "settle graph after hide": 4000,
+  "restore edge": 4000,
+  "exclude edge": 4000,
+  "restore excluded edge": 4000,
+  "confounders filter": 4000,
+  "colliders filter": 4000,
+  "path length": 4000,
+  "bottleneck filter": 4000,
+  "path links filter": 4000,
+  "DAG zoom out and fit": 1000,
+  "DAG fullscreen and Escape": 1000,
+  "map labels and group regions": 1000,
+  "map zoom out and fit": 1000,
+  "map wheel zoom": 1000,
+  "map drag pan": 1000,
+  "map fullscreen and Escape": 1000,
+  "map mode selection": 1000,
+  "history panel": 1000,
+  "manual edge drawer": 1000,
+  "add manual edge": 4000,
+  "undo manual edge": 4000,
+  "redo manual edge": 4000,
+  "remove manual edge": 4000,
+  "export drawer": 1000,
+  "project JSON download": 4000,
+  "working map download": 4000,
+  "grouping folder download": 4000,
+  "change IV": 4000,
+  "change DV": 4000,
+  "close evidence": 1000,
 };
 let server, browser, context, page, cdp;
 
@@ -88,6 +117,13 @@ async function measure(name, action) {
       .map(entry => ({ name: entry.name, durationMs: round(entry.duration) })),
     appMeasures: measures.map(entry => ({ name: entry.name, durationMs: round(entry.duration) })),
     heapMB: after.heap == null ? null : round(after.heap / 1048576),
+  });
+}
+
+async function waitForGraph() {
+  await page.evaluate(async () => {
+    const { whenDagRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
+    await whenDagRendered();
   });
 }
 
@@ -213,6 +249,58 @@ try {
   await measure("variable map zoom", async () => {
     await page.locator("#dagZoomIn").click();
   });
+  await measure("map labels and group regions", async () => {
+    for (const [id, key] of [["toggleVariableLabels", "showVariableLabels"],
+      ["toggleGroupLabels", "showGroupLabels"]]) {
+      const previous = await page.evaluate(stateKey => window.__dagBuilderState[stateKey], key);
+      await page.locator(`#${id}`).click();
+      await page.waitForFunction(({ stateKey, value }) => window.__dagBuilderState[stateKey] !== value,
+        { stateKey: key, value: previous });
+    }
+  });
+  await measure("map zoom out and fit", async () => {
+    await page.locator("#dagZoomOut").click();
+    await page.locator("#dagFitView").click();
+  });
+  if (!mobile) {
+    const canvasBox = await page.locator("#dagMapCanvas").boundingBox();
+    const x = canvasBox.x + canvasBox.width / 2, y = canvasBox.y + canvasBox.height / 2;
+    await measure("map wheel zoom", async () => {
+      const before = await page.evaluate(() => window.__dagBuilderState.map.transform.scale);
+      await page.mouse.move(x, y);
+      await page.mouse.wheel(0, -200);
+      await page.waitForFunction(value => window.__dagBuilderState.map.transform.scale !== value, before);
+    });
+    await measure("map drag pan", async () => {
+      const before = await page.evaluate(() => [window.__dagBuilderState.map.transform.tx,
+        window.__dagBuilderState.map.transform.ty]);
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x + 45, y + 30, { steps: 5 });
+      await page.mouse.up();
+      await page.waitForFunction(([tx, ty]) => window.__dagBuilderState.map.transform.tx !== tx
+        || window.__dagBuilderState.map.transform.ty !== ty, before);
+    });
+  }
+  await measure("map fullscreen and Escape", async () => {
+    await page.locator("#fullscreenVariableMap").click();
+    await page.locator("#fullscreenVariableMap[aria-pressed='true']").waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator("#fullscreenVariableMap[aria-pressed='false']").waitFor();
+  });
+  await measure("map mode selection", async () => {
+    for (const [id, mode] of [["dagBrushMode", "draw_add"], ["dagEraseMode", "draw_remove"],
+      ["dagSelectMode", "select"]]) {
+      await page.locator(`#${id}`).click();
+      await page.waitForFunction(value => window.__dagBuilderState.map.mode === value, mode);
+    }
+  });
+  await measure("history panel", async () => {
+    await page.locator("#historyToggle").click();
+    await page.locator("#actionHistory").waitFor({ state: "visible" });
+    await page.locator("#historyToggle").click();
+    await page.locator("#actionHistory").waitFor({ state: "hidden" });
+  });
   await measure("close variable definition", async () => {
     if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
     await page.locator("#definitionCancel").click();
@@ -231,6 +319,8 @@ try {
     await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
     await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).waitFor();
   });
+  await page.locator("#dvInput").fill("income");
+  await page.locator("#dvInput").fill("");
   await measure("select DV", async () => {
     await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
     await page.waitForFunction(() => window.__dagBuilderState?.project?.dv_group_id != null);
@@ -273,6 +363,148 @@ try {
       await whenDagRendered();
       if (isDagEdgeRendered(id)) throw new Error("Hidden edge returned after graph rebuild");
     }, edgeId);
+  });
+  await measure("restore edge", async () => {
+    await page.locator('#edgeInspector button[data-edge-action="restore"]').click();
+    await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
+    await waitForGraph();
+  });
+  await measure("exclude edge", async () => {
+    await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
+    await page.locator("#excludeCancelBtn").click();
+    await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
+    await page.locator("#excludeReasonInput").fill("Profiling exclusion");
+    await page.locator("#excludeConfirmBtn").click();
+    await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
+    await waitForGraph();
+  });
+  await measure("restore excluded edge", async () => {
+    await page.locator('#edgeInspector button[data-edge-action="restore"]').click();
+    await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
+    await waitForGraph();
+  });
+  await measure("close evidence", async () => {
+    await page.locator("#closeEvidencePane").click();
+    await page.waitForFunction(() => !window.__dagBuilderState.selectedEdgeId);
+    await page.locator("#provenancePanel").waitFor({ state: "hidden" });
+  });
+  for (const [name, id, stateKey] of [
+    ["confounders filter", "toggleConfoundersOnly", "showConfoundersOnly"],
+    ["colliders filter", "toggleCollidersOnly", "showCollidersOnly"],
+    ["bottleneck filter", "toggleBottleneckedConfounders", "excludeBottleneckedConfounders"],
+    ["path links filter", "toggleIrrelevantConfounderLinks", "hideIrrelevantConfounderLinks"],
+  ]) {
+    await measure(name, async () => {
+      const previous = await page.evaluate(key => window.__dagBuilderState[key], stateKey);
+      await page.locator(`#${id}`).click();
+      await page.waitForFunction(({ key, value }) => window.__dagBuilderState[key] !== value,
+        { key: stateKey, value: previous });
+      await waitForGraph();
+    });
+  }
+  await measure("path length", async () => {
+    await page.locator("#confounderPathLength").fill("2");
+    await page.waitForFunction(() => window.__dagBuilderState.confounderMaxPathLength === 2);
+    await waitForGraph();
+  });
+  await measure("DAG zoom out and fit", async () => {
+    await page.locator("#dagSvgZoomOut").click();
+    await page.locator("#dagSvgFit").click();
+  });
+  await measure("DAG fullscreen and Escape", async () => {
+    await page.locator("#fullscreenDag").click();
+    await page.locator("#fullscreenDag[aria-pressed='true']").waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator("#fullscreenDag[aria-pressed='false']").waitFor();
+  });
+  await measure("manual edge drawer", async () => {
+    await page.locator("#addEdgeToggle").click();
+    await page.locator("#addEdgeDrawer").waitFor({ state: "visible" });
+    await page.locator("#closeAddEdge").click();
+    await page.locator("#addEdgeDrawer").waitFor({ state: "hidden" });
+    await page.locator("#addEdgeToggle").click();
+  });
+  const manualCount = await page.evaluate(() => window.__dagBuilderState.project.manual_edges.length);
+  await measure("add manual edge", async () => {
+    const groups = await page.locator("#manualSource option").evaluateAll(options =>
+      options.slice(0, 4).map(option => option.value));
+    if (groups.length < 2) throw new Error("Manual edge needs two selectable groups");
+    await page.locator("#manualSource").selectOption(groups[0]);
+    await page.locator("#manualTarget").selectOption(groups.at(-1));
+    await page.locator("#manualDirection").selectOption("bidirectional");
+    await page.locator("#manualNote").fill("Profiling manual edge");
+    await page.locator("#addManualEdge").click();
+    await page.waitForFunction(count => window.__dagBuilderState.project.manual_edges.length === count + 1, manualCount);
+    await waitForGraph();
+  });
+  if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  await measure("undo manual edge", async () => {
+    await page.locator("#dag2UndoBtn").click();
+    await page.waitForFunction(count => window.__dagBuilderState.project.manual_edges.length === count, manualCount);
+    await waitForGraph();
+  });
+  await measure("redo manual edge", async () => {
+    await page.locator("#dag2RedoBtn").click();
+    await page.waitForFunction(count => window.__dagBuilderState.project.manual_edges.length === count + 1, manualCount);
+    await waitForGraph();
+  });
+  const manualId = await page.evaluate(() => window.__dagBuilderState.project.manual_edges.at(-1)?.edge_id);
+  const manualLinkId = await page.evaluate(id => window.__dagBuilderState.project.links
+    .find(link => link.manual_edge_ids?.includes(id))?.edge_id, manualId);
+  if (!manualLinkId) throw new Error("Manual edge is absent from the graph");
+  if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
+  await page.evaluate(async id => {
+    const { inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
+    inspectDagEdge(id);
+  }, manualLinkId);
+  await measure("remove manual edge", async () => {
+    await page.locator(`#edgeInspector button[data-edge-action="delete-manual"][data-manual-id="${manualId}"]`).click();
+    await page.waitForFunction(id => window.__dagBuilderState.project.manual_edges
+      .find(edge => edge.edge_id === id)?.deleted, manualId);
+    await waitForGraph();
+  });
+  if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  await measure("export drawer", async () => {
+    await page.locator("#exportToggleBtn").click();
+    await page.locator("#exportSection.open").waitFor();
+  });
+  await measure("project JSON download", async () => {
+    const downloadPromise = page.waitForEvent("download");
+    await page.locator("#exportProject").click();
+    const download = await downloadPromise;
+    if (download.suggestedFilename() !== "dag_project.json" || await download.failure()) {
+      throw new Error("Project JSON download failed");
+    }
+  });
+  for (const [name, selector, filename] of [
+    ["working map download", "#exportWorkingMap", "working_causal_map.json"],
+    ["grouping folder download", "#exportGroupingFolder", "grouping_schema.zip"],
+  ]) {
+    await measure(name, async () => {
+      const downloadPromise = page.waitForEvent("download");
+      await page.locator(selector).click();
+      const download = await downloadPromise;
+      if (download.suggestedFilename() !== filename || await download.failure()) {
+        throw new Error(`${name} failed`);
+      }
+    });
+  }
+  await measure("change IV", async () => {
+    const current = await page.evaluate(() => window.__dagBuilderState.project.iv_group_id);
+    await page.locator("#changeIv").click();
+    await page.locator(`#ivGroupPicker button[data-group-id="${current}"]`).click();
+    await page.waitForFunction(id => window.__dagBuilderState.project.iv_group_id === id
+      && !window.__dagBuilderState.changingAnchorSide, current);
+    await waitForGraph();
+  });
+  if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  await measure("change DV", async () => {
+    const current = await page.evaluate(() => window.__dagBuilderState.project.dv_group_id);
+    await page.locator("#changeDv").click();
+    await page.locator(`#dvGroupPicker button[data-group-id="${current}"]`).click();
+    await page.waitForFunction(id => window.__dagBuilderState.project.dv_group_id === id
+      && !window.__dagBuilderState.changingAnchorSide, current);
+    await waitForGraph();
   });
   }
   results.budgetFailures = [
