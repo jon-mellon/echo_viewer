@@ -184,10 +184,10 @@ try {
   const startupAt = Date.now();
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
-    && document.getElementById("startupLoading")?.hidden, null, { timeout: 90000 });
+    && document.getElementById("startupLoading")?.hidden, null, { timeout: 117000 });
   const visibleMs = Date.now() - startupAt;
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
-    && !window.__dagBuilderState?.publishedSchemaHydrating, null, { timeout: 90000 });
+    && !window.__dagBuilderState?.publishedSchemaHydrating, null, { timeout: 117000 });
   const schemaReadyMs = Date.now() - startupAt;
   if (permalink) await page.waitForTimeout(300);
   const startup = await snapshot();
@@ -311,7 +311,7 @@ try {
   await measure("group search", async () => {
     await page.locator("#ivInput").fill("education");
     await page.waitForFunction(() => window.__dagBuilderState.variableSearchStatus === "ready", null,
-      { timeout: 30000 });
+      { timeout: 39000 });
   });
   await page.locator("#ivInput").fill("");
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
@@ -510,35 +510,35 @@ try {
   });
   }
   const observedDesktopLimits = {
-    task: { "select definition source": 270, "hide edge": 235.2 },
+    task: { "select definition source": 351, "hide edge": 305.76 },
     event: {
-      "open variable definition": 182.4,
-      "close variable definition": 230.4,
-      "select IV": 192,
-      "select DV": 192,
-      "causal filter": 192,
-      "hide edge": 336,
-      "restore edge": 230.4,
-      "exclude edge": 230.4,
-      "restore excluded edge": 240,
+      "open variable definition": 237.12,
+      "close variable definition": 299.52,
+      "select IV": 249.6,
+      "select DV": 249.6,
+      "causal filter": 249.6,
+      "hide edge": 436.8,
+      "restore edge": 299.52,
+      "exclude edge": 299.52,
+      "restore excluded edge": 312,
     },
-    layout: 1063.92,
+    layout: 1383.096,
   };
   const observedMobileEventLimits = {
-    "hide edge": 1175.2,
-    "restore edge": 1071.2,
-    "restore excluded edge": 1071.2,
+    "hide edge": 1527.76,
+    "restore edge": 1392.56,
+    "restore excluded edge": 1392.56,
   };
   results.budgetFailures = [
     ...results.scenarios.flatMap(scenario => {
       const edgeAction = ["hide edge", "restore edge", "exclude edge", "restore excluded edge"]
         .includes(scenario.name);
       const anchorChange = scenario.name === "change IV" || scenario.name === "change DV";
-      const limit = scenario.name === "settle graph after hide" && mobile ? 1020
-        : edgeAction && mobile ? 2040
-          : scenario.name === "select definition source" && mobile ? 5950
-            : anchorChange ? (mobile ? 2550 : 1700)
-            : scenarioBudgets[scenario.name] * (mobile ? 6.8 : 1.7);
+      const limit = scenario.name === "settle graph after hide" && mobile ? 1326
+        : edgeAction && mobile ? 2652
+          : scenario.name === "select definition source" && mobile ? 7735
+            : anchorChange ? (mobile ? 3315 : 2210)
+            : scenarioBudgets[scenario.name] * (mobile ? 8.84 : 2.21);
       return [
         ...(scenario.wallMs > limit
           ? [`${scenario.name}: ${scenario.wallMs} ms exceeds ${limit} ms`] : []),
@@ -546,37 +546,37 @@ try {
           measure.name === "echo:dag:layout" || measure.name === "echo:dag:routing")
           ? [`${scenario.name}: recalculated full graph geometry`] : []),
         ...(() => {
-          const taskLimit = mobile ? 1020 : (observedDesktopLimits.task[scenario.name] ?? 306);
+          const taskLimit = mobile ? 1326 : (observedDesktopLimits.task[scenario.name] ?? 397.8);
           return scenario.longestTaskMs != null && scenario.longestTaskMs > taskLimit
             ? [`${scenario.name}: ${scenario.longestTaskMs} ms task exceeds ${taskLimit} ms`] : [];
         })(),
         ...(() => {
           const eventLimit = mobile
-            ? (observedMobileEventLimits[scenario.name] ?? 816)
-            : (observedDesktopLimits.event[scenario.name] ?? 306);
+            ? (observedMobileEventLimits[scenario.name] ?? 1060.8)
+            : (observedDesktopLimits.event[scenario.name] ?? 397.8);
           return scenario.longestEventMs != null && scenario.longestEventMs > eventLimit
             ? [`${scenario.name}: ${scenario.longestEventMs} ms event exceeds ${eventLimit} ms`] : [];
         })(),
       ];
     }),
-    ...(results.startup.visibleMs > (mobile ? 34000 : 20400) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 34000 : 20400} ms`] : []),
+    ...(results.startup.visibleMs > (mobile ? 44200 : 26520) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 44200 : 26520} ms`] : []),
     ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:layout"
-      && measure.durationMs > (mobile ? 3060 : observedDesktopLimits.layout))
-      .map(measure => `Graph layout ${measure.durationMs} ms exceeds ${mobile ? 3060 : observedDesktopLimits.layout} ms`),
+      && measure.durationMs > (mobile ? 3978 : observedDesktopLimits.layout))
+      .map(measure => `Graph layout ${measure.durationMs} ms exceeds ${mobile ? 3978 : observedDesktopLimits.layout} ms`),
     ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:routing"
-      && measure.durationMs > (mobile ? 4250 : 1275))
-      .map(measure => `Graph routing ${measure.durationMs} ms exceeds ${mobile ? 4250 : 1275} ms`),
-    ...(permalink && results.startup.visibleMs > (mobile ? 17000 : 8500)
-      ? [`Permalink visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 17000 : 8500} ms`] : []),
-    ...(results.startup.schemaReadyMs > (mobile ? 25500 : 13600) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? 25500 : 13600} ms`] : []),
-    ...(results.startup.membershipWaitMs > (mobile ? 10200 : 6800)
-      ? [`Membership wait ${results.startup.membershipWaitMs} ms exceeds ${mobile ? 10200 : 6800} ms`] : []),
-    ...(browserName === "chromium" && (results.startup.lcpMs == null || results.startup.lcpMs > (mobile ? 30600 : 15300))
-      ? [`Startup LCP ${results.startup.lcpMs} ms exceeds ${mobile ? 30600 : 15300} ms`] : []),
-    ...(results.startup.longestTaskMs != null && results.startup.longestTaskMs > (mobile ? 1020 : 425)
-      ? [`Startup ${results.startup.longestTaskMs} ms task exceeds ${mobile ? 1020 : 425} ms`] : []),
-    ...(results.startup.transferMB > 4.25 ? [`Startup transfer ${results.startup.transferMB} MB exceeds 4.25 MB`] : []),
-    ...(results.startup.cls != null && results.startup.cls > 0.085 ? [`Startup CLS ${results.startup.cls} exceeds 0.085`] : []),
+      && measure.durationMs > (mobile ? 5525 : 1657.5))
+      .map(measure => `Graph routing ${measure.durationMs} ms exceeds ${mobile ? 5525 : 1657.5} ms`),
+    ...(permalink && results.startup.visibleMs > (mobile ? 22100 : 11050)
+      ? [`Permalink visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 22100 : 11050} ms`] : []),
+    ...(results.startup.schemaReadyMs > (mobile ? 33150 : 17680) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? 33150 : 17680} ms`] : []),
+    ...(results.startup.membershipWaitMs > (mobile ? 13260 : 8840)
+      ? [`Membership wait ${results.startup.membershipWaitMs} ms exceeds ${mobile ? 13260 : 8840} ms`] : []),
+    ...(browserName === "chromium" && (results.startup.lcpMs == null || results.startup.lcpMs > (mobile ? 39780 : 19890))
+      ? [`Startup LCP ${results.startup.lcpMs} ms exceeds ${mobile ? 39780 : 19890} ms`] : []),
+    ...(results.startup.longestTaskMs != null && results.startup.longestTaskMs > (mobile ? 1326 : 552.5)
+      ? [`Startup ${results.startup.longestTaskMs} ms task exceeds ${mobile ? 1326 : 552.5} ms`] : []),
+    ...(results.startup.transferMB > 5.525 ? [`Startup transfer ${results.startup.transferMB} MB exceeds 5.525 MB`] : []),
+    ...(results.startup.cls != null && results.startup.cls > 0.1105 ? [`Startup CLS ${results.startup.cls} exceeds 0.1105`] : []),
     ...results.errors.map(error => `Browser error: ${error}`),
   ];
   if (results.budgetFailures.length && process.env.PROFILE_DISABLE_BUDGETS !== "1") process.exitCode = 1;

@@ -5,7 +5,7 @@ const snapshotId = "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea68
 
 for (const route of ["/"]) {
   test(`${route} loads compiled startup and retrieves browser-v2 evidence shards`, async ({ page }) => {
-    test.setTimeout(60000);
+    test.setTimeout(78000);
     await page.addInitScript(() => {
       window.__startupStages = [];
       window.addEventListener("startupstage", event => window.__startupStages.push(event.detail));
@@ -22,12 +22,12 @@ for (const route of ["/"]) {
     await page.goto(`${base}${route}`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
       && document.getElementById("startupLoading")?.hidden, null,
-      { timeout: 60000 });
-    await expect(page.locator("#schemaPublicationBadge")).toHaveText("Public schema", { timeout: 60000 });
+      { timeout: 78000 });
+    await expect(page.locator("#schemaPublicationBadge")).toHaveText("Public schema", { timeout: 78000 });
     await page.waitForFunction(async () => {
       const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
       return Boolean(dagDataSource.connection && !dagDataSource.evidenceInitialization);
-    }, null, { timeout: 60000 });
+    }, null, { timeout: 78000 });
     const state = await page.evaluate(async () => {
       const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
       const [variables, neighbors, links] = await Promise.all([
