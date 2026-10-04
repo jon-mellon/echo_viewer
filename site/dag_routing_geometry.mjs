@@ -32,7 +32,10 @@ export function lineSegmentsIntersect(a, b, c, d) {
 }
 
 export function segmentIntersectsBox(a, b, box, padding = 0) {
-  const expanded = expandBox(box, padding);
+  return segmentIntersectsExpandedBox(a, b, expandBox(box, padding));
+}
+
+export function segmentIntersectsExpandedBox(a, b, expanded) {
   if (Math.max(a.x, b.x) < expanded.x || Math.min(a.x, b.x) > expanded.x + expanded.w
     || Math.max(a.y, b.y) < expanded.y || Math.min(a.y, b.y) > expanded.y + expanded.h) return false;
   if (pointInsideBox(a, expanded) || pointInsideBox(b, expanded)) return true;
@@ -73,7 +76,23 @@ export function simplifyRoute(points) {
   return cleaned;
 }
 
-export function routeOverlapPenalty(points, occupiedRoutes) {
+export function appendOverlapSegments(segments, route) {
+  for (let index = 0; index < route.length - 1; index += 1) {
+    const c = route[index], d = route[index + 1];
+    const dx = d.x - c.x, dy = d.y - c.y;
+    const length = Math.hypot(dx, dy);
+    if (length < 1) continue;
+    segments.push({ c, d, dx, dy, length,
+      minX: Math.min(c.x, d.x), maxX: Math.max(c.x, d.x),
+      minY: Math.min(c.y, d.y), maxY: Math.max(c.y, d.y) });
+  }
+}
+
+export function routeOverlapPenalty(points, occupiedRoutes, preparedSegments = null) {
+  const segments = preparedSegments || [];
+  if (!preparedSegments) {
+    for (const route of occupiedRoutes) appendOverlapSegments(segments, route);
+  }
   let penalty = 0;
   for (let index = 0; index < points.length - 1; index += 1) {
     const a = points[index];
@@ -86,27 +105,22 @@ export function routeOverlapPenalty(points, occupiedRoutes) {
     if (length < 1) continue;
     const ux = (b.x - a.x) / length;
     const uy = (b.y - a.y) / length;
-    for (const route of occupiedRoutes) {
-      for (let other = 0; other < route.length - 1; other += 1) {
-        const c = route[other];
-        const d = route[other + 1];
-        // Segments farther apart than the overlap radius cannot contribute.
-        if (Math.max(c.x, d.x) < minX || Math.min(c.x, d.x) > maxX
-          || Math.max(c.y, d.y) < minY || Math.min(c.y, d.y) > maxY) continue;
-        const otherLength = Math.hypot(d.x - c.x, d.y - c.y);
-        if (otherLength < 1) continue;
-        const parallel = Math.abs(ux * (d.y - c.y) - uy * (d.x - c.x)) / otherLength;
-        if (parallel > 0.12) continue;
-        const project = (point) => (point.x - a.x) * ux + (point.y - a.y) * uy;
-        const start = Math.max(0, Math.min(project(c), project(d)));
-        const end = Math.min(length, Math.max(project(c), project(d)));
-        if (end - start <= 18) continue;
-        const denominator = project(d) - project(c);
-        const t = denominator === 0 ? 0 : ((start + end) / 2 - project(c)) / denominator;
-        const distance = Math.abs((c.x + (d.x - c.x) * t - a.x) * uy
-          - (c.y + (d.y - c.y) * t - a.y) * ux);
-        if (distance < 16) penalty += (end - start) * 40 * (1 - distance / 16);
-      }
+    for (const segment of segments) {
+      const { c, d } = segment;
+      // Segments farther apart than the overlap radius cannot contribute.
+      if (segment.maxX < minX || segment.minX > maxX
+        || segment.maxY < minY || segment.minY > maxY) continue;
+      const parallel = Math.abs(ux * segment.dy - uy * segment.dx) / segment.length;
+      if (parallel > 0.12) continue;
+      const project = (point) => (point.x - a.x) * ux + (point.y - a.y) * uy;
+      const start = Math.max(0, Math.min(project(c), project(d)));
+      const end = Math.min(length, Math.max(project(c), project(d)));
+      if (end - start <= 18) continue;
+      const denominator = project(d) - project(c);
+      const t = denominator === 0 ? 0 : ((start + end) / 2 - project(c)) / denominator;
+      const distance = Math.abs((c.x + (d.x - c.x) * t - a.x) * uy
+        - (c.y + (d.y - c.y) * t - a.y) * ux);
+      if (distance < 16) penalty += (end - start) * 40 * (1 - distance / 16);
     }
   }
   return penalty;

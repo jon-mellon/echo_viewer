@@ -1,10 +1,12 @@
 "use strict";
 
 import {
+  appendOverlapSegments,
+  expandBox,
   pointInsideBox,
   routePointForNode,
   routeOverlapPenalty,
-  segmentIntersectsBox,
+  segmentIntersectsExpandedBox,
   simplifyRoute,
 } from "./dag_routing_geometry.mjs";
 
@@ -40,8 +42,15 @@ export function studyArrowCorridor({ ivId, dvId, positions, boxes, fontSize = 12
   return { x: left, y: centerY - halfHeight, w: right - left, h: halfHeight * 2 };
 }
 
-export function scoreRoute(points, { boxes, sourceId, targetId, corridor = null, config = {} }) {
+function routeObstacles(boxes, sourceId, targetId, options) {
+  return [...boxes].filter(([groupId]) => groupId !== sourceId && groupId !== targetId)
+    .map(([, box]) => ({ hard: expandBox(box, options.hardObstaclePadding),
+      soft: expandBox(box, options.softObstaclePadding) }));
+}
+
+export function scoreRoute(points, { boxes, sourceId, targetId, corridor = null, config = {}, obstacles = null }) {
   const options = { ...DEFAULT_CONFIG, ...config };
+  const preparedObstacles = obstacles || routeObstacles(boxes, sourceId, targetId, options);
   let score = 0;
   for (let index = 0; index < points.length - 1; index += 1) {
     const a = points[index];
@@ -55,16 +64,15 @@ export function scoreRoute(points, { boxes, sourceId, targetId, corridor = null,
         }
       }
     }
-    for (const [groupId, box] of boxes) {
-      if (groupId === sourceId || groupId === targetId) continue;
-      if (segmentIntersectsBox(a, b, box, options.hardObstaclePadding)) score += options.hardObstaclePenalty;
-      else if (segmentIntersectsBox(a, b, box, options.softObstaclePadding)) score += options.softObstaclePenalty;
+    for (const obstacle of preparedObstacles) {
+      if (segmentIntersectsExpandedBox(a, b, obstacle.hard)) score += options.hardObstaclePenalty;
+      else if (segmentIntersectsExpandedBox(a, b, obstacle.soft)) score += options.softObstaclePenalty;
     }
   }
   return score + Math.max(0, points.length - 2) * options.bendPenalty;
 }
 
-export function routeEdge(link, { positions, boxes, occupiedRoutes = [], corridor = null, config = {} }) {
+export function routeEdge(link, { positions, boxes, occupiedRoutes = [], occupiedSegments = null, corridor = null, config = {} }) {
   const isReversed = link.direction_type === "B_TO_A";
   const sourceId = isReversed ? link.group_b : link.group_a;
   const targetId = isReversed ? link.group_a : link.group_b;
@@ -73,6 +81,8 @@ export function routeEdge(link, { positions, boxes, occupiedRoutes = [], corrido
   const sourcePoint = positions.get(sourceId);
   const targetPoint = positions.get(targetId);
   if (!sourceBox || !targetBox || !sourcePoint || !targetPoint) return null;
+  const options = { ...DEFAULT_CONFIG, ...config };
+  const obstacles = routeObstacles(boxes, sourceId, targetId, options);
 
   const directStart = routePointForNode(sourceBox, targetPoint);
   const directEnd = routePointForNode(targetBox, sourcePoint);
@@ -110,8 +120,8 @@ export function routeEdge(link, { positions, boxes, occupiedRoutes = [], corrido
   const consider = (candidate) => {
     const simplified = simplifyRoute(candidate);
     const actualPoints = [sourcePoint, ...simplified.slice(1, -1), targetPoint];
-    const overlap = routeOverlapPenalty(actualPoints, occupiedRoutes);
-    const score = scoreRoute(actualPoints, { boxes, sourceId, targetId, corridor, config }) + overlap;
+    const overlap = routeOverlapPenalty(actualPoints, occupiedRoutes, occupiedSegments);
+    const score = scoreRoute(actualPoints, { boxes, sourceId, targetId, corridor, config, obstacles }) + overlap;
     if (score < bestScore) {
       best = simplified;
       bestScore = score;
@@ -122,7 +132,6 @@ export function routeEdge(link, { positions, boxes, occupiedRoutes = [], corrido
 
   const horizontal = Math.abs(dx) >= Math.abs(dy);
   const laneCenters = horizontal ? [midY, minY - 30, maxY + 30] : [midX, minX - 30, maxX + 30];
-  const options = { ...DEFAULT_CONFIG, ...config };
   for (let lane = 1; (bestOverlap > 0 || bestScore >= options.hardObstaclePenalty)
     && lane <= Math.min(options.maxLanes, occupiedRoutes.length + 1); lane += 1) {
     for (const center of laneCenters) {
@@ -140,11 +149,14 @@ export function routeEdge(link, { positions, boxes, occupiedRoutes = [], corrido
 export function routeEdges(links, { positions, boxes, corridor = null, config = {} }) {
   const routes = [];
   const occupiedRoutes = [];
+  const occupiedSegments = [];
   for (const link of [...links].sort((a, b) => String(a.edge_id).localeCompare(String(b.edge_id)))) {
-    const route = routeEdge(link, { positions, boxes, occupiedRoutes, corridor, config });
+    const route = routeEdge(link, { positions, boxes, occupiedRoutes, occupiedSegments, corridor, config });
     if (!route) continue;
     routes.push({ link, ...route });
-    occupiedRoutes.push([positions.get(route.sourceId), ...route.points.slice(1, -1), positions.get(route.targetId)]);
+    const occupied = [positions.get(route.sourceId), ...route.points.slice(1, -1), positions.get(route.targetId)];
+    occupiedRoutes.push(occupied);
+    appendOverlapSegments(occupiedSegments, occupied);
   }
   return routes;
 }

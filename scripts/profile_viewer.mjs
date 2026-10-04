@@ -26,7 +26,7 @@ const scenarioBudgets = {
   "DAG zoom": 500,
   "causal filter": 1000,
   "hide edge": 750,
-  "settle graph after hide": 5000,
+  "settle graph after hide": 4000,
 };
 let server, browser, context, page, cdp;
 
@@ -250,14 +250,18 @@ try {
     }, edgeId);
   });
   results.budgetFailures = [
-    ...results.scenarios.flatMap(scenario => [
-      ...(scenario.wallMs > scenarioBudgets[scenario.name] * (mobile ? 4 : 1)
-        ? [`${scenario.name}: ${scenario.wallMs} ms exceeds ${scenarioBudgets[scenario.name] * (mobile ? 4 : 1)} ms`] : []),
-      ...(scenario.longestTaskMs != null && scenario.longestTaskMs > (mobile ? 500 : 150)
-        ? [`${scenario.name}: ${scenario.longestTaskMs} ms task exceeds ${mobile ? 500 : 150} ms`] : []),
-      ...(scenario.longestEventMs != null && scenario.longestEventMs > (mobile ? 400 : 150)
-        ? [`${scenario.name}: ${scenario.longestEventMs} ms event exceeds ${mobile ? 400 : 150} ms`] : []),
-    ]),
+    ...results.scenarios.flatMap(scenario => {
+      const limit = scenario.name === "settle graph after hide" && mobile
+        ? 6000 : scenarioBudgets[scenario.name] * (mobile ? 4 : 1);
+      return [
+        ...(scenario.wallMs > limit
+          ? [`${scenario.name}: ${scenario.wallMs} ms exceeds ${limit} ms`] : []),
+        ...(scenario.longestTaskMs != null && scenario.longestTaskMs > (mobile ? 500 : 150)
+          ? [`${scenario.name}: ${scenario.longestTaskMs} ms task exceeds ${mobile ? 500 : 150} ms`] : []),
+        ...(scenario.longestEventMs != null && scenario.longestEventMs > (mobile ? 400 : 150)
+          ? [`${scenario.name}: ${scenario.longestEventMs} ms event exceeds ${mobile ? 400 : 150} ms`] : []),
+      ];
+    }),
     ...(results.startup.visibleMs > (mobile ? 20000 : 12000) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 20000 : 12000} ms`] : []),
     ...(results.startup.schemaReadyMs > (mobile ? 15000 : 8000) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? 15000 : 8000} ms`] : []),
     ...(results.startup.membershipWaitMs > (mobile ? 6000 : 4000)

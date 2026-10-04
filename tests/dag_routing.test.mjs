@@ -10,6 +10,7 @@ import {
   segmentIntersectsBox,
   routePointForNode,
   simplifyRoute,
+  appendOverlapSegments,
   routeOverlapPenalty,
 } from '../site/dag_routing_geometry.mjs';
 import { routeEdge, routeEdges, studyArrowCorridor } from '../site/dag_router.mjs';
@@ -36,6 +37,23 @@ test('overlapping and reversed runs are penalized, crossings are allowed', () =>
     assert.ok(routeOverlapPenalty(line, [[...line].reverse()]) > 1000);
     assert.equal(routeOverlapPenalty(line, [[{ x: 250, y: -100 }, { x: 250, y: 100 }]]), 0);
     assert.equal(routeOverlapPenalty(line, [[{ x: 0, y: 22 }, { x: 500, y: 22 }]]), 0);
+});
+
+test('prepared overlap segments preserve scoring across bends and crossings', () => {
+  const routes = [
+    [{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 300, y: 150 }],
+    [{ x: 50, y: 9 }, { x: 260, y: 9 }],
+    [{ x: 180, y: -80 }, { x: 180, y: 80 }],
+  ];
+  const prepared = [];
+  for (const route of routes) appendOverlapSegments(prepared, route);
+  for (const candidate of [
+    [{ x: 20, y: 4 }, { x: 280, y: 4 }],
+    [{ x: 300, y: 120 }, { x: 300, y: 20 }],
+    [{ x: 180, y: -100 }, { x: 180, y: 100 }],
+  ]) {
+    assert.equal(routeOverlapPenalty(candidate, routes, prepared), routeOverlapPenalty(candidate, routes));
+  }
 });
 
 test('links sharing a bypass retain separately selectable segments', () => {
