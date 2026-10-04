@@ -33,6 +33,13 @@ test("definition navigation returns through both Back steps and Cancel", async (
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
+  // The variable map can open before the optional neighbor query runs, and
+  // the query must still complete while the definition remains open.
+  await expect.poll(() => page.evaluate(() => {
+    const variables = performance.getEntriesByName("echo:evidence:variables").at(-1);
+    const neighbors = performance.getEntriesByName("echo:evidence:neighbors").at(-1);
+    return Boolean(variables && neighbors && neighbors.startTime >= variables.startTime + variables.duration);
+  })).toBe(true);
   await page.locator("#definitionBack").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("sources");
   await page.locator("#definitionContinue").click();
@@ -43,7 +50,9 @@ test("definition navigation returns through both Back steps and Cancel", async (
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("review");
   await page.locator("#definitionReviewBack").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
-  await page.locator("#definitionAddNeighbors").click();
+  if (await page.locator("#definitionAddNeighbors").isEnabled()) {
+    await page.locator("#definitionAddNeighbors").click();
+  }
   await page.locator("#definitionCancel").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft)).toBeNull();
   await expect(page.locator("#ivGroupPicker")).toBeVisible();

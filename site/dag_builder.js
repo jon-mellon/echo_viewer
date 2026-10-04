@@ -725,30 +725,53 @@ function activeGroup() {
 }
 function createCustomGroup() { return groupEditorController.createCustomGroup(); }
 function closeGroupEditor() { return groupEditorController.closeGroupEditor(); }
-async function hydrateVariableDetails(variableIds) {
+async function hydrateVariableDetails(variableIds, { deferNeighbors = false } = {}) {
   const missing = [...new Set(variableIds || [])].filter(id => !state.variableById.has(id));
   if (!missing.length) return;
-  const [variables, neighbors] = await Promise.all([
-    dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource),
-    dagDataSource.loadNeighbors(missing),
-  ]);
-  const neighborsByVariable = new Map();
-  for (const row of neighbors) {
-    if (!neighborsByVariable.has(row.variable_id)) neighborsByVariable.set(row.variable_id, []);
-    neighborsByVariable.get(row.variable_id).push({ variable_id: row.neighbor_variable_id,
-      index: row.neighbor_index, cosine_similarity: row.cosine_similarity,
-      llm_rank: row.llm_rank, embedding_rank: row.embedding_rank,
-      is_substantive_duplicate: row.is_substantive_duplicate });
-  }
+  const variablesPromise = dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource);
+  const neighborsPromise = deferNeighbors ? null : dagDataSource.loadNeighbors(missing);
+  const [variables, neighbors] = deferNeighbors
+    ? [await variablesPromise, null]
+    : await Promise.all([variablesPromise, neighborsPromise]);
   for (const variable of variables) {
     if (variable.field_preview_json) variable.field_preview = JSON.parse(variable.field_preview_json);
     if (variable.metadata_blob_json) variable.metadata_blob = JSON.parse(variable.metadata_blob_json);
-    variable.similarity_neighbors = neighborsByVariable.get(variable.variable_id) || [];
+    variable.similarity_neighbors = [];
     state.variableById.set(variable.variable_id, variable);
   }
   state.variables = [...state.variableById.values()].sort((a, b) => Number(a.index || 0) - Number(b.index || 0));
   buildDuplicateClusters();
   invalidateMapCaches();
+  const applyNeighbors = rows => {
+    const byVariable = new Map();
+    const displayedById = new Map(state.variables.map(variable => [variable.variable_id, variable]));
+    for (const row of rows) {
+      if (!byVariable.has(row.variable_id)) byVariable.set(row.variable_id, []);
+      byVariable.get(row.variable_id).push({ variable_id: row.neighbor_variable_id,
+        index: row.neighbor_index, cosine_similarity: row.cosine_similarity,
+        llm_rank: row.llm_rank, embedding_rank: row.embedding_rank,
+        is_substantive_duplicate: row.is_substantive_duplicate });
+    }
+    for (const variable of variables) {
+      if (state.variableById.get(variable.variable_id) === variable) {
+        const suggestions = byVariable.get(variable.variable_id) || [];
+        variable.similarity_neighbors = suggestions;
+        // Cluster construction copies variable records for map/search views.
+        const displayed = displayedById.get(variable.variable_id);
+        if (displayed) displayed.similarity_neighbors = suggestions;
+      }
+    }
+  };
+  if (deferNeighbors) {
+    // The map only needs variable records. Starting the large neighbor query
+    // after those records arrive avoids competing for the same DuckDB worker.
+    void dagDataSource.loadNeighbors(missing).then(rows => {
+      applyNeighbors(rows);
+      if (state.definitionDraft?.step === "partition") renderDefinition();
+    }).catch(error => console.warn("Could not load variable neighbor suggestions.", error));
+  } else {
+    applyNeighbors(neighbors);
+  }
 }
 
 function renderGroupEditor() {
@@ -1228,7 +1251,8 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   searchVariables: searchVisibleVariables,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
   takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
-  hydrateVariableDetails, prewarmEvidence: async () => {
+  hydrateVariableDetails: ids => hydrateVariableDetails(ids, { deferNeighbors: true }),
+  prewarmEvidence: async () => {
     await dagDataSource.ensureEvidenceConnection();
     // DuckDB fetches the remote layout metadata when it creates this view.
     // Do that while the source picker is open instead of after Continue.

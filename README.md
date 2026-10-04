@@ -53,6 +53,8 @@ dialog starts the evidence query engine while a source is chosen. Use
 `PROFILE_DEFINITION_THINK_MS=1000 PROFILE_DISABLE_BUDGETS=1 PROFILE_OUTPUT=profile-results-warm npm run profile`
 to measure that warm path;
 the required default run still measures an immediate Continue click.
+The definition map loads variable records first, then queries optional neighbor
+suggestions in the background. The browser interaction suite checks this order.
 
 The suite uses synthetic browser sessions only. It does not collect viewer
 analytics or retain user activity.
