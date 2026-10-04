@@ -6,13 +6,18 @@ import { h, replaceChildren } from "./dom_builder.mjs";
 export function dag2AnchorPickerIsActive(state, side, groupById) {
   const iv = groupById(state.project?.iv_group_id);
   const dv = groupById(state.project?.dv_group_id);
-  const ivSet = Boolean(iv?.variable_ids?.length);
-  const dvSet = Boolean(dv?.variable_ids?.length);
+  const ivSet = anchorHasMembers(state, iv);
+  const dvSet = anchorHasMembers(state, dv);
   const changingIv = state.changingAnchorSide === "iv";
   const changingDv = state.changingAnchorSide === "dv";
   return side === "iv"
     ? !ivSet || changingIv
     : ivSet && (!dvSet || changingDv) && !changingIv;
+}
+
+function anchorHasMembers(state, group) {
+  return Boolean(group?.variable_ids?.length
+    || (state.publishedSchemaHydrating && Number(group?.member_count) > 0));
 }
 
 export function createDagSetupGroupController({
@@ -37,7 +42,7 @@ export function createDagSetupGroupController({
   function renderAnchorBar() {
     if (!elements.anchorBar) return;
     const iv = groupById(state.project?.iv_group_id), dv = groupById(state.project?.dv_group_id);
-    const ivSet = Boolean(iv?.variable_ids?.length), dvSet = Boolean(dv?.variable_ids?.length);
+    const ivSet = anchorHasMembers(state, iv), dvSet = anchorHasMembers(state, dv);
     const show = (state.interfaceMode === "dag2" || state.workflowMode !== "setup") && (ivSet || dvSet);
     elements.anchorBar.hidden = !show;
     if (!show) return;
@@ -88,7 +93,7 @@ export function createDagSetupGroupController({
         return;
       }
       const iv = groupById(state.project?.iv_group_id), dv = groupById(state.project?.dv_group_id);
-      const ivSet = Boolean(iv?.variable_ids?.length), dvSet = Boolean(dv?.variable_ids?.length);
+      const ivSet = anchorHasMembers(state, iv), dvSet = anchorHasMembers(state, dv);
       const changingIv = state.changingAnchorSide === "iv";
       const changingDv = state.changingAnchorSide === "dv";
       elements.currentStepTitle.textContent = !ivSet || changingIv

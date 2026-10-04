@@ -18,8 +18,10 @@ definition and map zoom, group search, IV/DV selection, DAG layout changes,
 DAG zoom, and the causal filter in Chromium.
 Run `PROFILE_DEVICE=mobile npm run profile` for the same flows at a 390-pixel
 viewport with 4× CPU throttling. Run `PROFILE_BROWSER=firefox npm run profile`
-to check the same interactions in Firefox. All three suites run on every pull
-request and before a GitHub Pages deployment.
+to check the same interactions in Firefox. Run `PROFILE_SCENARIO=permalink npm run profile`
+to time the published permalink's graph and full group-membership load; combine
+it with `PROFILE_DEVICE=mobile` or `PROFILE_BROWSER=firefox` for those browsers.
+All six suites run on every pull request and before a GitHub Pages deployment.
 Each run writes a summary and Playwright trace to its browser-specific results
 directory. Chromium also writes a CPU profile. Open that profile in Chrome
 DevTools Performance, or inspect a trace with

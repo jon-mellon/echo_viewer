@@ -2,6 +2,9 @@ test-results/
 profile-results/
 profile-results-mobile/
 profile-results-firefox/
+profile-results-permalink/
+profile-results-permalink-mobile/
+profile-results-permalink-firefox/
 node_modules/
 tests/dagitty_cache/
 .DS_Store

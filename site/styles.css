@@ -2136,6 +2136,7 @@ h2 {
   overflow-wrap: anywhere;
   color: var(--muted, #64748b);
   font-size: 12px;
+  min-height: 30px;
 }
 
 .publication-status:empty { display: none; }

@@ -39,6 +39,12 @@ jobs:
         run: PROFILE_DEVICE=mobile npm run profile
       - name: Enforce Firefox performance budgets
         run: PROFILE_BROWSER=firefox npm run profile
+      - name: Enforce permalink performance budgets
+        run: PROFILE_SCENARIO=permalink npm run profile
+      - name: Enforce mobile permalink performance budgets
+        run: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile npm run profile
+      - name: Enforce Firefox permalink performance budgets
+        run: PROFILE_SCENARIO=permalink PROFILE_BROWSER=firefox npm run profile
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -47,6 +53,9 @@ jobs:
             profile-results/
             profile-results-mobile/
             profile-results-firefox/
+            profile-results-permalink/
+            profile-results-permalink-mobile/
+            profile-results-permalink-firefox/
           if-no-files-found: ignore
           retention-days: 1
       - name: Configure GitHub Pages

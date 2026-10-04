@@ -41,6 +41,23 @@ test("DAG2 anchor picker follows missing anchors even when restored workflow fla
   assert.equal(dag2AnchorPickerIsActive(restored, "dv", groupById), false);
 });
 
+test("a permalink keeps its restored anchors while published memberships hydrate", () => {
+  const groups = new Map([
+    ["iv", { group_id: "iv", variable_ids: [], member_count: 12 }],
+    ["dv", { group_id: "dv", variable_ids: [], member_count: 8 }],
+  ]);
+  const state = {
+    project: { iv_group_id: "iv", dv_group_id: "dv" },
+    publishedSchemaHydrating: true,
+    changingAnchorSide: null,
+  };
+  const groupById = id => groups.get(id) || null;
+  assert.equal(dag2AnchorPickerIsActive(state, "iv", groupById), false);
+  assert.equal(dag2AnchorPickerIsActive(state, "dv", groupById), false);
+  state.publishedSchemaHydrating = false;
+  assert.equal(dag2AnchorPickerIsActive(state, "iv", groupById), true);
+});
+
 test("DAG2 advances after the second anchor is selected", () => {
   const state = {
     interfaceMode: "dag2", workflowMode: "setup", phase: "select_dv", changingAnchorSide: null,

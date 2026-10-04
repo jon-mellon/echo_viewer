@@ -58,10 +58,11 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
   // an artifact cached during a publication cutover from poisoning later loads
   // after the registry has reached its final immutable state.
   const cacheName = `echo-published-v2-${publication.content_hash}-${publication.compiled_manifest_hash || "uncompiled"}`;
+  const browserCachePromise = globalThis.caches ? globalThis.caches.open(cacheName) : Promise.resolve(null);
   const cachingFetch = async (url, options = {}) => {
     const absolute = new URL(url).href;
     if (!memory.has(absolute)) {
-      const browserCache = globalThis.caches ? await globalThis.caches.open(cacheName) : null;
+      const browserCache = await browserCachePromise;
       const cached = browserCache ? await browserCache.match(absolute) : null;
       if (cached) memory.set(absolute, new Uint8Array(await cached.arrayBuffer()));
       else {
@@ -78,9 +79,11 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
         if (!response.ok) return response;
         const bytes = new Uint8Array(await response.arrayBuffer());
         memory.set(absolute, bytes);
-        if (browserCache) await browserCache.put(absolute, new Response(bytes, {
+        // The downloaded bytes are held in memory and checked against the
+        // publication hash. Populating the browser cache need not delay the UI.
+        if (browserCache) void browserCache.put(absolute, new Response(bytes, {
           status: 200, headers: { "content-type": response.headers?.get?.("content-type") || "application/octet-stream" },
-        }));
+        })).catch(() => {});
       }
     }
     return new Response(memory.get(absolute), { status: 200 });

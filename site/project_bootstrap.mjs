@@ -24,6 +24,13 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     const dataStart = performance.now();
     await loadDagData(permalink?.get("vlayout") || "");
     performance.measure("echo:startup:data", { start: dataStart, end: performance.now() });
+    if (state.data.load_published_schema) {
+      state.publishedSchemaHydrating = true;
+      state.publishedSchemaHydrated = false;
+      state.publishedSchemaLoadFailed = false;
+      state.publishedMembershipReadyGroups = new Set();
+      publicationController.setSchemaReady?.(false);
+    }
     state.selectedUoa = null;
     state.uoaFilterEnabled = false;
     setStartupStage("Preparing workspace…");
@@ -80,11 +87,6 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     // first time. Group-label browsing does not need it at startup.
     if (state.data.load_published_schema) {
       const revision = state.compiledDagRevision || 0;
-      state.publishedSchemaHydrating = true;
-      state.publishedSchemaHydrated = false;
-      state.publishedSchemaLoadFailed = false;
-      state.publishedMembershipReadyGroups = new Set();
-      publicationController.setSchemaReady?.(false);
       const applyLoadedSchema = schema => {
         state.data.grouping_sets = [schema];
         state.data.default_grouping_set_id = schema.grouping_set_id;

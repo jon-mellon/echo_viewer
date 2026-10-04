@@ -3,15 +3,19 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const url = process.env.PROFILE_URL || "http://127.0.0.1:8767/";
+const permalink = process.env.PROFILE_SCENARIO === "permalink";
+const permalinkUrl = new URL(process.env.PROFILE_PERMALINK_URL || "https://echo.epistemicinfra.org/?p=1&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0&iv=category-academic-achievement&dv=category-income&mode=group_review&layout=hierarchical&path=1&selected_edge=category-academic-achievement__category-personality&sort=relevance&mz=1&mx=0&my=0&dz=0.8894702419882274&dx=-114.12353515625004&dy=1.749999999999995&causal=0&conf=1&coll=0&bottle=1&paths=1&vl=1&gl=1&schema=7f397168-bc90-4a84-94a9-cfbeac700152");
+const localUrl = new URL("http://127.0.0.1:8767/");
+if (permalink) localUrl.search = permalinkUrl.search;
+const url = process.env.PROFILE_URL || localUrl.href;
 const mobile = process.env.PROFILE_DEVICE === "mobile";
 const browserName = process.env.PROFILE_BROWSER === "firefox" ? "firefox" : "chromium";
 if (mobile && browserName === "firefox") throw new Error("Mobile CPU throttling requires Chromium.");
-const output = process.env.PROFILE_OUTPUT || (browserName === "firefox" ? "profile-results-firefox"
-  : mobile ? "profile-results-mobile" : "profile-results");
+const output = process.env.PROFILE_OUTPUT || `profile-results${permalink ? "-permalink" : ""}${browserName === "firefox" ? "-firefox" : mobile ? "-mobile" : ""}`;
 const local = !process.env.PROFILE_URL;
 const started = new Date().toISOString();
-const results = { started, url, browser: browserName, device: mobile ? "mobile" : "desktop", scenarios: [], errors: [] };
+const results = { started, url, browser: browserName, profileScenario: permalink ? "permalink" : "default",
+  device: mobile ? "mobile" : "desktop", scenarios: [], errors: [] };
 const scenarioBudgets = {
   "open variable definition": 750,
   "select definition source": 4000,
@@ -147,11 +151,13 @@ try {
   const visibleMs = Date.now() - startupAt;
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
     && !window.__dagBuilderState?.publishedSchemaHydrating, null, { timeout: 90000 });
+  const schemaReadyMs = Date.now() - startupAt;
+  if (permalink) await page.waitForTimeout(300);
   const startup = await snapshot();
   results.startup = {
     visibleMs,
-    schemaReadyMs: Date.now() - startupAt,
-    membershipWaitMs: Date.now() - startupAt - visibleMs,
+    schemaReadyMs,
+    membershipWaitMs: schemaReadyMs - visibleMs,
     domContentLoadedMs: round(startup.navigation?.domContentLoadedEventEnd ?? 0),
     lcpMs: startup.lcp == null ? null : round(startup.lcp),
     cls: startup.supported["layout-shift"] ? Math.round(startup.cls * 1000) / 1000 : null,
@@ -165,8 +171,27 @@ try {
     transferMB: round(startup.resources.reduce((sum, entry) => sum + entry.transferSize, 0) / 1048576),
     largestResources: startup.resources.sort((a, b) => b.transferSize - a.transferSize).slice(0, 8)
       .map(entry => ({ name: entry.name, transferMB: round(entry.transferSize / 1048576), durationMs: round(entry.duration) })),
+    slowestResources: startup.resources.sort((a, b) => b.duration - a.duration).slice(0, 12)
+      .map(entry => ({ name: entry.name, durationMs: round(entry.duration) })),
   };
+  if (permalink) {
+    results.permalinkView = await page.evaluate(async () => {
+      const state = window.__dagBuilderState;
+      const { renderedDagEdgeIds } = await import("/dag_builder.js?v=evidence-pane-v1");
+      return { iv: state.project?.iv_group_id, dv: state.project?.dv_group_id,
+        selectedEdge: state.selectedEdgeId,
+        displayedEdges: typeof renderedDagEdgeIds === "function"
+          ? renderedDagEdgeIds().length : state.visibleLinks?.length || 0 };
+    });
+    if (results.permalinkView.iv !== permalinkUrl.searchParams.get("iv")
+      || results.permalinkView.dv !== permalinkUrl.searchParams.get("dv")
+      || results.permalinkView.selectedEdge !== permalinkUrl.searchParams.get("selected_edge")
+      || results.permalinkView.displayedEdges < 1) {
+      throw new Error(`Permalink graph did not load correctly: ${JSON.stringify(results.permalinkView)}`);
+    }
+  }
 
+  if (!permalink) {
   await measure("open variable definition", async () => {
     await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
     await page.locator("#definitionSourceList input[data-source-id]").first().waitFor();
@@ -249,6 +274,7 @@ try {
       if (isDagEdgeRendered(id)) throw new Error("Hidden edge returned after graph rebuild");
     }, edgeId);
   });
+  }
   results.budgetFailures = [
     ...results.scenarios.flatMap(scenario => {
       const limit = scenario.name === "settle graph after hide" && mobile
@@ -263,6 +289,8 @@ try {
       ];
     }),
     ...(results.startup.visibleMs > (mobile ? 20000 : 12000) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 20000 : 12000} ms`] : []),
+    ...(permalink && results.startup.visibleMs > (mobile ? 10000 : 5000)
+      ? [`Permalink visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 10000 : 5000} ms`] : []),
     ...(results.startup.schemaReadyMs > (mobile ? 15000 : 8000) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? 15000 : 8000} ms`] : []),
     ...(results.startup.membershipWaitMs > (mobile ? 6000 : 4000)
       ? [`Membership wait ${results.startup.membershipWaitMs} ms exceeds ${mobile ? 6000 : 4000} ms`] : []),

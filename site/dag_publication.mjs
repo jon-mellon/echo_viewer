@@ -177,6 +177,7 @@ export function createPublicationController({
   }
 
   async function refreshPublicationState() {
+    if (!canPublish()) return;
     const revision = ++statusRevision;
     const published = getPublicationState();
     if (!published?.publication_id || !published?.content_hash) {
@@ -324,10 +325,21 @@ export function createPublicationController({
     elements.publish.addEventListener("click", publish);
     if (client) client.auth.onAuthStateChange(() => setTimeout(() => void refreshAuthVisibility(), 0));
     const published = getPublicationState();
+    hasPublishableChanges = !published?.publication_id;
+    refreshPublishVisibility();
     if (published?.publication_id) {
-      showStatus(elements.status, "Loaded the public schema. Further edits remain private and local until you publish them.");
+      elements.badge.textContent = "Public schema";
+      elements.badge.classList.remove("muted", "warn");
+      const currentUrl = new URL(windowApi.location.href);
+      if (currentUrl.searchParams.get("schema") === published.publication_id) {
+        setSafeUrl(elements.permalink, "href", currentUrl.href);
+        elements.permalink.hidden = false;
+      }
+      if (canPublish()) {
+        showStatus(elements.status, "Loaded the public schema. Further edits remain private and local until you publish them.");
+      }
     }
-    void refreshPublicationState();
+    if (canPublish()) void refreshPublicationState();
     void refreshAuthVisibility();
   }
 
