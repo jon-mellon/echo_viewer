@@ -26,7 +26,7 @@ export function deriveDagView({
 } = {}) {
   const fullGraph = createGraph(groups.map((group) => group.group_id), links);
   const connectivityGraph = filterGraphLinks(fullGraph, (link) => !excludedForConnectivity(link));
-  const traversableLink = (link) => !excludedForConnectivity(link) && link.display_status !== "hidden";
+  const traversableLink = (link) => !excludedForConnectivity(link);
   const diagnosticOptions = {
     ivId,
     dvId,
@@ -47,7 +47,6 @@ export function deriveDagView({
   const componentGroupIds = new Set(selectedGraph.nodeIds);
   let visibleGraph = filterGraphNodes(fullGraph, componentGroupIds);
   visibleGraph = filterGraphLinks(visibleGraph, (link) => {
-    if (link.display_status === "hidden") return false;
     return link.display_status !== "excluded" || link.is_manual || link.is_target_relation;
   });
   if ((showConfoundersOnly || showCollidersOnly) && hideIrrelevantDiagnosticLinks) {

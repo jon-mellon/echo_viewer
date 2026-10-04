@@ -30,8 +30,8 @@ const scenarioBudgets = {
   "DAG layout: auto": 750,
   "DAG zoom": 500,
   "causal filter": 1000,
-  "hide edge": 750,
-  "settle graph after hide": 300,
+  "exclude edge promptly": 750,
+  "settle graph after exclusion": 300,
   "restore edge": 750,
   "exclude edge": 750,
   "restore excluded edge": 750,
@@ -67,7 +67,7 @@ const scenarioBudgets = {
 const originalLimits = {
   scenarioScale: { desktop: 1, mobile: 4 },
   wall: {
-    "settle graph after hide": { mobile: 600 },
+    "settle graph after exclusion": { mobile: 600 },
     edgeAction: { mobile: 1200 },
     "select definition source": { mobile: 3500 },
     anchorChange: { desktop: 1000, mobile: 1500 },
@@ -370,25 +370,27 @@ try {
     await whenDagRendered();
     return renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__");
   });
-  if (!edgeId) throw new Error("No evidence edge is visible to test Hide");
+  if (!edgeId) throw new Error("No evidence edge is visible to test Exclude");
   await page.evaluate(async id => {
     const { inspectDagEdge, isDagEdgeRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
     if (!isDagEdgeRendered(id)) throw new Error("Chosen evidence edge is not rendered");
     inspectDagEdge(id);
   }, edgeId);
-  await measure("hide edge", async () => {
-    await page.locator('#edgeInspector button[data-edge-action="hide"]').click();
-    await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "hidden", edgeId);
+  await measure("exclude edge promptly", async () => {
+    await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
+    await page.locator("#excludeReasonInput").fill("Profiling exclusion responsiveness");
+    await page.locator("#excludeConfirmBtn").click();
+    await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
     await page.waitForFunction(async id => {
       const { isDagEdgeRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
       return !isDagEdgeRendered(id);
     }, edgeId);
   });
-  await measure("settle graph after hide", async () => {
+  await measure("settle graph after exclusion", async () => {
     await page.evaluate(async id => {
       const { whenDagRendered, isDagEdgeRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
       await whenDagRendered();
-      if (isDagEdgeRendered(id)) throw new Error("Hidden edge returned after graph rebuild");
+      if (isDagEdgeRendered(id)) throw new Error("Excluded edge returned after graph rebuild");
     }, edgeId);
   });
   await measure("restore edge", async () => {
@@ -535,14 +537,14 @@ try {
   });
   }
   const observedDesktopLimits = {
-    task: { "select definition source": 351, "hide edge": 305.76 },
+    task: { "select definition source": 351, "exclude edge promptly": 305.76 },
     event: {
       "open variable definition": 237.12,
       "close variable definition": 299.52,
       "select IV": 249.6,
       "select DV": 249.6,
       "causal filter": 249.6,
-      "hide edge": 436.8,
+      "exclude edge promptly": 436.8,
       "restore edge": 299.52,
       "exclude edge": 299.52,
       "restore excluded edge": 312,
@@ -550,7 +552,7 @@ try {
     layout: 1383.096,
   };
   const observedMobileEventLimits = {
-    "hide edge": 1527.76,
+    "exclude edge promptly": 1527.76,
     "restore edge": 1392.56,
     "restore excluded edge": 1392.56,
   };
@@ -561,10 +563,10 @@ try {
   };
   results.budgetFailures = [
     ...results.scenarios.flatMap(scenario => {
-      const edgeAction = ["hide edge", "restore edge", "exclude edge", "restore excluded edge"]
+      const edgeAction = ["exclude edge promptly", "restore edge", "exclude edge", "restore excluded edge"]
         .includes(scenario.name);
       const anchorChange = scenario.name === "change IV" || scenario.name === "change DV";
-      const originalWallLimit = scenario.name === "settle graph after hide" && mobile ? originalLimits.wall["settle graph after hide"].mobile
+      const originalWallLimit = scenario.name === "settle graph after exclusion" && mobile ? originalLimits.wall["settle graph after exclusion"].mobile
         : edgeAction && mobile ? originalLimits.wall.edgeAction.mobile
           : scenario.name === "select definition source" && mobile ? originalLimits.wall["select definition source"].mobile
             : anchorChange ? originalLimits.wall.anchorChange[mobile ? "mobile" : "desktop"]
@@ -572,7 +574,7 @@ try {
       recordBaseline(`${scenario.name} wall time`, scenario.wallMs, originalWallLimit);
       recordBaseline(`${scenario.name} longest task`, scenario.longestTaskMs, originalLimits.task[mobile ? "mobile" : "desktop"]);
       recordBaseline(`${scenario.name} longest event`, scenario.longestEventMs, originalLimits.event[mobile ? "mobile" : "desktop"]);
-      const limit = scenario.name === "settle graph after hide" && mobile ? 1326
+      const limit = scenario.name === "settle graph after exclusion" && mobile ? 1326
         : edgeAction && mobile ? 2652
           : scenario.name === "select definition source" && mobile ? 7735
             : anchorChange ? (mobile ? 3315 : 2210)

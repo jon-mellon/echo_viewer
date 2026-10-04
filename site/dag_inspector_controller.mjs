@@ -7,7 +7,7 @@ export const STUDY_DESIGN_EDGE_ID = "__study_design_iv_to_dv__";
 export function createDagInspectorController({
   state, elements, escapeHtml, truncate, nowIso, takeSnapshot,
   applyProjectOperation, addDecision, addToUndoHistory, rebuildProject, rebuildLinkDecision = rebuildProject,
-  hideRenderedEdge = () => {}, groupById, dagGroups,
+  groupById, dagGroups,
 }) {
   const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
   const diagnosticView = () => ({
@@ -30,6 +30,7 @@ export function createDagInspectorController({
   }, h("span", { className: "inline-spinner", ariaHidden: "true" }), h("span", { textContent: "Loading sources…" }));
 
   function handleEdgeAction(link, action, manualId, excludeReason) {
+    if (!["exclude", "restore", "delete-manual"].includes(action)) return;
     if (action === "exclude" && excludeReason === undefined) {
       const row = document.getElementById("excludeReasonRow");
       if (row) {
@@ -57,13 +58,6 @@ export function createDagInspectorController({
       }));
       addDecision("link_excluded", { edge_id: link.edge_id, reason: excludeReason });
       addToUndoHistory("Excluded edge", before);
-    } else {
-      applyProjectOperation(projectOps.setLinkDecision(state.project, link.edge_id, {
-        edge_id: link.edge_id, display_status: "hidden", timestamp: nowIso(),
-      }));
-      hideRenderedEdge(link.edge_id);
-      addDecision("link_hidden", { edge_id: link.edge_id });
-      addToUndoHistory("Hid edge", before);
     }
     if (action === "delete-manual") rebuildProject();
     else rebuildLinkDecision();

@@ -8,10 +8,14 @@ import { pairKey } from "./edge_keys.mjs";
 export const linkKey = (sourceId, targetId) => `${sourceId}->${targetId}`;
 export const edgeKey = (a, b) => `${a}__${b}`;
 
+export function normalizeLinkDecision(decision) {
+  return decision?.display_status === "hidden" ? { ...decision, display_status: "excluded" } : decision;
+}
+
 export function applyLinkDecisions(links, decisions = {}) {
   return links.map(link => {
-    const decision = decisions[link.edge_id] || null;
-    return { ...link, display_status: decision?.display_status || link.display_status || "active_by_default",
+    const decision = normalizeLinkDecision(decisions[link.edge_id]) || null;
+    return { ...link, display_status: decision?.display_status || normalizeLinkDecision(link).display_status || "active_by_default",
       user_decision: decision || link.user_decision || null };
   });
 }
@@ -28,7 +32,7 @@ export function aggregateGroupLinks({ project, linkLookup, rawLinksById }) {
   return [...evidenceByEdge.values()].map(({ groupA, groupB, targetPair, aToB, bToA }) => {
     const manual = manualFlagsForPair(groupA.group_id, groupB.group_id, project.manual_edges);
     const edgeId = edgeKey(groupA.group_id, groupB.group_id);
-    const decision = project.link_decisions[edgeId] || null;
+    const decision = normalizeLinkDecision(project.link_decisions[edgeId]) || null;
     return {
       edge_id: edgeId,
       group_a: groupA.group_id,

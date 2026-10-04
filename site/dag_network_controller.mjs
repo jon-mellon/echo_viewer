@@ -555,12 +555,6 @@ function edgeHoverText(link) {
     whenRendered: () => _dagRenderedPromise,
     renderedEdgeIds: () => [...new Set((_visEdges?.getIds() || []).map(id => _dagEdgeSegments.get(id) || id))],
     isEdgeRendered: edgeId => Boolean(_visEdges?.getIds().some(id => (_dagEdgeSegments.get(id) || id) === edgeId)),
-    hideRenderedEdge(edgeId) {
-      if (!_visEdges) return;
-      const ids = _visEdges.getIds().filter(id => (_dagEdgeSegments.get(id) || id) === edgeId);
-      if (ids.length) _visEdges.remove(ids);
-      _visNetwork?.redraw();
-    },
     getNetwork: () => _visNetwork, getNodes: () => _visNodes, getEdges: () => _visEdges,
     getPathLaneSegments: () => _dagPathLaneSegments,
     zoomIn: () => _visNetwork?.moveTo({ scale: _visNetwork.getScale() * 1.3 }),

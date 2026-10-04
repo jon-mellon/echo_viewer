@@ -15,7 +15,7 @@ python3 -m http.server --directory site
 
 Run `npm run profile` to start a local preview and measure startup, definition
 entry, group search, IV/DV selection and changes, map controls and gestures,
-DAG layouts and filters, edge Hide/Exclude/Restore, manual edges, undo/redo,
+DAG layouts and filters, edge Exclude/Restore, manual edges, undo/redo,
 fullscreen, history, and project/schema downloads in Chromium.
 Run `PROFILE_DEVICE=mobile npm run profile` for the same flows at a 390-pixel
 viewport with 4× CPU throttling. Run `PROFILE_BROWSER=firefox npm run profile`
@@ -37,7 +37,7 @@ The suites also run every Monday in GitHub Actions; download the one-day
 `viewer-profile` artifact to inspect a failing synthetic run. Set `PROFILE_URL` to
 profile another deployment. Only profile a deployment where you have access;
 the script uses the preview's session gate and does not submit a password.
-The scenarios include the edge inspector's Hide action and verify that the edge
+The scenarios include the edge inspector's Exclude action and verify that the edge
 disappears promptly, then that the graph finishes updating. The run fails if a
 profiled interaction exceeds its scenario budget, an
 interaction produces a long task or slow input event, or startup exceeds its

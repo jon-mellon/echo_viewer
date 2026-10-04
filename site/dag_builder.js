@@ -847,6 +847,10 @@ function exportGroupingFolder() { return groupingSetController.exportFolder(); }
 // ─── DAG / Link aggregation ───────────────────────────────────────────────────
 
 function aggregateGroupLinks() {
+  // Migrate saved decisions from the former Hide action before rendering/export.
+  for (const decision of Object.values(state.project.link_decisions || {})) {
+    if (decision.display_status === "hidden") decision.display_status = "excluded";
+  }
   if (state.compiledDagValid && state.compiledDag) {
     state.project.links = applyLinkDecisions(state.compiledDag.edges || [], state.project.link_decisions);
     return;
@@ -1091,7 +1095,6 @@ function detectDirectedCycle(groups = dagGroups(), links = state.project.links) 
   for (const g of groups) graph.set(g.group_id, []);
   for (const link of links) {
     if (excludedForConnectivity(link)) continue;
-    if (link.display_status === "hidden") continue;
     if (link.direction_type === "BIDIRECTIONAL" && !link.is_target_relation) return true;
     if (link.direction_type === "A_TO_B") graph.get(link.group_a)?.push(link.group_b);
     if (link.direction_type === "B_TO_A") graph.get(link.group_b)?.push(link.group_a);
@@ -1235,7 +1238,6 @@ const projectController = createDagProjectController({
 const inspectorController = createDagInspectorController({
   state, elements: els, escapeHtml, truncate, nowIso, takeSnapshot,
   applyProjectOperation, addDecision, addToUndoHistory, rebuildProject, rebuildLinkDecision, groupById, dagGroups,
-  hideRenderedEdge: edgeId => dagNetworkController.hideRenderedEdge(edgeId),
 });
 
 const mapViewController = createDagMapViewController({

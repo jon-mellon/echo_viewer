@@ -26,7 +26,7 @@ export function computeDagRender(input, onPhase = () => {}) {
 }
 
 // A link decision only changes which already routed edges are shown. Keep the
-// existing node positions and route segments so Hide/Restore does not recompute
+// existing node positions and route segments so Exclude/Restore does not recompute
 // the entire graph. An added edge or changed group set needs a full render.
 export function reuseDagGeometry(geometry, groups, links) {
   if (!geometry || geometry.groupIds.length !== groups.length

@@ -40,7 +40,7 @@ export function edgeInspector(link, project, diagnosticView = {}) {
     rawIds, rawCount: rawIds.length, manual,
     existingDecision: project.link_decisions[link.edge_id],
     actions: [
-      { action: "exclude", label: "Exclude" }, { action: "hide", label: "Hide" },
+      { action: "exclude", label: "Exclude" },
       { action: "restore", label: "Restore" },
       ...manual.map(e => ({ action: "delete-manual", label: "Remove manual", manualId: e.edge_id })),
     ],

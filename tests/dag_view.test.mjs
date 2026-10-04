@@ -11,7 +11,7 @@ const links = [
   link("c_dv", "c", "dv", "A_TO_B"),
   link("iv_x", "iv", "x", "A_TO_B"),
   link("dv_x", "dv", "x", "A_TO_B"),
-  link("hidden", "iv", "z", "A_TO_B", { display_status: "hidden" }),
+  link("excluded", "iv", "z", "A_TO_B", { display_status: "excluded" }),
 ];
 
 test("derived view combines causal, confounder and collider projections without mutation", () => {
@@ -21,8 +21,8 @@ test("derived view combines causal, confounder and collider projections without 
     filterByCausalRelevance: true,
   });
   assert.equal(view.filterByCausalRelevance, true);
-  // Hidden evidence is excluded from display but retains legacy connectivity.
-  assert.deepEqual([...view.componentGroupIds].sort(), ["c", "dv", "iv", "x", "z"]);
+  // Excluded evidence no longer connects z to the IV component.
+  assert.deepEqual([...view.componentGroupIds].sort(), ["c", "dv", "iv", "x"]);
   assert.deepEqual(view.visibleLinks.map(item => item.edge_id), ["c_iv", "c_dv", "iv_x", "dv_x"]);
   assert.deepEqual([...view.confounders.confounderIds], ["c"]);
   assert.deepEqual([...view.colliders.colliderIds], ["x"]);

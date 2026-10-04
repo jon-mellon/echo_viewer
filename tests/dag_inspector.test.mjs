@@ -22,8 +22,8 @@ test("inspectors deduplicate evidence, preserve direction and expose manual acti
   assert.equal(edge.targetLabel, "A");
   assert.equal(edge.rawCount, 2);
   assert.equal(edge.existingDecision.exclude_reason, "reason");
-  assert.deepEqual(edge.actions.map(a => a.action), ["exclude", "hide", "restore", "delete-manual"]);
-  assert.equal(edge.actions[3].manualId, "m");
+  assert.deepEqual(edge.actions.map(a => a.action), ["exclude", "restore", "delete-manual"]);
+  assert.equal(edge.actions[2].manualId, "m");
   const provenance = inspector.provenanceModel(link, project, rawById, variables);
   assert.equal(provenance.rows.length, 1);
   assert.deepEqual(provenance.rows[0].source, { concept: "Concept X", classifications: ["A"] });

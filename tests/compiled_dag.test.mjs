@@ -13,17 +13,18 @@ const raw = [link("r1", "v1", "v3"), link("r2", "v2", "v3"), link("r3", "v3", "v
   link("r4", "v2", "v4"), link("r5", "v4", "v1"), link("r6", "v2", "v2")];
 const base = schema([group("a", ["v1", "v2"], "A"), group("b", ["v3"], "B"), group("c", ["v4"], "C")]);
 
-test("compiled edges keep hide, exclude and restore decisions through rebuilds", () => {
+test("compiled edges migrate legacy hidden decisions and keep exclude and restore through rebuilds", () => {
   const edges = fullCompileDag({ schema: base, rawLinks: raw }).edges;
   const edgeId = edges[0].edge_id;
   const hidden = applyLinkDecisions(edges, { [edgeId]: { edge_id: edgeId, display_status: "hidden" } });
-  assert.equal(hidden[0].display_status, "hidden");
+  assert.equal(hidden[0].display_status, "excluded");
+  assert.equal(hidden[0].user_decision.display_status, "excluded");
   assert.equal(edges[0].display_status, "active_by_default");
   const excluded = applyLinkDecisions(edges, { [edgeId]: { edge_id: edgeId, display_status: "excluded" } });
   assert.equal(excluded[0].display_status, "excluded");
   const restored = applyLinkDecisions(edges);
   assert.equal(restored[0].display_status, "active_by_default");
-  assert.equal(applyLinkDecisions([{ ...edges[0], display_status: "hidden" }])[0].display_status, "hidden");
+  assert.equal(applyLinkDecisions([{ ...edges[0], display_status: "hidden" }])[0].display_status, "excluded");
 });
 
 function counts(dag) {
