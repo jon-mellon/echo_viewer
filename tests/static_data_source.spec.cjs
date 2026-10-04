@@ -5,6 +5,7 @@ const snapshotId = "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea68
 
 for (const route of ["/"]) {
   test(`${route} loads compiled startup and retrieves browser-v2 evidence shards`, async ({ page }) => {
+    // Original baseline was 60000 ms; this is a runner timeout, not a performance gate.
     test.setTimeout(78000);
     await page.addInitScript(() => {
       window.__startupStages = [];

@@ -9,6 +9,7 @@ on:
 jobs:
   profile:
     runs-on: ubuntu-latest
+    # Original baseline was 15 minutes; this runner limit is a non-performance CI timeout.
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

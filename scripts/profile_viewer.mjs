@@ -62,6 +62,31 @@ const scenarioBudgets = {
   "change DV": 4000,
   "close evidence": 1000,
 };
+// Original pre-tuning thresholds. These are retained for reporting only; the
+// larger limits below remain the CI gates so a baseline comparison never fails CI.
+const originalLimits = {
+  scenarioScale: { desktop: 1, mobile: 4 },
+  wall: {
+    "settle graph after hide": { mobile: 600 },
+    edgeAction: { mobile: 1200 },
+    "select definition source": { mobile: 3500 },
+    anchorChange: { desktop: 1000, mobile: 1500 },
+  },
+  task: { desktop: 150, mobile: 500 },
+  event: { desktop: 150, mobile: 400 },
+  startup: {
+    visible: { desktop: 12000, mobile: 20000 },
+    layout: { desktop: 600, mobile: 600 },
+    routing: { desktop: 750, mobile: 2500 },
+    permalink: { desktop: 5000, mobile: 10000 },
+    schemaReady: { desktop: 8000, mobile: 15000 },
+    membershipWait: { desktop: 4000, mobile: 6000 },
+    lcp: { desktop: 9000, mobile: 18000 },
+    longestTask: { desktop: 250, mobile: 600 },
+    transferMB: 2.5,
+    cls: 0.05,
+  },
+};
 let server, browser, context, page, cdp;
 
 function round(value) { return Math.round(value * 10) / 10; }
@@ -529,11 +554,24 @@ try {
     "restore edge": 1392.56,
     "restore excluded edge": 1392.56,
   };
+  const baselineComparisons = [];
+  const recordBaseline = (metric, observed, baseline) => {
+    if (observed == null || baseline == null) return;
+    baselineComparisons.push({ metric, observed, baseline, ratio: round(observed / baseline), withinBaseline: observed <= baseline });
+  };
   results.budgetFailures = [
     ...results.scenarios.flatMap(scenario => {
       const edgeAction = ["hide edge", "restore edge", "exclude edge", "restore excluded edge"]
         .includes(scenario.name);
       const anchorChange = scenario.name === "change IV" || scenario.name === "change DV";
+      const originalWallLimit = scenario.name === "settle graph after hide" && mobile ? originalLimits.wall["settle graph after hide"].mobile
+        : edgeAction && mobile ? originalLimits.wall.edgeAction.mobile
+          : scenario.name === "select definition source" && mobile ? originalLimits.wall["select definition source"].mobile
+            : anchorChange ? originalLimits.wall.anchorChange[mobile ? "mobile" : "desktop"]
+              : scenarioBudgets[scenario.name] * originalLimits.scenarioScale[mobile ? "mobile" : "desktop"];
+      recordBaseline(`${scenario.name} wall time`, scenario.wallMs, originalWallLimit);
+      recordBaseline(`${scenario.name} longest task`, scenario.longestTaskMs, originalLimits.task[mobile ? "mobile" : "desktop"]);
+      recordBaseline(`${scenario.name} longest event`, scenario.longestEventMs, originalLimits.event[mobile ? "mobile" : "desktop"]);
       const limit = scenario.name === "settle graph after hide" && mobile ? 1326
         : edgeAction && mobile ? 2652
           : scenario.name === "select definition source" && mobile ? 7735
@@ -579,6 +617,21 @@ try {
     ...(results.startup.cls != null && results.startup.cls > 0.1105 ? [`Startup CLS ${results.startup.cls} exceeds 0.1105`] : []),
     ...results.errors.map(error => `Browser error: ${error}`),
   ];
+  recordBaseline("startup visible time", results.startup.visibleMs, originalLimits.startup.visible[mobile ? "mobile" : "desktop"]);
+  recordBaseline("startup graph layout", results.startup.appMeasures
+    .filter(measure => measure.name === "echo:dag:layout")
+    .reduce((max, measure) => Math.max(max, measure.durationMs), 0), originalLimits.startup.layout[mobile ? "mobile" : "desktop"]);
+  recordBaseline("startup graph routing", results.startup.appMeasures
+    .filter(measure => measure.name === "echo:dag:routing")
+    .reduce((max, measure) => Math.max(max, measure.durationMs), 0), originalLimits.startup.routing[mobile ? "mobile" : "desktop"]);
+  if (permalink) recordBaseline("permalink visible time", results.startup.visibleMs, originalLimits.startup.permalink[mobile ? "mobile" : "desktop"]);
+  recordBaseline("schema ready time", results.startup.schemaReadyMs, originalLimits.startup.schemaReady[mobile ? "mobile" : "desktop"]);
+  recordBaseline("membership wait", results.startup.membershipWaitMs, originalLimits.startup.membershipWait[mobile ? "mobile" : "desktop"]);
+  if (browserName === "chromium") recordBaseline("startup LCP", results.startup.lcpMs, originalLimits.startup.lcp[mobile ? "mobile" : "desktop"]);
+  recordBaseline("startup longest task", results.startup.longestTaskMs, originalLimits.startup.longestTask[mobile ? "mobile" : "desktop"]);
+  recordBaseline("startup transfer", results.startup.transferMB, originalLimits.startup.transferMB);
+  recordBaseline("startup CLS", results.startup.cls, originalLimits.startup.cls);
+  results.baselineComparisons = baselineComparisons;
   if (results.budgetFailures.length && process.env.PROFILE_DISABLE_BUDGETS !== "1") process.exitCode = 1;
   if (cdp) {
     const cpu = await cdp.send("Profiler.stop");
@@ -591,7 +644,8 @@ try {
     transferMB: results.startup.transferMB,
     cls: results.startup.cls },
   scenarios: results.scenarios.map(scenario => ({ name: scenario.name, wallMs: scenario.wallMs,
-    longestTaskMs: scenario.longestTaskMs })), budgetFailures: results.budgetFailures }, null, 2));
+    longestTaskMs: scenario.longestTaskMs })), budgetFailures: results.budgetFailures,
+    baselineComparisons: results.baselineComparisons }, null, 2));
 } catch (error) {
   results.failure = String(error?.stack || error);
   await mkdir(output, { recursive: true });
