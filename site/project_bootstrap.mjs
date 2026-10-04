@@ -1,4 +1,4 @@
-import { dagDataSource } from "./dag_data_source.mjs";
+import { dagDataSource } from "./dag_data_source.mjs?v=browser-v2";
 import { schemaPublicationId } from "./dag_data_config.mjs";
 import { applyPermalink, permalinkInput } from "./dag_permalink.mjs";
 import { createProjectBootstrapPresenter } from "./project_bootstrap_presenter.mjs";
@@ -11,6 +11,13 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
   const presenter = createProjectBootstrapPresenter({});
   const setStartupStage = message => presenter.setStartupStage(message);
   const finishStartupLoading = () => presenter.finishStartupLoading();
+
+  function prepareDefinitionEvidenceWhenIdle() {
+    if (state.interfaceMode !== "dag2" || !["select_iv", "select_dv"].includes(state.phase)) return;
+    const prepare = () => { void dagDataSource.ensureEvidenceConnection().catch(() => {}); };
+    if (typeof requestIdleCallback === "function") requestIdleCallback(prepare, { timeout: 1500 });
+    else setTimeout(prepare, 0);
+  }
 
   async function init() {
     dagDataSource.onStatus = setStartupStage;
@@ -107,6 +114,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         applyLoadedSchema(schema);
         publicationController.setSchemaReady?.(true);
         void publicationController.refreshPublicationState?.();
+        prepareDefinitionEvidenceWhenIdle();
       }).catch(error => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.publishedSchemaHydrating = false;
@@ -114,6 +122,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         publicationController.setSchemaLoadFailed?.();
         console.error("Could not finish loading the published schema.", error);
       });
+    } else {
+      prepareDefinitionEvidenceWhenIdle();
     }
   }
 

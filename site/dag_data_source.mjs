@@ -52,7 +52,9 @@ export class ParquetManifestDagDataSource {
   async initialize() {
     if (this.connection || this.compiledPublishedLoad) return;
     const publicationId = schemaPublicationId();
-    if (publicationId) {
+    // A compiled startup already resolved this immutable publication. Reuse
+    // its binding when the same instance later opens the lazy evidence engine.
+    if (publicationId && !(this.skipCompiledOnce && this.loadedPublication?.id === publicationId)) {
       const publicationStart = performance.now();
       this.onStatus("Loading published schema and compiled DAG…");
       const loaded = await loadPublishedSchema(publicationId);

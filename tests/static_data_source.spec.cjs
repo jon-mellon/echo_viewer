@@ -24,6 +24,10 @@ for (const route of ["/"]) {
       && document.getElementById("startupLoading")?.hidden, null,
       { timeout: 60000 });
     await expect(page.locator("#schemaPublicationBadge")).toHaveText("Public schema", { timeout: 60000 });
+    await page.waitForFunction(async () => {
+      const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+      return Boolean(dagDataSource.connection && !dagDataSource.evidenceInitialization);
+    }, null, { timeout: 60000 });
     const state = await page.evaluate(async () => {
       const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
       const [variables, neighbors, links] = await Promise.all([
@@ -39,6 +43,8 @@ for (const route of ["/"]) {
       groupingCount: window.__dagBuilderState.data.grouping_sets[0]?.groups?.length,
       startupStages: window.__startupStages,
       loadingFinished: document.getElementById("startupLoading")?.hidden,
+      engineStarts: performance.getEntriesByName("echo:evidence:engine").length,
+      publicationLoads: performance.getEntriesByName("echo:evidence:publication").length,
     }});
     expect(state.variables).toHaveLength(1);
     expect(state.variables[0].variable_id).toBe("v1");
@@ -57,6 +63,8 @@ for (const route of ["/"]) {
       "Rendering graph…",
     ]));
     expect(state.loadingFinished).toBe(true);
+    expect(state.engineStarts).toBe(1);
+    expect(state.publicationLoads).toBe(1);
     const uniqueParquetRequests = [...new Set(parquetRequests)];
     expect(uniqueParquetRequests.some(url => url.includes("/lookup/variable-shards.parquet"))).toBe(false);
     expect(uniqueParquetRequests.some(url => url.includes("/variables/shard-"))).toBe(true);
