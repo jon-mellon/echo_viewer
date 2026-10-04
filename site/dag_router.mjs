@@ -120,8 +120,12 @@ export function routeEdge(link, { positions, boxes, occupiedRoutes = [], occupie
   const consider = (candidate) => {
     const simplified = simplifyRoute(candidate);
     const actualPoints = [sourcePoint, ...simplified.slice(1, -1), targetPoint];
+    const geometryScore = scoreRoute(actualPoints, { boxes, sourceId, targetId, corridor, config, obstacles });
+    // Overlap checks scan every previously routed edge. A candidate whose
+    // geometry alone cannot beat the current route needs no overlap scan.
+    if (geometryScore >= bestScore) return;
     const overlap = routeOverlapPenalty(actualPoints, occupiedRoutes, occupiedSegments);
-    const score = scoreRoute(actualPoints, { boxes, sourceId, targetId, corridor, config, obstacles }) + overlap;
+    const score = geometryScore + overlap;
     if (score < bestScore) {
       best = simplified;
       bestScore = score;

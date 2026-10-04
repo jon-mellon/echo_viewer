@@ -532,6 +532,9 @@ try {
       ];
     }),
     ...(results.startup.visibleMs > (mobile ? 20000 : 12000) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 20000 : 12000} ms`] : []),
+    ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:routing"
+      && measure.durationMs > (mobile ? 2500 : 750))
+      .map(measure => `Graph routing ${measure.durationMs} ms exceeds ${mobile ? 2500 : 750} ms`),
     ...(permalink && results.startup.visibleMs > (mobile ? 10000 : 5000)
       ? [`Permalink visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 10000 : 5000} ms`] : []),
     ...(results.startup.schemaReadyMs > (mobile ? 15000 : 8000) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? 15000 : 8000} ms`] : []),

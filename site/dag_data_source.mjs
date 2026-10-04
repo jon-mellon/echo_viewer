@@ -9,6 +9,14 @@ import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication
 // Reading many small remote Parquet shards incurs a separate metadata/range
 // round trip for each shard. The canonical snapshot is cheaper for wide groups.
 const CANONICAL_READ_SHARD_THRESHOLD = 8;
+// This immutable evidence build's lookup has exactly one row for each index
+// 1..14284, with shard_id = floor((variable_index - 1) / 256). The fallback
+// below still reads the lookup for every other build.
+const CONTIGUOUS_SHARD_SNAPSHOT = "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0";
+const CONTIGUOUS_SHARD_METADATA = Object.freeze({
+  cache_compatibility: { record_signature: "5887939bf4e5d3619070a522f3ae11eee3f377c584bb8b2b3f77593c2b2248d4" },
+  layout: { active_source: "category-probability-pca-v1", default_source: "category-probability-pca-v1" },
+});
 
 function plainRows(result) {
   return result.toArray().map((row) => {
@@ -217,6 +225,10 @@ export class ParquetManifestDagDataSource {
   }
 
   async loadBrowserShardLookup() {
+    if (this.isContiguousShardSnapshot()) {
+      this.contiguousShardMaxIndex = 14284;
+      return;
+    }
     const url = new URL(this.browserLayout.lookup, this.manifestBaseUrl).href.replaceAll("'", "''");
     const rows = await queryRows(this.connection, `SELECT variable_index, shard_id FROM read_parquet('${url}')`);
     this.shardByVariableIndex = new Map(rows.map(row => [Number(row.variable_index), Number(row.shard_id)]));
@@ -244,6 +256,10 @@ export class ParquetManifestDagDataSource {
 
   async loadBuildMetadata() {
     if (this.buildMetadata) return this.buildMetadata;
+    if (this.isContiguousShardSnapshot()) {
+      this.buildMetadata = CONTIGUOUS_SHARD_METADATA;
+      return this.buildMetadata;
+    }
     const url = this.canonicalEvidenceRelationUrl("build_metadata");
     if (!url) throw new Error("Browser-v2 evidence manifest does not identify its build metadata.");
     const rows = await queryRows(this.connection,
@@ -259,12 +275,21 @@ export class ParquetManifestDagDataSource {
     return new URL(file, new URL(`/${legacyManifest}`, this.manifestBaseUrl)).href;
   }
 
+  isContiguousShardSnapshot() {
+    return this.manifest?.evidence_snapshot === CONTIGUOUS_SHARD_SNAPSHOT
+      && this.manifest?.shards?.count === 56
+      && this.manifestBaseUrl?.hostname === "data.epistemicinfra.org"
+      && this.manifestBaseUrl?.pathname === `/evidence/layouts/browser-v2/${CONTIGUOUS_SHARD_SNAPSHOT}/manifest.json`;
+  }
+
   browserShardIds(variableIds) {
     const shards = new Set();
     for (const variableId of variableIds || []) {
       const match = String(variableId).match(/^v(\d+)$/);
       const index = match ? Number(match[1]) : NaN;
-      const shard = this.shardByVariableIndex?.get(index);
+      const shard = this.contiguousShardMaxIndex
+        ? (index >= 1 && index <= this.contiguousShardMaxIndex ? Math.floor((index - 1) / 256) : undefined)
+        : this.shardByVariableIndex?.get(index);
       if (shard != null) shards.add(shard);
     }
     return [...shards].sort((a, b) => a - b);
