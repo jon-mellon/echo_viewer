@@ -65,7 +65,7 @@ function assignGroupAsAnchor(side, sourceGroupId) {
     Object.assign(state, workflow.transition(state, { type: "anchor-selected", side, groupId: sourceGroupId, alreadyCurrent: true }));
     setMapMode("select");
     fitMap(source.variable_ids);
-    renderAll();
+    renderAll({ rebuild: false });
     notifyWhenAnchorsReady();
     return;
   }

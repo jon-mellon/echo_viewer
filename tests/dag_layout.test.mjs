@@ -4,6 +4,23 @@ import { computeDagLayout } from '../site/dag_layout.mjs';
 import { legacyLayout } from './fixtures/legacy_dag_layout.mjs';
 import { routeEdges } from '../site/dag_router.mjs';
 import { routesToVisData } from '../site/dag_vis_routing.mjs';
+import { reuseDagGeometry } from '../site/dag_render_compute.mjs';
+
+test('edge decisions reuse existing graph geometry and refresh link metadata', () => {
+  const groups = [{ group_id: 'a' }, { group_id: 'b' }];
+  const oldLink = { edge_id: 'a-b', display_status: 'active' };
+  const layout = { positions: new Map([['a', { x: 0 }], ['b', { x: 1 }]]) };
+  const route = { link: oldLink, points: [{ x: 0 }, { x: 1 }] };
+  const geometry = { groupIds: ['a', 'b'], layout, routes: [route] };
+  assert.deepEqual(reuseDagGeometry(geometry, groups, []).routes, []);
+  const restored = { ...oldLink, display_status: 'active', updated_at: 'new' };
+  const reused = reuseDagGeometry(geometry, groups, [restored]);
+  assert.equal(reused.layout, layout);
+  assert.equal(reused.routes[0].link, restored);
+  assert.equal(reused.routes[0].points, route.points);
+  assert.equal(reuseDagGeometry(geometry, groups, [{ edge_id: 'new' }]), null);
+  assert.equal(reuseDagGeometry(geometry, [{ group_id: 'a' }], []), null);
+});
 
 // Synthetic graphs exercise the small/large and auto-layout thresholds, with
 // reversed links, ambiguous directions and a cycle. No research data is used.

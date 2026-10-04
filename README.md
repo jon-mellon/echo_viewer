@@ -47,6 +47,12 @@ membership wait after the first paint at 4 seconds. Mobile budgets account for
 4× CPU throttling. Firefox enforces interaction and readiness times; browser
 metrics unsupported by Firefox are reported as unavailable. Use
 `PROFILE_DISABLE_BUDGETS=1` for a diagnostic run without those gates.
+Edge decisions reuse existing routes and update changed graph segments; the
+profile fails if they trigger a full layout or routing pass. The definition
+dialog starts the evidence query engine while a source is chosen. Use
+`PROFILE_DEFINITION_THINK_MS=1000 PROFILE_DISABLE_BUDGETS=1 PROFILE_OUTPUT=profile-results-warm npm run profile`
+to measure that warm path;
+the required default run still measures an immediate Continue click.
 
 The suite uses synthetic browser sessions only. It does not collect viewer
 analytics or retain user activity.

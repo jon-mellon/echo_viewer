@@ -5,12 +5,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   invalidateMapCaches, renderAll, setMapMode, fitMap, groupById, persistProjectLocally,
   visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
-  hydrateVariableDetails = async () => {} }) {
+  hydrateVariableDetails = async () => {}, prewarmEvidence = async () => {} }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
 
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv"].includes(role)) return;
+    // Start the query engine while the user chooses a source. The source load
+    // still awaits this setup and reports any error through its normal path.
+    void prewarmEvidence().catch(() => {});
     hydrationRevision += 1;
     sourceHydrations.clear();
     state.definitionDraft = {

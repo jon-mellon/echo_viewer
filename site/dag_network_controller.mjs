@@ -1,5 +1,5 @@
 import { routeEdges, studyArrowCorridor } from "./dag_router.mjs";
-import { computeDagRender } from "./dag_render_compute.mjs";
+import { computeDagRender, reuseDagGeometry } from "./dag_render_compute.mjs";
 import { routesToVisData } from "./dag_vis_routing.mjs";
 import { attachDagInteractions } from "./dag_interactions.mjs";
 import * as dagDisplay from "./dag_display.mjs";
@@ -17,7 +17,9 @@ let _visNetwork = null;
 let _visNodes = null;
 let _visEdges = null;
 let _dagLayoutSignature = "";
+let _dagGeometry = null;
 let _dagEdgeSegments = new Map();
+let _dagNodeDataById = new Map();
 let _dagHoverBaseline = null;
 let _dagHoveredConfounderId = null;
 let _dagPathLaneSegments = [];
@@ -314,7 +316,7 @@ let _dagRenderWorker = null;
 let _dagRenderRequest = 0;
 let _dagRenderedPromise = Promise.resolve();
 
-function renderDag() {
+function renderDag({ reuseGeometry = false } = {}) {
   let resolveRendered;
   _dagRenderedPromise = new Promise(resolve => { resolveRendered = resolve; });
   clearLogicalDagEdgeHover();
@@ -322,11 +324,21 @@ function renderDag() {
   const groups = dagVisibleGroups();
   els.dagLayoutSelect.value = state.dagLayoutMode;
 
+  const links = state.visibleLinks.filter((link) => !link.is_target_relation);
+  if (reuseGeometry && !_dagRenderWorker && _visNetwork) {
+    const reused = reuseDagGeometry(_dagGeometry, groups, links);
+    if (reused) {
+      applyReusedDagRender(groups, reused.layout, reused.routes);
+      resolveRendered();
+      return;
+    }
+  }
+
   // Layout and obstacle-aware routing are pure but CPU intensive. Keep them off
   // the UI thread so the map and controls can paint immediately during startup.
   const input = {
     groups,
-    links: state.visibleLinks.filter((link) => !link.is_target_relation),
+    links,
     centroids: groups.map(group => [group.group_id, groupMapCentroid(group)]),
     ivId: state.project?.iv_group_id,
     dvId: state.project?.dv_group_id,
@@ -344,6 +356,7 @@ function renderDag() {
 
   if (typeof Worker === "undefined") {
     const { layout, routes } = computeDagRender(input);
+    _dagGeometry = { groupIds: groups.map(group => group.group_id), layout, routes };
     applyDagRender(groups, layout, routes);
     resolveRendered();
     return;
@@ -363,6 +376,7 @@ function renderDag() {
     };
     worker.terminate();
     if (_dagRenderWorker === worker) _dagRenderWorker = null;
+    _dagGeometry = { groupIds: groups.map(group => group.group_id), layout, routes: event.data.routes };
     applyDagRender(groups, layout, event.data.routes);
     resolveRendered();
   });
@@ -371,6 +385,7 @@ function renderDag() {
     worker.terminate();
     if (_dagRenderWorker === worker) _dagRenderWorker = null;
     const { layout, routes } = computeDagRender(input);
+    _dagGeometry = { groupIds: groups.map(group => group.group_id), layout, routes };
     applyDagRender(groups, layout, routes);
     resolveRendered();
   }, { once: true });
@@ -379,6 +394,9 @@ function renderDag() {
 
 function applyDagRender(groups, layout, routes) {
   const { nodeData, edgeData, edgeSegments } = routedDagDataFromRoutes(groups, routes, layout);
+  const groupIds = new Set(groups.map(group => group.group_id));
+  _dagNodeDataById = new Map(nodeData.filter(node => groupIds.has(node.id))
+    .map(node => [node.id, node]));
   const designEdge = studyDesignEdgeData(groups);
   if (designEdge) edgeData.push(designEdge);
   _dagEdgeSegments = edgeSegments;
@@ -424,6 +442,40 @@ function applyDagRender(groups, layout, routes) {
       setTimeout(() => _visNetwork?.fit({ animation: false, padding: 34 }), 120);
     }
   }
+}
+
+function applyReusedDagRender(groups, layout, routes) {
+  const wanted = new Set(routes.map(route => route.link.edge_id));
+  const removed = [..._dagEdgeSegments].filter(([, logicalId]) => !wanted.has(logicalId));
+  const currentEdgeIds = new Set(_visEdges.getIds());
+  const removeEdgeIds = removed.map(([id]) => id).filter(id => currentEdgeIds.has(id));
+  if (removeEdgeIds.length) _visEdges.remove(removeEdgeIds);
+  const removedLogicalIds = new Set(removed.map(([, logicalId]) => logicalId));
+  const removeNodeIds = _dagGeometry.routes.filter(route => removedLogicalIds.has(route.link.edge_id))
+    .flatMap(route => route.points.slice(1, -1).map((_, index) =>
+      `__route__${route.link.edge_id}__${index}`));
+  if (removeNodeIds.length) _visNodes.remove(removeNodeIds);
+  for (const [id] of removed) _dagEdgeSegments.delete(id);
+
+  const rendered = new Set(_dagEdgeSegments.values());
+  const additions = routes.filter(route => !rendered.has(route.link.edge_id));
+  if (additions.length) {
+    const added = routedDagDataFromRoutes([], additions, layout);
+    if (added.nodeData.length) _visNodes.add(added.nodeData);
+    if (added.edgeData.length) _visEdges.add(added.edgeData);
+    for (const [id, logicalId] of added.edgeSegments) _dagEdgeSegments.set(id, logicalId);
+  }
+
+  const changedNodes = [];
+  for (const group of groups) {
+    const node = visNodeData(group, layout.positions.get(group.group_id), layout.params);
+    if (JSON.stringify(node) !== JSON.stringify(_dagNodeDataById.get(group.group_id))) {
+      changedNodes.push(node);
+      _dagNodeDataById.set(group.group_id, node);
+    }
+  }
+  if (changedNodes.length) _visNodes.update(changedNodes);
+  _visNetwork.redraw();
 }
 
 function minimumDagScale() {

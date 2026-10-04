@@ -24,3 +24,19 @@ export function computeDagRender(input, onPhase = () => {}) {
   onPhase("routing", performance.now() - routeStart);
   return { layout, routes };
 }
+
+// A link decision only changes which already routed edges are shown. Keep the
+// existing node positions and route segments so Hide/Restore does not recompute
+// the entire graph. An added edge or changed group set needs a full render.
+export function reuseDagGeometry(geometry, groups, links) {
+  if (!geometry || geometry.groupIds.length !== groups.length
+      || groups.some(group => !geometry.groupIds.includes(group.group_id))) return null;
+  const routesById = new Map(geometry.routes.map(route => [route.link.edge_id, route]));
+  const routes = [];
+  for (const link of links) {
+    const route = routesById.get(link.edge_id);
+    if (!route) return null;
+    routes.push({ ...route, link });
+  }
+  return { layout: geometry.layout, routes };
+}

@@ -374,15 +374,19 @@ const renderCoordinator = createRenderCoordinator({
   renderGroupEditor, renderRightPanel, renderDefinition,
 });
 
-function renderAll() {
-  renderCoordinator.renderAll();
+function renderAll(options) {
+  renderCoordinator.renderAll(options);
   // Enrich references opportunistically while the user works. Export actions
   // await the same de-duplicated, rate-limited requests before downloading.
   exportController.warmBibliography();
 }
 
-function rebuildProject() {
-  renderCoordinator.rebuildProject();
+function rebuildProject(options) {
+  renderCoordinator.rebuildProject(options);
+}
+
+function rebuildLinkDecision() {
+  renderCoordinator.rebuildLinkDecision();
 }
 
 function renderMapToolbarToggles() { return toolbarController.render(); }
@@ -413,7 +417,7 @@ function changeAnchor(side) {
   if (input) input.value = "";
   setMapMode("select");
   fitMap(group.variable_ids);
-  renderAll();
+  renderAll({ rebuild: false });
   setTimeout(() => { input?.focus(); }, 60);
 }
 
@@ -952,7 +956,7 @@ function dagVisibleGroups() { return dagNetworkController.dagVisibleGroups(); }
 function highlightConfounderPaths(id) { return dagNetworkController.highlightConfounderPaths(id); }
 function clearConfounderPathHover() { return dagNetworkController.clearConfounderPathHover(); }
 function clearLogicalDagEdgeHover() { return dagNetworkController.clearLogicalDagEdgeHover(); }
-function renderDag() { return dagNetworkController.renderDag(); }
+function renderDag(options) { return dagNetworkController.renderDag(options); }
 function refreshDagEdgeSelection() { return dagNetworkController.refreshEdgeSelection(); }
 function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 
@@ -1220,7 +1224,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   searchVariables: searchVisibleVariables,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
   takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
-  hydrateVariableDetails,
+  hydrateVariableDetails, prewarmEvidence: () => dagDataSource.ensureEvidenceConnection(),
 });
 
 const projectController = createDagProjectController({
@@ -1230,7 +1234,7 @@ const projectController = createDagProjectController({
 
 const inspectorController = createDagInspectorController({
   state, elements: els, escapeHtml, truncate, nowIso, takeSnapshot,
-  applyProjectOperation, addDecision, addToUndoHistory, rebuildProject, groupById, dagGroups,
+  applyProjectOperation, addDecision, addToUndoHistory, rebuildProject, rebuildLinkDecision, groupById, dagGroups,
   hideRenderedEdge: edgeId => dagNetworkController.hideRenderedEdge(edgeId),
 });
 

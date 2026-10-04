@@ -5,6 +5,7 @@ profile-results-firefox/
 profile-results-permalink/
 profile-results-permalink-mobile/
 profile-results-permalink-firefox/
+profile-results-warm/
 node_modules/
 tests/dagitty_cache/
 .DS_Store

@@ -9,6 +9,7 @@ const localUrl = new URL("http://127.0.0.1:8767/");
 if (permalink) localUrl.search = permalinkUrl.search;
 const url = process.env.PROFILE_URL || localUrl.href;
 const mobile = process.env.PROFILE_DEVICE === "mobile";
+const definitionThinkMs = Math.max(0, Number(process.env.PROFILE_DEFINITION_THINK_MS || 0));
 const browserName = process.env.PROFILE_BROWSER === "firefox" ? "firefox" : "chromium";
 if (mobile && browserName === "firefox") throw new Error("Mobile CPU throttling requires Chromium.");
 const output = process.env.PROFILE_OUTPUT || `profile-results${permalink ? "-permalink" : ""}${browserName === "firefox" ? "-firefox" : mobile ? "-mobile" : ""}`;
@@ -18,7 +19,7 @@ const results = { started, url, browser: browserName, profileScenario: permalink
   device: mobile ? "mobile" : "desktop", scenarios: [], errors: [] };
 const scenarioBudgets = {
   "open variable definition": 750,
-  "select definition source": 4000,
+  "select definition source": 2500,
   "variable map zoom": 500,
   "close variable definition": 750,
   "group search": 2000,
@@ -30,10 +31,10 @@ const scenarioBudgets = {
   "DAG zoom": 500,
   "causal filter": 1000,
   "hide edge": 750,
-  "settle graph after hide": 4000,
-  "restore edge": 4000,
-  "exclude edge": 4000,
-  "restore excluded edge": 4000,
+  "settle graph after hide": 300,
+  "restore edge": 750,
+  "exclude edge": 750,
+  "restore excluded edge": 750,
   "confounders filter": 4000,
   "colliders filter": 4000,
   "path length": 4000,
@@ -232,6 +233,7 @@ try {
     await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
     await page.locator("#definitionSourceList input[data-source-id]").first().waitFor();
   });
+  if (definitionThinkMs) await page.waitForTimeout(definitionThinkMs);
   const sourceGroupId = await page.locator("#definitionSourceList input[data-source-id]").first()
     .getAttribute("data-source-id");
   await measure("select definition source", async () => {
@@ -509,11 +511,20 @@ try {
   }
   results.budgetFailures = [
     ...results.scenarios.flatMap(scenario => {
-      const limit = scenario.name === "settle graph after hide" && mobile
-        ? 6000 : scenarioBudgets[scenario.name] * (mobile ? 4 : 1);
+      const edgeAction = ["hide edge", "restore edge", "exclude edge", "restore excluded edge"]
+        .includes(scenario.name);
+      const anchorChange = scenario.name === "change IV" || scenario.name === "change DV";
+      const limit = scenario.name === "settle graph after hide" && mobile ? 600
+        : edgeAction && mobile ? 1200
+          : scenario.name === "select definition source" && mobile ? 3500
+            : anchorChange ? (mobile ? 1500 : 1000)
+            : scenarioBudgets[scenario.name] * (mobile ? 4 : 1);
       return [
         ...(scenario.wallMs > limit
           ? [`${scenario.name}: ${scenario.wallMs} ms exceeds ${limit} ms`] : []),
+        ...(edgeAction && scenario.appMeasures.some(measure =>
+          measure.name === "echo:dag:layout" || measure.name === "echo:dag:routing")
+          ? [`${scenario.name}: recalculated full graph geometry`] : []),
         ...(scenario.longestTaskMs != null && scenario.longestTaskMs > (mobile ? 500 : 150)
           ? [`${scenario.name}: ${scenario.longestTaskMs} ms task exceeds ${mobile ? 500 : 150} ms`] : []),
         ...(scenario.longestEventMs != null && scenario.longestEventMs > (mobile ? 400 : 150)

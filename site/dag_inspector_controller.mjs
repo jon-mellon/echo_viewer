@@ -6,7 +6,8 @@ export const STUDY_DESIGN_EDGE_ID = "__study_design_iv_to_dv__";
 
 export function createDagInspectorController({
   state, elements, escapeHtml, truncate, nowIso, takeSnapshot,
-  applyProjectOperation, addDecision, addToUndoHistory, rebuildProject, hideRenderedEdge = () => {}, groupById, dagGroups,
+  applyProjectOperation, addDecision, addToUndoHistory, rebuildProject, rebuildLinkDecision = rebuildProject,
+  hideRenderedEdge = () => {}, groupById, dagGroups,
 }) {
   const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
   const diagnosticView = () => ({
@@ -64,7 +65,8 @@ export function createDagInspectorController({
       addDecision("link_hidden", { edge_id: link.edge_id });
       addToUndoHistory("Hid edge", before);
     }
-    rebuildProject();
+    if (action === "delete-manual") rebuildProject();
+    else rebuildLinkDecision();
   }
 
   function renderStudyRelation() {

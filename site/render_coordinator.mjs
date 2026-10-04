@@ -1,14 +1,14 @@
 // Synchronous scheduling preserves event-time rendering and autosave semantics.
 // Deliberately no frame batching until redundant work has been measured.
 export function createRenderCoordinator(view) {
-  function rebuildProject() {
+  function rebuildProject({ reuseDagGeometry = false } = {}) {
     view.buildCandidateQueue();
     view.aggregateGroupLinks();
     view.computeVisibleLinks();
     view.renderGroupList();
     view.renderRejectedVariablesPanel();
     view.renderManualEdgeControls();
-    view.renderDag();
+    view.renderDag({ reuseGeometry: reuseDagGeometry });
     if (!view.renderVariableComparison()) {
       view.renderSelectedEdge();
     }
@@ -19,7 +19,16 @@ export function createRenderCoordinator(view) {
     view.drawMap();
     view.saveProjectLocally();
   }
-  function renderAll() {
+  function rebuildLinkDecision() {
+    view.aggregateGroupLinks();
+    view.computeVisibleLinks();
+    view.renderDag({ reuseGeometry: true });
+    view.renderSelectedEdge();
+    view.renderExportStatus();
+    view.renderUndoRedo();
+    view.saveProjectLocally();
+  }
+  function renderAll({ rebuild = true } = {}) {
     view.renderModeUI();
     view.renderAnchorBar();
     view.renderStatus();
@@ -34,11 +43,11 @@ export function createRenderCoordinator(view) {
     view.renderGroupEditor();
     view.renderDefinition?.();
     view.renderRightPanel();
-    rebuildProject();
+    if (rebuild) rebuildProject();
   }
   function selectEdge() {
     view.refreshDagEdgeSelection();
     view.renderSelectedEdge();
   }
-  return { renderAll, rebuildProject, selectEdge };
+  return { renderAll, rebuildProject, rebuildLinkDecision, selectEdge };
 }
