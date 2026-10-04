@@ -15,7 +15,8 @@
     "test:rejection-reload": "node tests/rejection_reload_smoke.mjs",
     "test:exports": "node tests/dag_exports_smoke.mjs",
     "test:static-data": "playwright test tests/static_data_source.spec.cjs --workers=1",
-    "build:search-catalog": "node scripts/generate_variable_search_catalog.mjs"
+    "build:search-catalog": "node scripts/generate_variable_search_catalog.mjs",
+    "profile": "node scripts/profile_viewer.mjs"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "1.32.0",

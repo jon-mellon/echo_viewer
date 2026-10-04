@@ -17,6 +17,9 @@ function compareFiniteNumbers(left, right) {
 
 export function groupCoherence(variableIds, similarityEdgeMap) {
   if (variableIds.length <= 1) return 1;
+  // Compiled publications omit raw similarity edges. Avoid generating every
+  // variable pair when there cannot be a matching weight.
+  if (!similarityEdgeMap.size) return 0;
   const weights = [];
   for (let i = 0; i < variableIds.length; i += 1) {
     for (let j = i + 1; j < variableIds.length; j += 1) {
@@ -50,7 +53,7 @@ function candidateContext(project, { variables, similarityEdgeMap, linkLookup })
   }
   return {
     iv, dv,
-    hasAnyMapping: (a, b) => rawLinksBetween(a, b, linkLookup).length > 0,
+    hasAnyMapping: (a, b) => linkLookup.size > 0 && rawLinksBetween(a, b, linkLookup).length > 0,
     groupCoherence: ids => groupCoherence(ids, similarityEdgeMap),
     groupProximity: (g, x, y) => Math.min(
       distance(centroid(g.variable_ids, variables), centroid(x.variable_ids, variables)),

@@ -7,6 +7,7 @@ export function createProjectBootstrapPresenter({ windowApi = window, documentAp
 
   function finishStartupLoading() {
     documentApi.getElementById("startupLoading")?.setAttribute("hidden", "");
+    documentApi.body.classList.remove("viewer-loading");
   }
 
   function configureInterface(interfaceMode) {

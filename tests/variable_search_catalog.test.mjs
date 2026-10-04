@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { StaticVariableSearchCatalog, hydrateSearchResult } from "../site/variable_search_catalog.mjs";
 
 const payload = {
@@ -58,4 +60,20 @@ test("catalog loading does not mutate the application's hydrated-variable map", 
   const catalog = await loadedCatalog();
   assert.equal(catalog.records.length, 4);
   assert.deepEqual([...variableById.keys()], ["already"]);
+});
+
+test("deployed compressed catalog matches its source JSON", () => {
+  const json = readFileSync(new URL("../site/variable-search-catalog.json", import.meta.url));
+  const compressed = readFileSync(new URL("../site/variable-search-catalog.json.gz", import.meta.url));
+  assert.deepEqual(gunzipSync(compressed), json);
+});
+
+test("browser catalog loader reads gzip responses", async () => {
+  const catalog = new StaticVariableSearchCatalog();
+  const compressed = gzipSync(JSON.stringify(payload));
+  await catalog.load("/catalog.json.gz", async url => {
+    assert.equal(url, "/catalog.json.gz");
+    return new Response(compressed, { status: 200 });
+  });
+  assert.equal(catalog.searchVariables("income")[0].variable_id, "v1");
 });

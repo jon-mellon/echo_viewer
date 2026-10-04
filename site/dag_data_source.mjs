@@ -6,6 +6,10 @@ import { browserV2ManifestLayout, browserV2ShardPath,
 import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
 import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication-v2";
 
+// Reading many small remote Parquet shards incurs a separate metadata/range
+// round trip for each shard. The canonical snapshot is cheaper for wide groups.
+const CANONICAL_READ_SHARD_THRESHOLD = 8;
+
 function plainRows(result) {
   return result.toArray().map((row) => {
     const value = row.toJSON();
@@ -41,8 +45,10 @@ export class ParquetManifestDagDataSource {
     if (this.connection || this.compiledPublishedLoad) return;
     const publicationId = schemaPublicationId();
     if (publicationId) {
+      const publicationStart = performance.now();
       this.onStatus("Loading published schema and compiled DAG…");
       const loaded = await loadPublishedSchema(publicationId);
+      performance.measure("echo:evidence:publication", { start: publicationStart, end: performance.now() });
       this.groupingSet = loaded.schema;
       this.loadedPublication = loaded.publication;
       const permalinkVersion = new URL(globalThis.location?.href || "http://localhost/")
@@ -61,10 +67,12 @@ export class ParquetManifestDagDataSource {
       this.onStatus(`Compiled DAG unavailable (${loaded.compiledFallbackReason}); checking browser-v2 evidence…`);
     }
     const manifestUrl = new URL(this.manifestUrl, window.location.href);
+    const manifestStart = performance.now();
     this.onStatus("Loading evidence manifest…");
     const response = await fetch(manifestUrl, { cache: "no-store" });
     if (!response.ok) throw new Error(`Could not load DAG snapshot manifest ${manifestUrl.href}: HTTP ${response.status}`);
     this.manifest = await response.json();
+    performance.measure("echo:evidence:manifest", { start: manifestStart, end: performance.now() });
     this.manifestBaseUrl = manifestUrl;
     this.browserLayout = browserV2ManifestLayout(this.manifest);
     this.onStatus("Loading grouping schema…");
@@ -77,6 +85,7 @@ export class ParquetManifestDagDataSource {
       || this.groupingSet?.cache_compatibility?.record_signature;
 
     this.onStatus("Starting query engine…");
+    const engineStart = performance.now();
     const mainModule = new URL("./vendor/duckdb/duckdb-eh.wasm", import.meta.url).href;
     const mainWorker = new URL("./vendor/duckdb/duckdb-browser-eh.worker.js", import.meta.url).href;
     const worker = new Worker(mainWorker);
@@ -86,13 +95,19 @@ export class ParquetManifestDagDataSource {
     );
     await database.instantiate(mainModule);
     this.connection = await database.connect();
+    this.neighborConnection = await database.connect();
+    performance.measure("echo:evidence:engine", { start: engineStart, end: performance.now() });
+    const lookupStart = performance.now();
     await this.loadBrowserShardLookup();
+    performance.measure("echo:evidence:lookup", { start: lookupStart, end: performance.now() });
+    const validationStart = performance.now();
     validateBrowserV2EvidenceBinding({
       manifest: this.manifest,
       manifestUrl: this.manifestBaseUrl.href,
       metadata: await this.loadBuildMetadata(),
       expectedRecordSignature,
     });
+    performance.measure("echo:evidence:validation", { start: validationStart, end: performance.now() });
     this.lazyEvidenceInit = false;
   }
 
@@ -116,18 +131,23 @@ export class ParquetManifestDagDataSource {
   }
 
   async loadVariableMetadata(variableIds, layoutSource = "") {
+    const start = performance.now();
     await this.ensureEvidenceConnection();
     if (!variableIds?.length) return [];
     if (!this.browserShardIds(variableIds).length) return [];
     await this.ensureVariableLayouts();
     const selectedLayoutSource = layoutSource || this.defaultVariableLayoutSource;
     const placeholders = variableIds.map(() => "?").join(",");
-    const urls = this.browserUrls(this.browserLayout.variables, variableIds)
+    const canonical = this.browserShardIds(variableIds).length >= CANONICAL_READ_SHARD_THRESHOLD
+      ? this.canonicalEvidenceRelationUrl("variable_occurrences") : "";
+    const urls = (canonical ? [canonical] : this.browserUrls(this.browserLayout.variables, variableIds))
       .map(url => `'${url.replaceAll("'", "''")}'`).join(",");
-    return queryRows(this.connection, `SELECT o.*, l.map_x, l.map_y
+    const rows = await queryRows(this.connection, `SELECT o.*, l.map_x, l.map_y
       FROM read_parquet([${urls}]) o JOIN variable_layouts l USING (variable_id)
       WHERE l.layout_source = ? AND o.variable_id IN (${placeholders}) ORDER BY o.index`,
     [selectedLayoutSource, ...variableIds]);
+    performance.measure("echo:evidence:variables", { start, end: performance.now() });
+    return rows;
   }
 
   async loadIncidentRawLinks(variableIds) {
@@ -161,19 +181,24 @@ export class ParquetManifestDagDataSource {
   }
 
   async loadNeighbors(variableIds) {
+    const start = performance.now();
     await this.ensureEvidenceConnection();
     if (!variableIds?.length) return [];
     if (!this.browserShardIds(variableIds).length) return [];
     const placeholders = variableIds.map(() => "?").join(",");
-    const urls = this.browserUrls(this.browserLayout.neighbors, variableIds)
+    const canonical = this.browserShardIds(variableIds).length >= CANONICAL_READ_SHARD_THRESHOLD
+      ? this.canonicalEvidenceRelationUrl("variable_neighbors") : "";
+    const urls = (canonical ? [canonical] : this.browserUrls(this.browserLayout.neighbors, variableIds))
       .map(url => `'${url.replaceAll("'", "''")}'`).join(",");
-    return queryRows(this.connection, `SELECT * FROM read_parquet([${urls}])
+    const rows = await queryRows(this.neighborConnection || this.connection, `SELECT * FROM read_parquet([${urls}])
       WHERE variable_id IN (${placeholders}) ORDER BY variable_id, display_rank`, variableIds);
+    performance.measure("echo:evidence:neighbors", { start, end: performance.now() });
+    return rows;
   }
 
   async ensureEvidenceConnection() {
-    if (this.connection) return;
     if (this.evidenceInitialization) return this.evidenceInitialization;
+    if (this.connection) return;
     // A compiled publication intentionally deferred R2/DuckDB setup until detail
     // or editing asks for a narrowly filtered relation.
     this.evidenceInitialization = (async () => {

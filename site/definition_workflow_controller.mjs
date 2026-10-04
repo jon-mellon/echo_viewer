@@ -7,10 +7,12 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails = async () => {} }) {
   let hydrationRevision = 0;
+  const sourceHydrations = new Map();
 
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv"].includes(role)) return;
     hydrationRevision += 1;
+    sourceHydrations.clear();
     state.definitionDraft = {
       role, step: "sources", source_group_ids: [], source_snapshot: [],
       eligible_variable_ids: [], new_variable_ids: [], new_label: "",
@@ -82,7 +84,18 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       .map(edge => [edge.edge_id, "keep"]));
     draft.step = "partition";
     state.selectedVariableIds.clear();
-    await hydrateVariableDetails(draft.eligible_variable_ids);
+    presenter.setContinueLoading();
+    try {
+      await Promise.all(sources.map(source => sourceHydrations.get(source.group_id)
+        || hydrateVariableDetails(source.variable_ids)));
+    } catch (error) {
+      if (revision === hydrationRevision && state.definitionDraft === draft) {
+        draft.step = "sources";
+        renderDefinition();
+        presenter.showLoadError(error);
+      }
+      return;
+    }
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     invalidateMapCaches();
     setMapMode("select");
@@ -149,6 +162,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.definitionDraft.source_group_ids = [...ids];
     persistProjectLocally();
     renderDefinition();
+    if (selected && !sourceHydrations.has(sourceId)) {
+      const source = groupById(sourceId);
+      if (source?.variable_ids?.length) {
+        const loading = hydrateVariableDetails(source.variable_ids);
+        sourceHydrations.set(sourceId, loading);
+        // Continue will await this same promise; handle cancellation separately.
+        void loading.catch(() => sourceHydrations.delete(sourceId));
+      }
+    }
   }
 
   function setResidualLabel(groupId, label) {

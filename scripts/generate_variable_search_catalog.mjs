@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 
 const [source, output = "site/variable-search-catalog.json"] = process.argv.slice(2);
 if (!source) {
@@ -23,4 +24,7 @@ const records = variables.map(variable => {
 });
 const payload = JSON.stringify({ format: "echo-variable-search-v1", count: records.length, records });
 writeFileSync(output, payload);
-console.log(JSON.stringify({ output, variables: records.length, bytes: Buffer.byteLength(payload) }));
+const compressed = gzipSync(payload, { level: 9 });
+writeFileSync(`${output}.gz`, compressed);
+console.log(JSON.stringify({ output, variables: records.length, bytes: Buffer.byteLength(payload),
+  compressedBytes: compressed.length }));

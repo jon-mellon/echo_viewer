@@ -23,6 +23,29 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install test dependencies
+        run: npm ci
+      - name: Run unit and architecture checks
+        run: npm test
+      - name: Install profiling browser
+        run: npx playwright install --with-deps chromium
+      - name: Enforce performance budgets
+        run: npm run profile
+      - name: Enforce mobile performance budgets
+        run: PROFILE_DEVICE=mobile npm run profile
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: viewer-profile
+          path: |
+            profile-results/
+            profile-results-mobile/
+          if-no-files-found: ignore
+          retention-days: 1
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:

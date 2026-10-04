@@ -2108,6 +2108,22 @@ h2 {
 }
 
 @media (max-width: 840px) {
+  .setup-group-picker {
+    height: min(45vh, 340px);
+    overflow-y: auto;
+    align-content: start;
+  }
+
+  .dag-map-toolbar {
+    left: 10px;
+    right: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+  }
+
+  .dag-map-toolbar > * { flex-shrink: 0; }
+
   .dag2-mode .dag-shell {
     display: block;
     height: calc(100dvh - 64px - env(safe-area-inset-bottom));
@@ -2169,6 +2185,8 @@ h2 {
 .password-locked .startup-loading {
   visibility: hidden;
 }
+
+.viewer-loading .dag-shell { visibility: hidden; }
 
 .password-gate {
   position: fixed;

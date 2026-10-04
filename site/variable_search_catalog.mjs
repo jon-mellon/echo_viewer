@@ -1,4 +1,4 @@
-export const VARIABLE_SEARCH_CATALOG_URL = "/variable-search-catalog.json";
+export const VARIABLE_SEARCH_CATALOG_URL = "/variable-search-catalog.json.gz";
 
 const normalize = value => String(value ?? "").trim().toLowerCase();
 
@@ -16,9 +16,13 @@ export class StaticVariableSearchCatalog {
     this.status = "loading";
     this.loading = (async () => {
       try {
-        const response = await fetchImpl(url, { cache: "force-cache" });
+        const compressed = url.endsWith(".gz") && typeof DecompressionStream === "function";
+        const requestedUrl = compressed ? url : url.replace(/\.gz$/, "");
+        const response = await fetchImpl(requestedUrl, { cache: "force-cache" });
         if (!response.ok) throw new Error(`Could not load variable search catalog: HTTP ${response.status}`);
-        const payload = await response.json();
+        const payload = compressed
+          ? await new Response(response.body.pipeThrough(new DecompressionStream("gzip"))).json()
+          : await response.json();
         if (payload?.format !== "echo-variable-search-v1" || !Array.isArray(payload.records)) {
           throw new Error("Unsupported variable search catalog format.");
         }

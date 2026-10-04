@@ -72,9 +72,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     finishStartupLoading();
-    // Search is useful immediately after it arrives, but it is not on the
-    // critical path for rendering the compiled DAG.
-    void loadVariableSearchCatalog();
+    // The large variable catalog is loaded when someone searches for the
+    // first time. Group-label browsing does not need it at startup.
     if (state.data.load_published_schema) {
       const revision = state.compiledDagRevision || 0;
       state.publishedSchemaHydrating = true;

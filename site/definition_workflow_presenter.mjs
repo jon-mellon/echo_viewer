@@ -115,5 +115,14 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionValidation.textContent = error?.message || String(error);
   }
 
-  return { render, showValidationError };
+  function setContinueLoading() {
+    els.definitionContinue.disabled = true;
+    els.definitionContinue.textContent = "Loading selected variables…";
+  }
+
+  function showLoadError(error) {
+    els.definitionContinue.title = `Could not load variables: ${error?.message || error}`;
+  }
+
+  return { render, showValidationError, setContinueLoading, showLoadError };
 }

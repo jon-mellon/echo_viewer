@@ -473,6 +473,7 @@ function renderSearch(side) {
   const input = side === "iv" ? els.ivInput : els.dvInput;
   const container = side === "iv" ? els.ivResults : els.dvResults;
   const query = input.value.trim();
+  if (query && state.variableSearchStatus === "idle") void loadVariableSearchCatalog();
   const selected = state.seeds[side];
   if (state.anchorSearchMode[side] !== "new") {
     state.searchMatches[side] = [];
@@ -546,6 +547,7 @@ function searchAnchorGroups(project, side, query, variableById, limit = 12) {
 }
 
 async function loadVariableSearchCatalog() {
+  if (state.variableSearchStatus === "loading" || state.variableSearchStatus === "ready") return;
   state.variableSearchStatus = "loading";
   state.variableSearchError = null;
   try {
