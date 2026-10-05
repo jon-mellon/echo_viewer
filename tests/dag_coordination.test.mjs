@@ -4,6 +4,48 @@ import { attachDagInteractions } from "../site/dag_interactions.mjs";
 import { createRenderCoordinator } from "../site/render_coordinator.mjs";
 import { createDagNetworkController, selectionUpdatesForSegments } from "../site/dag_network_controller.mjs";
 
+test("DAG rerenders only reconfigure vis when visual options change", async () => {
+  const groups = ["a", "b", "c", "d"].map(group_id => ({ group_id, label: group_id, variable_ids: [] }));
+  const state = {
+    project: { groups, links: [], iv_group_id: "a", dv_group_id: "d" },
+    componentGroupIds: new Set(groups.map(group => group.group_id)),
+    variableById: new Map(), dagLayoutMode: "hierarchical", selectedEdgeId: null,
+    colliderGroupIds: new Set(), colliderPathGroupIds: new Set(),
+    confounderGroupIds: new Set(), confounderPathGroupIds: new Set(), visibleLinks: [],
+  };
+  const dagNetwork = { clientWidth: 630, clientHeight: 700,
+    addEventListener() {}, removeEventListener() {} };
+  class DataSet {
+    constructor(items) { this.items = new Map(items.map(item => [item.id, item])); }
+    getIds() { return [...this.items.keys()]; }
+    update(items) { for (const item of items) this.items.set(item.id, item); }
+    remove(ids) { for (const id of ids) this.items.delete(id); }
+  }
+  const networks = [];
+  class Network {
+    constructor(element, data, options) { this.options = options; this.setOptionsCalls = 0; networks.push(this); }
+    on() {} off() {} redraw() {} fit() {}
+    setOptions(options) { this.options = options; this.setOptionsCalls++; }
+  }
+  const controller = createDagNetworkController({ state,
+    elements: { dagNetwork, dagLayoutSelect: { value: "" } }, visApi: { DataSet, Network },
+    clusterRep: id => id, groupColor: () => "#000", dagGroups: () => groups,
+    groupById: id => groups.find(group => group.group_id === id),
+    drawMap() {}, setMapMode() {}, renderAll() {}, selectEdge() {},
+  });
+  controller.renderDag();
+  await controller.whenRendered();
+  controller.renderDag();
+  await controller.whenRendered();
+  assert.equal(networks.length, 1);
+  assert.equal(networks[0].setOptionsCalls, 0);
+  dagNetwork.clientWidth = 1200;
+  controller.renderDag();
+  await controller.whenRendered();
+  assert.equal(networks[0].setOptionsCalls, 1);
+  assert.equal(networks[0].options.nodes.widthConstraint.maximum, 185);
+});
+
 test("edge selection updates only the old and new routed links", () => {
   const segments = new Map([
     ["a::seg0", "a"], ["a::seg1", "a"], ["b::seg0", "b"], ["c::seg0", "c"],

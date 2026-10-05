@@ -20,6 +20,13 @@ export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId
   return updates;
 }
 
+function visOptionSignature(params = {}) {
+  return JSON.stringify([
+    params.fontSize ?? 14, params.vMargin ?? 8, params.hMargin ?? 13,
+    params.edgeWidth ?? 1.25, params.nodeMaxWidth || 190,
+  ]);
+}
+
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
   drawMap, setMapMode, renderAll, selectEdge,
@@ -30,6 +37,7 @@ let _visNetwork = null;
 let _visNodes = null;
 let _visEdges = null;
 let _dagLayoutSignature = "";
+let _visOptionSignature = "";
 let _dagGeometry = null;
 let _dagEdgeSegments = new Map();
 let _renderedSelectedEdgeId = null;
@@ -421,6 +429,7 @@ function applyDagRender(groups, layout, routes) {
       visNetworkOptions(layout.params)
     );
     _dagLayoutSignature = layout.signature;
+    _visOptionSignature = visOptionSignature(layout.params);
     attachDagNetworkHandlers(_visNetwork);
     setTimeout(() => _visNetwork?.fit({ animation: false, padding: 34 }), 80);
   } else {
@@ -444,7 +453,11 @@ function applyDagRender(groups, layout, routes) {
     const dropEdges = _visEdges.getIds().filter((id) => !nextEdgeIds.has(id));
     if (dropEdges.length) _visEdges.remove(dropEdges);
 
-    _visNetwork.setOptions(visNetworkOptions(layout.params));
+    const optionSignature = visOptionSignature(layout.params);
+    if (optionSignature !== _visOptionSignature) {
+      _visNetwork.setOptions(visNetworkOptions(layout.params));
+      _visOptionSignature = optionSignature;
+    }
     // Only refit when the node set changed; refitting on every edge selection
     // would yank the viewport around as the user inspects edges.
     const layoutChanged = layout.signature !== _dagLayoutSignature;
