@@ -1,5 +1,5 @@
-// Synchronous scheduling preserves event-time rendering and autosave semantics.
-// Deliberately no frame batching until redundant work has been measured.
+// Render synchronously so controls reflect each edit before its event returns.
+// Project persistence is coalesced separately by the project controller.
 export function createRenderCoordinator(view) {
   function rebuildProject({ reuseDagGeometry = false } = {}) {
     view.buildCandidateQueue();

@@ -131,6 +131,37 @@ test("project controller preserves live group identity and owns history transiti
   assert.equal(renders, 1);
 });
 
+test("autosave coalesces edits and flushes the latest project on page hide", () => {
+  const state = createDagAppState();
+  state.data = { generated_at: "fixture", default_grouping_set_id: "none", grouping_sets: [] };
+  state.projectStorageVariableCount = 0;
+  const writes = [];
+  const listeners = new Map();
+  const lifecycleTarget = {
+    addEventListener(name, listener) { listeners.set(name, listener); },
+    document: { visibilityState: "visible" },
+  };
+  const controller = createDagProjectController({
+    state, storage: { setItem(key, value) { writes.push({ key, value }); } },
+    storagePrefix: "test", nowIso: () => "2026-09-10T00:00:00Z",
+    invalidateMapCaches() {}, renderAll() {}, renderUndoRedo() {}, renderActionHistory() {},
+    lifecycleTarget,
+  });
+  controller.initialize();
+  state.project.project_id = "first";
+  controller.save();
+  state.project.project_id = "latest";
+  controller.save();
+  assert.equal(writes.length, 0);
+  listeners.get("pagehide")();
+  assert.equal(writes.length, 1);
+  assert.equal(JSON.parse(writes[0].value).project_id, "latest");
+  controller.save();
+  lifecycleTarget.document.visibilityState = "hidden";
+  listeners.get("visibilitychange")();
+  assert.equal(writes.length, 2);
+});
+
 test("export controller snapshots mutable viewer data at its boundary", () => {
   const state = createDagAppState();
   state.data = { cache_compatibility: { fingerprint: "fixture" } };

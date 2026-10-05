@@ -8,7 +8,10 @@ import * as workflow from "./dag_workflow.mjs";
 export function createDagProjectController({
   state, storage, storagePrefix, nowIso, invalidateMapCaches,
   renderAll, renderUndoRedo, renderActionHistory, warn = console.warn,
+  lifecycleTarget = globalThis,
 }) {
+  let saveTimer = null;
+  let savePending = false;
   function createProject() {
     return projectOps.createProject({
       projectId: `dag_project_${Date.now()}`,
@@ -73,7 +76,11 @@ export function createDagProjectController({
     }, nowIso());
   }
 
-  function save() {
+  function flushSave() {
+    if (saveTimer !== null) clearTimeout(saveTimer);
+    saveTimer = null;
+    if (!savePending) return;
+    savePending = false;
     if (!state.project || !state.data) return;
     try {
       persistence.writeProject(storage, storageKey(), payload());
@@ -82,7 +89,22 @@ export function createDagProjectController({
     }
   }
 
+  function save() {
+    if (!state.project || !state.data) return;
+    savePending = true;
+    if (saveTimer !== null) clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushSave, 250);
+  }
+
+  lifecycleTarget.addEventListener?.("pagehide", flushSave);
+  lifecycleTarget.addEventListener?.("visibilitychange", () => {
+    if (lifecycleTarget.document?.visibilityState === "hidden") flushSave();
+  });
+
   function restore() {
+    if (saveTimer !== null) clearTimeout(saveTimer);
+    saveTimer = null;
+    savePending = false;
     try {
       const saved = persistence.readProject(storage, storageKey());
       applyLoaded(saved);
@@ -129,7 +151,7 @@ export function createDagProjectController({
 
   return {
     createProject, currentSchema, applyOperation, initialize, loadCurrentSchema,
-    applyLoaded, storageKey, payload, save, restore, snapshot, applySnapshot, record,
+    applyLoaded, storageKey, payload, save, flushSave, restore, snapshot, applySnapshot, record,
     undo: () => step("undo"), redo: () => step("redo"), addDecision,
   };
 }
