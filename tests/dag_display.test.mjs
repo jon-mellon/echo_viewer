@@ -37,9 +37,9 @@ test("display records preserve node roles, selection, edge styles and descriptio
     }
   }
   for (const direction_type of ["A_TO_B", "B_TO_A", "BIDIRECTIONAL"]) {
-    for (const is_manual of [false, true]) for (const is_target_relation of [false, true]) {
+    for (const is_target_relation of [false, true]) {
       const link = { edge_id: "edge", group_a: "iv", group_b: "dv", direction_type,
-        is_manual, is_target_relation,
+        is_target_relation,
         a_to_b_raw_link_ids: ["test-1", "test-2"], b_to_a_raw_link_ids: ["test-2", "test-3"],
         a_to_b_paper_table_keys: ["p1", "p2"], b_to_a_paper_table_keys: ["p2"] };
       for (const selected of [null, "edge"]) {

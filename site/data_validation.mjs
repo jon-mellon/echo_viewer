@@ -72,21 +72,13 @@ export function validateProjectPayload(payload) {
   assertSafeJson(payload, "Project payload");
   for (const key of [
     "groups", "links", "decisions", "grouping_imports", "grouping_exports", "carve_outs",
-    "manual_edges", "rejected_variables", "restored_variable_ids", "undoHistory", "actionLog",
+    "rejected_variables", "restored_variable_ids", "undoHistory", "actionLog",
   ]) requireArray(payload, key, "Project payload");
   for (const key of ["filters", "link_decisions", "seeds", "definitionDraft"]) {
     requireRecord(payload, key, "Project payload", { nullable: key === "definitionDraft" });
   }
   requireRecord(payload, "publication", "Project payload", { nullable: true });
-  const groupIds = validateGroups(payload.groups || [], "Project payload");
-  for (const [index, edge] of (payload.manual_edges || []).entries()) {
-    const path = `Project payload.manual_edges[${index}]`;
-    if (!isRecord(edge)) throw new Error(`${path} must be an object.`);
-    for (const key of ["edge_id", "source_group_id", "target_group_id"]) requireString(edge, key, path);
-    if (groupIds.size && (!groupIds.has(edge.source_group_id) || !groupIds.has(edge.target_group_id))) {
-      throw new Error(`${path} references an unknown group.`);
-    }
-  }
+  validateGroups(payload.groups || [], "Project payload");
   return payload;
 }
 

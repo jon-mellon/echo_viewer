@@ -51,11 +51,8 @@ const scenarioBudgets = {
   "map fullscreen and Escape": 1000,
   "map mode selection": 1000,
   "history panel": 1000,
-  "manual edge drawer": 1000,
-  "add manual edge": 4000,
-  "undo manual edge": 4000,
-  "redo manual edge": 4000,
-  "remove manual edge": 4000,
+  "undo edge decision": 1000,
+  "redo edge decision": 1000,
   "export drawer": 1000,
   "project JSON download": 4000,
   "working map download": 4000,
@@ -441,6 +438,18 @@ try {
     await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
     await waitForGraph();
   });
+  if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  await measure("undo edge decision", async () => {
+    await page.locator("#dag2UndoBtn").click();
+    await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
+    await waitForGraph();
+  });
+  await measure("redo edge decision", async () => {
+    await page.locator("#dag2RedoBtn").click();
+    await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
+    await waitForGraph();
+  });
+  if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
   await measure("close evidence", async () => {
     await page.locator("#closeEvidencePane").click();
     await page.waitForFunction(() => !window.__dagBuilderState.selectedEdgeId);
@@ -474,52 +483,6 @@ try {
     await page.locator("#fullscreenDag[aria-pressed='true']").waitFor();
     await page.keyboard.press("Escape");
     await page.locator("#fullscreenDag[aria-pressed='false']").waitFor();
-  });
-  await measure("manual edge drawer", async () => {
-    await page.locator("#addEdgeToggle").click();
-    await page.locator("#addEdgeDrawer").waitFor({ state: "visible" });
-    await page.locator("#closeAddEdge").click();
-    await page.locator("#addEdgeDrawer").waitFor({ state: "hidden" });
-    await page.locator("#addEdgeToggle").click();
-  });
-  const manualCount = await page.evaluate(() => window.__dagBuilderState.project.manual_edges.length);
-  await measure("add manual edge", async () => {
-    const groups = await page.locator("#manualSource option").evaluateAll(options =>
-      options.slice(0, 4).map(option => option.value));
-    if (groups.length < 2) throw new Error("Manual edge needs two selectable groups");
-    await page.locator("#manualSource").selectOption(groups[0]);
-    await page.locator("#manualTarget").selectOption(groups.at(-1));
-    await page.locator("#manualDirection").selectOption("bidirectional");
-    await page.locator("#manualNote").fill("Profiling manual edge");
-    await page.locator("#addManualEdge").click();
-    await page.waitForFunction(count => window.__dagBuilderState.project.manual_edges.length === count + 1, manualCount);
-    await waitForGraph();
-  });
-  if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
-  await measure("undo manual edge", async () => {
-    await page.locator("#dag2UndoBtn").click();
-    await page.waitForFunction(count => window.__dagBuilderState.project.manual_edges.length === count, manualCount);
-    await waitForGraph();
-  });
-  await measure("redo manual edge", async () => {
-    await page.locator("#dag2RedoBtn").click();
-    await page.waitForFunction(count => window.__dagBuilderState.project.manual_edges.length === count + 1, manualCount);
-    await waitForGraph();
-  });
-  const manualId = await page.evaluate(() => window.__dagBuilderState.project.manual_edges.at(-1)?.edge_id);
-  const manualLinkId = await page.evaluate(id => window.__dagBuilderState.project.links
-    .find(link => link.manual_edge_ids?.includes(id))?.edge_id, manualId);
-  if (!manualLinkId) throw new Error("Manual edge is absent from the graph");
-  if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
-  await page.evaluate(async id => {
-    const { inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
-    inspectDagEdge(id);
-  }, manualLinkId);
-  await measure("remove manual edge", async () => {
-    await page.locator(`#edgeInspector button[data-edge-action="delete-manual"][data-manual-id="${manualId}"]`).click();
-    await page.waitForFunction(id => window.__dagBuilderState.project.manual_edges
-      .find(edge => edge.edge_id === id)?.deleted, manualId);
-    await waitForGraph();
   });
   if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
   await measure("export drawer", async () => {

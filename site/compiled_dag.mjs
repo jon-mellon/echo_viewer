@@ -41,7 +41,6 @@ export function projectForSchema(schema, project = {}) {
     groups,
     iv_group_id: ids.has(project.iv_group_id) ? project.iv_group_id : "",
     dv_group_id: ids.has(project.dv_group_id) ? project.dv_group_id : "",
-    manual_edges: project.manual_edges || [],
     link_decisions: project.link_decisions || {},
   };
 }
@@ -146,15 +145,14 @@ export function incrementCompiledDag({ compiledDag, oldSchema, newSchema, incide
     }
   }
   const incidentIds = new Set(incident.map(link => link.raw_causal_link_id));
-  const edgesById = new Map((compiledDag.edges || []).map(edge => [edge.edge_id, {
-    ...edge,
-    a_to_b_raw_link_ids: (edge.a_to_b_raw_link_ids || []).filter(id => !incidentIds.has(id)),
-    b_to_a_raw_link_ids: (edge.b_to_a_raw_link_ids || []).filter(id => !incidentIds.has(id)),
-    manual_edge_ids: [],
-    manual_a_to_b_exists: false,
-    manual_b_to_a_exists: false,
-    is_manual: false,
-  }]));
+  const edgesById = new Map((compiledDag.edges || []).map(edge => {
+    const { manual_edge_ids, manual_a_to_b_exists, manual_b_to_a_exists, is_manual, ...evidenceEdge } = edge;
+    return [edge.edge_id, {
+      ...evidenceEdge,
+      a_to_b_raw_link_ids: (edge.a_to_b_raw_link_ids || []).filter(id => !incidentIds.has(id)),
+      b_to_a_raw_link_ids: (edge.b_to_a_raw_link_ids || []).filter(id => !incidentIds.has(id)),
+    }];
+  }));
   const additions = fullCompileDag({ schema: newSchema, project, rawLinks: incident }).edges;
   for (const addition of additions) {
     const current = edgesById.get(addition.edge_id);
@@ -162,10 +160,6 @@ export function incrementCompiledDag({ compiledDag, oldSchema, newSchema, incide
     else {
       current.a_to_b_raw_link_ids.push(...addition.a_to_b_raw_link_ids);
       current.b_to_a_raw_link_ids.push(...addition.b_to_a_raw_link_ids);
-      current.manual_edge_ids = addition.manual_edge_ids;
-      current.manual_a_to_b_exists = addition.manual_a_to_b_exists;
-      current.manual_b_to_a_exists = addition.manual_b_to_a_exists;
-      current.is_manual = addition.is_manual;
     }
   }
   const edges = [...edgesById.values()].flatMap(edge => {
@@ -176,12 +170,11 @@ export function incrementCompiledDag({ compiledDag, oldSchema, newSchema, incide
     edge.causal_link_occurrence_count = edge.a_to_b_occurrence_count + edge.b_to_a_occurrence_count;
     edge.mapping_a_to_b_exists = edge.a_to_b_occurrence_count > 0;
     edge.mapping_b_to_a_exists = edge.b_to_a_occurrence_count > 0;
-    const forward = edge.mapping_a_to_b_exists || edge.manual_a_to_b_exists || edge.is_target_relation;
-    const reverse = edge.mapping_b_to_a_exists || edge.manual_b_to_a_exists;
+    const forward = edge.mapping_a_to_b_exists || edge.is_target_relation;
+    const reverse = edge.mapping_b_to_a_exists;
     edge.direction_type = forward && reverse ? "BIDIRECTIONAL" : forward ? "A_TO_B" : reverse ? "B_TO_A" : "NO_MAPPING_LINK";
-    edge.edge_source = edge.causal_link_occurrence_count
-      ? (edge.is_manual ? "mapping_and_manual" : "mapping_derived") : "user_manual";
-    return edge.causal_link_occurrence_count || edge.is_manual || edge.is_target_relation ? [edge] : [];
+    edge.edge_source = "mapping_derived";
+    return edge.causal_link_occurrence_count || edge.is_target_relation ? [edge] : [];
   }).sort((a, b) => compareText(a.edge_id, b.edge_id));
   const nodeById = new Map((compiledDag.nodes || []).map(node => [node.group_id, node]));
   const nodes = (newSchema.groups || []).map(group => ({

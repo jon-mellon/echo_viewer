@@ -70,7 +70,6 @@ try {
   assert.equal(membership.hasEdge, true);
   assert.equal(membership.undone, true);
   assert.equal(membership.owners, 1);
-  assert.equal(await page.locator(`#manualSource option[value="${membership.id}"]`).count(), 1);
   await page.locator('#cancelGroupEdit').click();
   assert.ok(await page.evaluate(id => groupTest.dagGroups().some(g => g.group_id === id), membership.id));
 

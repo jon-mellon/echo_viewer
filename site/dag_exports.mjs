@@ -128,14 +128,13 @@ export function buildLinksTable(fmt, { visibleLinks, project, rawLinksById }, ke
     const { sourceLabel, targetLabel, arrow } = directedGroupLabels(link, project.groups, "↔");
     const rawIds = [...new Set([...link.a_to_b_raw_link_ids, ...link.b_to_a_raw_link_ids])];
     const dois = [...new Set(rawIds.map(id => rawLinksById.get(id)?.paper_id).filter(isDoi))];
-    const manual = link.is_manual ? ["manual"] : [];
     if (fmt === "md") {
       const cites = dois.map(d => `[@${keyMap?.get(d.trim()) || d.trim()}]`);
-      const src = [...cites, ...manual].join("; ") || "—";
+      const src = cites.join("; ") || "—";
       return `| ${escapeHtml(sourceLabel)} | ${escapeHtml(targetLabel)} | ${arrow} | ${src} |`;
     } else {
       const cites = dois.map(d => `\\citep{${keyMap?.get(d.trim()) || d.trim().replace(/[^a-zA-Z0-9_.\-]/g, "_")}}`);
-      const src = [...cites, ...manual].join("; ") || "---";
+      const src = cites.join("; ") || "---";
       const texArrow = arrow === "↔" ? "$\\leftrightarrow$" : "$\\rightarrow$";
       return `  ${texEscape(sourceLabel)} & ${texEscape(targetLabel)} & ${texArrow} & ${src} \\\\`;
     }
@@ -245,7 +244,7 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, gr
     graphImageBytes ? `![Causal DAG](dag-graph.png)`
       : svgStr ? `![Causal DAG](dag.svg)`
       : hasGraph ? `*(Graph figure export is not yet available — the causal structure is listed in the Causal Links table below.)*`
-        : `*(No DAG to display — create groups and add edges first.)*`,
+        : `*(No DAG to display — choose groups with evidence links first.)*`,
     ``,
     `## Causal Links`,
     ``,
@@ -309,7 +308,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
         ? `\\textit{The causal graph image could not be rendered; the causal structure is listed below.}`
       : ((visibleLinks || []).length
         ? `\\textit{Graph figure export is not yet available; the causal structure is listed in the Causal Links table below.}`
-        : `\\textit{No DAG to display --- create groups and add edges first.}`),
+        : `\\textit{No DAG to display --- choose groups with evidence links first.}`),
     ``,
     `\\section{Causal Links}`,
     ``,
@@ -337,7 +336,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
 
 /** @returns {SerializedProjectPayload} */
 export function buildProjectPayload({ project, ...view }, savedAt) {
-  const { candidate_queue: _derivedCandidateQueue, ...persistedProject } = project;
+  const { candidate_queue: _derivedCandidateQueue, manual_edges: _removedManualEdges, ...persistedProject } = project;
   return /** @type {SerializedProjectPayload} */ ({
     ...persistedProject,
     schema_version: PROJECT_FORMAT_VERSION,
@@ -373,7 +372,6 @@ export function buildWorkingMapPayload({ project, visibleLinks, rejectedVariable
     dv_group_id: project.dv_group_id,
     groups: project.groups.filter(group => group.variable_ids?.length).filter((group) => visibleGroupIds.has(group.group_id)),
     links: visibleLinks,
-    manual_edges: project.manual_edges.filter((e) => !e.deleted),
     rejected_variables: rejectedVariables,
     hidden_variable_ids: [...hiddenVariableIds],
     allows_bidirectional_links: true,

@@ -69,7 +69,6 @@ export function restoreProjectPayload(payload, defaults, currentLayoutSource) {
       ...projectDefaults, ...persistedProject,
       groups: Array.isArray(serialized.groups) ? serialized.groups.map(withoutGroupReviewStatus) : [],
       decisions: Array.isArray(serialized.decisions) ? serialized.decisions : [],
-      manual_edges: Array.isArray(serialized.manual_edges) ? serialized.manual_edges : [],
       rejected_variables: Array.isArray(serialized.rejected_variables) ? serialized.rejected_variables : [],
       restored_variable_ids: serialized.restored_variable_ids || [],
       link_decisions: serialized.link_decisions || {},

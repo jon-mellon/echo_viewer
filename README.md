@@ -15,7 +15,7 @@ python3 -m http.server --directory site
 
 Run `npm run profile` to start a local preview and measure startup, definition
 entry, group search, IV/DV selection and changes, map controls and gestures,
-DAG layouts and filters, edge Exclude/Restore, manual edges, undo/redo,
+DAG layouts and filters, edge Exclude/Restore, undo/redo,
 fullscreen, history, incident-link retrieval for 40 changed variables, and
 project/schema downloads in Chromium.
 Run `PROFILE_DEVICE=mobile npm run profile` for the same flows at a 390-pixel

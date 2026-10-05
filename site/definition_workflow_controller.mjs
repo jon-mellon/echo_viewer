@@ -26,7 +26,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.definitionDraft = {
       role, step: "sources", source_group_ids: [], source_snapshot: [],
       eligible_variable_ids: [], new_variable_ids: [], new_label: "",
-      residual_labels: {}, manual_edge_dispositions: {},
+      residual_labels: {},
     };
     state.selectedVariableIds.clear();
     invalidateMapCaches();
@@ -51,7 +51,6 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       new_variable_ids: [...new Set(newGroup.variable_ids.map(clusterRep))],
       new_label: newGroup.label || "",
       residual_labels: Object.fromEntries(residuals.map(group => [group.group_id, group.label || ""])),
-      manual_edge_dispositions: {},
     };
     state.activeGroupId = null;
     state.selectedVariableIds = new Set(state.definitionDraft.new_variable_ids);
@@ -90,8 +89,6 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.new_variable_ids = [];
     draft.residual_labels = Object.fromEntries(sources.map(group =>
       [group.group_id, `Other: ${group.label || group.group_id}`]));
-    draft.manual_edge_dispositions = Object.fromEntries(affectedDefinitionManualEdges()
-      .map(edge => [edge.edge_id, "keep"]));
     draft.step = "partition";
     state.selectedVariableIds.clear();
     presenter.setContinueLoading();
@@ -131,12 +128,6 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.selectedVariableId = id;
     invalidateMapCaches();
     renderDraft({ redrawMap: true });
-  }
-
-  function affectedDefinitionManualEdges() {
-    const sources = new Set(state.definitionDraft?.source_group_ids || []);
-    return (state.project?.manual_edges || []).filter(edge => !edge.deleted
-      && (sources.has(edge.source_group_id) || sources.has(edge.target_group_id)));
   }
 
   function definitionCanReview() {
@@ -189,12 +180,6 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     persistProjectLocally();
   }
 
-  function setManualDisposition(edgeId, disposition) {
-    if (!state.definitionDraft) return;
-    state.definitionDraft.manual_edge_dispositions[edgeId] = disposition;
-    persistProjectLocally();
-  }
-
   function renderDefinition() {
     if (state.definitionDraft?.step === "partition" && state.definitionDraft.new_variable_ids?.length) {
       void hydrateNeighbors(state.definitionDraft.new_variable_ids)
@@ -223,7 +208,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         sourceGroupIds: draft.source_group_ids, newGroupId, newLabel: draft.new_label,
         residualLabels: draft.residual_labels,
         newVariableIds: expandToClusterMembers(draft.new_variable_ids), timestamp: nowIso(),
-        role: draft.role, manualEdgeDispositions: draft.manual_edge_dispositions,
+        role: draft.role,
         splitId: draft.split_id,
       });
       applyProjectOperation(next);
@@ -279,13 +264,12 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   const presenter = createDefinitionWorkflowPresenter({
     state, elements: els, normalized, clusterRep, truncate, definitionSources,
     definitionResidualIds, definitionCanReview, searchVariables, visibleVariables,
-    clusterDisplayVariable, definitionNeighbors, affectedDefinitionManualEdges,
-    groupById, resizeMap, fitMap, onSourceSelection: setSourceSelection,
+    clusterDisplayVariable, definitionNeighbors,
+    resizeMap, fitMap, onSourceSelection: setSourceSelection,
     onToggleVariable: toggleDefinitionVariable, onResidualLabel: setResidualLabel,
-    onManualDisposition: setManualDisposition,
   });
 
   return { startDefinition, startEditSplit, cancelDefinition, definitionSources, continueDefinition,
-    definitionResidualIds, toggleDefinitionVariable, affectedDefinitionManualEdges,
+    definitionResidualIds, toggleDefinitionVariable,
     definitionCanReview, definitionNeighbors, renderDefinition, saveDefinition, installDefinitionHandlers };
 }

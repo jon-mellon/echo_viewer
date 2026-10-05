@@ -128,7 +128,6 @@
               <div class="section-title compact-title"><h2>New group variables</h2></div>
               <div id="definitionReviewVariables" class="definition-review-variables"></div>
               <div id="definitionResidualLabels"></div>
-              <div id="definitionManualReview"></div>
               <div id="definitionValidation" class="small-note" aria-live="polite"></div>
               <div class="mini-toolbar">
                 <button id="definitionReviewBack" class="toolbar-button" type="button">Back</button>
@@ -307,25 +306,6 @@
             <div id="edgeInspector" class="edge-inspector empty">Select an edge to inspect its provenance</div>
             <!-- Provenance detail: appears when edge selected -->
             <div id="provenancePanel" class="provenance-panel" hidden></div>
-            <!-- + Add edge: collapsed by default -->
-            <div class="add-edge-bar">
-              <button id="addEdgeToggle" class="toolbar-button" type="button">+ Add edge</button>
-            </div>
-            <div id="addEdgeDrawer" class="add-edge-drawer" hidden>
-              <div class="add-edge-header">
-                <span class="dag-label" style="margin:0">Manual edge</span>
-                <button id="closeAddEdge" class="text-button" type="button">Cancel</button>
-              </div>
-              <select id="manualSource" class="select-input"></select>
-              <select id="manualTarget" class="select-input"></select>
-              <select id="manualDirection" class="select-input">
-                <option value="source_to_target">Source → Target</option>
-                <option value="target_to_source">Target → Source</option>
-                <option value="bidirectional">Bidirectional</option>
-              </select>
-              <textarea id="manualNote" class="dag-textarea" placeholder="Note or justification (optional)"></textarea>
-              <button id="addManualEdge" class="primary-button" type="button">Add edge</button>
-            </div>
           </div>
         </section>
 

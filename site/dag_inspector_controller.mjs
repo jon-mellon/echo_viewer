@@ -5,9 +5,8 @@ import { h, replaceChildren, safeUrl } from "./dom_builder.mjs";
 export const STUDY_DESIGN_EDGE_ID = "__study_design_iv_to_dv__";
 
 export function createDagInspectorController({
-  state, elements, escapeHtml, truncate, nowIso, takeSnapshot,
-  applyProjectOperation, addDecision, addToUndoHistory, rebuildProject, rebuildLinkDecision = rebuildProject,
-  groupById, dagGroups,
+  state, elements, truncate, nowIso, takeSnapshot,
+  applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision,
 }) {
   const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
   let pendingExclude = null;
@@ -31,8 +30,8 @@ export function createDagInspectorController({
     className: "edge-sources-loading", role: "status", ariaLive: "polite",
   }, h("span", { className: "inline-spinner", ariaHidden: "true" }), h("span", { textContent: "Loading sources…" }));
 
-  function handleEdgeAction(link, action, manualId, excludeReason) {
-    if (!["exclude", "restore", "delete-manual"].includes(action)) return;
+  function handleEdgeAction(link, action, excludeReason) {
+    if (!["exclude", "restore"].includes(action)) return;
     if (action === "exclude" && excludeReason === undefined) {
       pendingExclude = { edgeId: link.edge_id, reason: "" };
       const row = document.getElementById("excludeReasonRow");
@@ -43,14 +42,7 @@ export function createDagInspectorController({
       return;
     }
     const before = takeSnapshot();
-    if (action === "delete-manual") {
-      const manual = state.project.manual_edges.find(edge => edge.edge_id === manualId);
-      if (manual) {
-        applyProjectOperation(projectOps.deleteManualEdge(state.project, manualId));
-        addDecision("manual_edge_deleted", { edge_id: manual.edge_id });
-      }
-      addToUndoHistory("Removed manual edge", before);
-    } else if (action === "restore") {
+    if (action === "restore") {
       applyProjectOperation(projectOps.setLinkDecision(state.project, link.edge_id, null));
       addDecision("link_restored", { edge_id: link.edge_id });
       addToUndoHistory("Restored edge", before);
@@ -63,8 +55,7 @@ export function createDagInspectorController({
       addDecision("link_excluded", { edge_id: link.edge_id, reason: excludeReason });
       addToUndoHistory("Excluded edge", before);
     }
-    if (action === "delete-manual") rebuildProject();
-    else rebuildLinkDecision();
+    rebuildLinkDecision();
   }
 
   function renderStudyRelation() {
@@ -110,12 +101,12 @@ export function createDagInspectorController({
       h("strong", { textContent: `${model.sourceLabel} ${model.arrow} ${model.targetLabel}` }),
       h("div", { textContent: `${link.is_target_relation ? "Target relationship. " : ""}${link.edge_source}; ${sourcesLoading ? "sources loading" : model.rawCount ? `${model.rawCount} evidence record(s)` : "no provenance"}` }),
       sourcesLoading ? loadingSources() : null,
-      model.manual.length ? h("div", { textContent: model.manual.map(edge => edge.user_note || "Manual edge").join("; ") }) : null, reason,
+      reason,
       h("div", { className: "edge-actions" }, model.actions.map(item => h("button", {
-        className: "action-button", type: "button", dataset: { edgeAction: item.action, ...(item.manualId ? { manualId: item.manualId } : {}) }, textContent: item.label,
+        className: "action-button", type: "button", dataset: { edgeAction: item.action }, textContent: item.label,
       }))), reasonRow);
     elements.edgeInspector.querySelectorAll("button[data-edge-action]").forEach(button => {
-      button.addEventListener("click", () => handleEdgeAction(link, button.dataset.edgeAction, button.dataset.manualId));
+      button.addEventListener("click", () => handleEdgeAction(link, button.dataset.edgeAction));
     });
     const row = elements.edgeInspector.querySelector("#excludeReasonRow");
     const input = elements.edgeInspector.querySelector("#excludeReasonInput");
@@ -124,7 +115,7 @@ export function createDagInspectorController({
       const reason = input.value.trim();
       if (!reason) { input.focus(); input.classList.add("input-error"); return; }
       input.classList.remove("input-error"); row.hidden = true;
-      handleEdgeAction(link, "exclude", null, reason);
+      handleEdgeAction(link, "exclude", reason);
     });
     elements.edgeInspector.querySelector("#excludeCancelBtn")?.addEventListener("click", () => {
       row.hidden = true; input.value = ""; clearPendingExclude();
@@ -142,10 +133,8 @@ export function createDagInspectorController({
     const model = inspector.provenanceModel(
       link, state.project, state.rawLinksById, state.variableById, diagnosticView(),
     );
-    const manualNode = model.manual.length
-      ? h("div", { className: "small-note" }, h("strong", { textContent: "Manual annotation" }), h("br"), model.manual.map(edge => edge.user_note || "Manual edge added by user.").join("; ")) : null;
     if (!model.rawIds.length) {
-      replaceChildren(elements.provenancePanel, manualNode, h("div", { className: "small-note", textContent: "No raw provenance for this edge." }));
+      replaceChildren(elements.provenancePanel, h("div", { className: "small-note", textContent: "No raw provenance for this edge." }));
       return;
     }
     const rows = model.rows.map(({ raw, source, target }) => {
@@ -161,47 +150,9 @@ export function createDagInspectorController({
         cell(raw.within_table_occurrence_id || ""), cell(raw.causal_link_existence || ""), cell(raw.identification_strategy || ""), cell(truncate(raw.target_population || "", 60)));
     });
     const headings = ["Paper", "Source concept", "Source classification", "Target concept", "Target classification", "Occurrence", "Existence", "Strategy", "Population"];
-    replaceChildren(elements.provenancePanel, manualNode, h("table", { className: "provenance-table" },
+    replaceChildren(elements.provenancePanel, h("table", { className: "provenance-table" },
       h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))), h("tbody", {}, rows)));
   }
 
-  function renderManualControls() {
-    const groups = dagGroups ? dagGroups() : state.project.groups.filter(group => group.variable_ids?.length);
-    const sourceValue = groups.some(group => group.group_id === elements.manualSource.value) ? elements.manualSource.value : groups[0]?.group_id;
-    const targetValue = groups.some(group => group.group_id === elements.manualTarget.value) ? elements.manualTarget.value : groups.find(group => group.group_id !== sourceValue)?.group_id;
-    const options = () => groups.map(group => h("option", { value: group.group_id, textContent: group.label }));
-    replaceChildren(elements.manualSource, options()); replaceChildren(elements.manualTarget, options());
-    if (sourceValue) elements.manualSource.value = sourceValue;
-    if (targetValue) elements.manualTarget.value = targetValue;
-    if (elements.manualSource.value === elements.manualTarget.value) {
-      const alternate = groups.find(group => group.group_id !== elements.manualSource.value);
-      if (alternate) elements.manualTarget.value = alternate.group_id;
-    }
-  }
-
-  function addManualEdge() {
-    const source = elements.manualSource.value;
-    const target = elements.manualTarget.value;
-    if (!source || !target || source === target) {
-      window.alert("Manual edges require two distinct nonempty groups.");
-      return;
-    }
-    const before = takeSnapshot();
-    const selectedDirection = elements.manualDirection.value;
-    const storedSource = selectedDirection === "target_to_source" ? target : source;
-    const storedTarget = selectedDirection === "target_to_source" ? source : target;
-    applyProjectOperation(projectOps.appendManualEdge(state.project, {
-      edge_id: `manual_${Date.now()}_${state.project.manual_edges.length + 1}`,
-      source_group_id: storedSource, target_group_id: storedTarget,
-      direction: selectedDirection === "bidirectional" ? "bidirectional" : "source_to_target",
-      user_note: elements.manualNote.value.trim(), created_at: nowIso(),
-      created_by: "local_user", deleted: false,
-    }));
-    addDecision("manual_edge_created", { source_group_id: storedSource, target_group_id: storedTarget, direction: selectedDirection });
-    addToUndoHistory(`Added manual edge: ${groupById(storedSource)?.label || storedSource} → ${groupById(storedTarget)?.label || storedTarget}`, before);
-    elements.manualNote.value = ""; elements.addEdgeDrawer.hidden = true;
-    elements.addEdgeToggle.classList.remove("active"); rebuildProject();
-  }
-
-  return { renderEdge, renderProvenance, renderManualControls, addManualEdge, selectedEdge, clearPendingExclude };
+  return { renderEdge, renderProvenance, selectedEdge, clearPendingExclude };
 }

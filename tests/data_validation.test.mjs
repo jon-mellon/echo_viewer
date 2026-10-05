@@ -8,21 +8,17 @@ const group = (id = "g", variableIds = ["v"]) => ({ group_id: id, variable_ids: 
 test("project validation accepts a minimal well-formed import", () => {
   const payload = {
     schema_version: "dag-builder-project-v1",
-    groups: [group()], manual_edges: [{ edge_id: "e", source_group_id: "g", target_group_id: "g" }],
+    groups: [group()],
     filters: {}, link_decisions: {}, seeds: { iv: [], dv: [] },
   };
   assert.equal(validateProjectPayload(payload), payload);
 });
 
-test("project validation rejects malformed collections and broken edge references", () => {
+test("project validation rejects malformed collections", () => {
   assert.throws(() => validateProjectPayload({ groups: {} }), /groups must be an array/);
   assert.throws(() => validateProjectPayload({ groups: [{ group_id: "g", variable_ids: "v" }] }), /variable_ids must be an array/);
   assert.throws(() => validateProjectPayload({ groups: [group("g"), group("g")] }), /duplicate group_id/);
   assert.throws(() => validateProjectPayload({ groups: [group("g", ["v", "v"])] }), /contains duplicates/);
-  assert.throws(() => validateProjectPayload({
-    groups: [group("g")],
-    manual_edges: [{ edge_id: "e", source_group_id: "g", target_group_id: "missing" }],
-  }), /unknown group/);
 });
 
 test("validation rejects prototype-sensitive keys and resource-exhaustion inputs", () => {

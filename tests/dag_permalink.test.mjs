@@ -9,7 +9,7 @@ const schema = { grouping_set_id: "schema", groups: [
 ] };
 const project = { active_grouping_set_id: "schema", iv_group_id: "cause", dv_group_id: "outcome",
   groups: schema.groups.map(group => ({ ...group, source_group_id: group.group_id })),
-  manual_edges: [], link_decisions: {} };
+  link_decisions: {} };
 
 test("compact permalink round trip preserves reproducible view settings", () => {
   const state = { project: structuredClone(project), workflowMode: "dag", dagLayoutMode: "hierarchical",
@@ -49,7 +49,6 @@ test("edited or imported schemas are not shareable", () => {
   edited.groups[0].variable_ids.push("v3");
   assert.equal(schemaMatchesProject(schema, edited), false);
   assert.equal(schemaMatchesProject({ ...schema, grouping_set_id: "custom" }, project), false);
-  assert.equal(schemaMatchesProject(schema, { ...project, manual_edges: [{ edge_id: "manual" }] }), false);
 });
 
 test("a permalink fails explicitly when its anchors are absent", () => {

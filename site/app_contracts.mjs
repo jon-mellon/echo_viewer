@@ -21,15 +21,6 @@
  */
 
 /**
- * @typedef {Object} ManualEdge
- * @property {string} edge_id
- * @property {string} source_group_id
- * @property {string} target_group_id
- * @property {string} [direction]
- * @property {boolean} [deleted]
- */
-
-/**
  * @typedef {Object} LinkDecision
  * @property {string} [display_status]
  * @property {string} [direction]
@@ -52,7 +43,6 @@
  * @property {JsonValue[]} grouping_exports
  * @property {JsonValue[]} carve_outs
  * @property {Record<string, LinkDecision>} link_decisions
- * @property {ManualEdge[]} manual_edges
  * @property {JsonValue[]} rejected_variables
  * @property {string[]} [restored_variable_ids]
  * @property {JsonValue | null} publication
@@ -86,13 +76,9 @@
  * @property {string} group_b
  * @property {boolean} is_target_relation
  * @property {string} target_direction
- * @property {"mapping_derived" | "user_manual" | "mapping_and_manual"} edge_source
- * @property {boolean} is_manual
- * @property {string[]} manual_edge_ids
+ * @property {"mapping_derived"} edge_source
  * @property {boolean} mapping_a_to_b_exists
  * @property {boolean} mapping_b_to_a_exists
- * @property {boolean} manual_a_to_b_exists
- * @property {boolean} manual_b_to_a_exists
  * @property {"A_TO_B" | "B_TO_A" | "BIDIRECTIONAL" | "NO_MAPPING_LINK"} direction_type
  * @property {string[]} a_to_b_raw_link_ids
  * @property {string[]} b_to_a_raw_link_ids

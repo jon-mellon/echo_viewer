@@ -68,6 +68,8 @@ test("browser-v2 supports group detail, layout controls, fullscreen and project 
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
     && document.getElementById("startupLoading")?.hidden);
   await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
+  await expect(page.locator("#addEdgeToggle, #addEdgeDrawer")).toHaveCount(0);
+  expect(await page.evaluate(() => Object.hasOwn(window.__dagBuilderState.project, "manual_edges"))).toBe(false);
 
   for (const mode of ["hierarchical", "organic", "auto"]) {
     await page.locator("#dagLayoutSelect").selectOption(mode);

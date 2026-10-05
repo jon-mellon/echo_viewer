@@ -9,6 +9,7 @@ test("storage round-trip preserves settings and normalizes legacy project fields
   const payload = {
     schema_version: "dag-builder-project-v1",
     groups: [{ group_id: "g", status: "rejected", variable_ids: ["a"] }],
+    manual_edges: [{ edge_id: "obsolete", source_group_id: "g", target_group_id: "g" }],
     selectedUoa: "people", uoaFilterEnabled: false, phase: "build",
     workflowMode: "dag_review", changingAnchorSide: "iv",
     variableLayoutSource: " custom ", dagLayoutMode: "organic",
@@ -49,6 +50,7 @@ test("storage round-trip preserves settings and normalizes legacy project fields
   assert.equal(Object.hasOwn(result.project, "saved_at"), false);
   assert.equal(Object.hasOwn(result.project, "selectedUoa"), false);
   assert.equal(Object.hasOwn(result.project, "undoHistory"), false);
+  assert.equal(Object.hasOwn(result.project, "manual_edges"), false);
 });
 
 test("missing, incompatible and malformed storage is explicit", () => {

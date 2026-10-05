@@ -22,12 +22,12 @@ const expectedByFile = new Map(
 );
 
 function excludedForConnectivity(link) {
-  return link.display_status === "excluded" && !link.is_manual && !link.is_target_relation;
+  return link.display_status === "excluded" && !link.is_target_relation;
 }
 
 function displayedLink(link) {
   if (link.display_status === "hidden") return false;
-  return link.display_status !== "excluded" || link.is_manual || link.is_target_relation;
+  return link.display_status !== "excluded" || link.is_target_relation;
 }
 
 function graphForState({

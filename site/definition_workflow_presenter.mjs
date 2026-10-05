@@ -3,8 +3,8 @@ import { h, replaceChildren } from "./dom_builder.mjs";
 
 export function createDefinitionWorkflowPresenter({ state, elements: els, normalized, clusterRep, truncate,
   definitionSources, definitionResidualIds, definitionCanReview, searchVariables, visibleVariables,
-  clusterDisplayVariable, definitionNeighbors, affectedDefinitionManualEdges, groupById, resizeMap, fitMap,
-  onSourceSelection, onToggleVariable, onResidualLabel, onManualDisposition }) {
+  clusterDisplayVariable, definitionNeighbors, resizeMap, fitMap,
+  onSourceSelection, onToggleVariable, onResidualLabel }) {
   function render() {
     const draft = state.definitionDraft;
     const wasSpatial = document.body.classList.contains("defining-variable");
@@ -95,17 +95,6 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       }));
       els.definitionResidualLabels.querySelectorAll("input[data-residual-id]").forEach(input =>
         input.addEventListener("input", () => onResidualLabel(input.dataset.residualId, input.value)));
-      const affected = draft.mode === "edit" ? [] : affectedDefinitionManualEdges();
-      replaceChildren(els.definitionManualReview, affected.length ? [h("h3", { textContent: "Review affected manual records" }),
-        affected.map(edge => h("div", { className: "definition-manual-row" },
-          h("div", { textContent: `${groupById(edge.source_group_id)?.label || edge.source_group_id} → ${groupById(edge.target_group_id)?.label || edge.target_group_id}` }),
-          h("select", { className: "select-input", dataset: { manualId: edge.edge_id } },
-            h("option", { value: "keep", textContent: "Keep with leftover" }), h("option", { value: "move", textContent: "Move to new variable" }),
-            h("option", { value: "remove", textContent: "Remove" }))))] : []);
-      els.definitionManualReview.querySelectorAll("select[data-manual-id]").forEach(select => {
-        select.value = draft.manual_edge_dispositions[select.dataset.manualId] || "keep";
-        select.addEventListener("change", () => onManualDisposition(select.dataset.manualId, select.value));
-      });
       els.definitionSave.textContent = draft.mode === "edit" ? "Update split"
         : `Save and use as ${draft.role.toUpperCase()}`;
     }

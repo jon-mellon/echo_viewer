@@ -77,7 +77,7 @@ export function edgeVisualData(link, selectedEdgeId) {
       inherit: false,
       opacity: isSelected ? 0.95 : isTarget ? 0.74 : 0.38,
     },
-    dashes: link.is_manual ? [6, 4] : false,
+    dashes: false,
     width: isSelected ? 3.6 : isTarget ? 2.6 : 1.0,
   };
 }
@@ -86,7 +86,6 @@ export function edgeHoverText(link, groups) {
   const { sourceLabel, targetLabel, arrow } = directedGroupLabels(link, groups, "<->");
   const lines = [`${sourceLabel} ${arrow} ${targetLabel}`];
   if (link.is_target_relation) lines.push("Target relation");
-  if (link.is_manual) lines.push("Manual edge");
   const supportingTests = new Set([
     ...(link.a_to_b_raw_link_ids || []),
     ...(link.b_to_a_raw_link_ids || []),

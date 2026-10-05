@@ -41,7 +41,7 @@ test("DAG UOA projection filters group membership without mutating the project",
 
 test("projected DAG links contain only evidence from the selected UOA", () => {
   const project = {
-    iv_group_id: "iv", dv_group_id: "dv", manual_edges: [], link_decisions: {},
+    iv_group_id: "iv", dv_group_id: "dv", link_decisions: {},
     groups: [
       { group_id: "iv", variable_ids: ["person_iv", "country_iv"] },
       { group_id: "dv", variable_ids: ["person_dv", "country_dv"] },

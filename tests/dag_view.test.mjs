@@ -50,6 +50,5 @@ test("missing IV disables causal filtering and excluded evidence obeys connectiv
   assert.equal(view.filterByCausalRelevance, false);
   assert.equal(view.componentGroupIds.size, groups.length);
   assert.equal(excludedForConnectivity({ display_status: "excluded" }), true);
-  assert.equal(excludedForConnectivity({ display_status: "excluded", is_manual: true }), false);
   assert.equal(excludedForConnectivity({ display_status: "excluded", is_target_relation: true }), false);
 });

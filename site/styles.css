@@ -794,8 +794,7 @@ h2 {
   border-radius: 8px;
 }
 
-.definition-residual-row,
-.definition-manual-row {
+.definition-residual-row {
   margin-top: 10px;
 }
 
@@ -1827,31 +1826,6 @@ h2 {
   color: var(--muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-}
-
-/* ── + Add edge collapsed bar + drawer ── */
-
-.add-edge-bar {
-  padding: 10px 0 2px;
-}
-
-.add-edge-toggle {
-  width: 100%;
-}
-
-.add-edge-drawer {
-  margin-top: 8px;
-  padding: 12px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fafbf9;
-}
-
-.add-edge-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
 }
 
 /* ── Edge inspector (now always in right panel) ── */

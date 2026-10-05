@@ -9,7 +9,7 @@ import {
 } from "./dag_graph.mjs";
 
 export function excludedForConnectivity(link) {
-  return link.display_status === "excluded" && !link.is_manual && !link.is_target_relation;
+  return link.display_status === "excluded" && !link.is_target_relation;
 }
 
 export function deriveDagView({
@@ -47,7 +47,7 @@ export function deriveDagView({
   const componentGroupIds = new Set(selectedGraph.nodeIds);
   let visibleGraph = filterGraphNodes(fullGraph, componentGroupIds);
   visibleGraph = filterGraphLinks(visibleGraph, (link) => {
-    return link.display_status !== "excluded" || link.is_manual || link.is_target_relation;
+    return link.display_status !== "excluded" || link.is_target_relation;
   });
   if ((showConfoundersOnly || showCollidersOnly) && hideIrrelevantDiagnosticLinks) {
     const retainedPairs = showCollidersOnly

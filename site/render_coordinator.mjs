@@ -7,7 +7,6 @@ export function createRenderCoordinator(view) {
     view.computeVisibleLinks();
     view.renderGroupList();
     view.renderRejectedVariablesPanel();
-    view.renderManualEdgeControls();
     view.renderDag({ reuseGeometry: reuseDagGeometry });
     if (!view.renderVariableComparison()) {
       view.renderSelectedEdge();

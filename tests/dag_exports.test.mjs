@@ -7,12 +7,12 @@ import { legacyExports, legacyZip } from './fixtures/legacy_dag_exports.mjs';
 const timestamp = '2026-09-09T12:00:00Z';
 function fixture() {
   const links = [{ edge_id: 'iv__dv', group_a: 'iv', group_b: 'dv', direction_type: 'B_TO_A',
-    is_manual: true, a_to_b_raw_link_ids: ['r1'], b_to_a_raw_link_ids: ['r2', 'r1'] }];
+    a_to_b_raw_link_ids: ['r1'], b_to_a_raw_link_ids: ['r2', 'r1'] }];
   const project = { iv_group_id: 'iv', dv_group_id: 'dv', groups: [
     { group_id: 'iv', label: 'Income & wealth', variable_ids: ['v1'], type: 'iv' },
     { group_id: 'dv', label: 'Tax_50%', variable_ids: ['v2'], type: 'dv' },
     { group_id: 'other', label: 'Other', variable_ids: ['v3'], notes: 'note' },
-  ], links, manual_edges: [{ edge_id: 'm1', deleted: false }, { edge_id: 'm2', deleted: true }],
+  ], links, manual_edges: [],
     grouping_exports: [], link_decisions: { iv__dv: { edge_id: 'iv__dv', display_status: 'excluded', exclude_reason: 'Reason & details' } } };
   const input = { project, visibleLinks: links,
     rawLinksById: new Map([['r1', { paper_id: '10.1234/one' }], ['r2', { paper_id: '10.1234/two' }]]),
@@ -34,15 +34,19 @@ for (const scenario of ['normal', 'empty', 'bidirectional', 'missing-group', 'sv
     const expected = await legacyExports(input, metadata, timestamp, svg);
     const bibliography = exports.buildBibText(exports.collectAllDagDois(input), metadata);
     assert.deepEqual(bibliography.keyMap, expected.bibliography.keyMap);
-    const expectedMd = expected.md.map(file => file.name === 'references.bib' ? { ...file, data: bibliography.bibText } : file);
+    const expectedMd = expected.md.map(file => file.name === 'references.bib'
+      ? { ...file, data: bibliography.bibText }
+      : { ...file, data: file.data.replace('create groups and add edges first', 'choose groups with evidence links first') });
     assert.deepEqual(exports.buildMarkdownFiles(input, bibliography, svg), expectedMd);
     const latex = exports.buildLatexFiles(input, bibliography, svg);
     assert.deepEqual(latex.find(file => file.name === 'references.bib'), { name: 'references.bib', data: bibliography.bibText });
     assert.deepEqual(latex.map(file => file.name), expected.tex.map(file => file.name));
     assert.doesNotMatch(latex[0].data, /[→↔]/);
     if (svg) assert.match(latex[0].data, /causal graph image could not be rendered/);
-    assert.deepEqual(exports.buildWorkingMapPayload(input, timestamp), expected.working);
-    assert.deepEqual(exports.buildProjectPayload(input, timestamp), expected.payload);
+    const { manual_edges: _workingManualEdges, ...expectedWorking } = expected.working;
+    const { manual_edges: _projectManualEdges, ...expectedPayload } = expected.payload;
+    assert.deepEqual(exports.buildWorkingMapPayload(input, timestamp), expectedWorking);
+    assert.deepEqual(exports.buildProjectPayload(input, timestamp), expectedPayload);
     assert.deepEqual({ input, metadata }, before);
   });
 }

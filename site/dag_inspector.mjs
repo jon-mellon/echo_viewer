@@ -34,15 +34,13 @@ export function edgeInspector(link, project, diagnosticView = {}) {
   const rawIds = [...new Set(preferredDirection === "B_TO_A"
     ? [...reverseIds, ...forwardIds]
     : [...forwardIds, ...reverseIds])];
-  const manual = (link.manual_edge_ids || []).map(id => project.manual_edges.find(e => e.edge_id === id)).filter(Boolean);
   return {
     ...directedGroupLabels(link, project.groups, "↔"),
-    rawIds, rawCount: rawIds.length, manual,
+    rawIds, rawCount: rawIds.length,
     existingDecision: project.link_decisions[link.edge_id],
     actions: [
       { action: "exclude", label: "Exclude" },
       { action: "restore", label: "Restore" },
-      ...manual.map(e => ({ action: "delete-manual", label: "Remove manual", manualId: e.edge_id })),
     ],
   };
 }

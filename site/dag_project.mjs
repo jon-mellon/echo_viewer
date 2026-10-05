@@ -21,7 +21,7 @@ export function createProject({ projectId, groupingSetId }) {
     project_id: projectId, active_grouping_set_id: groupingSetId,
     iv_group_id: 'g_iv', dv_group_id: 'g_dv', groups: [], links: [],
     decisions: [], filters: {}, grouping_imports: [],
-    grouping_exports: [], carve_outs: [], link_decisions: {}, manual_edges: [],
+    grouping_exports: [], carve_outs: [], link_decisions: {},
     rejected_variables: [], publication: null,
   };
 }
@@ -93,7 +93,7 @@ export function removeMembersEverywhere(project, memberIds) {
 
 export function snapshotProject(project, phase) {
   return JSON.stringify({ groups: project.groups, link_decisions: project.link_decisions,
-    manual_edges: project.manual_edges, rejected_variables: project.rejected_variables,
+    rejected_variables: project.rejected_variables,
     restored_variable_ids: project.restored_variable_ids, decisions: project.decisions,
     iv_group_id: project.iv_group_id, dv_group_id: project.dv_group_id, phase });
 }
@@ -101,7 +101,7 @@ export function snapshotProject(project, phase) {
 export function restoreSnapshot(project, json) {
   const snap = JSON.parse(json);
   return { project: { ...project, groups: snap.groups.map(withoutGroupReviewStatus),
-    link_decisions: snap.link_decisions, manual_edges: snap.manual_edges,
+    link_decisions: snap.link_decisions,
     rejected_variables: snap.rejected_variables || [],
     restored_variable_ids: snap.restored_variable_ids || [],
     decisions: snap.decisions || [],
@@ -226,14 +226,6 @@ function recordCarveOut(project, groupingSet, sourceGroup, removed, iv, dv) {
   });
 }
 
-export function appendManualEdge(project, edge) {
-  return { ...project, manual_edges: [...project.manual_edges, edge] };
-}
-
-export function deleteManualEdge(project, edgeId) {
-  return { ...project, manual_edges: project.manual_edges.map(edge => edge.edge_id === edgeId ? { ...edge, deleted: true } : edge) };
-}
-
 export function setLinkDecision(project, edgeId, decision) {
   const link_decisions = { ...project.link_decisions };
   if (decision === null) delete link_decisions[edgeId];
@@ -243,7 +235,7 @@ export function setLinkDecision(project, edgeId, decision) {
 
 export function splitCategories(project, {
   sourceGroupIds, newGroupId, newLabel, residualLabels = {}, newVariableIds,
-  timestamp, role, manualEdgeDispositions = {}, splitId = null,
+  timestamp, role, splitId = null,
 }) {
   splitId ||= `split_${newGroupId}`;
   const sourceIds = [...new Set(sourceGroupIds || [])];
@@ -289,16 +281,7 @@ export function splitCategories(project, {
       source_group_by_variable: sourceGroupByVariable,
       source_group_ids_retained_as_residuals: true, edited_at: timestamp },
   };
-  let manual_edges = (project.manual_edges || []).map(edge => {
-    const disposition = manualEdgeDispositions[edge.edge_id];
-    if (!disposition) return edge;
-    if (disposition === "remove") return { ...edge, deleted: true };
-    if (disposition === "move") return { ...edge,
-      source_group_id: sourceIds.includes(edge.source_group_id) ? newGroupId : edge.source_group_id,
-      target_group_id: sourceIds.includes(edge.target_group_id) ? newGroupId : edge.target_group_id };
-    return edge;
-  });
-  const next = { ...project, groups: [...nextGroups, newGroup], manual_edges,
+  const next = { ...project, groups: [...nextGroups, newGroup],
     ...(["iv", "dv"].includes(role) ? { [`${role}_group_id`]: newGroupId } : {}),
     decisions: [...(project.decisions || []), {
       decision_id: `decision_${(project.decisions || []).length + 1}`,

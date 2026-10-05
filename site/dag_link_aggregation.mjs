@@ -13,9 +13,11 @@ export function normalizeLinkDecision(decision) {
 }
 
 export function applyLinkDecisions(links, decisions = {}) {
-  return links.map(link => {
+  return links.filter(link => link.edge_source !== "user_manual").map(link => {
     const decision = normalizeLinkDecision(decisions[link.edge_id]) || null;
-    return { ...link, display_status: decision?.display_status || normalizeLinkDecision(link).display_status || "active_by_default",
+    const { manual_edge_ids, manual_a_to_b_exists, manual_b_to_a_exists, is_manual, ...evidenceLink } = link;
+    return { ...evidenceLink, edge_source: "mapping_derived",
+      display_status: decision?.display_status || normalizeLinkDecision(link).display_status || "active_by_default",
       user_decision: decision || link.user_decision || null };
   });
 }
@@ -28,9 +30,8 @@ export function aggregateGroupLinks({ project, linkLookup, rawLinksById }) {
   const groups = project.groups.filter(g => g.variable_ids?.length);
   const iv = project.groups.find(g => g.group_id === project.iv_group_id);
   const dv = project.groups.find(g => g.group_id === project.dv_group_id);
-  const evidenceByEdge = indexGroupLinkEvidence(groups, iv, dv, linkLookup, project.manual_edges);
+  const evidenceByEdge = indexGroupLinkEvidence(groups, iv, dv, linkLookup);
   return [...evidenceByEdge.values()].map(({ groupA, groupB, targetPair, aToB, bToA }) => {
-    const manual = manualFlagsForPair(groupA.group_id, groupB.group_id, project.manual_edges);
     const edgeId = edgeKey(groupA.group_id, groupB.group_id);
     const decision = normalizeLinkDecision(project.link_decisions[edgeId]) || null;
     return {
@@ -39,14 +40,10 @@ export function aggregateGroupLinks({ project, linkLookup, rawLinksById }) {
       group_b: groupB.group_id,
       is_target_relation: Boolean(targetPair),
       target_direction: targetPair ? "group_a_to_group_b" : "",
-      edge_source: edgeSource(aToB.length || bToA.length, manual.aToB || manual.bToA),
-      is_manual: Boolean(manual.aToB || manual.bToA),
-      manual_edge_ids: manual.edgeIds,
+      edge_source: "mapping_derived",
       mapping_a_to_b_exists: aToB.length > 0,
       mapping_b_to_a_exists: bToA.length > 0,
-      manual_a_to_b_exists: manual.aToB,
-      manual_b_to_a_exists: manual.bToA,
-      direction_type: directionType(aToB.length > 0 || manual.aToB, bToA.length > 0 || manual.bToA, targetPair),
+      direction_type: directionType(aToB.length > 0, bToA.length > 0, targetPair),
       a_to_b_raw_link_ids: aToB,
       b_to_a_raw_link_ids: bToA,
       a_to_b_paper_table_keys: paperTableKeys(aToB, rawLinksById),
@@ -60,7 +57,7 @@ export function aggregateGroupLinks({ project, linkLookup, rawLinksById }) {
 // Index only group pairs that have evidence. The previous implementation scanned
 // every group pair and every cross-product of their members, even though causal
 // mappings are sparse. Rank tuples retain rawLinksBetween's exact evidence order.
-function indexGroupLinkEvidence(groups, iv, dv, linkLookup, manualEdges) {
+function indexGroupLinkEvidence(groups, iv, dv, linkLookup) {
   const groupById = new Map(groups.map(group => [group.group_id, group]));
   const owners = new Map();
   const positions = new Map();
@@ -86,13 +83,6 @@ function indexGroupLinkEvidence(groups, iv, dv, linkLookup, manualEdges) {
   };
 
   if (iv && dv && groupById.has(iv.group_id) && groupById.has(dv.group_id)) ensure(iv, dv);
-  for (const edge of manualEdges || []) {
-    if (edge.deleted) continue;
-    const source = groupById.get(edge.source_group_id);
-    const target = groupById.get(edge.target_group_id);
-    if (source && target && source !== target) ensure(source, target);
-  }
-
   for (const [key, rawIds] of linkLookup) {
     const separator = key.indexOf("->");
     if (separator < 0) continue;
@@ -129,13 +119,6 @@ function compareRank(a, b) {
   return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 }
 
-/** @returns {AggregatedLink["edge_source"]} */
-function edgeSource(hasMapping, hasManual) {
-  if (hasMapping && hasManual) return "mapping_and_manual";
-  if (hasManual) return "user_manual";
-  return "mapping_derived";
-}
-
 /** @returns {AggregatedLink["direction_type"]} */
 function directionType(aToB, bToA, targetPair) {
   const forward = aToB || targetPair;
@@ -143,20 +126,6 @@ function directionType(aToB, bToA, targetPair) {
   if (forward) return "A_TO_B";
   if (bToA) return "B_TO_A";
   return "NO_MAPPING_LINK";
-}
-
-function manualFlagsForPair(groupAId, groupBId, manualEdges) {
-  const out = { aToB: false, bToA: false, edgeIds: [] };
-  for (const edge of manualEdges) {
-    if (edge.deleted) continue;
-    if (pairKey(edge.source_group_id, edge.target_group_id) !== pairKey(groupAId, groupBId)) continue;
-    out.edgeIds.push(edge.edge_id);
-    const sourceIsA = edge.source_group_id === groupAId;
-    if (edge.direction === "bidirectional") { out.aToB = true; out.bToA = true; }
-    else if (sourceIsA) out.aToB = true;
-    else out.bToA = true;
-  }
-  return out;
 }
 
 export function paperTableKeys(rawLinkIds, rawLinksById) {

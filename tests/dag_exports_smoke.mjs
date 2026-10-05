@@ -36,9 +36,9 @@ try {
     ];
     s.project.iv_group_id = 'iv'; s.project.dv_group_id = 'dv';
     s.project.publication = { publication_id: 'fixture-publication', content_hash: 'published-fixture-hash' };
-    s.project.manual_edges = []; s.project.link_decisions = {}; s.project.rejected_variables = [];
+    s.project.link_decisions = {}; s.project.rejected_variables = [];
     s.project.links = [{ edge_id: 'iv__dv', group_a: 'iv', group_b: 'dv', direction_type: 'A_TO_B',
-      a_to_b_raw_link_ids: ['r1', 'r2'], b_to_a_raw_link_ids: [], is_manual: false }];
+      a_to_b_raw_link_ids: ['r1', 'r2'], b_to_a_raw_link_ids: [] }];
     s.visibleLinks = s.project.links;
     s.rawLinksById = new Map([['r1', { paper_id: '10.1234/found' }], ['r2', { paper_id: '10.1234/missing' }]]);
     s.linkLookup = new Map([['v1->v2', ['r1', 'r2']]]);

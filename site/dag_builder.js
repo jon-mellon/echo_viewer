@@ -145,8 +145,6 @@ function initElements() {
     "dagWorkspaceSection", "dagNetwork", "dagWorkspaceResizer",
     "dagLayoutSelect", "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
-    "addEdgeToggle", "addEdgeDrawer", "closeAddEdge",
-    "manualSource", "manualTarget", "manualDirection", "manualNote", "addManualEdge",
     // Export
     "exportProject", "exportWorkingMap", "projectImport", "strictDagStatus",
     "exportBib", "exportMd", "exportTex",
@@ -365,7 +363,7 @@ function installDagHandlers() {
 
 const renderCoordinator = createRenderCoordinator({
   buildCandidateQueue, aggregateGroupLinks, computeVisibleLinks, renderGroupList,
-  renderRejectedVariablesPanel, renderManualEdgeControls, renderDag, refreshDagEdgeSelection,
+  renderRejectedVariablesPanel, renderDag, refreshDagEdgeSelection,
   renderVariableComparison,
   renderSelectedEdge, renderExportStatus, renderMapModeControls,
   renderMapToolbarToggles, renderUndoRedo, drawMap, saveProjectLocally,
@@ -464,7 +462,6 @@ function definitionSources() { return definitionWorkflowController.definitionSou
 function continueDefinition() { return definitionWorkflowController.continueDefinition(); }
 function definitionResidualIds(source) { return definitionWorkflowController.definitionResidualIds(source); }
 function toggleDefinitionVariable(variableId, add = null) { return definitionWorkflowController.toggleDefinitionVariable(variableId, add); }
-function affectedDefinitionManualEdges() { return definitionWorkflowController.affectedDefinitionManualEdges(); }
 function definitionCanReview() { return definitionWorkflowController.definitionCanReview(); }
 function definitionNeighbors() { return definitionWorkflowController.definitionNeighbors(); }
 function renderDefinition() { return definitionWorkflowController.renderDefinition(); }
@@ -1057,16 +1054,6 @@ function dismissEvidencePane() {
   refreshDagEdgeSelection();
 }
 
-// ─── Manual edge form ─────────────────────────────────────────────────────────
-
-function renderManualEdgeControls() {
-  inspectorController.renderManualControls();
-}
-
-function addManualEdge() {
-  inspectorController.addManualEdge();
-}
-
 // ─── Export / Import ──────────────────────────────────────────────────────────
 
 let importProjectRevision = 0;
@@ -1284,8 +1271,8 @@ const projectController = createDagProjectController({
 });
 
 const inspectorController = createDagInspectorController({
-  state, elements: els, escapeHtml, truncate, nowIso, takeSnapshot,
-  applyProjectOperation, addDecision, addToUndoHistory, rebuildProject, rebuildLinkDecision, groupById, dagGroups,
+  state, elements: els, truncate, nowIso, takeSnapshot,
+  applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision,
 });
 
 const mapViewController = createDagMapViewController({
@@ -1440,7 +1427,7 @@ const eventController = createDagEventController({
   saveProjectLocally, applyActiveGroupingSet, rebuildProject, exportGroupingFolder,
   copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
   canvasHeight, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber, setMapMode,
-  undo, redo, renderActionHistory, renderDag, setFullscreenPanel, addManualEdge,
+  undo, redo, renderActionHistory, renderDag, setFullscreenPanel,
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,
   exportTex, resizeMap, installDagHandlers, initPanelResizers, hideMapContextMenu,
   showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,

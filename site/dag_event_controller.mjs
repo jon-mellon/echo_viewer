@@ -11,7 +11,7 @@ export function createDagEventController({
   saveProjectLocally, applyActiveGroupingSet, rebuildProject, exportGroupingFolder,
   copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
   canvasHeight, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber, setMapMode,
-  undo, redo, renderActionHistory, renderDag, setFullscreenPanel, addManualEdge,
+  undo, redo, renderActionHistory, renderDag, setFullscreenPanel,
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,
   exportTex, resizeMap, installDagHandlers, initPanelResizers, hideMapContextMenu,
   showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,
@@ -206,18 +206,6 @@ function installHandlers() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && state.fullscreenPanel) setFullscreenPanel(null);
   });
-
-  // + Add edge drawer
-  els.addEdgeToggle.addEventListener("click", () => {
-    const open = !els.addEdgeDrawer.hidden;
-    els.addEdgeDrawer.hidden = open;
-    els.addEdgeToggle.classList.toggle("active", !open);
-  });
-  els.closeAddEdge.addEventListener("click", () => {
-    els.addEdgeDrawer.hidden = true;
-    els.addEdgeToggle.classList.remove("active");
-  });
-  els.addManualEdge.addEventListener("click", addManualEdge);
 
   // Create custom group
   els.createGroupBtn.addEventListener("click", createCustomGroup);

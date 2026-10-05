@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import * as visibility from '../site/variable_visibility.mjs';
 import * as ops from '../site/dag_project.mjs';
-import { aggregateGroupLinks, linkKey } from '../site/dag_link_aggregation.mjs';
+import { aggregateGroupLinks, applyLinkDecisions, linkKey } from '../site/dag_link_aggregation.mjs';
 import { legacyAggregate, legacyGroupOperation } from './fixtures/legacy_dag_project.mjs';
 
 const timestamp = '2026-09-09T12:00:00.000Z';
@@ -94,17 +94,17 @@ function fixture() {
   return { project, linkLookup, rawLinksById };
 }
 
-test('aggregation preserves exact legacy direction, provenance, manual and decision semantics', () => {
-  for (const scenario of ['mapping', 'manual', 'deleted', 'no-evidence', 'missing-anchor']) {
+test('aggregation preserves evidence direction, provenance and decision semantics', () => {
+  for (const scenario of ['mapping', 'no-evidence', 'missing-anchor']) {
     const input = fixture();
-    input.project.manual_edges.push({ edge_id: 'm1', source_group_id: 'c', target_group_id: 'a', direction: 'bidirectional', deleted: scenario === 'deleted' });
     input.project.link_decisions.a__c = { display_status: 'excluded', exclude_reason: 'test' };
-    if (scenario === 'manual' || scenario === 'no-evidence') input.linkLookup.clear();
-    if (scenario === 'no-evidence') input.project.manual_edges = [];
+    if (scenario === 'no-evidence') input.linkLookup.clear();
     if (scenario === 'missing-anchor') input.project.iv_group_id = 'missing';
     const before = structuredClone(input);
     const links = aggregateGroupLinks(input);
-    assert.deepEqual(links, legacyAggregate(input), scenario);
+    const expected = legacyAggregate({ ...input, project: { ...input.project, manual_edges: [] } })
+      .map(({ is_manual, manual_edge_ids, manual_a_to_b_exists, manual_b_to_a_exists, ...link }) => link);
+    assert.deepEqual(links, expected, scenario);
     assert.deepEqual(input, before);
     assert.deepEqual(aggregateGroupLinks({ ...input, project: { ...input.project, groups: [...input.project.groups].reverse() } }), links);
     assert.ok(links.every(link => link.group_a !== 'empty' && link.group_b !== 'empty'));
@@ -114,6 +114,16 @@ test('aggregation preserves exact legacy direction, provenance, manual and decis
       assert.equal(links[0].direction_type, 'A_TO_B');
     }
   }
+});
+
+test('published links discard obsolete manual-only edges and annotations', () => {
+  const links = [
+    { edge_id: 'manual', edge_source: 'user_manual', is_manual: true },
+    { edge_id: 'evidence', edge_source: 'mapping_and_manual', is_manual: true,
+      manual_edge_ids: ['obsolete'], manual_a_to_b_exists: true, manual_b_to_a_exists: false },
+  ];
+  assert.deepEqual(applyLinkDecisions(links), [{ edge_id: 'evidence', edge_source: 'mapping_derived',
+    display_status: 'active_by_default', user_decision: null }]);
 });
 
 test('sparse link aggregation scales with evidence rather than group cross-products', () => {
@@ -135,7 +145,7 @@ test('sparse link aggregation scales with evidence rather than group cross-produ
     rawLinksById.set(rawId, { paper_id: `p${index % 20}`, within_table_occurrence_id: `t${index}` });
   }
   const project = { groups, iv_group_id: groups[0].group_id, dv_group_id: groups[1].group_id,
-    manual_edges: [], link_decisions: {} };
+    link_decisions: {} };
   const started = performance.now();
   const links = aggregateGroupLinks({ project, linkLookup, rawLinksById });
   const elapsed = performance.now() - started;
@@ -232,15 +242,13 @@ test('schema hydration preserves IV and DV roles used by anchor colors', () => {
   assert.equal(next.groups.find(group => group.group_id === 'c').type, 'candidate');
 });
 
-test('category splitting retains one source ID per leftover and moves reviewed manual records', () => {
+test('category splitting retains one source ID per leftover', () => {
   const { project } = fixture();
   project.groups[2].variable_ids.push('v4');
-  project.manual_edges = [{ edge_id: 'm1', source_group_id: 'c', target_group_id: 'a' }];
   const next = ops.splitCategories(project, {
     sourceGroupIds: ['z', 'c'], newGroupId: 'new', newLabel: 'New construct',
     residualLabels: { z: 'Other IV', c: 'Other category' },
     newVariableIds: ['v1', 'v3'], timestamp, role: 'iv',
-    manualEdgeDispositions: { m1: 'move' },
   });
   assert.deepEqual(next.groups.find(group => group.group_id === 'z').variable_ids, ['v1dup']);
   assert.equal(next.groups.find(group => group.group_id === 'z').type, null);
@@ -249,7 +257,6 @@ test('category splitting retains one source ID per leftover and moves reviewed m
   assert.equal(next.groups.find(group => group.group_id === 'new').type, 'iv');
   assert.deepEqual(next.groups.find(group => group.group_id === 'new').variable_ids, ['v1', 'v3']);
   assert.equal(next.iv_group_id, 'new');
-  assert.equal(next.manual_edges[0].source_group_id, 'new');
   assert.equal(next.decisions.at(-1).type, 'split_categories');
   assert.throws(() => ops.splitCategories(project, {
     sourceGroupIds: ['c'], newGroupId: 'bad', newLabel: 'Bad',
@@ -266,16 +273,4 @@ test('membership conflicts, protected seeds and removal metadata retain their ru
   const result = ops.removeMembersEverywhere(project, ['v1', 'v1dup', 'v3']);
   assert.deepEqual(result.previousGroupIds, ['z', 'c']);
   assert.equal(result.project.groups[0].variable_ids.length, 0);
-});
-
-test('manual deletion is immutable and removes only manual evidence', () => {
-  const input = fixture();
-  const edge = { edge_id: 'm', source_group_id: 'c', target_group_id: 'a', direction: 'bidirectional', deleted: false };
-  const next = ops.appendManualEdge(input.project, edge);
-  const deleted = ops.deleteManualEdge(next, 'm');
-  assert.equal(next.manual_edges[0].deleted, false);
-  assert.equal(deleted.manual_edges[0].deleted, true);
-  const aggregated = aggregateGroupLinks({ ...input, project: deleted }).find(link => link.edge_id === 'a__c');
-  assert.equal(aggregated.is_manual, false);
-  assert.equal(aggregated.direction_type, 'B_TO_A');
 });
