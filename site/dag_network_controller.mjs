@@ -417,9 +417,8 @@ function renderDag({ reuseGeometry = false } = {}) {
 function applyDagRender(groups, layout, routes) {
   _dagBoundsCache = null;
   const { nodeData, edgeData, edgeSegments } = routedDagDataFromRoutes(groups, routes, layout);
-  const groupIds = new Set(groups.map(group => group.group_id));
-  _dagNodeDataById = new Map(nodeData.filter(node => groupIds.has(node.id))
-    .map(node => [node.id, node]));
+  const previousNodeData = _dagNodeDataById;
+  _dagNodeDataById = new Map(nodeData.map(node => [node.id, node]));
   const designEdge = studyDesignEdgeData(groups);
   if (designEdge) edgeData.push(designEdge);
   _dagEdgeSegments = edgeSegments;
@@ -449,7 +448,9 @@ function applyDagRender(groups, layout, routes) {
       prevNodeIds.size !== nextNodeIds.size ||
       [...nextNodeIds].some((id) => !prevNodeIds.has(id));
 
-    _visNodes.update(nodeData);
+    const changedNodes = nodeData.filter(node =>
+      JSON.stringify(node) !== JSON.stringify(previousNodeData.get(node.id)));
+    if (changedNodes.length) _visNodes.update(changedNodes);
     const dropNodes = [...prevNodeIds].filter((id) => !nextNodeIds.has(id));
     if (dropNodes.length) _visNodes.remove(dropNodes);
 
@@ -485,13 +486,17 @@ function applyReusedDagRender(groups, layout, routes) {
     .flatMap(route => route.points.slice(1, -1).map((_, index) =>
       `__route__${route.link.edge_id}__${index}`));
   if (removeNodeIds.length) _visNodes.remove(removeNodeIds);
+  for (const id of removeNodeIds) _dagNodeDataById.delete(id);
   for (const [id] of removed) _dagEdgeSegments.delete(id);
 
   const rendered = new Set(_dagEdgeSegments.values());
   const additions = routes.filter(route => !rendered.has(route.link.edge_id));
   if (additions.length) {
     const added = routedDagDataFromRoutes([], additions, layout);
-    if (added.nodeData.length) _visNodes.add(added.nodeData);
+    if (added.nodeData.length) {
+      _visNodes.add(added.nodeData);
+      for (const node of added.nodeData) _dagNodeDataById.set(node.id, node);
+    }
     if (added.edgeData.length) _visEdges.add(added.edgeData);
     for (const [id, logicalId] of added.edgeSegments) _dagEdgeSegments.set(id, logicalId);
   }

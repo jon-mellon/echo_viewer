@@ -28,9 +28,12 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   const dagNetwork = { clientWidth: 630, clientHeight: 700,
     addEventListener() {}, removeEventListener() {} };
   class DataSet {
-    constructor(items) { this.items = new Map(items.map(item => [item.id, item])); }
+    constructor(items) { this.items = new Map(items.map(item => [item.id, item])); this.updateCalls = []; }
     getIds() { return [...this.items.keys()]; }
-    update(items) { for (const item of items) this.items.set(item.id, item); }
+    update(items) {
+      this.updateCalls.push(items);
+      for (const item of items) this.items.set(item.id, item);
+    }
     remove(ids) { for (const id of ids) this.items.delete(id); }
   }
   const networks = [];
@@ -67,6 +70,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   await controller.whenRendered();
   controller.minimumDagScale();
   assert.equal(networks[0].boundingBoxCalls, networks[0].data.nodes.getIds().length * 2);
+  assert.equal(networks[0].data.nodes.updateCalls.length, 0);
   assert.equal(networks.length, 1);
   assert.equal(networks[0].setOptionsCalls, 0);
   dagNetwork.clientWidth = 1200;
@@ -74,6 +78,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   await controller.whenRendered();
   assert.equal(networks[0].setOptionsCalls, 1);
   assert.equal(networks[0].options.nodes.widthConstraint.maximum, 185);
+  assert.equal(networks[0].data.nodes.updateCalls.length, 1);
   assert.ok(controller.minimumDagScale() > firstScale);
 });
 
