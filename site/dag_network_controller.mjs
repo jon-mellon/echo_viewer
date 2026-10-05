@@ -20,6 +20,23 @@ export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId
   return updates;
 }
 
+export function applyLogicalEdgeHover(edges, visEdges) {
+  if (!edges.length) return;
+  const hoverColor = "#9a5a0a";
+  visEdges.update(edges.map(edge => ({
+    id: edge.id,
+    color: {
+      color: hoverColor,
+      highlight: hoverColor,
+      hover: hoverColor,
+      inherit: false,
+      opacity: 1,
+    },
+    width: Math.max(3.4, Number(edge.width || 1) + 2.2),
+    shadow: { enabled: true, color: "rgba(154,90,10,0.32)", size: 7, x: 0, y: 0 },
+  })));
+}
+
 function visOptionSignature(params = {}) {
   return JSON.stringify([
     params.fontSize ?? 14, params.vMargin ?? 8, params.hMargin ?? 13,
@@ -262,21 +279,7 @@ function highlightLogicalDagEdges(logicalEdgeIds) {
   }));
   _dagHoveredLogicalEdgeIds = nextIds;
 
-  for (const edge of _dagEdgeHoverBaseline) {
-    const hoverColor = "#9a5a0a";
-    _visEdges.update({
-      id: edge.id,
-      color: {
-        color: hoverColor,
-        highlight: hoverColor,
-        hover: hoverColor,
-        inherit: false,
-        opacity: 1,
-      },
-      width: Math.max(3.4, Number(edge.width || 1) + 2.2),
-      shadow: { enabled: true, color: "rgba(154,90,10,0.32)", size: 7, x: 0, y: 0 },
-    });
-  }
+  applyLogicalEdgeHover(_dagEdgeHoverBaseline, _visEdges);
 }
 
 function highlightLogicalDagEdge(segmentId) {

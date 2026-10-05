@@ -2,7 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { attachDagInteractions } from "../site/dag_interactions.mjs";
 import { createRenderCoordinator } from "../site/render_coordinator.mjs";
-import { createDagNetworkController, selectionUpdatesForSegments } from "../site/dag_network_controller.mjs";
+import { applyLogicalEdgeHover, createDagNetworkController, selectionUpdatesForSegments } from "../site/dag_network_controller.mjs";
+
+test("connected edge hover updates routed segments in one batch", () => {
+  const calls = [];
+  const dataset = { update: records => calls.push(records) };
+  applyLogicalEdgeHover([{ id: "a::seg0", width: 1 }, { id: "a::seg1", width: 4 }], dataset);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].map(record => record.id), ["a::seg0", "a::seg1"]);
+  assert.deepEqual(calls[0].map(record => record.width), [3.4, 6.2]);
+  assert.ok(calls[0].every(record => record.color.color === "#9a5a0a" && record.shadow.enabled));
+  applyLogicalEdgeHover([], dataset);
+  assert.equal(calls.length, 1);
+});
 
 test("DAG rerenders only reconfigure vis when visual options change", async () => {
   const groups = ["a", "b", "c", "d"].map(group_id => ({ group_id, label: group_id, variable_ids: [] }));
