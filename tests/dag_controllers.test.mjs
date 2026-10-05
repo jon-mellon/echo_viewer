@@ -131,6 +131,34 @@ test("project controller preserves live group identity and owns history transiti
   assert.equal(renders, 1);
 });
 
+test("edge-decision undo and redo refresh only links; group edits still rebuild", () => {
+  const state = createDagAppState();
+  state.data = { generated_at: "fixture", default_grouping_set_id: "none", grouping_sets: [] };
+  const calls = [];
+  const controller = createDagProjectController({
+    state, storage: memoryStorage(), storagePrefix: "test", nowIso: () => "2026-09-10T00:00:00Z",
+    invalidateMapCaches: () => calls.push("invalidate"),
+    renderAll: () => calls.push("full"),
+    rebuildLinkDecision: () => calls.push("links"),
+    renderUndoRedo() {}, renderActionHistory() {},
+  });
+  controller.initialize();
+  const beforeDecision = controller.snapshot();
+  state.project.link_decisions.edge = { display_status: "excluded" };
+  controller.record("Excluded edge", beforeDecision, "link-decision");
+  controller.undo();
+  assert.deepEqual(state.project.link_decisions, {});
+  controller.redo();
+  assert.equal(state.project.link_decisions.edge.display_status, "excluded");
+  assert.deepEqual(calls, ["links", "links"]);
+
+  const beforeGroup = controller.snapshot();
+  state.project.groups.push({ group_id: "g", variable_ids: ["v"] });
+  controller.record("Added group", beforeGroup);
+  controller.undo();
+  assert.deepEqual(calls.slice(-2), ["invalidate", "full"]);
+});
+
 test("autosave coalesces edits and flushes the latest project on page hide", () => {
   const state = createDagAppState();
   state.data = { generated_at: "fixture", default_grouping_set_id: "none", grouping_sets: [] };

@@ -1,7 +1,9 @@
 // Snapshot strings are opaque here; project transformations own their format.
-export function recordHistory({ undoHistory, undoPointer, actionLog }, description, before, after, time) {
+export function recordHistory({ undoHistory, undoPointer, actionLog }, description, before, after, time,
+  renderKind = "full") {
   if (before === after) return null;
-  const history = [...undoHistory.slice(0, undoPointer + 1), { description, before, after }].slice(-60);
+  const entry = { description, before, after, ...(renderKind === "full" ? {} : { renderKind }) };
+  const history = [...undoHistory.slice(0, undoPointer + 1), entry].slice(-60);
   return {
     undoHistory: history,
     undoPointer: history.length - 1,
@@ -15,5 +17,6 @@ export function historyStep({ undoHistory, undoPointer }, direction) {
   return {
     undoPointer: direction === "undo" ? index - 1 : index,
     snapshot: undoHistory[index][direction === "undo" ? "before" : "after"],
+    renderKind: undoHistory[index].renderKind || "full",
   };
 }

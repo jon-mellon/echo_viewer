@@ -293,8 +293,8 @@ function applySnapshot(serialized) {
   projectController.applySnapshot(serialized);
 }
 
-function addToUndoHistory(description, before) {
-  projectController.record(description, before);
+function addToUndoHistory(description, before, renderKind) {
+  projectController.record(description, before, renderKind);
 }
 
 function undo() {
@@ -1267,7 +1267,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
 
 const projectController = createDagProjectController({
   state, storage: window.localStorage, storagePrefix: PROJECT_STORAGE_PREFIX,
-  nowIso, invalidateMapCaches, renderAll, renderUndoRedo, renderActionHistory,
+  nowIso, invalidateMapCaches, renderAll, rebuildLinkDecision, renderUndoRedo, renderActionHistory,
 });
 
 const inspectorController = createDagInspectorController({

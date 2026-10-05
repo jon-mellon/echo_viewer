@@ -7,7 +7,7 @@ import * as workflow from "./dag_workflow.mjs";
 // Owns project lifecycle and the sole in-place mutation adapter used by the UI.
 export function createDagProjectController({
   state, storage, storagePrefix, nowIso, invalidateMapCaches,
-  renderAll, renderUndoRedo, renderActionHistory, warn = console.warn,
+  renderAll, rebuildLinkDecision = renderAll, renderUndoRedo, renderActionHistory, warn = console.warn,
   lifecycleTarget = globalThis,
 }) {
   let saveTimer = null;
@@ -117,17 +117,17 @@ export function createDagProjectController({
 
   const snapshot = () => projectOps.snapshotProject(state.project, state.phase);
 
-  function applySnapshot(serialized) {
+  function applySnapshot(serialized, { invalidate = true } = {}) {
     const restored = projectOps.restoreSnapshot(state.project, serialized);
     state.project = restored.project;
     state.phase = restored.phase;
-    invalidateMapCaches();
+    if (invalidate) invalidateMapCaches();
   }
 
-  function record(description, before) {
+  function record(description, before, renderKind = "full") {
     const after = snapshot();
     if (before === after) return;
-    Object.assign(state, history.recordHistory(state, description, before, after, nowIso()));
+    Object.assign(state, history.recordHistory(state, description, before, after, nowIso(), renderKind));
     renderUndoRedo();
     if (state.showActionHistory) renderActionHistory();
   }
@@ -136,8 +136,10 @@ export function createDagProjectController({
     const next = history.historyStep(state, direction);
     if (!next) return;
     state.undoPointer = next.undoPointer;
-    applySnapshot(next.snapshot);
-    renderAll();
+    const linkDecisionOnly = next.renderKind === "link-decision";
+    applySnapshot(next.snapshot, { invalidate: !linkDecisionOnly });
+    if (linkDecisionOnly) rebuildLinkDecision();
+    else renderAll();
   }
 
   function addDecision(type, decisionPayload) {

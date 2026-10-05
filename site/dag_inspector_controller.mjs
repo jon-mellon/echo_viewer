@@ -45,7 +45,7 @@ export function createDagInspectorController({
     if (action === "restore") {
       applyProjectOperation(projectOps.setLinkDecision(state.project, link.edge_id, null));
       addDecision("link_restored", { edge_id: link.edge_id });
-      addToUndoHistory("Restored edge", before);
+      addToUndoHistory("Restored edge", before, "link-decision");
     } else if (action === "exclude") {
       clearPendingExclude();
       applyProjectOperation(projectOps.setLinkDecision(state.project, link.edge_id, {
@@ -53,7 +53,7 @@ export function createDagInspectorController({
         exclude_reason: excludeReason || "", timestamp: nowIso(),
       }));
       addDecision("link_excluded", { edge_id: link.edge_id, reason: excludeReason });
-      addToUndoHistory("Excluded edge", before);
+      addToUndoHistory("Excluded edge", before, "link-decision");
     }
     rebuildLinkDecision();
   }
