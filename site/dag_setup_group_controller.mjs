@@ -165,7 +165,10 @@ export function createDagSetupGroupController({
     const rows = groups.map(({ group, variableMatch }) => h("div", { className: "setup-group-picker-row" },
       h("div", {}, h("strong", { textContent: group.label || group.group_id }),
         h("span", { textContent: `${group.variable_ids?.length || 0} vars` }),
-        variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched variable: ${truncate(variableMatch, 86)}` }) : null),
+        variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched variable: ${truncate(variableMatch, 86)}` }) : null,
+        group.description ? h("details", { className: "setup-group-definition" },
+          h("summary", { textContent: "Definition" }),
+          h("p", { textContent: group.description })) : null),
       h("button", { className: "action-button", type: "button", dataset: { side, groupId: group.group_id }, textContent: `Use as ${side.toUpperCase()}` })));
     rows.push(h("div", { className: "setup-group-picker-row define-new-row" },
       h("div", {}, h("strong", { textContent: "Define new variable…" }), h("span", { textContent: "Chop one or more existing categories in the spatial viewer" })),
