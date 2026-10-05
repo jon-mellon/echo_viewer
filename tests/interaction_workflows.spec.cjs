@@ -26,6 +26,15 @@ test("definition navigation returns through both Back steps and Cancel", async (
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);
   await ready(page);
+  await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    const loadNeighbors = dagDataSource.loadNeighbors.bind(dagDataSource);
+    window.__neighborQuerySizes = [];
+    dagDataSource.loadNeighbors = ids => {
+      window.__neighborQuerySizes.push(ids.length);
+      return loadNeighbors(ids);
+    };
+  });
   await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
   await page.locator("#definitionSourceSearch").fill("education");
   await expect(page.locator("#definitionSourceList input[data-source-id]").first()).toBeVisible();
@@ -33,19 +42,22 @@ test("definition navigation returns through both Back steps and Cancel", async (
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
-  // The variable map can open before the optional neighbor query runs, and
-  // the query must still complete while the definition remains open.
-  await expect.poll(() => page.evaluate(() => {
-    const variables = performance.getEntriesByName("echo:evidence:variables").at(-1);
-    const neighbors = performance.getEntriesByName("echo:evidence:neighbors").at(-1);
-    return Boolean(variables && neighbors && neighbors.startTime >= variables.startTime + variables.duration);
-  })).toBe(true);
+  // Opening a source only needs map records; neighbor suggestions are fetched
+  // for selected variables when the person starts defining the new group.
+  expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:neighbors").length)).toBe(0);
+  expect(await page.evaluate(() => window.__neighborQuerySizes)).toEqual([]);
   await page.locator("#definitionBack").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("sources");
   await page.locator("#definitionContinue").click();
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
   await page.locator("#definitionVariableSearch").fill(variableId);
   await page.locator("#definitionVariableResults .result-button").first().click();
+  await expect.poll(() => page.evaluate(() => {
+    const variables = performance.getEntriesByName("echo:evidence:variables").at(-1);
+    const neighbors = performance.getEntriesByName("echo:evidence:neighbors").at(-1);
+    return Boolean(variables && neighbors && neighbors.startTime >= variables.startTime + variables.duration);
+  })).toBe(true);
+  expect(await page.evaluate(() => window.__neighborQuerySizes)).toEqual([1]);
   await page.locator("#definitionReview").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("review");
   await page.locator("#definitionReviewBack").click();

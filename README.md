@@ -55,7 +55,8 @@ dialog starts the evidence query engine while a source is chosen. Use
 to measure that warm path;
 the required default run still measures an immediate Continue click.
 The definition map loads variable records first, then queries optional neighbor
-suggestions in the background. The browser interaction suite checks this order.
+suggestions only for selected variables. The browser interaction suite checks
+that order, and the profiler times the selection step.
 Incremental group edits read incident links from the canonical Parquet snapshot
 when available. The browser suite checks that path and its returned links; the
 profile suite enforces a retrieval-time budget. Older manifests use the sharded

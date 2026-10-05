@@ -5,7 +5,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   invalidateMapCaches, renderAll, drawMap = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
   visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
-  hydrateVariableDetails = async () => {}, prewarmEvidence = async () => {} }) {
+  hydrateVariableDetails = async () => {}, hydrateNeighbors = async () => {},
+  prewarmEvidence = async () => {} }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
   const renderDraft = ({ redrawMap = false } = {}) => {
@@ -194,7 +195,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     persistProjectLocally();
   }
 
-  function renderDefinition() { return presenter.render(); }
+  function renderDefinition() {
+    if (state.definitionDraft?.step === "partition" && state.definitionDraft.new_variable_ids?.length) {
+      void hydrateNeighbors(state.definitionDraft.new_variable_ids)
+        .catch(error => console.warn("Could not load variable neighbor suggestions.", error));
+    }
+    return presenter.render();
+  }
 
   function saveDefinition() {
     const draft = state.definitionDraft;

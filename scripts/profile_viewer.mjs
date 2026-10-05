@@ -20,6 +20,7 @@ const results = { started, url, browser: browserName, profileScenario: permalink
 const scenarioBudgets = {
   "open variable definition": 750,
   "select definition source": 2500,
+  "select definition variable": 1000,
   "incident links (40 variables)": 1000,
   "variable map zoom": 500,
   "close variable definition": 750,
@@ -273,6 +274,17 @@ try {
       return { total: ids.length, missing: ids.filter(id => !state.variableById.has(id)).length };
     }, sourceGroupId);
     if (!loaded.total || loaded.missing) throw new Error(`Definition metadata missing for ${loaded.missing}/${loaded.total} variables`);
+  });
+  await measure("select definition variable", async () => {
+    if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+    const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
+    const neighborQueries = await page.evaluate(() => performance.getEntriesByName("echo:evidence:neighbors").length);
+    await page.locator("#definitionVariableSearch").fill(variableId);
+    await page.locator("#definitionVariableResults .result-button").first().click();
+    await page.waitForFunction(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), variableId);
+    await page.waitForFunction(count => performance.getEntriesByName("echo:evidence:neighbors").length > count,
+      neighborQueries);
+    if (mobile) await page.locator('button[data-mobile-panel="variables"]').click();
   });
   await measure("variable map zoom", async () => {
     await page.locator("#dagZoomIn").click();

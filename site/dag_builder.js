@@ -725,59 +725,76 @@ function activeGroup() {
 }
 function createCustomGroup() { return groupEditorController.createCustomGroup(); }
 function closeGroupEditor() { return groupEditorController.closeGroupEditor(); }
-async function hydrateVariableDetails(variableIds, { deferNeighbors = false } = {}) {
-  const missing = [...new Set(variableIds || [])].filter(id => !state.variableById.has(id));
-  if (!missing.length) return;
-  const variablesPromise = dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource);
-  const neighborsPromise = deferNeighbors ? null : dagDataSource.loadNeighbors(missing);
-  const [variables, neighbors] = deferNeighbors
-    ? [await variablesPromise, null]
-    : await Promise.all([variablesPromise, neighborsPromise]);
+const loadedNeighborRecords = new WeakSet();
+const pendingNeighborRecords = new WeakMap();
+
+function applyVariableNeighbors(variables, rows) {
+  const byVariable = new Map();
+  const displayedById = new Map(state.variables.map(variable => [variable.variable_id, variable]));
+  for (const row of rows) {
+    if (!byVariable.has(row.variable_id)) byVariable.set(row.variable_id, []);
+    byVariable.get(row.variable_id).push({ variable_id: row.neighbor_variable_id,
+      index: row.neighbor_index, cosine_similarity: row.cosine_similarity,
+      llm_rank: row.llm_rank, embedding_rank: row.embedding_rank,
+      is_substantive_duplicate: row.is_substantive_duplicate });
+  }
   for (const variable of variables) {
-    if (variable.field_preview_json) variable.field_preview = JSON.parse(variable.field_preview_json);
-    if (variable.metadata_blob_json) variable.metadata_blob = JSON.parse(variable.metadata_blob_json);
-    variable.similarity_neighbors = [];
-    state.variableById.set(variable.variable_id, variable);
+    if (state.variableById.get(variable.variable_id) !== variable) continue;
+    const suggestions = byVariable.get(variable.variable_id) || [];
+    variable.similarity_neighbors = suggestions;
+    loadedNeighborRecords.add(variable);
+    // Cluster construction copies variable records for map/search views.
+    const displayed = displayedById.get(variable.variable_id);
+    if (displayed) displayed.similarity_neighbors = suggestions;
   }
-  state.variables = [...state.variableById.values()].sort((a, b) => Number(a.index || 0) - Number(b.index || 0));
-  buildDuplicateClusters();
-  invalidateMapCaches();
-  const applyNeighbors = rows => {
-    const byVariable = new Map();
-    const displayedById = new Map(state.variables.map(variable => [variable.variable_id, variable]));
-    for (const row of rows) {
-      if (!byVariable.has(row.variable_id)) byVariable.set(row.variable_id, []);
-      byVariable.get(row.variable_id).push({ variable_id: row.neighbor_variable_id,
-        index: row.neighbor_index, cosine_similarity: row.cosine_similarity,
-        llm_rank: row.llm_rank, embedding_rank: row.embedding_rank,
-        is_substantive_duplicate: row.is_substantive_duplicate });
-    }
+  if (state.definitionDraft?.step === "partition") renderDefinition();
+}
+
+async function hydrateVariableNeighbors(variableIds) {
+  const variables = [...new Set(variableIds || [])].map(id => state.variableById.get(id)).filter(Boolean);
+  const missing = variables.filter(variable =>
+    !loadedNeighborRecords.has(variable) && !pendingNeighborRecords.has(variable));
+  if (missing.length) {
+    const pending = dagDataSource.loadNeighbors(missing.map(variable => variable.variable_id))
+      .then(rows => applyVariableNeighbors(missing, rows))
+      .finally(() => missing.forEach(variable => pendingNeighborRecords.delete(variable)));
+    for (const variable of missing) pendingNeighborRecords.set(variable, pending);
+  }
+  await Promise.all([...new Set(variables.map(variable => pendingNeighborRecords.get(variable)).filter(Boolean))]);
+}
+
+async function hydrateVariableDetails(variableIds, { skipNeighbors = false } = {}) {
+  const requested = [...new Set(variableIds || [])];
+  const missing = requested.filter(id => !state.variableById.has(id));
+  if (missing.length) {
+    const variablesPromise = dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource);
+    const neighborsPromise = skipNeighbors ? null : dagDataSource.loadNeighbors(missing);
+    const [variables, neighbors] = skipNeighbors
+      ? [await variablesPromise, null]
+      : await Promise.all([variablesPromise, neighborsPromise]);
     for (const variable of variables) {
-      if (state.variableById.get(variable.variable_id) === variable) {
-        const suggestions = byVariable.get(variable.variable_id) || [];
-        variable.similarity_neighbors = suggestions;
-        // Cluster construction copies variable records for map/search views.
-        const displayed = displayedById.get(variable.variable_id);
-        if (displayed) displayed.similarity_neighbors = suggestions;
-      }
+      if (variable.field_preview_json) variable.field_preview = JSON.parse(variable.field_preview_json);
+      if (variable.metadata_blob_json) variable.metadata_blob = JSON.parse(variable.metadata_blob_json);
+      variable.similarity_neighbors = [];
+      state.variableById.set(variable.variable_id, variable);
     }
-  };
-  if (deferNeighbors) {
-    // The map only needs variable records. Starting the large neighbor query
-    // after those records arrive avoids competing for the same DuckDB worker.
-    void dagDataSource.loadNeighbors(missing).then(rows => {
-      applyNeighbors(rows);
-      if (state.definitionDraft?.step === "partition") renderDefinition();
-    }).catch(error => console.warn("Could not load variable neighbor suggestions.", error));
-  } else {
-    applyNeighbors(neighbors);
+    state.variables = [...state.variableById.values()].sort((a, b) => Number(a.index || 0) - Number(b.index || 0));
+    buildDuplicateClusters();
+    invalidateMapCaches();
+    if (!skipNeighbors) applyVariableNeighbors(variables, neighbors);
   }
+  if (!skipNeighbors) await hydrateVariableNeighbors(requested);
 }
 
 function renderGroupEditor() {
   const group = state.project?.groups?.find(item => item.group_id === state.activeGroupId);
-  const missing = (group?.variable_ids || []).filter(id => !state.variableById.has(id));
-  if (missing.length && !state.pendingVariableMetadata) {
+  // Definition source loading only fetches map records. The group editor uses
+  // neighbors for its suggestions, so fetch them if this group is opened later.
+  const missing = (group?.variable_ids || []).filter(id => {
+    const variable = state.variableById.get(id);
+    return !variable || !loadedNeighborRecords.has(variable);
+  });
+  if (!state.definitionDraft && missing.length && !state.pendingVariableMetadata) {
     state.pendingVariableMetadata = true;
     void hydrateVariableDetails(missing).then(() => {
       state.pendingVariableMetadata = false;
@@ -1251,7 +1268,8 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   searchVariables: searchVisibleVariables,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
   takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
-  hydrateVariableDetails: ids => hydrateVariableDetails(ids, { deferNeighbors: true }),
+  hydrateVariableDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),
+  hydrateNeighbors: hydrateVariableNeighbors,
   prewarmEvidence: async () => {
     await dagDataSource.ensureEvidenceConnection();
     // DuckDB fetches the remote layout metadata when it creates this view.
