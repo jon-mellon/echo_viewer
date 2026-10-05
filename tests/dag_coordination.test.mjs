@@ -35,9 +35,21 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   }
   const networks = [];
   class Network {
-    constructor(element, data, options) { this.options = options; this.setOptionsCalls = 0; networks.push(this); }
-    on() {} off() {} redraw() {} fit() {}
+    constructor(element, data, options) {
+      this.data = data; this.options = options; this.setOptionsCalls = 0;
+      this.boundingBoxCalls = 0; this.handlers = new Map(); networks.push(this);
+    }
+    on(name, handler) { this.handlers.set(name, handler); }
+    off(name) { this.handlers.delete(name); }
+    redraw() {} fit() {} moveTo() {}
+    getScale() { return 0.5; }
+    getViewPosition() { return { x: 0, y: 0 }; }
     setOptions(options) { this.options = options; this.setOptionsCalls++; }
+    getBoundingBox(id) {
+      this.boundingBoxCalls++;
+      const index = groups.findIndex(group => group.group_id === id);
+      return { left: index * 400, right: index * 400 + 100, top: 0, bottom: 40 };
+    }
   }
   const controller = createDagNetworkController({ state,
     elements: { dagNetwork, dagLayoutSelect: { value: "" } }, visApi: { DataSet, Network },
@@ -47,8 +59,14 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   });
   controller.renderDag();
   await controller.whenRendered();
+  const firstScale = controller.minimumDagScale();
+  controller.minimumDagScale();
+  networks[0].handlers.get("zoom")();
+  assert.equal(networks[0].boundingBoxCalls, networks[0].data.nodes.getIds().length);
   controller.renderDag();
   await controller.whenRendered();
+  controller.minimumDagScale();
+  assert.equal(networks[0].boundingBoxCalls, networks[0].data.nodes.getIds().length * 2);
   assert.equal(networks.length, 1);
   assert.equal(networks[0].setOptionsCalls, 0);
   dagNetwork.clientWidth = 1200;
@@ -56,6 +74,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   await controller.whenRendered();
   assert.equal(networks[0].setOptionsCalls, 1);
   assert.equal(networks[0].options.nodes.widthConstraint.maximum, 185);
+  assert.ok(controller.minimumDagScale() > firstScale);
 });
 
 test("edge selection updates only the old and new routed links", () => {

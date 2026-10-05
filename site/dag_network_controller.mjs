@@ -56,6 +56,7 @@ let _visEdges = null;
 let _dagLayoutSignature = "";
 let _visOptionSignature = "";
 let _dagGeometry = null;
+let _dagBoundsCache = null;
 let _dagEdgeSegments = new Map();
 let _renderedSelectedEdgeId = null;
 let _dagNodeDataById = new Map();
@@ -414,6 +415,7 @@ function renderDag({ reuseGeometry = false } = {}) {
 }
 
 function applyDagRender(groups, layout, routes) {
+  _dagBoundsCache = null;
   const { nodeData, edgeData, edgeSegments } = routedDagDataFromRoutes(groups, routes, layout);
   const groupIds = new Set(groups.map(group => group.group_id));
   _dagNodeDataById = new Map(nodeData.filter(node => groupIds.has(node.id))
@@ -472,6 +474,7 @@ function applyDagRender(groups, layout, routes) {
 }
 
 function applyReusedDagRender(groups, layout, routes) {
+  _dagBoundsCache = null;
   const wanted = new Set(routes.map(route => route.link.edge_id));
   const removed = [..._dagEdgeSegments].filter(([, logicalId]) => !wanted.has(logicalId));
   const currentEdgeIds = new Set(_visEdges.getIds());
@@ -506,10 +509,27 @@ function applyReusedDagRender(groups, layout, routes) {
   _visNetwork.redraw();
 }
 
-function minimumDagScale() {
+function dagBounds() {
+  if (_dagBoundsCache) return _dagBoundsCache;
   const ids = _visNodes?.getIds() || [];
-  if (!ids.length || !_visNetwork) return 0.1;
-  const boxes = ids.map(id => _visNetwork.getBoundingBox(id));
+  if (!ids.length || !_visNetwork) return null;
+  const all = ids.map(id => ({ id, box: _visNetwork.getBoundingBox(id) }));
+  const boxes = all.map(item => item.box);
+  const groupBoxes = all.filter(item => Boolean(groupById(item.id))).map(item => item.box);
+  const contentBounds = groupBoxes.length ? {
+    left: Math.min(...groupBoxes.map(box => box.left)),
+    right: Math.max(...groupBoxes.map(box => box.right)),
+    top: Math.min(...groupBoxes.map(box => box.top)),
+    bottom: Math.max(...groupBoxes.map(box => box.bottom)),
+    boxes: groupBoxes,
+  } : null;
+  _dagBoundsCache = { boxes, contentBounds };
+  return _dagBoundsCache;
+}
+
+function minimumDagScale() {
+  const boxes = dagBounds()?.boxes;
+  if (!boxes?.length) return 0.1;
   const width = Math.max(...boxes.map(b => b.right)) - Math.min(...boxes.map(b => b.left));
   const height = Math.max(...boxes.map(b => b.bottom)) - Math.min(...boxes.map(b => b.top));
   return 0.8 * Math.min(Math.max(1, els.dagNetwork.clientWidth - 68) / Math.max(1, width),
@@ -522,18 +542,7 @@ function attachDagNetworkHandlers(network) {
   detachDagInteractions?.();
   detachDagInteractions = attachDagInteractions(network, els.dagNetwork, {
     minimumScale: minimumDagScale,
-    contentBounds() {
-      const ids = (_visNodes?.getIds() || []).filter(id => Boolean(groupById(id)));
-      if (!ids.length) return null;
-      const boxes = ids.map(id => network.getBoundingBox(id));
-      return {
-        left: Math.min(...boxes.map(box => box.left)),
-        right: Math.max(...boxes.map(box => box.right)),
-        top: Math.min(...boxes.map(box => box.top)),
-        bottom: Math.max(...boxes.map(box => box.bottom)),
-        boxes,
-      };
-    },
+    contentBounds: () => dagBounds()?.contentBounds || null,
     drawPathLanes: drawConfounderPathLanes,
     highlightEdge: highlightLogicalDagEdge,
     highlightNodeEdges: highlightConnectedDagEdges,
