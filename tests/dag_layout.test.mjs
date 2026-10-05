@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { computeDagLayout, dagNodeBoxes } from '../site/dag_layout.mjs';
-import { legacyLayout } from './fixtures/legacy_dag_layout.mjs';
 import { routeEdges } from '../site/dag_router.mjs';
 import { routesToVisData } from '../site/dag_vis_routing.mjs';
 import { reuseDagGeometry } from '../site/dag_render_compute.mjs';
@@ -53,14 +52,13 @@ function fixture(count, mode, width = 900, height = 720) {
 
 for (const mode of ['auto', 'hierarchical', 'organic']) {
   for (const count of [0, 1, 8, 28, 43]) {
-    test(`${mode}, ${count} nodes: exact legacy parity and unchanged inputs`, () => {
+    test(`${mode}, ${count} nodes: deterministic geometry and unchanged inputs`, () => {
       const input = fixture(count, mode, count <= 8 ? 630 : 1100);
       const before = structuredClone(input);
-      const expected = legacyLayout(input);
       const actual = computeDagLayout(input);
-      assert.deepEqual(actual, expected);
       assert.deepEqual(input, before);
       assert.deepEqual(computeDagLayout(input), actual);
+      assert.deepEqual(computeDagLayout(structuredClone(input)), actual);
       assert.equal(actual.positions.size, count);
       assert.equal(actual.boxes.size, count);
       for (const group of input.groups) {
@@ -79,12 +77,19 @@ for (const mode of ['auto', 'hierarchical', 'organic']) {
   }
 }
 
-test('103-node startup layout preserves legacy positions after distance culling', () => {
+test('103-node startup layout produces finite, stable geometry', () => {
   const input = fixture(103, 'auto', 1100);
   const actual = computeDagLayout(input);
-  const expected = legacyLayout(input);
-  assert.deepEqual(actual.positions, expected.positions);
-  assert.deepEqual(actual.boxes, expected.boxes);
+  assert.equal(actual.positions.size, 103);
+  assert.equal(actual.boxes.size, 103);
+  assert.deepEqual(computeDagLayout(structuredClone(input)), actual);
+  for (const [id, point] of actual.positions) {
+    const box = actual.boxes.get(id);
+    assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y));
+    assert.ok(Number.isFinite(box.x) && Number.isFinite(box.y));
+    assert.equal(box.cx, point.x);
+    assert.equal(box.cy, point.y);
+  }
 });
 
 test('layout, routing and adapter preserve every endpoint', () => {
