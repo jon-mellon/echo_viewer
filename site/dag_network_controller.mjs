@@ -7,6 +7,19 @@ import * as workflow from "./dag_workflow.mjs";
 import * as dagPathHighlights from "./dag_path_highlights.mjs";
 import { STUDY_DESIGN_EDGE_ID } from "./dag_inspector_controller.mjs";
 
+export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId, links, visualData) {
+  if (previousId === selectedId) return [];
+  const changedIds = new Set([previousId, selectedId].filter(Boolean));
+  const linksById = new Map(links.filter(link => changedIds.has(link.edge_id))
+    .map(link => [link.edge_id, link]));
+  const updates = [];
+  for (const [segmentId, logicalId] of edgeSegments) {
+    const link = linksById.get(logicalId);
+    if (link) updates.push({ id: segmentId, ...visualData(link) });
+  }
+  return updates;
+}
+
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
   drawMap, setMapMode, renderAll, selectEdge,
@@ -19,6 +32,7 @@ let _visEdges = null;
 let _dagLayoutSignature = "";
 let _dagGeometry = null;
 let _dagEdgeSegments = new Map();
+let _renderedSelectedEdgeId = null;
 let _dagNodeDataById = new Map();
 let _dagHoverBaseline = null;
 let _dagHoveredConfounderId = null;
@@ -106,15 +120,11 @@ function refreshEdgeSelection() {
   // the full layout here can make vis.js move nodes while it is still completing
   // the click event, especially for routed edges with synthetic bend nodes.
   clearLogicalDagEdgeHover();
-  const linksById = new Map((state.project?.links || []).map(link => [link.edge_id, link]));
-  const updates = [];
-  for (const segmentId of _visEdges.getIds()) {
-    const logicalId = _dagEdgeSegments.get(segmentId) || segmentId;
-    const link = linksById.get(logicalId);
-    if (link) updates.push({ id: segmentId, ...edgeVisualData(link) });
-  }
+  const updates = selectionUpdatesForSegments(_dagEdgeSegments, _renderedSelectedEdgeId,
+    state.selectedEdgeId, state.project?.links || [], edgeVisualData);
+  _renderedSelectedEdgeId = state.selectedEdgeId;
   if (updates.length) _visEdges.update(updates);
-  _visNetwork?.redraw();
+  if (updates.length) _visNetwork?.redraw();
 }
 
 function routedDagData(groups, links, layout) {
@@ -400,6 +410,7 @@ function applyDagRender(groups, layout, routes) {
   const designEdge = studyDesignEdgeData(groups);
   if (designEdge) edgeData.push(designEdge);
   _dagEdgeSegments = edgeSegments;
+  _renderedSelectedEdgeId = state.selectedEdgeId;
 
   if (!_visNetwork) {
     _visNodes = new visApi.DataSet(nodeData);
@@ -475,6 +486,7 @@ function applyReusedDagRender(groups, layout, routes) {
     }
   }
   if (changedNodes.length) _visNodes.update(changedNodes);
+  _renderedSelectedEdgeId = state.selectedEdgeId;
   _visNetwork.redraw();
 }
 

@@ -2,7 +2,24 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { attachDagInteractions } from "../site/dag_interactions.mjs";
 import { createRenderCoordinator } from "../site/render_coordinator.mjs";
-import { createDagNetworkController } from "../site/dag_network_controller.mjs";
+import { createDagNetworkController, selectionUpdatesForSegments } from "../site/dag_network_controller.mjs";
+
+test("edge selection updates only the old and new routed links", () => {
+  const segments = new Map([
+    ["a::seg0", "a"], ["a::seg1", "a"], ["b::seg0", "b"], ["c::seg0", "c"],
+  ]);
+  const links = ["a", "b", "c"].map(edge_id => ({ edge_id }));
+  const updates = selectionUpdatesForSegments(segments, "a", "b", links,
+    link => ({ color: link.edge_id === "b" ? "selected" : "normal" }));
+  assert.deepEqual(updates, [
+    { id: "a::seg0", color: "normal" },
+    { id: "a::seg1", color: "normal" },
+    { id: "b::seg0", color: "selected" },
+  ]);
+  assert.deepEqual(selectionUpdatesForSegments(segments, "b", "b", links, () => ({})), []);
+  assert.deepEqual(selectionUpdatesForSegments(segments, "b", null, links,
+    () => ({ color: "normal" })), [{ id: "b::seg0", color: "normal" }]);
+});
 
 test("node hover cannot apply a partial physical-segment highlight", () => {
   const controller = createDagNetworkController({});
