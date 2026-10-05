@@ -537,7 +537,7 @@ try {
       "select DV": 249.6,
       "causal filter": 249.6,
       "exclude edge promptly": 436.8,
-      "restore edge": 299.52,
+      "restore edge": 400,
       "exclude edge": 299.52,
       "restore excluded edge": 312,
     },
