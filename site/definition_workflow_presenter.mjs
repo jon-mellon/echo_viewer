@@ -77,7 +77,8 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
         const variable = clusterDisplayVariable(neighbor.variable_id) || state.variableById.get(neighbor.variable_id);
         return h("button", { className: "result-button", type: "button", dataset: { neighborId: neighbor.variable_id } },
           h("strong", { textContent: variable?.display_label || variable?.concept_label || neighbor.variable_id }),
-          h("span", { textContent: `LLM rank ${neighbor.llm_rank || ""}; cosine ${Number(neighbor.cosine_similarity || 0).toFixed(3)}` }));
+          h("span", { textContent: neighbor.map_distance ? "Nearby on map" :
+            `LLM rank ${neighbor.llm_rank || ""}; cosine ${Number(neighbor.cosine_similarity || 0).toFixed(3)}` }));
       }));
       els.definitionNeighborResults.querySelectorAll("button[data-neighbor-id]").forEach(button =>
         button.addEventListener("click", () => onToggleVariable(button.dataset.neighborId, true)));

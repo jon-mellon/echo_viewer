@@ -1,5 +1,6 @@
 import * as projectOps from "./dag_project.mjs";
 import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
+import { nearbyMapNeighbors } from "./definition_neighbors.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
   invalidateMapCaches, renderAll, drawMap = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
@@ -153,6 +154,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         }
       }
     }
+    // Some source groups have no similarity links between their members. Keep
+    // nearby suggestions useful by falling back to the displayed map layout.
+    if (!best.size) return nearbyMapNeighbors(eligible, selected, state.variableById);
     return [...best.values()].sort((a, b) => Number(a.llm_rank || 99) - Number(b.llm_rank || 99)
       || Number(b.cosine_similarity || 0) - Number(a.cosine_similarity || 0)).slice(0, 12);
   }
