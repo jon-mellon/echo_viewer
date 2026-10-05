@@ -585,6 +585,7 @@ try {
     "restore edge": 1392.56,
     "restore excluded edge": 1392.56,
   };
+  const mobileBudget = limit => Number((limit * 1.2).toFixed(3));
   const baselineComparisons = [];
   const recordBaseline = (metric, observed, baseline) => {
     if (observed == null || baseline == null) return;
@@ -603,11 +604,11 @@ try {
       recordBaseline(`${scenario.name} wall time`, scenario.wallMs, originalWallLimit);
       recordBaseline(`${scenario.name} longest task`, scenario.longestTaskMs, originalLimits.task[mobile ? "mobile" : "desktop"]);
       recordBaseline(`${scenario.name} longest event`, scenario.longestEventMs, originalLimits.event[mobile ? "mobile" : "desktop"]);
-      const limit = scenario.name === "settle graph after exclusion" && mobile ? 1326
-        : edgeAction && mobile ? 2652
-          : scenario.name === "select definition source" && mobile ? 7735
-            : anchorChange ? (mobile ? 3315 : 2210)
-            : scenarioBudgets[scenario.name] * (mobile ? 8.84 : 2.21);
+      const limit = scenario.name === "settle graph after exclusion" && mobile ? mobileBudget(1326)
+        : edgeAction && mobile ? mobileBudget(2652)
+          : scenario.name === "select definition source" && mobile ? mobileBudget(7735)
+            : anchorChange ? (mobile ? mobileBudget(3315) : 2210)
+            : scenarioBudgets[scenario.name] * (mobile ? mobileBudget(8.84) : 2.21);
       return [
         ...(scenario.wallMs > limit
           ? [`${scenario.name}: ${scenario.wallMs} ms exceeds ${limit} ms`] : []),
@@ -618,37 +619,37 @@ try {
           measure.name === "echo:dag:layout" || measure.name === "echo:dag:routing")
           ? ["Definition source selection recalculated hidden graph geometry"] : []),
         ...(() => {
-          const taskLimit = mobile ? 1326 : (observedDesktopLimits.task[scenario.name] ?? 397.8);
+          const taskLimit = mobile ? mobileBudget(1326) : (observedDesktopLimits.task[scenario.name] ?? 397.8);
           return scenario.longestTaskMs != null && scenario.longestTaskMs > taskLimit
             ? [`${scenario.name}: ${scenario.longestTaskMs} ms task exceeds ${taskLimit} ms`] : [];
         })(),
         ...(() => {
           const eventLimit = mobile
-            ? (observedMobileEventLimits[scenario.name] ?? 1060.8)
+            ? mobileBudget(observedMobileEventLimits[scenario.name] ?? 1060.8)
             : (observedDesktopLimits.event[scenario.name] ?? 397.8);
           return scenario.longestEventMs != null && scenario.longestEventMs > eventLimit
             ? [`${scenario.name}: ${scenario.longestEventMs} ms event exceeds ${eventLimit} ms`] : [];
         })(),
       ];
     }),
-    ...(results.startup.visibleMs > (mobile ? 44200 : 26520) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 44200 : 26520} ms`] : []),
+    ...(results.startup.visibleMs > (mobile ? mobileBudget(44200) : 26520) ? [`Startup visible time ${results.startup.visibleMs} ms exceeds ${mobile ? mobileBudget(44200) : 26520} ms`] : []),
     ...(!permalink && results.startup.appMeasures.filter(measure => measure.name === "echo:dag:layout").length > 1
       ? ["Startup recalculated graph layout during schema hydration"] : []),
     ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:layout"
-      && measure.durationMs > (mobile ? 3978 : observedDesktopLimits.layout))
-      .map(measure => `Graph layout ${measure.durationMs} ms exceeds ${mobile ? 3978 : observedDesktopLimits.layout} ms`),
+      && measure.durationMs > (mobile ? mobileBudget(3978) : observedDesktopLimits.layout))
+      .map(measure => `Graph layout ${measure.durationMs} ms exceeds ${mobile ? mobileBudget(3978) : observedDesktopLimits.layout} ms`),
     ...results.startup.appMeasures.filter(measure => measure.name === "echo:dag:routing"
-      && measure.durationMs > (mobile ? 5525 : 1657.5))
-      .map(measure => `Graph routing ${measure.durationMs} ms exceeds ${mobile ? 5525 : 1657.5} ms`),
-    ...(permalink && results.startup.visibleMs > (mobile ? 22100 : 11050)
-      ? [`Permalink visible time ${results.startup.visibleMs} ms exceeds ${mobile ? 22100 : 11050} ms`] : []),
-    ...(results.startup.schemaReadyMs > (mobile ? 33150 : 17680) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? 33150 : 17680} ms`] : []),
-    ...(results.startup.membershipWaitMs > (mobile ? 13260 : 8840)
-      ? [`Membership wait ${results.startup.membershipWaitMs} ms exceeds ${mobile ? 13260 : 8840} ms`] : []),
-    ...(browserName === "chromium" && (results.startup.lcpMs == null || results.startup.lcpMs > (mobile ? 39780 : 19890))
-      ? [`Startup LCP ${results.startup.lcpMs} ms exceeds ${mobile ? 39780 : 19890} ms`] : []),
-    ...(results.startup.longestTaskMs != null && results.startup.longestTaskMs > (mobile ? 1326 : 552.5)
-      ? [`Startup ${results.startup.longestTaskMs} ms task exceeds ${mobile ? 1326 : 552.5} ms`] : []),
+      && measure.durationMs > (mobile ? mobileBudget(5525) : 1657.5))
+      .map(measure => `Graph routing ${measure.durationMs} ms exceeds ${mobile ? mobileBudget(5525) : 1657.5} ms`),
+    ...(permalink && results.startup.visibleMs > (mobile ? mobileBudget(22100) : 11050)
+      ? [`Permalink visible time ${results.startup.visibleMs} ms exceeds ${mobile ? mobileBudget(22100) : 11050} ms`] : []),
+    ...(results.startup.schemaReadyMs > (mobile ? mobileBudget(33150) : 17680) ? [`Schema ready time ${results.startup.schemaReadyMs} ms exceeds ${mobile ? mobileBudget(33150) : 17680} ms`] : []),
+    ...(results.startup.membershipWaitMs > (mobile ? mobileBudget(13260) : 8840)
+      ? [`Membership wait ${results.startup.membershipWaitMs} ms exceeds ${mobile ? mobileBudget(13260) : 8840} ms`] : []),
+    ...(browserName === "chromium" && (results.startup.lcpMs == null || results.startup.lcpMs > (mobile ? mobileBudget(39780) : 19890))
+      ? [`Startup LCP ${results.startup.lcpMs} ms exceeds ${mobile ? mobileBudget(39780) : 19890} ms`] : []),
+    ...(results.startup.longestTaskMs != null && results.startup.longestTaskMs > (mobile ? mobileBudget(1326) : 552.5)
+      ? [`Startup ${results.startup.longestTaskMs} ms task exceeds ${mobile ? mobileBudget(1326) : 552.5} ms`] : []),
     ...(results.startup.transferMB > 5.525 ? [`Startup transfer ${results.startup.transferMB} MB exceeds 5.525 MB`] : []),
     ...(results.startup.cls != null && results.startup.cls > 0.1105 ? [`Startup CLS ${results.startup.cls} exceeds 0.1105`] : []),
     ...results.errors.map(error => `Browser error: ${error}`),

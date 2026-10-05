@@ -45,7 +45,7 @@ interaction produces a long task or slow input event, or startup exceeds its
 visibility, largest paint, schema readiness, long task, transfer, or layout
 shift budget. Schema readiness is capped at 8 seconds on desktop and the
 membership wait after the first paint at 4 seconds. Mobile budgets account for
-4× CPU throttling. Firefox enforces interaction and readiness times; browser
+4× CPU throttling and include 20% extra headroom. Firefox enforces interaction and readiness times; browser
 metrics unsupported by Firefox are reported as unavailable. Use
 `PROFILE_DISABLE_BUDGETS=1` for a diagnostic run without those gates.
 Edge decisions reuse existing routes and update changed graph segments; the
