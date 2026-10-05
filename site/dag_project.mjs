@@ -194,6 +194,7 @@ export function importSchemaGroups(project, groupingSet, linkLookup, timestamp) 
     project.groups.push({
       group_id: importedGroupId,
       label: sourceGroup.label || "Imported group",
+      ...(sourceGroup.description ? { description: sourceGroup.description } : {}),
       variable_ids: remaining,
       seed_variable_ids: remaining.slice(),
       excluded_nearby_variable_ids: [],

@@ -145,6 +145,8 @@ function renderGroupEditor() {
     els.editSplit.hidden = !projectOps.editableSplitContext(state.project, group);
   }
   els.groupLabelInput.value = model.label;
+  els.groupDescription.textContent = model.description;
+  els.groupDescription.hidden = !model.description;
   els.groupNotesInput.value = model.notes;
   // Reset the in-editor add-search when a different group is opened.
   if (els.groupSeedInput.dataset.groupId !== group.group_id) {

@@ -135,7 +135,7 @@ function initElements() {
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
     // Right: group editor
-    "groupEditorSection", "groupEditorTitle", "groupEditorHint", "cancelGroupEdit",
+    "groupEditorSection", "groupEditorTitle", "groupEditorHint", "groupDescription", "cancelGroupEdit",
     "groupLabelInput", "groupNotesInput", "useGroupAsAnchor",
     "zoomGroup", "editSplit",
     "addNeighbors", "removeNeighbors", "clearGroupSelection",

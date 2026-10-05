@@ -1154,6 +1154,16 @@ h2 {
   display: block;
 }
 
+.group-description {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .dag-textarea {
   width: 100%;
   min-height: 68px;

@@ -5,7 +5,7 @@ import { prepareLoadedProject } from "../site/project_persistence.mjs";
 import { buildGroupEditorModel } from "../site/dag_group_editor.mjs";
 
 test("editor display preserves member order, fallbacks and setup-only anchor action", () => {
-  const group = { type: "dv", variable_ids: ["v", "missing"], label: "Outcome" };
+  const group = { type: "dv", variable_ids: ["v", "missing"], label: "Outcome", description: "Measured outcome." };
   const context = { variables: new Map([["v", { display_label: "Variable", raw_variable_text: "Raw" }]]),
     workflowMode: "setup", phase: "define_dv" };
   const before = structuredClone(group);
@@ -14,6 +14,7 @@ test("editor display preserves member order, fallbacks and setup-only anchor act
   assert.equal(model.choosingAnchor, true);
   assert.equal(model.anchorButtonLabel, "Use as DV");
   assert.equal(model.notes, "");
+  assert.equal(model.description, "Measured outcome.");
   assert.deepEqual(model.members, [
     { variableId: "v", label: "Variable", title: "Raw" },
     { variableId: "missing", label: "missing", title: "" },
