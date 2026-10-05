@@ -330,6 +330,15 @@ export class ParquetManifestDagDataSource {
 
   async queryBrowserIncidentLinks(variableIds) {
     const placeholders = variableIds.map(() => "?").join(",");
+    const canonicalUrl = this.canonicalEvidenceRelationUrl("causal_link_occurrences");
+    if (canonicalUrl) {
+      // The canonical file has one row per raw link. A single Parquet binding
+      // avoids preparing a union across many source and target shard files.
+      const url = canonicalUrl.replaceAll("'", "''");
+      return queryRows(this.connection, `SELECT * FROM read_parquet('${url}')
+        WHERE source_variable_id IN (${placeholders}) OR target_variable_id IN (${placeholders})`,
+      [...variableIds, ...variableIds]);
+    }
     const sourceUrls = this.browserUrls(this.browserLayout.causal_links_by_source, variableIds)
       .map(url => `'${url.replaceAll("'", "''")}'`).join(",");
     const targetUrls = this.browserUrls(this.browserLayout.causal_links_by_target, variableIds)

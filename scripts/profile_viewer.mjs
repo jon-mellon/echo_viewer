@@ -20,6 +20,7 @@ const results = { started, url, browser: browserName, profileScenario: permalink
 const scenarioBudgets = {
   "open variable definition": 750,
   "select definition source": 2500,
+  "incident links (40 variables)": 1000,
   "variable map zoom": 500,
   "close variable definition": 750,
   "group search": 2000,
@@ -331,6 +332,22 @@ try {
   await measure("close variable definition", async () => {
     if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
     await page.locator("#definitionCancel").click();
+  });
+
+  await measure("incident links (40 variables)", async () => {
+    const result = await page.evaluate(async groupId => {
+      const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+      const ids = window.__dagBuilderState.project.groups.find(group => group.group_id === groupId)
+        ?.variable_ids.slice(0, 40) || [];
+      const links = await dagDataSource.loadIncidentRawLinks(ids);
+      return { ids: ids.length, count: links.length,
+        unique: new Set(links.map(link => link.raw_causal_link_id)).size,
+        allIncident: links.every(link => ids.includes(link.source_variable_id)
+          || ids.includes(link.target_variable_id)) };
+    }, sourceGroupId);
+    if (result.ids !== 40 || !result.count || result.unique !== result.count || !result.allIncident) {
+      throw new Error(`Incident link query returned invalid results: ${JSON.stringify(result)}`);
+    }
   });
 
   await measure("group search", async () => {

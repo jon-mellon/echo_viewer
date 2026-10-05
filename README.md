@@ -16,7 +16,8 @@ python3 -m http.server --directory site
 Run `npm run profile` to start a local preview and measure startup, definition
 entry, group search, IV/DV selection and changes, map controls and gestures,
 DAG layouts and filters, edge Exclude/Restore, manual edges, undo/redo,
-fullscreen, history, and project/schema downloads in Chromium.
+fullscreen, history, incident-link retrieval for 40 changed variables, and
+project/schema downloads in Chromium.
 Run `PROFILE_DEVICE=mobile npm run profile` for the same flows at a 390-pixel
 viewport with 4× CPU throttling. Run `PROFILE_BROWSER=firefox npm run profile`
 to check the same interactions in Firefox. Run `PROFILE_SCENARIO=permalink npm run profile`
@@ -55,6 +56,10 @@ to measure that warm path;
 the required default run still measures an immediate Continue click.
 The definition map loads variable records first, then queries optional neighbor
 suggestions in the background. The browser interaction suite checks this order.
+Incremental group edits read incident links from the canonical Parquet snapshot
+when available. The browser suite checks that path and its returned links; the
+profile suite enforces a retrieval-time budget. Older manifests use the sharded
+source and target files.
 
 The suite uses synthetic browser sessions only. It does not collect viewer
 analytics or retain user activity.

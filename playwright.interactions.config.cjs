@@ -1,7 +1,7 @@
 module.exports = {
   testDir: "./tests",
   testMatch: ["browser_v2_workflows.spec.cjs", "dag2_define_variable.spec.cjs",
-    "interaction_workflows.spec.cjs"],
+    "interaction_workflows.spec.cjs", "static_data_source.spec.cjs"],
   workers: 1,
   timeout: 120_000,
   expect: { timeout: 15_000 },

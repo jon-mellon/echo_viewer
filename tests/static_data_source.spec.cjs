@@ -8,6 +8,7 @@ for (const route of ["/"]) {
     // Original baseline was 60000 ms; this is a runner timeout, not a performance gate.
     test.setTimeout(78000);
     await page.addInitScript(() => {
+      sessionStorage.setItem("echo-viewer-password-accepted", "yes");
       window.__startupStages = [];
       window.addEventListener("startupstage", event => window.__startupStages.push(event.detail));
     });
@@ -25,10 +26,10 @@ for (const route of ["/"]) {
       && document.getElementById("startupLoading")?.hidden, null,
       { timeout: 78000 });
     await expect(page.locator("#schemaPublicationBadge")).toHaveText("Public schema", { timeout: 78000 });
-    await page.waitForFunction(async () => {
+    await page.evaluate(async () => {
       const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
-      return Boolean(dagDataSource.connection && !dagDataSource.evidenceInitialization);
-    }, null, { timeout: 78000 });
+      await dagDataSource.ensureEvidenceConnection();
+    });
     const state = await page.evaluate(async () => {
       const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
       const [variables, neighbors, links] = await Promise.all([
@@ -70,8 +71,9 @@ for (const route of ["/"]) {
     expect(uniqueParquetRequests.some(url => url.includes("/lookup/variable-shards.parquet"))).toBe(false);
     expect(uniqueParquetRequests.some(url => url.includes("/variables/shard-"))).toBe(true);
     expect(uniqueParquetRequests.some(url => url.includes("/neighbors/shard-"))).toBe(true);
-    expect(uniqueParquetRequests.some(url => url.includes("/causal-links/by-source/shard-"))).toBe(true);
-    expect(uniqueParquetRequests.some(url => url.includes("/causal-links/by-target/shard-"))).toBe(true);
+    expect(uniqueParquetRequests.some(url => url.endsWith("/causal_link_occurrences.parquet"))).toBe(true);
+    expect(uniqueParquetRequests.some(url => url.includes("/causal-links/by-source/shard-"))).toBe(false);
+    expect(uniqueParquetRequests.some(url => url.includes("/causal-links/by-target/shard-"))).toBe(false);
     expect(uniqueParquetRequests.some(url => url.endsWith("/build_metadata.parquet"))).toBe(false);
     expect(uniqueParquetRequests.some(url => url.endsWith("/variable_layouts.parquet"))).toBe(true);
     expect(errors.filter(error => !/favicon/i.test(error))).toEqual([]);

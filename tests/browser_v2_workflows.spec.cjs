@@ -4,6 +4,47 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
 });
 
+test("incident links use the canonical snapshot and retain both edge directions", async ({ page }) => {
+  const parquetRequests = [];
+  page.on("request", request => {
+    if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
+  });
+  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
+    && window.__dagBuilderState?.project?.groups?.some(group => group.variable_ids?.length > 40));
+  const result = await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    const group = window.__dagBuilderState.project.groups.find(item => item.variable_ids?.length > 40);
+    const ids = group.variable_ids.slice(0, 40);
+    const links = await dagDataSource.loadIncidentRawLinks(ids);
+    return { count: links.length, unique: new Set(links.map(link => link.raw_causal_link_id)).size,
+      allIncident: links.every(link => ids.includes(link.source_variable_id)
+        || ids.includes(link.target_variable_id)) };
+  });
+  expect(result.count).toBeGreaterThan(0);
+  expect(result.unique).toBe(result.count);
+  expect(result.allIncident).toBe(true);
+  expect(parquetRequests.some(url => url.endsWith("/causal_link_occurrences.parquet"))).toBe(true);
+  expect(parquetRequests.some(url => url.includes("/causal-links/by-source/")
+    || url.includes("/causal-links/by-target/"))).toBe(false);
+  const fallbackMatches = await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    const ids = window.__dagBuilderState.project.groups.find(item => item.variable_ids?.length > 40)
+      .variable_ids.slice(0, 8);
+    const canonical = await dagDataSource.loadIncidentRawLinks(ids);
+    const canonicalUrl = dagDataSource.canonicalEvidenceRelationUrl;
+    try {
+      dagDataSource.canonicalEvidenceRelationUrl = () => "";
+      const fallback = await dagDataSource.loadIncidentRawLinks(ids);
+      return canonical.map(link => link.raw_causal_link_id).sort().join("|")
+        === fallback.map(link => link.raw_causal_link_id).sort().join("|");
+    } finally {
+      dagDataSource.canonicalEvidenceRelationUrl = canonicalUrl;
+    }
+  });
+  expect(fallbackMatches).toBe(true);
+});
+
 test("browser-v2 supports group detail, layout controls, fullscreen and project export", async ({ page }) => {
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
