@@ -17,6 +17,7 @@ export function createDagAppState(interfaceMode = "classic") {
     seeds: { iv: new Set(), dv: new Set() },
     searchMatches: { iv: [], dv: [] },
     activeGroupId: null, focusedGroupId: null, selectedVariableId: null,
+    selectedEvidenceGroupId: null,
     comparisonVariableIds: [], hoveredVariableId: null, selectedEdgeId: null,
     candidateQueue: [], visibleLinks: [], componentGroupIds: new Set(),
     selectedUoa: null, uoaFilterEnabled: false,

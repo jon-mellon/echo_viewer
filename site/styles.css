@@ -1384,6 +1384,12 @@ h2 {
   white-space: pre-wrap;
 }
 
+.group-definition-inspector p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 /* ── DAG workspace (right panel) ── */
 .dag-workspace {
   flex: 1;

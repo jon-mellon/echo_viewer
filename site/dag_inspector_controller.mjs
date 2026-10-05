@@ -73,6 +73,21 @@ export function createDagInspectorController({
       h("div", { textContent: rawIds.length ? `${rawIds.length} evidence record(s) attached across both directions.` : "No raw evidence records attached." }), papers);
   }
 
+  function renderGroupDefinition() {
+    const group = state.project?.groups.find(item => item.group_id === state.selectedEvidenceGroupId);
+    if (!group) return false;
+    elements.edgeInspector.className = "edge-inspector group-definition-inspector";
+    elements.edgeInspector.hidden = false;
+    elements.closeEvidencePane.hidden = false;
+    elements.provenancePanel.hidden = true;
+    replaceChildren(elements.edgeInspector,
+      h("strong", { textContent: group.label || group.group_id }),
+      h("div", { className: "small-note", textContent: "Group definition" }),
+      h("p", { textContent: group.description || (state.publishedSchemaHydrating
+        ? "Definition loading…" : "No definition available for this group.") }));
+    return true;
+  }
+
   function renderEdge() {
     if (state.selectedEdgeId === STUDY_DESIGN_EDGE_ID) return renderStudyRelation();
     const link = selectedEdge();
@@ -154,5 +169,5 @@ export function createDagInspectorController({
       h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))), h("tbody", {}, rows)));
   }
 
-  return { renderEdge, renderProvenance, selectedEdge, clearPendingExclude };
+  return { renderEdge, renderProvenance, renderGroupDefinition, selectedEdge, clearPendingExclude };
 }

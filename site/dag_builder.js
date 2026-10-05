@@ -1011,6 +1011,7 @@ function renderSelectedEdgePanels() {
 }
 
 function renderSelectedEdge() {
+  if (!state.selectedEdgeId && state.selectedEvidenceGroupId && inspectorController.renderGroupDefinition()) return;
   const selected = (state.project?.links || []).find(edge => edge.edge_id === state.selectedEdgeId);
   const rawIds = [...new Set([...(selected?.a_to_b_raw_link_ids || []), ...(selected?.b_to_a_raw_link_ids || [])])];
   const missing = rawIds.filter(id => !state.rawLinksById.has(id));
@@ -1046,6 +1047,7 @@ function renderSelectedEdge() {
 function dismissEvidencePane() {
   inspectorController.clearPendingExclude();
   state.selectedEdgeId = null;
+  state.selectedEvidenceGroupId = null;
   state.comparisonVariableIds = [];
   state.selectedVariableIds.clear();
   els.edgeInspector.hidden = true;
@@ -1311,12 +1313,20 @@ const setupGroupController = createDagSetupGroupController({
 
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, selectEdge: () => renderCoordinator.selectEdge(),
+  drawMap, setMapMode, renderAll,
+  selectEdge: () => { state.selectedEvidenceGroupId = null; renderCoordinator.selectEdge(); },
+  selectGroup: id => {
+    state.selectedEdgeId = null;
+    state.comparisonVariableIds = [];
+    state.selectedEvidenceGroupId = id;
+    renderCoordinator.selectEdge();
+  },
 });
 
 // Programmatic edge selection keeps browser regression tests on the same
 // inspector path as a graph click, without depending on canvas coordinates.
 export function inspectDagEdge(edgeId) {
+  state.selectedEvidenceGroupId = null;
   state.selectedEdgeId = edgeId;
   renderCoordinator.selectEdge();
 }

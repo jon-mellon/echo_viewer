@@ -46,7 +46,7 @@ function visOptionSignature(params = {}) {
 
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, selectEdge,
+  drawMap, setMapMode, renderAll, selectEdge, selectGroup,
 }) {
 // ─── DAG visApi.js rendering ─────────────────────────────────────────────────────
 
@@ -563,6 +563,7 @@ function attachDagNetworkHandlers(network) {
     focusGroup(id) {
       Object.assign(state, workflow.transition(state, { type: "focus-group", groupId: id }));
       drawMap();
+      selectGroup(id);
     },
     openGroup(id) {
       if (state.interfaceMode === "dag2") {
