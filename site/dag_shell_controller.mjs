@@ -1,6 +1,6 @@
 // Owns cross-feature shell layout: fullscreen focus and draggable panel sizes.
 import { DAG_FIT_OPTIONS } from "./dag_network_controller.mjs";
-export function createDagShellController({ state, elements, resizeMap, fitMap, renderDag, getNetwork }) {
+export function createDagShellController({ state, elements, resizeMap, fitMap, renderDag, getNetwork, dismissEvidencePane }) {
   let showInstalledMobilePanel = null;
 
   function showMobilePanel(panel) {
@@ -33,7 +33,10 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     showInstalledMobilePanel = showPanel;
 
     document.body.dataset.mobilePanel ||= "controls";
-    for (const tab of tabs) tab.addEventListener("click", () => showPanel(tab.dataset.mobilePanel));
+    for (const tab of tabs) tab.addEventListener("click", () => {
+      if (tab.dataset.mobilePanel === "dag" && !elements.closeEvidencePane.hidden) dismissEvidencePane();
+      showPanel(tab.dataset.mobilePanel);
+    });
     if (document.body.dataset.mobilePanel === "variables" && !document.body.classList.contains("defining-variable")) {
       document.body.dataset.mobilePanel = "controls";
     }

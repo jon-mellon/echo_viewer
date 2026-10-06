@@ -190,6 +190,27 @@ test("evidence replaces the desktop sidebar and closing it restores navigation",
   await expect(pane).toBeHidden();
 });
 
+test("Map tab returns from mobile evidence to the DAG", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto(viewer);
+  await ready(page);
+  await page.locator('button[data-mobile-panel="dag"]').click();
+  await page.evaluate(async () => {
+    const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
+    await whenDagRendered();
+    inspectDagEdge(renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__"));
+  });
+  await expect(page.locator("#closeEvidencePane")).toBeVisible();
+  await expect(page.locator(".dag-network-wrapper")).toBeHidden();
+
+  await page.locator('button[data-mobile-panel="dag"]').click();
+  await expect(page.locator("#closeEvidencePane")).toBeHidden();
+  await expect(page.locator(".dag-network-wrapper")).toBeVisible();
+  await expect(page.locator(".dag-ws-footer")).toBeHidden();
+  await expect(page.locator('button[data-mobile-panel="dag"]')).toHaveAttribute("aria-pressed", "true");
+});
+
 test("project export can be imported with its anchors intact", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);

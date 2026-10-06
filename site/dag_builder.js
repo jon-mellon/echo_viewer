@@ -1351,6 +1351,7 @@ export function renderedDagEdgeIds() {
 const shellController = createDagShellController({
   state, elements: els, resizeMap, fitMap, renderDag,
   getNetwork: () => dagNetworkController.getNetwork(),
+  dismissEvidencePane,
 });
 
 let publicationController;
