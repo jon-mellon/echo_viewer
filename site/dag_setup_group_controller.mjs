@@ -77,7 +77,6 @@ export function createDagSetupGroupController({
     const groups = (project?.groups || []).slice()
       .sort((a, b) => (a.label || a.group_id).localeCompare(b.label || b.group_id));
     elements.variablePanelCount.textContent = String(groups.length);
-    if (!elements.variablePanelDisclosure.open) return;
     const openIds = new Set([...elements.variablePanelList.querySelectorAll("details[open]")]
       .map(detail => detail.dataset.groupId));
     const scrollTop = elements.variablePanelList.scrollTop;

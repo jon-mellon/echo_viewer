@@ -1312,7 +1312,6 @@ const setupGroupController = createDagSetupGroupController({
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
   searchAnchorGroups,
 });
-els.variablePanelDisclosure?.addEventListener("toggle", () => setupGroupController.renderVariablePanel());
 
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,

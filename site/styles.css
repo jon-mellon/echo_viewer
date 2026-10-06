@@ -1391,6 +1391,21 @@ h2 {
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
+  list-style: none;
+}
+
+.variable-panel > details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.variable-panel > details > summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.variable-panel > details:not([open]) > summary::after {
+  content: "▸";
 }
 
 .variable-panel-list {
