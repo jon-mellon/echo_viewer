@@ -149,19 +149,11 @@ export function createDagSetupGroupController({
     if (isNew) { container.hidden = true; container.replaceChildren(); return; }
     const searchProject = dagProjectView ? dagProjectView() : state.project;
     const query = normalized(input.value);
-    const groups = searchAnchorGroups(searchProject, side, query, state.variableById);
+    const groups = searchAnchorGroups(searchProject, side, query, state.variableById, Infinity);
     container.hidden = false;
-    if (!groups.length) {
-      const text = query && state.variableSearchStatus === "loading"
-        ? "Loading variable search…"
-        : query && state.publishedSchemaHydrating
-          ? "Loading group memberships…"
-          : query && state.variableSearchStatus === "error"
-            ? "Variable search unavailable"
-            : "No matching existing groups";
-      replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: text }));
-      return;
-    }
+    const defineRow = h("div", { className: "setup-group-picker-row define-new-row" },
+      h("div", {}, h("strong", { textContent: "Define a group" }), h("span", { textContent: "Chop one or more existing categories in the spatial viewer" })),
+      h("button", { className: "action-button", type: "button", dataset: { defineSide: side }, textContent: "Define" }));
     const rows = groups.map(({ group, variableMatch }) => h("div", { className: "setup-group-picker-row" },
       h("div", {}, h("strong", { textContent: group.label || group.group_id }),
         h("span", { textContent: `${group.variable_ids?.length || 0} vars` }),
@@ -170,16 +162,21 @@ export function createDagSetupGroupController({
           h("summary", { textContent: "Definition" }),
           h("p", { textContent: group.description })) : null),
       h("button", { className: "action-button", type: "button", dataset: { side, groupId: group.group_id }, textContent: `Use as ${side.toUpperCase()}` })));
-    rows.push(h("div", { className: "setup-group-picker-row define-new-row" },
-      h("div", {}, h("strong", { textContent: "Define new variable…" }), h("span", { textContent: "Chop one or more existing categories in the spatial viewer" })),
-      h("button", { className: "action-button", type: "button", dataset: { defineSide: side }, textContent: "Define" })));
-    const title = query && state.variableSearchStatus === "loading"
-      ? "Existing groups · variable search loading…"
-      : query && state.variableSearchStatus === "error"
-        ? "Existing groups · variable search unavailable"
-        : "Existing groups";
+    const emptyTitle = query && state.variableSearchStatus === "loading"
+      ? "Loading variable search…"
+      : query && state.publishedSchemaHydrating
+        ? "Loading group memberships…"
+        : query && state.variableSearchStatus === "error"
+          ? "Variable search unavailable"
+          : "No matching existing groups";
+    const title = !groups.length ? emptyTitle
+      : query && state.variableSearchStatus === "loading"
+        ? "Existing groups · variable search loading…"
+        : query && state.variableSearchStatus === "error"
+          ? "Existing groups · variable search unavailable"
+          : "Existing groups";
     replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: title }),
-      h("div", { className: "setup-group-picker-list" }, rows));
+      h("div", { className: "setup-group-picker-list" }, defineRow, ...rows));
     container.querySelectorAll("button[data-group-id]").forEach(button =>
       button.addEventListener("click", () => assignGroupAsAnchor(button.dataset.side, button.dataset.groupId)));
     container.querySelector("button[data-define-side]")?.addEventListener("click", event =>
