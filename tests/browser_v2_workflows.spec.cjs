@@ -1,4 +1,20 @@
 const { test, expect } = require("playwright/test");
+const { EventEmitter } = require("node:events");
+const { watchBrowserErrors } = require("./browser_errors.cjs");
+
+test("browser errors allow only recovered rate limits", () => {
+  const page = new EventEmitter();
+  const browserErrors = watchBrowserErrors(page);
+  const url = "https://example.test/compiled/dag.json";
+  page.emit("response", { url: () => url, status: () => 429 });
+  page.emit("console", { type: () => "error",
+    text: () => "Failed to load resource: the server responded with a status of 429 ()" });
+  expect(browserErrors.check).toThrow(/HTTP 429 responses must be retried successfully/);
+  page.emit("response", { url: () => url, status: () => 200 });
+  browserErrors.check();
+  page.emit("pageerror", new Error("Unrelated failure"));
+  expect(browserErrors.check).toThrow(/Unrelated failure/);
+});
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
@@ -45,9 +61,7 @@ test("incident links use the canonical snapshot and retain both edge directions"
 });
 
 test("browser-v2 supports group detail, layout controls, fullscreen and project export", async ({ page }) => {
-  const errors = [];
-  page.on("pageerror", error => errors.push(error.message));
-  page.on("console", message => { if (message.type() === "error") errors.push(message.text()); });
+  const browserErrors = watchBrowserErrors(page);
   await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
     && window.__dagBuilderState?.publishedSchemaHydrated
@@ -85,5 +99,5 @@ test("browser-v2 supports group detail, layout controls, fullscreen and project 
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("dag_project.json");
   expect(await download.failure()).toBeNull();
-  expect(errors.filter(error => !/favicon|Range request .* did not return a partial response/i.test(error))).toEqual([]);
+  browserErrors.check();
 });

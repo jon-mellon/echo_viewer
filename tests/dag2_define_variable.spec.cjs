@@ -1,9 +1,8 @@
 const { test, expect } = require("playwright/test");
+const { watchBrowserErrors } = require("./browser_errors.cjs");
 
 test("DAG2 defines a canonical variable from per-source residual slices", async ({ page }) => {
-  const errors = [];
-  page.on("pageerror", error => errors.push(error.message));
-  page.on("console", message => { if (["error", "warning"].includes(message.type())) errors.push(message.text()); });
+  const browserErrors = watchBrowserErrors(page, { warnings: true });
   await page.addInitScript(() => {
     if (!sessionStorage.getItem("dag2-test-initialized")) {
       localStorage.clear();
@@ -29,7 +28,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
     return { group_id: id, label: group.label, variable_ids: [...group.variable_ids] };
   }), sourceIds);
   await page.locator("#definitionContinue").click();
-  await expect(page.locator("body"), errors.join("\n")).toHaveClass(/defining-variable/);
+  await expect(page.locator("body"), browserErrors.errors.join("\n")).toHaveClass(/defining-variable/);
   await expect(page.locator("#dagMapCanvas")).toBeVisible();
   await expect(page.locator("#dagWorkspaceSection")).toBeHidden();
   await expect.poll(() => page.locator("#dagMapCanvas").evaluate(canvas => canvas.width)).toBeGreaterThan(100);
@@ -106,5 +105,5 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   }), { sourceIds, originals });
   expect(undone.newExists).toBe(false);
   expect(undone.restored).toEqual(undone.originals);
-  expect(errors.filter(error => !/favicon|Range request .* did not return a partial response/i.test(error))).toEqual([]);
+  browserErrors.check();
 });
