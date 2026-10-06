@@ -243,9 +243,11 @@ function computeDagLayoutUncached({
   const edges = layoutDirectedEdges(groups, links);
   const scores = softCausalRanks(groups, edges);
   const degree = degreeByGroup(groups, edges);
-  const minColumns = n <= 8 ? 2 : (n > 30 && (containerW || 900) > 720) ? 4 : 3;
+  const canvasAspect = (containerW || 900) / (containerH || 720);
+  const minColumns = canvasAspect < 0.75 ? 2 : n <= 8 ? 2 :
+    (n > 30 && (containerW || 900) > 720) ? 4 : 3;
   const columnCount = clampNumber(
-    Math.round((containerW || 900) / 210),
+    canvasAspect < 0.75 ? 2 : Math.round((containerW || 900) / 210),
     minColumns,
     Math.min(7, Math.max(minColumns, n)),
   );
@@ -259,7 +261,7 @@ function computeDagLayoutUncached({
   const rowGap = clampNumber(
     Math.floor((containerH || 720) / Math.max(maxRows + 1, 2)),
     64,
-    98,
+    canvasAspect < 0.75 ? 150 : 98,
   );
   const columnGap = clampNumber(
     Math.floor((containerW || 900) / Math.max(columnCount + 0.5, 2)),
@@ -287,7 +289,10 @@ function computeDagLayoutUncached({
   const nodeGeometry = prepareDagNodeGeometry(groups, params);
 
   const layoutMode = ["hierarchical", "organic"].includes(mode) ? mode : "auto";
-  const useOrganicLayout = layoutMode === "organic" || (layoutMode === "auto" && n >= 28);
+  // Wide canvases benefit from the column layout: it fills the width by
+  // placing nodes in more columns instead of stretching gaps between them.
+  const useOrganicLayout = layoutMode === "organic" ||
+    (layoutMode === "auto" && n >= 28 && (containerW || 900) / (containerH || 720) < 1.45);
   if (useOrganicLayout) {
     seedOrganicDagPositions(
       groups,

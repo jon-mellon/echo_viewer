@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { computeDagLayout, dagNodeBoxes } from '../site/dag_layout.mjs';
 import { routeEdges } from '../site/dag_router.mjs';
 import { routesToVisData } from '../site/dag_vis_routing.mjs';
-import { reuseDagGeometry } from '../site/dag_render_compute.mjs';
+import { computeDagRender, reuseDagGeometry } from '../site/dag_render_compute.mjs';
 
 test('edge decisions reuse existing graph geometry and refresh link metadata', () => {
   const groups = [{ group_id: 'a' }, { group_id: 'b' }];
@@ -118,4 +118,20 @@ test('missing anchors and missing centroids produce finite positions', () => {
   const layout = computeDagLayout(input);
   assert.equal(layout.positions.size, input.groups.length);
   for (const point of layout.positions.values()) assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y));
+});
+
+test('routed DAG uses both dimensions of wide and tall canvases', () => {
+  for (const [count, width, height] of [[12, 1800, 700], [43, 1800, 700], [12, 700, 1200]]) {
+    const input = fixture(count, 'auto', width, height);
+    const { layout, routes } = computeDagRender({ ...input, centroids: [...input.centroids] });
+    const xs = [...layout.boxes.values()].flatMap(box => [box.x, box.x + box.w]);
+    const ys = [...layout.boxes.values()].flatMap(box => [box.y, box.y + box.h]);
+    for (const route of routes) for (const point of route.points) {
+      xs.push(point.x);
+      ys.push(point.y);
+    }
+    const aspect = (Math.max(...xs) - Math.min(...xs)) / (Math.max(...ys) - Math.min(...ys));
+    assert.ok(Math.abs(Math.log(aspect / (width / height))) < 0.3,
+      `drawing aspect ${aspect} should follow canvas aspect ${width / height}`);
+  }
 });
