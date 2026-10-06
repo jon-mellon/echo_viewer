@@ -153,6 +153,7 @@ test("touch taps hold diagnostic paths and require a second tap for the definiti
   const network = {
     on: (name, handler) => handlers.set(name, handler),
     off: name => handlers.delete(name),
+    getNodeAt: point => point.x === 12 ? "candidate" : undefined,
     unselectAll: () => calls.push("unselect"),
   };
   const element = {
@@ -176,8 +177,11 @@ test("touch taps hold diagnostic paths and require a second tap for the definiti
   assert.deepEqual(calls.slice(-3), ["clearEdge", ["paths", "candidate"], "unselect"]);
   handlers.get("blurNode")();
   assert.notEqual(calls.at(-1), "clearPath");
-  handlers.get("doubleClick")({ nodes: ["candidate"] });
+  handlers.get("doubleClick")({ nodes: [], edges: [], pointer: {
+    DOM: { x: 12, y: 8 }, canvas: { x: 40, y: 20 },
+  } });
   assert.deepEqual(calls.slice(-2), ["clearPath", ["definition", "candidate"]]);
+  assert.equal(calls.some(call => call[0] === "zoomAt"), false);
   handlers.get("selectNode")({ nodes: ["candidate"], event: { srcEvent: { pointerType: "touch" } } });
   handlers.get("click")({ nodes: [], edges: [] });
   assert.deepEqual(calls.slice(-2), ["unselect", "clearPath"]);

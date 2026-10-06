@@ -113,7 +113,12 @@ export function attachDagInteractions(network, element, actions) {
       }
     },
     doubleClick(event) {
-      const id = event.nodes?.[0];
+      // vis-network reports the current selection here, which we intentionally
+      // clear after a single tap. Hit-test the second tap before treating it as
+      // a double-click on empty space.
+      const id = event.pointer?.DOM
+        ? network.getNodeAt?.(event.pointer.DOM) || event.nodes?.[0]
+        : event.nodes?.[0];
       if (id && actions.hasGroup(id)) {
         clearTappedCandidate();
         if (isTouchGesture(event)) actions.focusGroup(id);

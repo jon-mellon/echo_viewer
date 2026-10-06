@@ -164,6 +164,36 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
   expect(parquetRequests.some(url => url.includes("/variables/shard-"))).toBe(true);
 });
 
+test("evidence keeps available fields visible while concept labels load", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const edgeId = await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
+    await whenDagRendered();
+    const original = dagDataSource.loadVariableProvenance.bind(dagDataSource);
+    dagDataSource.loadVariableProvenance = ids => new Promise(resolve => {
+      window.__releaseConceptLabels = async () => resolve(await original(ids));
+    });
+    const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__"
+      && window.__dagBuilderState.project.links.some(link => link.edge_id === value
+        && (link.a_to_b_raw_link_ids?.length || link.b_to_a_raw_link_ids?.length)));
+    if (id) inspectDagEdge(id);
+    return id;
+  });
+  expect(edgeId).toBeTruthy();
+  await expect(page.locator("#provenancePanel .concept-loading").first()).toBeVisible();
+  const firstRow = page.locator("#provenancePanel tbody tr").first();
+  await expect(firstRow.locator("td").first()).not.toBeEmpty();
+  await expect(firstRow.locator("td").nth(2)).not.toBeEmpty();
+  await expect(firstRow.locator(".concept-loading .inline-spinner").first()).toBeVisible();
+  expect((await page.locator("#provenancePanel .concept-loading").allTextContents())
+    .every(text => text.trim() === "Loading…")).toBe(true);
+  await page.evaluate(() => window.__releaseConceptLabels());
+  await expect(page.locator("#provenancePanel .concept-loading")).toHaveCount(0);
+});
+
 test("evidence replaces the desktop sidebar and closing it restores navigation", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.setViewportSize({ width: 1440, height: 900 });
