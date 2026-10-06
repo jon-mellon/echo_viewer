@@ -6,7 +6,8 @@ import {
   groupingSchemaUrl, schemaPublicationId,
 } from "../site/dag_data_config.mjs";
 
-test("the grouping schema defaults to the canonical Supabase publication", () => {
+test("the grouping schema defaults to the described Supabase publication", () => {
+  assert.equal(DEFAULT_SCHEMA_PUBLICATION_ID, "f22dab8b-d9a7-4047-a775-0216b31c79fc");
   assert.equal(schemaPublicationId({ href: "http://localhost:8767/" }), DEFAULT_SCHEMA_PUBLICATION_ID);
   assert.equal(groupingSchemaUrl({ href: "http://localhost:8767/" }), "");
 });

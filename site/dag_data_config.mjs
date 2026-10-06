@@ -5,7 +5,7 @@ export const PRODUCTION_EVIDENCE_SNAPSHOT_BASE =
 
 export const PRODUCTION_APP_ORIGIN = "https://echo.epistemicinfra.org";
 
-export const DEFAULT_SCHEMA_PUBLICATION_ID = "7f397168-bc90-4a84-94a9-cfbeac700152";
+export const DEFAULT_SCHEMA_PUBLICATION_ID = "f22dab8b-d9a7-4047-a775-0216b31c79fc";
 
 /** Allow a deployment or shared link to select any ordinary static schema URL. */
 export function groupingSchemaUrl(location = globalThis.location) {
