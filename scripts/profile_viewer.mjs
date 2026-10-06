@@ -13,6 +13,7 @@ const definitionThinkMs = Math.max(0, Number(process.env.PROFILE_DEFINITION_THIN
 const browserName = process.env.PROFILE_BROWSER === "firefox" ? "firefox" : "chromium";
 if (mobile && browserName === "firefox") throw new Error("Mobile CPU throttling requires Chromium.");
 const output = process.env.PROFILE_OUTPUT || `profile-results${permalink ? "-permalink" : ""}${browserName === "firefox" ? "-firefox" : mobile ? "-mobile" : ""}`;
+const siteDirectory = process.env.PROFILE_SITE_DIR || "site";
 const local = !process.env.PROFILE_URL;
 const started = new Date().toISOString();
 const results = { started, url, browser: browserName, profileScenario: permalink ? "permalink" : "default",
@@ -149,7 +150,7 @@ async function measure(name, action) {
 
 async function waitForGraph() {
   await page.evaluate(async () => {
-    const { whenDagRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
+    const { whenDagRendered } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
     await whenDagRendered();
   });
 }
@@ -157,7 +158,7 @@ async function waitForGraph() {
 try {
   await mkdir(output, { recursive: true });
   if (local) {
-    server = spawn("python3", ["-m", "http.server", "8767", "--directory", "site"], { stdio: "ignore" });
+    server = spawn("python3", ["-m", "http.server", "8767", "--directory", siteDirectory], { stdio: "ignore" });
     await waitForServer();
   }
   browser = await (browserName === "firefox" ? firefox : chromium).launch({ headless: true });
@@ -240,7 +241,7 @@ try {
   if (permalink) {
     results.permalinkView = await page.evaluate(async () => {
       const state = window.__dagBuilderState;
-      const { renderedDagEdgeIds } = await import("/dag_builder.js?v=evidence-pane-v1");
+      const { renderedDagEdgeIds } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
       return { iv: state.project?.iv_group_id, dv: state.project?.dv_group_id,
         selectedEdge: state.selectedEdgeId,
         displayedEdges: typeof renderedDagEdgeIds === "function"
@@ -393,13 +394,13 @@ try {
     await page.locator("#showUnfiltered").click();
   });
   const edgeId = await page.evaluate(async () => {
-    const { whenDagRendered, renderedDagEdgeIds } = await import("/dag_builder.js?v=evidence-pane-v1");
+    const { whenDagRendered, renderedDagEdgeIds } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
     await whenDagRendered();
     return renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__");
   });
   if (!edgeId) throw new Error("No evidence edge is visible to test Exclude");
   await page.evaluate(async id => {
-    const { inspectDagEdge, isDagEdgeRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
+    const { inspectDagEdge, isDagEdgeRendered } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
     if (!isDagEdgeRendered(id)) throw new Error("Chosen evidence edge is not rendered");
     inspectDagEdge(id);
   }, edgeId);
@@ -409,13 +410,13 @@ try {
     await page.locator("#excludeConfirmBtn").click();
     await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
     await page.waitForFunction(async id => {
-      const { isDagEdgeRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
+      const { isDagEdgeRendered } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
       return !isDagEdgeRendered(id);
     }, edgeId);
   });
   await measure("settle graph after exclusion", async () => {
     await page.evaluate(async id => {
-      const { whenDagRendered, isDagEdgeRendered } = await import("/dag_builder.js?v=evidence-pane-v1");
+      const { whenDagRendered, isDagEdgeRendered } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
       await whenDagRendered();
       if (isDagEdgeRendered(id)) throw new Error("Excluded edge returned after graph rebuild");
     }, edgeId);

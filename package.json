@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "npm run check:dom-safety && npm run check:boundaries && npm run check:types && npm run test:controllers && npm run test:graph && npm run test:dagitty",
+    "test": "npm run check:dom-safety && npm run check:boundaries && npm run check:types && node --test tests/site_build.test.mjs && npm run test:controllers && npm run test:graph && npm run test:dagitty",
     "check:dom-safety": "node scripts/check_dom_safety.mjs",
     "check:boundaries": "node scripts/check_feature_boundaries.mjs",
     "check:types": "tsc -p jsconfig.json",
@@ -17,6 +17,7 @@
     "test:static-data": "playwright test tests/static_data_source.spec.cjs --workers=1",
     "test:browser": "playwright test --config=playwright.interactions.config.cjs",
     "build:search-catalog": "node scripts/generate_variable_search_catalog.mjs",
+    "build:site": "node scripts/build_site.mjs",
     "profile": "node scripts/profile_viewer.mjs"
   },
   "dependencies": {

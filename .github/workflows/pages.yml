@@ -35,18 +35,20 @@ jobs:
         run: npx playwright install --with-deps chromium firefox
       - name: Check browser workflows
         run: npm run test:browser
+      - name: Build cache-versioned site
+        run: npm run build:site
       - name: Enforce performance budgets
-        run: npm run profile
+        run: PROFILE_SITE_DIR=dist/site npm run profile
       - name: Enforce mobile performance budgets
-        run: PROFILE_DEVICE=mobile npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_DEVICE=mobile npm run profile
       - name: Enforce Firefox performance budgets
-        run: PROFILE_BROWSER=firefox npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_BROWSER=firefox npm run profile
       - name: Enforce permalink performance budgets
-        run: PROFILE_SCENARIO=permalink npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink npm run profile
       - name: Enforce mobile permalink performance budgets
-        run: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile npm run profile
       - name: Enforce Firefox permalink performance budgets
-        run: PROFILE_SCENARIO=permalink PROFILE_BROWSER=firefox npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink PROFILE_BROWSER=firefox npm run profile
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -67,7 +69,7 @@ jobs:
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: dist/site
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

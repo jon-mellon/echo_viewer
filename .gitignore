@@ -7,6 +7,7 @@ profile-results-permalink-mobile/
 profile-results-permalink-firefox/
 profile-results-warm/
 node_modules/
+dist/
 tests/dagitty_cache/
 .DS_Store
 /supabase/.temp
