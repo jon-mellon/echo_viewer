@@ -999,7 +999,7 @@ function highlightConfounderPaths(id) { return dagNetworkController.highlightCon
 function clearConfounderPathHover() { return dagNetworkController.clearConfounderPathHover(); }
 function clearLogicalDagEdgeHover() { return dagNetworkController.clearLogicalDagEdgeHover(); }
 function renderDag(options) { return dagNetworkController.renderDag(options); }
-function refreshDagEdgeSelection() { return dagNetworkController.refreshEdgeSelection(); }
+function refreshDagEdgeSelection(options) { return dagNetworkController.refreshEdgeSelection(options); }
 function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 
 // ─── Edge inspector + provenance ──────────────────────────────────────────────
@@ -1319,7 +1319,11 @@ const setupGroupController = createDagSetupGroupController({
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
   drawMap, setMapMode, renderAll,
-  selectEdge: () => { state.selectedEvidenceGroupId = null; renderCoordinator.selectEdge(); },
+  selectEdge: () => {
+    state.selectedEvidenceGroupId = null;
+    // The interaction clears vis's segment selection and redraws the network.
+    renderCoordinator.selectEdge({ redraw: false });
+  },
   selectGroup: id => {
     state.selectedEdgeId = null;
     state.comparisonVariableIds = [];

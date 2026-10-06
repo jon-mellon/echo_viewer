@@ -140,7 +140,7 @@ test("network events use live state and dispose only their own listeners", () =>
   handlers.get("hoverNode")({ node: "g" });
   listeners.get("mouseleave")();
   assert.deepEqual(calls, [["zoom", 0.5], ["focus", "g"], "unselect", ["open", "g"],
-    ["zoomAt", { x: 42, y: -7 }], ["edge", "logical"], ["clearEdge", "old-segment"],
+    ["zoomAt", { x: 42, y: -7 }], ["edge", "logical"], "unselect", ["clearEdge", "old-segment"],
     "clearPath", ["nodeEdges", "g"], ["clearEdge", undefined], ["paths", "g"],
     "clearPath", ["clearEdge", undefined]]);
   detach();
@@ -171,4 +171,8 @@ test("render coordination preserves rebuild order, comparison precedence and fin
   calls.length = 0;
   coordinator.selectEdge();
   assert.deepEqual(calls.map(c => c[0]), ["refreshDagEdgeSelection", "renderSelectedEdge"]);
+  assert.deepEqual(calls[0], ["refreshDagEdgeSelection", { redraw: true }]);
+  calls.length = 0;
+  coordinator.selectEdge({ redraw: false });
+  assert.deepEqual(calls[0], ["refreshDagEdgeSelection", { redraw: false }]);
 });

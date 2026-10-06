@@ -144,7 +144,7 @@ function edgeVisualData(link) {
   return dagDisplay.edgeVisualData(link, state.selectedEdgeId);
 }
 
-function refreshEdgeSelection() {
+function refreshEdgeSelection({ redraw = true } = {}) {
   if (!_visEdges) return;
   // Selecting an edge only changes its presentation. Recomputing and reapplying
   // the full layout here can make vis.js move nodes while it is still completing
@@ -154,7 +154,7 @@ function refreshEdgeSelection() {
     state.selectedEdgeId, state.project?.links || [], edgeVisualData);
   _renderedSelectedEdgeId = state.selectedEdgeId;
   if (updates.length) _visEdges.update(updates);
-  if (updates.length) _visNetwork?.redraw();
+  if (updates.length && redraw) _visNetwork?.redraw();
 }
 
 function routedDagData(groups, links, layout) {

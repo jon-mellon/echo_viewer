@@ -45,8 +45,8 @@ export function createRenderCoordinator(view) {
     view.renderRightPanel();
     if (rebuild) rebuildProject({ reuseDagGeometry });
   }
-  function selectEdge() {
-    view.refreshDagEdgeSelection();
+  function selectEdge({ redraw = true } = {}) {
+    view.refreshDagEdgeSelection({ redraw });
     view.renderSelectedEdge();
   }
   return { renderAll, rebuildProject, rebuildLinkDecision, selectEdge };

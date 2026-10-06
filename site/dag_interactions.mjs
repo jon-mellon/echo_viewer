@@ -92,7 +92,12 @@ export function attachDagInteractions(network, element, actions) {
     },
     selectEdge(event) {
       const id = actions.logicalEdgeId(event.edges[0]);
-      if (id) actions.selectEdge(id);
+      if (id) {
+        actions.selectEdge(id);
+        // A routed link consists of several vis edges. Its built-in selection
+        // paints only the clicked segment over our logical-link styling.
+        network.unselectAll();
+      }
     },
   };
   const leave = () => { actions.clearPathHover(); actions.clearEdgeHover(); };
