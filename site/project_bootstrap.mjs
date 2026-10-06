@@ -49,7 +49,6 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.workflowMode = "setup";
         state.selectedUoa = null;
         state.uoaFilterEnabled = false;
-        state.filterDagByCausalRelevance = false;
       }
       if (permalink) {
         applyPermalink(permalink, state);

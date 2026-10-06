@@ -27,7 +27,7 @@ export function createDagAppState(interfaceMode = "classic") {
     definitionDraft: null,
     showVariableLabels: true, showGroupLabels: true, variableLayoutSource: "",
     projectStorageVariableCount: null, dagLayoutMode: "auto",
-    filterDagByCausalRelevance: true, showConfoundersOnly: false, showCollidersOnly: false,
+    showConfoundersOnly: true, showCollidersOnly: false,
     confounderMaxPathLength: 1, excludeBottleneckedConfounders: true,
     hideIrrelevantConfounderLinks: true,
     confounderGroupIds: new Set(), confounderPathGroupIds: new Set(),

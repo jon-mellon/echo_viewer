@@ -34,7 +34,8 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     elements.variableLayoutSelect.hidden = layoutSources.length < 2;
     renderAssignmentCoverage();
     for (const [element, active] of [[elements.toggleVariableLabels, state.showVariableLabels],
-      [elements.toggleGroupLabels, state.showGroupLabels], [elements.toggleCausalFilter, state.filterDagByCausalRelevance]]) {
+      [elements.toggleGroupLabels, state.showGroupLabels],
+      [elements.showUnfiltered, !state.showConfoundersOnly && !state.showCollidersOnly]]) {
       element.classList.toggle("active", active);
       element.setAttribute("aria-pressed", active ? "true" : "false");
     }

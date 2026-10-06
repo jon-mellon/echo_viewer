@@ -17,6 +17,8 @@ function memoryStorage() {
 
 test("application state instances do not share mutable collections", () => {
   const first = createDagAppState(), second = createDagAppState();
+  assert.equal(first.showConfoundersOnly, true);
+  assert.equal(first.showCollidersOnly, false);
   first.seeds.iv.add("v1"); first.map.transform.scale = 3;
   assert.deepEqual([...second.seeds.iv], []);
   assert.equal(second.map.transform.scale, 1);

@@ -124,28 +124,19 @@ function installHandlers() {
     renderMapToolbarToggles();
     drawMap();
   });
-  els.toggleCausalFilter.addEventListener("click", () => {
-    state.filterDagByCausalRelevance = !state.filterDagByCausalRelevance;
-    if (state.filterDagByCausalRelevance) {
-      state.showConfoundersOnly = false;
-      state.showCollidersOnly = false;
-    }
+  els.showUnfiltered.addEventListener("click", () => {
+    state.showConfoundersOnly = false;
+    state.showCollidersOnly = false;
     rebuildProject();
   });
   els.toggleConfoundersOnly.addEventListener("click", () => {
-    state.showConfoundersOnly = !state.showConfoundersOnly;
-    if (state.showConfoundersOnly) {
-      state.showCollidersOnly = false;
-      state.filterDagByCausalRelevance = false;
-    }
+    state.showConfoundersOnly = true;
+    state.showCollidersOnly = false;
     rebuildProject();
   });
   els.toggleCollidersOnly.addEventListener("click", () => {
-    state.showCollidersOnly = !state.showCollidersOnly;
-    if (state.showCollidersOnly) {
-      state.showConfoundersOnly = false;
-      state.filterDagByCausalRelevance = false;
-    }
+    state.showCollidersOnly = true;
+    state.showConfoundersOnly = false;
     rebuildProject();
   });
   els.confounderPathLength.addEventListener("input", () => {
@@ -154,7 +145,6 @@ function installHandlers() {
     state.confounderMaxPathLength = clampNumber(requested, 1, 99);
     els.confounderPathLength.value = String(state.confounderMaxPathLength);
     if (!state.showCollidersOnly) state.showConfoundersOnly = true;
-    state.filterDagByCausalRelevance = false;
     rebuildProject();
   });
   els.confounderPathLength.addEventListener("change", () => {
@@ -163,13 +153,11 @@ function installHandlers() {
   els.toggleBottleneckedConfounders.addEventListener("click", () => {
     state.excludeBottleneckedConfounders = !state.excludeBottleneckedConfounders;
     if (!state.showCollidersOnly) state.showConfoundersOnly = true;
-    state.filterDagByCausalRelevance = false;
     rebuildProject();
   });
   els.toggleIrrelevantConfounderLinks.addEventListener("click", () => {
     state.hideIrrelevantConfounderLinks = !state.hideIrrelevantConfounderLinks;
     if (!state.showCollidersOnly) state.showConfoundersOnly = true;
-    state.filterDagByCausalRelevance = false;
     rebuildProject();
   });
   els.dagSelectMode.addEventListener("click", () => setMapMode("select"));

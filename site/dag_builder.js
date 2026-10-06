@@ -131,7 +131,7 @@ function initElements() {
     // Map
     "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts",
     "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "toggleCausalFilter", "toggleConfoundersOnly", "toggleCollidersOnly", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
+    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
@@ -968,12 +968,11 @@ function computeVisibleLinks() {
     dvId: state.project.dv_group_id,
     maxPathLength: state.confounderMaxPathLength,
     excludeBottlenecked: state.excludeBottleneckedConfounders,
-    filterByCausalRelevance: state.filterDagByCausalRelevance,
+    filterByCausalRelevance: false,
     showConfoundersOnly: state.showConfoundersOnly,
     showCollidersOnly: state.showCollidersOnly,
     hideIrrelevantDiagnosticLinks: state.hideIrrelevantConfounderLinks,
   });
-  state.filterDagByCausalRelevance = view.filterByCausalRelevance;
   state.componentGroupIds = view.componentGroupIds;
   state.visibleLinks = view.visibleLinks;
   state.confounderGroupIds = view.confounders.confounderIds;

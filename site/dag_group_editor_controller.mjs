@@ -325,8 +325,7 @@ function resolveGroupMembershipConflicts(group) {
 function finishSchemaChoice(loadSchema) {
   Object.assign(state, workflow.transition(state, { type: "finish-schema" }));
   if (loadSchema) {
-    state.filterDagByCausalRelevance = true;
-    state.showConfoundersOnly = false;
+    state.showConfoundersOnly = true;
     state.showCollidersOnly = false;
     state.confounderMaxPathLength = 1;
     state.excludeBottleneckedConfounders = true;

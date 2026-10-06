@@ -374,7 +374,7 @@ function renderDag({ reuseGeometry = false } = {}) {
       ? `confounders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
       : state.showCollidersOnly
         ? `colliders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
-        : state.filterDagByCausalRelevance ? "causal" : "all",
+        : "all",
   };
   const requestId = ++_dagRenderRequest;
   _dagRenderWorker?.terminate();

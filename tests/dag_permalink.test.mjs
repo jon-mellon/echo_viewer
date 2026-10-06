@@ -29,6 +29,7 @@ test("compact permalink round trip preserves reproducible view settings", () => 
   assert.equal(params.get("data_version"), "snapshot-7");
   assert.equal(params.get("schema_url"), "/config/schema/");
   assert.equal(params.has("layout"), false);
+  assert.equal(params.has("causal"), false);
   assert.equal(params.has("uoa"), false);
   assert.equal(params.has("uf"), false);
   assert.equal(restored.project.iv_group_id, "cause");
@@ -50,6 +51,23 @@ test("legacy layout links open with auto layout", () => {
   const state = { project: structuredClone(project), seeds: { iv: new Set(), dv: new Set() } };
   assert.equal(applyPermalink(params, state), true);
   assert.equal(state.dagLayoutMode, "auto");
+  assert.equal(state.showConfoundersOnly, true);
+  assert.equal(state.showCollidersOnly, false);
+});
+
+test("older causal links use one of the three available views", () => {
+  const state = { project: structuredClone(project), seeds: { iv: new Set(), dv: new Set() } };
+  applyPermalink(new URLSearchParams("p=1&iv=cause&dv=outcome&causal=1&conf=0&coll=0"), state);
+  assert.equal(state.showConfoundersOnly, false);
+  assert.equal(state.showCollidersOnly, false);
+});
+
+test("a collider permalink works when confounders is the app default", () => {
+  const state = { project: structuredClone(project), showConfoundersOnly: true,
+    showCollidersOnly: false, seeds: { iv: new Set(), dv: new Set() } };
+  applyPermalink(new URLSearchParams("p=1&iv=cause&dv=outcome&coll=1"), state);
+  assert.equal(state.showConfoundersOnly, false);
+  assert.equal(state.showCollidersOnly, true);
 });
 
 test("edited or imported schemas are not shareable", () => {

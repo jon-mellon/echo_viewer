@@ -1,8 +1,8 @@
 export const PERMALINK_VERSION = "1";
 
 const booleanFields = {
-  causal: "filterDagByCausalRelevance", conf: "showConfoundersOnly",
-  coll: "showCollidersOnly", bottle: "excludeBottleneckedConfounders",
+  conf: "showConfoundersOnly", coll: "showCollidersOnly",
+  bottle: "excludeBottleneckedConfounders",
   paths: "hideIrrelevantConfounderLinks", vl: "showVariableLabels", gl: "showGroupLabels",
 };
 
@@ -73,6 +73,11 @@ export function applyPermalink(params, state) {
   state.uoaFilterEnabled = false;
   state.confounderMaxPathLength = Math.max(1, Math.min(99, Number(params.get("path")) || 1));
   for (const [parameter, field] of Object.entries(booleanFields)) if (params.has(parameter)) state[field] = params.get(parameter) === "1";
+  if (!params.has("conf")) state.showConfoundersOnly = !params.has("coll");
+  if (!params.has("coll")) state.showCollidersOnly = false;
+  if (state.showConfoundersOnly && state.showCollidersOnly) {
+    state.showCollidersOnly = false;
+  }
   state.activeGroupId = resolveGroup(params.get("selected_group")) || null;
   state.selectedVariableId = params.get("selected_variable") || null;
   state.selectedEdgeId = params.get("selected_edge") || null;

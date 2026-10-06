@@ -45,6 +45,14 @@ test("diagnostic modes retain only witness links when requested", () => {
   assert.deepEqual(colliders.visibleLinks.map(item => item.edge_id), ["iv_x", "dv_x"]);
 });
 
+test("confounder default leaves the map visible while anchors are missing", () => {
+  const view = deriveDagView({
+    groups, links, showConfoundersOnly: true, hideIrrelevantDiagnosticLinks: true,
+  });
+  assert.equal(view.componentGroupIds.size, groups.length);
+  assert.deepEqual(view.visibleLinks.map(item => item.edge_id), ["c_iv", "c_dv", "iv_x", "dv_x"]);
+});
+
 test("missing IV disables causal filtering and excluded evidence obeys connectivity exceptions", () => {
   const view = deriveDagView({ groups, links, ivId: "missing", dvId: "dv", filterByCausalRelevance: true });
   assert.equal(view.filterByCausalRelevance, false);

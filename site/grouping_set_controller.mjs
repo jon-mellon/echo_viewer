@@ -90,7 +90,6 @@ export function createGroupingSetController({ state, elements, publicationContro
     }
     const result = projectOps.importSchemaGroups(state.project, groupingSet, state.linkLookup, nowIso());
     applyProjectOperation(result.project);
-    if (!result.anchorsReady) state.filterDagByCausalRelevance = false;
     return result.loadedGroupIds;
   }
 

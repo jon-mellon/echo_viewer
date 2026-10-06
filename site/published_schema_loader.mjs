@@ -148,8 +148,8 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
           dvId,
           maxPathLength: Math.max(1, Math.min(99, Number(parameters.get("path")) || 1)),
           excludeBottlenecked: bool("bottle", true),
-          filterByCausalRelevance: bool("causal", true),
-          showConfoundersOnly: bool("conf", false),
+          filterByCausalRelevance: false,
+          showConfoundersOnly: bool("conf", !parameters.has("coll")),
           showCollidersOnly: bool("coll", false),
           hideIrrelevantDiagnosticLinks: bool("paths", true),
         }).componentGroupIds]

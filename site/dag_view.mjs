@@ -38,10 +38,11 @@ export function deriveDagView({
   const colliderGraph = filterGraphByColliders(fullGraph, diagnosticOptions);
   const componentGraph = connectedComponentGraph(connectivityGraph, ivId);
   const canFilterFromIv = filterByCausalRelevance && connectivityGraph.nodeIds.has(ivId);
+  const anchorsReady = fullGraph.nodeIds.has(ivId) && fullGraph.nodeIds.has(dvId) && ivId !== dvId;
 
   let selectedGraph;
-  if (showConfoundersOnly) selectedGraph = confounderGraph;
-  else if (showCollidersOnly) selectedGraph = colliderGraph;
+  if (showConfoundersOnly && anchorsReady) selectedGraph = confounderGraph;
+  else if (showCollidersOnly && anchorsReady) selectedGraph = colliderGraph;
   else selectedGraph = canFilterFromIv ? componentGraph : fullGraph;
 
   const componentGroupIds = new Set(selectedGraph.nodeIds);
@@ -49,7 +50,7 @@ export function deriveDagView({
   visibleGraph = filterGraphLinks(visibleGraph, (link) => {
     return link.display_status !== "excluded" || link.is_target_relation;
   });
-  if ((showConfoundersOnly || showCollidersOnly) && hideIrrelevantDiagnosticLinks) {
+  if (anchorsReady && (showConfoundersOnly || showCollidersOnly) && hideIrrelevantDiagnosticLinks) {
     const retainedPairs = showCollidersOnly
       ? colliderGraph.metadata.linkPairKeys
       : confounderGraph.metadata.linkPairKeys;

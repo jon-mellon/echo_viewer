@@ -281,7 +281,7 @@
           <div class="dag-ws-header section-title">
             <h2>Working Map</h2>
             <div class="dag-ws-controls">
-              <button id="toggleCausalFilter" class="toolbar-button" type="button" aria-pressed="false" title="Show only groups causally connected to the IV/DV path">Causal view</button>
+              <button id="showUnfiltered" class="toolbar-button" type="button" aria-pressed="false" title="Show all groups without a confounder or collider filter">Unfiltered</button>
               <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the IV, DV, and groups that could point into both; bidirectional edges count in either direction">Confounders only</button>
               <button id="toggleCollidersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the IV, DV, and groups that both could point into; bidirectional edges count in either direction">Colliders only</button>
               <label class="path-length-control" for="confounderPathLength" title="Maximum number of directed edges allowed on each path from a confounder to the IV and DV">

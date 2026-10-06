@@ -31,7 +31,7 @@ const scenarioBudgets = {
   "DAG layout: organic": 750,
   "DAG layout: auto": 750,
   "DAG zoom": 500,
-  "causal filter": 1000,
+  "unfiltered view": 1000,
   "exclude edge promptly": 750,
   "settle graph after exclusion": 300,
   "restore edge": 750,
@@ -394,8 +394,8 @@ try {
   await measure("DAG zoom", async () => {
     await page.locator("#dagSvgZoomIn").click();
   });
-  await measure("causal filter", async () => {
-    await page.locator("#toggleCausalFilter").click();
+  await measure("unfiltered view", async () => {
+    await page.locator("#showUnfiltered").click();
   });
   const edgeId = await page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds } = await import("/dag_builder.js?v=evidence-pane-v1");
@@ -547,7 +547,7 @@ try {
       "close variable definition": 299.52,
       "select IV": 249.6,
       "select DV": 249.6,
-      "causal filter": 249.6,
+      "unfiltered view": 249.6,
       "exclude edge promptly": 436.8,
       "restore edge": 400,
       "exclude edge": 299.52,

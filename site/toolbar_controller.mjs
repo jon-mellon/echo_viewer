@@ -9,10 +9,6 @@ export function createToolbarController({ state, elements, dagGroups, groupById,
     const visibleGroupIds = new Set(dagGroups().map(group => group.group_id));
     const anchorsReady = visibleGroupIds.has(state.project?.iv_group_id)
       && visibleGroupIds.has(state.project?.dv_group_id);
-    if (!anchorsReady) {
-      state.showConfoundersOnly = false;
-      state.showCollidersOnly = false;
-    }
     presenter.render(anchorsReady);
   }
 
