@@ -4,7 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const permalink = process.env.PROFILE_SCENARIO === "permalink";
-const permalinkUrl = new URL(process.env.PROFILE_PERMALINK_URL || "https://echo.epistemicinfra.org/?p=1&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0&iv=category-academic-achievement&dv=category-income&mode=group_review&layout=hierarchical&path=1&selected_edge=category-academic-achievement__category-personality&sort=relevance&mz=1&mx=0&my=0&dz=0.8894702419882274&dx=-114.12353515625004&dy=1.749999999999995&causal=0&conf=1&coll=0&bottle=1&paths=1&vl=1&gl=1&schema=7f397168-bc90-4a84-94a9-cfbeac700152");
+const permalinkUrl = new URL(process.env.PROFILE_PERMALINK_URL || "https://echo.epistemicinfra.org/?p=1&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0&iv=category-academic-achievement&dv=category-income&mode=group_review&path=1&selected_edge=category-academic-achievement__category-personality&sort=relevance&mz=1&mx=0&my=0&dz=0.8894702419882274&dx=-114.12353515625004&dy=1.749999999999995&causal=0&conf=1&coll=0&bottle=1&paths=1&vl=1&gl=1&schema=7f397168-bc90-4a84-94a9-cfbeac700152");
 const localUrl = new URL("http://127.0.0.1:8767/");
 if (permalink) localUrl.search = permalinkUrl.search;
 const url = process.env.PROFILE_URL || localUrl.href;
@@ -27,8 +27,6 @@ const scenarioBudgets = {
   "group search": 2000,
   "select IV": 750,
   "select DV": 1000,
-  "DAG layout: hierarchical": 750,
-  "DAG layout: organic": 750,
   "DAG layout: auto": 750,
   "DAG zoom": 500,
   "unfiltered view": 1000,
@@ -384,13 +382,10 @@ try {
     await page.waitForFunction(() => window.__dagBuilderState?.project?.dv_group_id != null);
   });
   if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
-  for (const mode of ["hierarchical", "organic", "auto"]) {
-    await measure(`DAG layout: ${mode}`, async () => {
-      await page.locator("#dagLayoutSelect").selectOption(mode);
-      await page.waitForFunction(expected => window.__dagBuilderState.dagLayoutMode === expected, mode);
-      await waitForGraph();
-    });
-  }
+  await measure("DAG layout: auto", async () => {
+    await page.waitForFunction(() => window.__dagBuilderState.dagLayoutMode === "auto");
+    await waitForGraph();
+  });
   await measure("DAG zoom", async () => {
     await page.locator("#dagSvgZoomIn").click();
   });
