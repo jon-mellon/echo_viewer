@@ -135,3 +135,24 @@ test('routed DAG uses both dimensions of wide and tall canvases', () => {
       `drawing aspect ${aspect} should follow canvas aspect ${width / height}`);
   }
 });
+
+test('dense wide DAG fills both axes after perimeter routing', () => {
+  const groups = Array.from({ length: 43 }, (_, index) =>
+    ({ group_id: `g${index}`, label: `Group ${index}` }));
+  const links = groups.slice(1).flatMap((group, index) => [
+    { edge_id: `e${index}`, group_a: group.group_id, group_b: 'g0', direction_type: 'A_TO_B' },
+    { edge_id: `f${index}`, group_a: group.group_id, group_b: 'g4', direction_type: 'A_TO_B' },
+  ]);
+  const width = 1800, height = 700;
+  const { layout, routes } = computeDagRender({ groups, links,
+    centroids: groups.map((group, index) => [group.group_id, { x: index % 7, y: index % 9 }]),
+    ivId: 'g0', dvId: 'g4', mode: 'auto', width, height });
+  const xs = [...layout.boxes.values()].flatMap(box => [box.x, box.x + box.w]);
+  const ys = [...layout.boxes.values()].flatMap(box => [box.y, box.y + box.h]);
+  for (const route of routes) for (const point of route.points) {
+    xs.push(point.x);
+    ys.push(point.y);
+  }
+  const aspect = (Math.max(...xs) - Math.min(...xs)) / (Math.max(...ys) - Math.min(...ys));
+  assert.ok(Math.min(aspect / (width / height), (width / height) / aspect) > 0.9);
+});

@@ -26,7 +26,9 @@ function routeDag(input, layout) {
     positions: layout.positions, boxes: layout.boxes,
     fontSize: layout.params.fontSize,
   });
-  return routeEdges(input.links, { positions: layout.positions, boxes: layout.boxes, corridor });
+  const compactOuterLanes = input.width / input.height > 1.45;
+  return routeEdges(input.links, { positions: layout.positions, boxes: layout.boxes, corridor,
+    config: { compactOuterLanes } });
 }
 
 // Shared pure calculation for both the browser worker and its synchronous fallback.
@@ -39,21 +41,41 @@ export function computeDagRender(input, onPhase = () => {}) {
   // fit() scales both axes equally. Spread the node centers along the short
   // dimension so the routed drawing matches the canvas aspect ratio.
   if (layout.positions.size > 2 && input.width > 0 && input.height > 0) {
-    const bounds = renderBounds(layout, routes);
-    const currentAspect = bounds.width / bounds.height;
     const targetAspect = input.width / input.height;
-    if (Number.isFinite(currentAspect) && currentAspect > 0 &&
-        (currentAspect < targetAspect / 1.12 || currentAspect > targetAspect * 1.12)) {
+    let bestError = Infinity;
+    let bestGeometry = null;
+    for (let pass = 0; pass < 2; pass += 1) {
+      const bounds = renderBounds(layout, routes);
+      const currentAspect = bounds.width / bounds.height;
+      if (!Number.isFinite(currentAspect) || currentAspect <= 0) break;
+      const error = Math.abs(Math.log(currentAspect / targetAspect));
+      if (error >= bestError) {
+        layout.positions = bestGeometry.positions;
+        layout.boxes = bestGeometry.boxes;
+        routes = bestGeometry.routes;
+        break;
+      }
+      bestError = error;
+      bestGeometry = { positions: layout.positions, boxes: layout.boxes, routes };
+      if (error <= Math.log(1.08)) break;
       const axis = currentAspect < targetAspect ? "x" : "y";
       // Keep this a small finishing adjustment; large stretches create empty
       // lanes inside the graph and make related nodes feel far apart.
-      const factor = Math.min(1.25, axis === "x" ? targetAspect / currentAspect : currentAspect / targetAspect);
+      const factor = Math.min(pass === 0 ? 1.25 : 1.06,
+        axis === "x" ? targetAspect / currentAspect : currentAspect / targetAspect);
       const centers = [...layout.positions.values()].map(point => point[axis]);
       const center = (Math.min(...centers) + Math.max(...centers)) / 2;
       layout.positions = new Map([...layout.positions].map(([id, point]) =>
         [id, { ...point, [axis]: center + (point[axis] - center) * factor }]));
       layout.boxes = dagNodeBoxes(input.groups, layout);
       routes = routeDag(input, layout);
+    }
+    const finalBounds = renderBounds(layout, routes);
+    const finalError = Math.abs(Math.log((finalBounds.width / finalBounds.height) / targetAspect));
+    if (bestGeometry && finalError > bestError) {
+      layout.positions = bestGeometry.positions;
+      layout.boxes = bestGeometry.boxes;
+      routes = bestGeometry.routes;
     }
   }
   onPhase("routing", performance.now() - routeStart);

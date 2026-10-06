@@ -15,7 +15,7 @@ import {
 } from '../site/dag_routing_geometry.mjs';
 import { routeEdge, routeEdges, studyArrowCorridor } from '../site/dag_router.mjs';
 import { routeNodeData, routesToVisData } from '../site/dag_vis_routing.mjs';
-import { dagNodeBoxes } from '../site/dag_layout.mjs';
+import { computeDagLayout, dagNodeBoxes } from '../site/dag_layout.mjs';
 import { computeDagRender } from '../site/dag_render_compute.mjs';
 import * as pathHighlights from '../site/dag_path_highlights.mjs';
 import { createDagMapViewController } from '../site/dag_map_view_controller.mjs';
@@ -131,6 +131,43 @@ test('worker-ready DAG computation is deterministic and leaves serializable inpu
   });
   assert.deepEqual(serializable(first), serializable(second));
   assert.deepEqual(input, before);
+});
+
+test('wide-canvas routing keeps perimeter detours close to nodes', () => {
+  const groups = Array.from({ length: 43 }, (_, index) =>
+    ({ group_id: `g${index}`, label: `Group ${index}` }));
+  const links = groups.slice(1).flatMap((group, index) => [
+    { edge_id: `e${index}`, group_a: group.group_id, group_b: 'g0', direction_type: 'A_TO_B' },
+    { edge_id: `f${index}`, group_a: group.group_id, group_b: 'g1', direction_type: 'A_TO_B' },
+  ]);
+  const layout = computeDagLayout({ groups, links,
+    centroids: new Map(groups.map((group, index) =>
+      [group.group_id, { x: index % 7, y: index % 9 }])),
+    ivId: 'g0', dvId: 'g1', mode: 'auto', width: 1800, height: 700 });
+  const corridor = studyArrowCorridor({ ivId: 'g0', dvId: 'g1',
+    positions: layout.positions, boxes: layout.boxes, fontSize: layout.params.fontSize });
+  const normal = routeEdges(links, { positions: layout.positions, boxes: layout.boxes, corridor });
+  const compact = routeEdges(links, { positions: layout.positions, boxes: layout.boxes, corridor,
+    config: { compactOuterLanes: true } });
+  const minY = Math.min(...[...layout.boxes.values()].map(box => box.y));
+  const maxY = Math.max(...[...layout.boxes.values()].map(box => box.y + box.h));
+  const excursion = routes => {
+    const ys = routes.flatMap(route => route.points.map(point => point.y));
+    return Math.max(minY - Math.min(...ys), Math.max(...ys) - maxY);
+  };
+  assert.equal(compact.length, normal.length);
+  assert.ok(excursion(compact) < excursion(normal) * 0.75);
+  const nodeCollisions = routes => routes.reduce((count, route) => {
+    const points = [layout.positions.get(route.sourceId), ...route.points.slice(1, -1),
+      layout.positions.get(route.targetId)];
+    for (const [id, box] of layout.boxes) {
+      if (id === route.sourceId || id === route.targetId) continue;
+      if (points.slice(1).some((point, index) =>
+        segmentIntersectsBox(points[index], point, box, 10))) count += 1;
+    }
+    return count;
+  }, 0);
+  assert.ok(nodeCollisions(compact) <= nodeCollisions(normal));
 });
 
 test('hover preserves a clear original route without new loops', () => {

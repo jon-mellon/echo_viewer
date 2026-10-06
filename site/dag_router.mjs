@@ -1480,7 +1480,7 @@ function fastRouteEdge(link, state) {
     c[n * 2 + 1] = ty;
     n += 1;
 
-    const geometryScore = scoreCoords(
+    let geometryScore = scoreCoords(
       c,
       n,
       sourceIndex,
@@ -1489,6 +1489,18 @@ function fastRouteEdge(link, state) {
       ctx,
       bestScore,
     );
+
+    // Exterior lanes keep dense routes apart, but distant lanes enlarge the
+    // fitted graph and make edges appear detached from their nodes. Prefer
+    // nearby lanes unless they would cross a node or heavily overlap a route.
+    if (options.compactOuterLanes) {
+      let outside = 0;
+      for (let bend = 1; bend < n - 1; bend += 1) {
+        const x = c[bend * 2], y = c[bend * 2 + 1];
+        outside = Math.max(outside, ctx.minX - x, x - ctx.maxX, ctx.minY - y, y - ctx.maxY);
+      }
+      geometryScore += 1.5 * Math.max(0, outside - 45) ** 2;
+    }
 
     if (geometryScore >= bestScore) return;
 

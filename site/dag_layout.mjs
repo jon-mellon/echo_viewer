@@ -249,7 +249,7 @@ function computeDagLayoutUncached({
   const columnCount = clampNumber(
     canvasAspect < 0.75 ? 2 : Math.round((containerW || 900) / 210),
     minColumns,
-    Math.min(7, Math.max(minColumns, n)),
+    Math.min(canvasAspect > 1.8 ? 9 : 7, Math.max(minColumns, n)),
   );
   const columns = assignDagColumns(groups, scores, columnCount);
   rebalanceColumnsForDirectedEdges(columns, edges);
