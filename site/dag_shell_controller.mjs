@@ -1,4 +1,5 @@
 // Owns cross-feature shell layout: fullscreen focus and draggable panel sizes.
+import { DAG_FIT_OPTIONS } from "./dag_network_controller.mjs";
 export function createDagShellController({ state, elements, resizeMap, fitMap, renderDag, getNetwork }) {
   let showInstalledMobilePanel = null;
 
@@ -25,7 +26,7 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
           fitMap();
         } else if (panel === "dag") {
           renderDag();
-          setTimeout(() => getNetwork()?.fit({ animation: false, padding: 28 }), 50);
+          setTimeout(() => getNetwork()?.fit(DAG_FIT_OPTIONS), 50);
         }
       });
     };
@@ -58,7 +59,7 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
       resizeMap();
       if (panel !== "dag") fitMap();
       renderDag();
-      setTimeout(() => getNetwork()?.fit({ animation: false, padding: 28 }), 100);
+      setTimeout(() => getNetwork()?.fit(DAG_FIT_OPTIONS), 100);
     });
   }
 

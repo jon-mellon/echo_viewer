@@ -44,6 +44,10 @@ function visOptionSignature(params = {}) {
   ]);
 }
 
+// vis-network's fit() defaults to maxZoomLevel: 1, leaving small DAGs surrounded
+// by empty canvas even when there is room to display them larger.
+export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: Number.MAX_VALUE };
+
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
   drawMap, setMapMode, renderAll, selectEdge, selectGroup,
@@ -435,7 +439,7 @@ function applyDagRender(groups, layout, routes) {
     _dagLayoutSignature = layout.signature;
     _visOptionSignature = visOptionSignature(layout.params);
     attachDagNetworkHandlers(_visNetwork);
-    setTimeout(() => _visNetwork?.fit({ animation: false, padding: 34 }), 80);
+    setTimeout(() => _visNetwork?.fit(DAG_FIT_OPTIONS), 80);
   } else {
     // Update the existing network in place. Destroying/recreating the network
     // synchronously here is unsafe when renderDag() is called from inside a visApi.js
@@ -469,7 +473,7 @@ function applyDagRender(groups, layout, routes) {
     const layoutChanged = layout.signature !== _dagLayoutSignature;
     _dagLayoutSignature = layout.signature;
     if (nodeSetChanged || layoutChanged) {
-      setTimeout(() => _visNetwork?.fit({ animation: false, padding: 34 }), 120);
+      setTimeout(() => _visNetwork?.fit(DAG_FIT_OPTIONS), 120);
     }
   }
 }
@@ -602,7 +606,7 @@ function edgeHoverText(link) {
     getPathLaneSegments: () => _dagPathLaneSegments,
     zoomIn: () => _visNetwork?.moveTo({ scale: _visNetwork.getScale() * 1.3 }),
     zoomOut: () => _visNetwork?.moveTo({ scale: Math.max(minimumDagScale(), _visNetwork.getScale() / 1.3) }),
-    fit: (padding = 20) => _visNetwork?.fit({ animation: false, padding }),
+    fit: () => _visNetwork?.fit(DAG_FIT_OPTIONS),
     redraw: () => _visNetwork?.redraw(),
   };
 }
