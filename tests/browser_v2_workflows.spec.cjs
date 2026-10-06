@@ -10,27 +10,26 @@ test("incident links use the canonical snapshot and retain both edge directions"
     if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
   });
   await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
-    && window.__dagBuilderState?.project?.groups?.some(group => group.variable_ids?.length > 40));
-  const result = await page.evaluate(async () => {
+  await page.waitForFunction(() => window.__dagBuilderState?.compiledDag);
+  // This frozen snapshot has v1..v14284, with 256 variables per shard. Use
+  // identifiers across 40 shards so this retrieval test does not depend on
+  // downloading every group membership from the published schema.
+  const ids = Array.from({ length: 40 }, (_, index) => `v${index * 256 + 1}`);
+  const result = await page.evaluate(async ids => {
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
-    const group = window.__dagBuilderState.project.groups.find(item => item.variable_ids?.length > 40);
-    const ids = group.variable_ids.slice(0, 40);
     const links = await dagDataSource.loadIncidentRawLinks(ids);
     return { count: links.length, unique: new Set(links.map(link => link.raw_causal_link_id)).size,
       allIncident: links.every(link => ids.includes(link.source_variable_id)
         || ids.includes(link.target_variable_id)) };
-  });
+  }, ids);
   expect(result.count).toBeGreaterThan(0);
   expect(result.unique).toBe(result.count);
   expect(result.allIncident).toBe(true);
   expect(parquetRequests.some(url => url.endsWith("/causal_link_occurrences.parquet"))).toBe(true);
   expect(parquetRequests.some(url => url.includes("/causal-links/by-source/")
     || url.includes("/causal-links/by-target/"))).toBe(false);
-  const fallbackMatches = await page.evaluate(async () => {
+  const fallbackMatches = await page.evaluate(async ids => {
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
-    const ids = window.__dagBuilderState.project.groups.find(item => item.variable_ids?.length > 40)
-      .variable_ids.slice(0, 8);
     const canonical = await dagDataSource.loadIncidentRawLinks(ids);
     const canonicalUrl = dagDataSource.canonicalEvidenceRelationUrl;
     try {
@@ -41,7 +40,7 @@ test("incident links use the canonical snapshot and retain both edge directions"
     } finally {
       dagDataSource.canonicalEvidenceRelationUrl = canonicalUrl;
     }
-  });
+  }, ids.slice(0, 8));
   expect(fallbackMatches).toBe(true);
 });
 
