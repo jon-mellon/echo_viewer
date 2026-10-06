@@ -35,6 +35,23 @@ export function constrainViewPosition(position, scale, contentBounds, viewport, 
 // Network event ownership; callbacks read current viewer state at event time.
 export function attachDagInteractions(network, element, actions) {
   let constrainingViewport = false;
+  let lastTouchAt = -Infinity;
+  let tappedCandidateId = null;
+  const rememberTouch = () => { lastTouchAt = Date.now(); };
+  const isTouchGesture = event => {
+    const source = event?.event?.srcEvent || event?.event;
+    if (source?.pointerType) return source.pointerType === "touch";
+    if (source?.type) return source.type.startsWith("touch");
+    return Date.now() - lastTouchAt < 700;
+  };
+  const rememberTouchPointer = event => {
+    if (event.pointerType === "touch") rememberTouch();
+  };
+  const clearTappedCandidate = () => {
+    if (!tappedCandidateId) return;
+    tappedCandidateId = null;
+    actions.clearPathHover();
+  };
   const constrainViewport = () => {
     if (constrainingViewport) return;
     const scale = Math.max(actions.minimumScale(), network.getScale());
@@ -61,6 +78,8 @@ export function attachDagInteractions(network, element, actions) {
     // Ignore a late blur for an old edge after a newer hover has already won.
     blurEdge: event => actions.clearEdgeHover(event.edge),
     hoverNode(event) {
+      if (tappedCandidateId && isTouchGesture(event)) return;
+      clearTappedCandidate();
       if (actions.isDiagnosticCandidate(event.node)) {
         actions.clearEdgeHover();
         actions.highlightPaths(event.node);
@@ -69,21 +88,36 @@ export function attachDagInteractions(network, element, actions) {
         actions.highlightNodeEdges(event.node);
       }
     },
-    blurNode: () => { actions.clearPathHover(); actions.clearEdgeHover(); },
+    blurNode: () => {
+      if (!tappedCandidateId) actions.clearPathHover();
+      actions.clearEdgeHover();
+    },
     selectNode(event) {
       const id = event.nodes[0];
       if (id && actions.hasGroup(id)) {
-        actions.focusGroup(id);
-        // Clicking a node focuses its associated content; it is not a lasting
-        // graph-selection mode. Clear vis.js's otherwise persistent burgundy
-        // selection treatment once that click has been handled.
+        if (isTouchGesture(event)) {
+          clearTappedCandidate();
+          if (actions.isDiagnosticCandidate(id)) {
+            tappedCandidateId = id;
+            actions.clearEdgeHover();
+            actions.highlightPaths(id);
+          } else {
+            actions.highlightNodeEdges(id);
+          }
+        } else {
+          actions.focusGroup(id);
+        }
+        // The graph selection is temporary for both mouse and touch actions.
+        // Clear vis.js's otherwise persistent burgundy selection treatment.
         network.unselectAll();
       }
     },
     doubleClick(event) {
       const id = event.nodes?.[0];
       if (id && actions.hasGroup(id)) {
-        actions.openGroup(id);
+        clearTappedCandidate();
+        if (isTouchGesture(event)) actions.focusGroup(id);
+        else actions.openGroup(id);
         return;
       }
       if (!event.nodes?.length && !event.edges?.length && event.pointer?.canvas) {
@@ -91,6 +125,7 @@ export function attachDagInteractions(network, element, actions) {
       }
     },
     selectEdge(event) {
+      clearTappedCandidate();
       const id = actions.logicalEdgeId(event.edges[0]);
       if (id) {
         actions.selectEdge(id);
@@ -100,11 +135,22 @@ export function attachDagInteractions(network, element, actions) {
       }
     },
   };
-  const leave = () => { actions.clearPathHover(); actions.clearEdgeHover(); };
+  const leave = () => {
+    if (!tappedCandidateId) actions.clearPathHover();
+    actions.clearEdgeHover();
+  };
+  const clearOnBackgroundTap = event => {
+    if (!event.nodes?.length && !event.edges?.length) clearTappedCandidate();
+  };
+  handlers.click = clearOnBackgroundTap;
   for (const [name, handler] of Object.entries(handlers)) network.on(name, handler);
+  element.addEventListener("touchstart", rememberTouch, { passive: true });
+  element.addEventListener("pointerdown", rememberTouchPointer);
   element.addEventListener("mouseleave", leave);
   return () => {
     for (const [name, handler] of Object.entries(handlers)) network.off(name, handler);
+    element.removeEventListener("touchstart", rememberTouch);
+    element.removeEventListener("pointerdown", rememberTouchPointer);
     element.removeEventListener("mouseleave", leave);
   };
 }

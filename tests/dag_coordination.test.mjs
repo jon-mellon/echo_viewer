@@ -148,6 +148,46 @@ test("network events use live state and dispose only their own listeners", () =>
   assert.equal(listeners.size, 0);
 });
 
+test("touch taps hold diagnostic paths and require a second tap for the definition", () => {
+  const handlers = new Map(), listeners = new Map(), calls = [];
+  const network = {
+    on: (name, handler) => handlers.set(name, handler),
+    off: name => handlers.delete(name),
+    unselectAll: () => calls.push("unselect"),
+  };
+  const element = {
+    addEventListener: (name, handler) => listeners.set(name, handler),
+    removeEventListener: name => listeners.delete(name),
+  };
+  const detach = attachDagInteractions(network, element, {
+    isDiagnosticCandidate: id => id === "candidate",
+    hasGroup: id => ["candidate", "other"].includes(id),
+    clearPathHover: () => calls.push("clearPath"),
+    clearEdgeHover: () => calls.push("clearEdge"),
+    highlightPaths: id => calls.push(["paths", id]),
+    highlightNodeEdges: id => calls.push(["nodeEdges", id]),
+    focusGroup: id => calls.push(["definition", id]),
+    openGroup: id => calls.push(["open", id]),
+    logicalEdgeId: id => id,
+  });
+  listeners.get("touchstart")();
+  handlers.get("selectNode")({ nodes: ["candidate"] });
+  assert.equal(calls.some(call => call[0] === "definition"), false);
+  assert.deepEqual(calls.slice(-3), ["clearEdge", ["paths", "candidate"], "unselect"]);
+  handlers.get("blurNode")();
+  assert.notEqual(calls.at(-1), "clearPath");
+  handlers.get("doubleClick")({ nodes: ["candidate"] });
+  assert.deepEqual(calls.slice(-2), ["clearPath", ["definition", "candidate"]]);
+  handlers.get("selectNode")({ nodes: ["candidate"], event: { srcEvent: { pointerType: "touch" } } });
+  handlers.get("click")({ nodes: [], edges: [] });
+  assert.deepEqual(calls.slice(-2), ["unselect", "clearPath"]);
+  handlers.get("selectNode")({ nodes: ["candidate"], event: { srcEvent: { pointerType: "mouse" } } });
+  assert.deepEqual(calls.slice(-2), [["definition", "candidate"], "unselect"]);
+  detach();
+  assert.equal(handlers.size, 0);
+  assert.equal(listeners.size, 0);
+});
+
 test("render coordination preserves rebuild order, comparison precedence and final autosave", () => {
   const calls = [];
   let comparing = false;
