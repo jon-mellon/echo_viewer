@@ -21,10 +21,7 @@ export function createDagInspectorController({
   const edgeSourcesLoading = link => {
     if (!link || !state.pendingEdgeEvidence) return false;
     const rawIds = [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])];
-    return rawIds.some(id => !state.rawLinksById.has(id)) || rawIds.some(id => {
-      const raw = state.rawLinksById.get(id);
-      return raw && (!state.variableById.has(raw.source_variable_id) || !state.variableById.has(raw.target_variable_id));
-    });
+    return rawIds.some(id => !state.rawLinksById.has(id));
   };
   const loadingSources = () => h("div", {
     className: "edge-sources-loading", role: "status", ariaLive: "polite",
@@ -165,7 +162,11 @@ export function createDagInspectorController({
         cell(raw.within_table_occurrence_id || ""), cell(raw.causal_link_existence || ""), cell(raw.identification_strategy || ""), cell(truncate(raw.target_population || "", 60)));
     });
     const headings = ["Paper", "Source concept", "Source classification", "Target concept", "Target classification", "Occurrence", "Existence", "Strategy", "Population"];
-    replaceChildren(elements.provenancePanel, h("table", { className: "provenance-table" },
+    const labelsLoading = state.pendingEdgeEvidence && model.rows.some(({ raw }) =>
+      !state.variableById.has(raw.source_variable_id) || !state.variableById.has(raw.target_variable_id));
+    replaceChildren(elements.provenancePanel,
+      labelsLoading ? h("div", { className: "small-note", role: "status", textContent: "Loading concept labels…" }) : null,
+      h("table", { className: "provenance-table" },
       h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))), h("tbody", {}, rows)));
   }
 

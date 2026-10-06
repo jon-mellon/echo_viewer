@@ -1023,12 +1023,15 @@ function renderSelectedEdge() {
   }).filter(Boolean))];
   const missingVariables = loadedVariableIds().filter(id => !state.variableById.has(id));
   if ((missing.length || missingVariables.length) && !pendingEdgeEvidencePromise) {
+    const loadingEdgeId = state.selectedEdgeId;
     state.pendingEdgeEvidence = true;
     const load = (missing.length ? dagDataSource.loadRawLinksByIds(missing) : Promise.resolve([])).then(async links => {
       for (const link of links) state.rawLinksById.set(link.raw_causal_link_id, link);
+      // Show paper and study rows immediately; labels can arrive separately.
+      renderSelectedEdgePanels();
       const variableIds = loadedVariableIds().filter(id => !state.variableById.has(id));
       if (variableIds.length) {
-        const variables = await dagDataSource.loadVariableMetadata(variableIds, state.variableLayoutSource);
+        const variables = await dagDataSource.loadVariableProvenance(variableIds);
         for (const variable of variables) state.variableById.set(variable.variable_id, variable);
       }
     }).catch(error => {
@@ -1037,9 +1040,10 @@ function renderSelectedEdge() {
       if (pendingEdgeEvidencePromise !== load) return;
       pendingEdgeEvidencePromise = null;
       state.pendingEdgeEvidence = false;
-      // Refresh the live selection even if another render happened while the
-      // evidence query was in flight.
-      renderSelectedEdge();
+      // A changed selection needs its own query. Re-rendering the same edge
+      // must not retry forever if a record is missing or a request failed.
+      if (state.selectedEdgeId === loadingEdgeId) renderSelectedEdgePanels();
+      else renderSelectedEdge();
     });
     pendingEdgeEvidencePromise = load;
   }
@@ -1420,6 +1424,13 @@ const projectBootstrap = createProjectBootstrap({
   normalizeProjectDuplicateAssignments, saveProjectLocally, publicationController,
   renderAll, constrainMapTransform, drawMap, fitMap, dagNetworkController,
   buildDuplicateClusters, linkKey, pairKey, loadVariableSearchCatalog,
+  onReady: () => {
+    if (!state.project?.links?.some(link => (link.a_to_b_raw_link_ids?.length || 0)
+      + (link.b_to_a_raw_link_ids?.length || 0) > 0)) return;
+    const prewarm = () => { void dagDataSource.ensureEvidenceConnection().catch(() => {}); };
+    if ("requestIdleCallback" in window) requestIdleCallback(prewarm, { timeout: 3000 });
+    else setTimeout(prewarm, 0);
+  },
 });
 
 // Stable adapter names keep event wiring and browser smoke-test hooks simple.

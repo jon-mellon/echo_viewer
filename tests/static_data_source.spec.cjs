@@ -32,13 +32,14 @@ for (const route of ["/"]) {
     });
     const state = await page.evaluate(async () => {
       const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
-      const [variables, neighbors, links] = await Promise.all([
+      const [variables, provenance, neighbors, links] = await Promise.all([
         dagDataSource.loadVariableMetadata(["v1"]),
+        dagDataSource.loadVariableProvenance(["v1"]),
         dagDataSource.loadNeighbors(["v1"]),
         dagDataSource.loadIncidentRawLinks(["v1"]),
       ]);
       return {
-      variables, neighbors, links,
+      variables, provenance, neighbors, links,
       shardBoundaries: ["v1", "v256", "v257", "v14284", "v14285"]
         .map(id => dagDataSource.browserShardIds([id])),
       snapshotId: window.__dagBuilderState.data.snapshot.snapshot_id,
@@ -50,6 +51,11 @@ for (const route of ["/"]) {
     }});
     expect(state.variables).toHaveLength(1);
     expect(state.variables[0].variable_id).toBe("v1");
+    expect(state.provenance).toEqual([{
+      variable_id: "v1",
+      concept_label: state.variables[0].concept_label,
+      display_label: state.variables[0].display_label,
+    }]);
     expect(Number.isFinite(state.variables[0].map_x)).toBe(true);
     expect(Number.isFinite(state.variables[0].map_y)).toBe(true);
     expect(state.neighbors.length).toBeGreaterThan(0);

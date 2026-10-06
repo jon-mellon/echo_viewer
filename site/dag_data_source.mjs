@@ -164,6 +164,16 @@ export class ParquetManifestDagDataSource {
     return rows;
   }
 
+  async loadVariableProvenance(variableIds) {
+    await this.ensureEvidenceConnection();
+    if (!variableIds?.length || !this.browserShardIds(variableIds).length) return [];
+    const placeholders = variableIds.map(() => "?").join(",");
+    const urls = this.browserUrls(this.browserLayout.variables, variableIds)
+      .map(url => `'${url.replaceAll("'", "''")}'`).join(",");
+    return queryRows(this.connection, `SELECT variable_id, concept_label, display_label
+      FROM read_parquet([${urls}]) WHERE variable_id IN (${placeholders})`, variableIds);
+  }
+
   async loadIncidentRawLinks(variableIds) {
     await this.ensureEvidenceConnection();
     if (!variableIds?.length) return [];

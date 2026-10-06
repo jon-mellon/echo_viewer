@@ -7,7 +7,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
   resizeMap, restoreProjectLocally, initializeProject, loadLatestSchemaGroups,
   normalizeProjectDuplicateAssignments, saveProjectLocally, publicationController, renderAll,
   constrainMapTransform, drawMap, fitMap, dagNetworkController, buildDuplicateClusters,
-  linkKey, pairKey, loadVariableSearchCatalog = async () => {} }) {
+  linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {} }) {
   const presenter = createProjectBootstrapPresenter({});
   const setStartupStage = message => presenter.setStartupStage(message);
   const finishStartupLoading = () => presenter.finishStartupLoading();
@@ -109,6 +109,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         applyLoadedSchema(schema);
         publicationController.setSchemaReady?.(true);
         void publicationController.refreshPublicationState?.();
+        onReady();
       }).catch(error => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.publishedSchemaHydrating = false;
@@ -116,6 +117,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         publicationController.setSchemaLoadFailed?.();
         console.error("Could not finish loading the published schema.", error);
       });
+    } else {
+      onReady();
     }
   }
 

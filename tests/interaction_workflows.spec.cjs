@@ -125,6 +125,29 @@ test("exclusion reason survives an evidence inspector refresh", async ({ page })
     window.__dagBuilderState.project.link_decisions[id]?.display_status, edgeId)).toBe("excluded");
 });
 
+test("edge evidence renders provenance without loading map layouts", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  const parquetRequests = [];
+  page.on("request", request => {
+    if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
+  });
+  await page.goto(viewer);
+  await ready(page);
+  const edgeId = await page.evaluate(async () => {
+    const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
+    await whenDagRendered();
+    const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__"
+      && window.__dagBuilderState.project.links.some(link => link.edge_id === value
+        && (link.a_to_b_raw_link_ids?.length || link.b_to_a_raw_link_ids?.length)));
+    if (id) inspectDagEdge(id);
+    return id;
+  });
+  expect(edgeId).toBeTruthy();
+  await expect(page.locator("#provenancePanel tbody tr").first()).toBeVisible();
+  expect(parquetRequests.some(url => url.endsWith("/variable_layouts.parquet"))).toBe(false);
+  expect(parquetRequests.some(url => url.includes("/variables/shard-"))).toBe(true);
+});
+
 test("evidence replaces the desktop sidebar and closing it restores navigation", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.setViewportSize({ width: 1440, height: 900 });
