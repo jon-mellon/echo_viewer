@@ -323,13 +323,14 @@ try {
         || window.__dagBuilderState.map.transform.ty !== ty, before);
     });
   }
-  await measure("map fullscreen and Escape", async () => {
-    if (mobile) await page.locator('button[data-mobile-panel="variables"]').click();
-    await page.locator("#fullscreenVariableMap").click();
-    await page.locator("#fullscreenVariableMap[aria-pressed='true']").waitFor();
-    await page.keyboard.press("Escape");
-    await page.locator("#fullscreenVariableMap[aria-pressed='false']").waitFor();
-  });
+  if (!mobile) {
+    await measure("map fullscreen and Escape", async () => {
+      await page.locator("#fullscreenVariableMap").click();
+      await page.locator("#fullscreenVariableMap[aria-pressed='true']").waitFor();
+      await page.keyboard.press("Escape");
+      await page.locator("#fullscreenVariableMap[aria-pressed='false']").waitFor();
+    });
+  }
   await measure("map mode selection", async () => {
     for (const [id, mode] of [["dagBrushMode", "draw_add"], ["dagEraseMode", "draw_remove"],
       ["dagSelectMode", "select"]]) {
@@ -441,29 +442,27 @@ try {
     await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
     await waitForGraph();
   });
-  if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
-  // The classic workflow can hide both history toolbars during DAG review.
-  // Dispatch the button's handler directly so this measures the undo work.
-  await measure("undo edge decision", async () => {
-    await page.evaluate(() => document.getElementById("undoBtn").click());
-    await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
-    await waitForGraph();
-  });
-  await measure("redo edge decision", async () => {
-    await page.evaluate(() => document.getElementById("redoBtn").click());
-    await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
-    await waitForGraph();
-  });
-  if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
-  // Vis renders its canvas after the graph promise resolves. Let the preceding
-  // redo finish painting before attributing work to the close button.
-  await waitForGraph();
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await measure("close evidence", async () => {
     await page.locator("#closeEvidencePane").click();
     await page.waitForFunction(() => !window.__dagBuilderState.selectedEdgeId);
     await page.locator("#provenancePanel").waitFor({ state: "hidden" });
   });
+  if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  await measure("undo edge decision", async () => {
+    await page.locator("#dag2UndoBtn").click();
+    await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
+    await waitForGraph();
+  });
+  await measure("redo edge decision", async () => {
+    await page.locator("#dag2RedoBtn").click();
+    await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
+    await waitForGraph();
+  });
+  if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
+  // Vis finishes painting after the graph promise resolves; keep that work
+  // outside the following filter measurements.
+  await waitForGraph();
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   for (const [name, id, stateKey] of [
     ["confounders filter", "toggleConfoundersOnly", "showConfoundersOnly"],
     ["colliders filter", "toggleCollidersOnly", "showCollidersOnly"],
@@ -487,12 +486,14 @@ try {
     await page.locator("#dagSvgZoomOut").click();
     await page.locator("#dagSvgFit").click();
   });
-  await measure("DAG fullscreen and Escape", async () => {
-    await page.locator("#fullscreenDag").click();
-    await page.locator("#fullscreenDag[aria-pressed='true']").waitFor();
-    await page.keyboard.press("Escape");
-    await page.locator("#fullscreenDag[aria-pressed='false']").waitFor();
-  });
+  if (!mobile) {
+    await measure("DAG fullscreen and Escape", async () => {
+      await page.locator("#fullscreenDag").click();
+      await page.locator("#fullscreenDag[aria-pressed='true']").waitFor();
+      await page.keyboard.press("Escape");
+      await page.locator("#fullscreenDag[aria-pressed='false']").waitFor();
+    });
+  }
   if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
   await measure("export drawer", async () => {
     await page.locator("#exportToggleBtn").click();
