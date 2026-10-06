@@ -2020,6 +2020,10 @@ h2 {
 }
 
 @media (max-width: 840px) {
+  .dag-body {
+    --mobile-nav-height: 56px;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(260px, 42vh) minmax(0, 1fr);
@@ -2039,7 +2043,7 @@ h2 {
 
   .dag-shell {
     display: block;
-    height: calc(100dvh - 64px - env(safe-area-inset-bottom));
+    height: calc(100dvh - var(--mobile-nav-height) - env(safe-area-inset-bottom));
     min-height: 0;
     overflow: hidden;
   }
@@ -2079,10 +2083,11 @@ h2 {
     inset: auto 0 0;
     z-index: 110;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-    min-height: 64px;
-    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    grid-template-columns: repeat(2, minmax(0, 112px));
+    justify-content: center;
+    gap: 8px;
+    min-height: var(--mobile-nav-height);
+    padding: 5px 10px calc(5px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--line);
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 -6px 20px rgba(23, 32, 51, 0.08);
@@ -2120,7 +2125,7 @@ h2 {
   }
 
   .dag-body.defining-variable .mobile-panel-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 112px));
   }
 
   .dag-body.defining-variable .mobile-variable-tab {
@@ -2220,7 +2225,7 @@ h2 {
 
   .dag2-mode .dag-shell {
     display: block;
-    height: calc(100dvh - 64px - env(safe-area-inset-bottom));
+    height: calc(100dvh - var(--mobile-nav-height) - env(safe-area-inset-bottom));
     overflow: hidden;
   }
 
@@ -2363,6 +2368,6 @@ h2 {
 
 @media (max-width: 840px) {
   .legal-link {
-    bottom: calc(64px + max(6px, env(safe-area-inset-bottom)));
+    bottom: calc(var(--mobile-nav-height) + max(6px, env(safe-area-inset-bottom)));
   }
 }
