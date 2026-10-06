@@ -445,13 +445,15 @@ try {
     await waitForGraph();
   });
   if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  // The classic workflow can hide both history toolbars during DAG review.
+  // Dispatch the button's handler directly so this measures the undo work.
   await measure("undo edge decision", async () => {
-    await page.locator("#dag2UndoBtn").click();
+    await page.evaluate(() => document.getElementById("undoBtn").click());
     await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
     await waitForGraph();
   });
   await measure("redo edge decision", async () => {
-    await page.locator("#dag2RedoBtn").click();
+    await page.evaluate(() => document.getElementById("redoBtn").click());
     await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
     await waitForGraph();
   });
