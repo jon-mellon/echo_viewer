@@ -324,6 +324,7 @@ try {
     });
   }
   await measure("map fullscreen and Escape", async () => {
+    if (mobile) await page.locator('button[data-mobile-panel="variables"]').click();
     await page.locator("#fullscreenVariableMap").click();
     await page.locator("#fullscreenVariableMap[aria-pressed='true']").waitFor();
     await page.keyboard.press("Escape");
