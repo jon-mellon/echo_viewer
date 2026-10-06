@@ -158,14 +158,14 @@ export function createDagInspectorController({
       return h("tr", {}, h("td", {}, paper), cell(source.concept, "provenance-concept"),
         cell(source.classifications.length ? source.classifications.join("; ") : "Unclassified", "provenance-classification"),
         cell(target.concept, "provenance-concept"), cell(target.classifications.length ? target.classifications.join("; ") : "Unclassified", "provenance-classification"),
-        cell(raw.within_table_occurrence_id || ""), cell(raw.causal_link_existence || ""), cell(raw.identification_strategy || ""), cell(truncate(raw.target_population || "", 60)));
+        cell(raw.causal_link_existence || ""), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(truncate(raw.target_population || "", 60)));
     });
-    const headings = ["Paper", "Source concept", "Source classification", "Target concept", "Target classification", "Occurrence", "Existence", "Strategy", "Population"];
+    const headings = ["Paper", "Source concept", "Source classification", "Target concept", "Target classification", "Existence", "Strategy", "Population"];
     const labelsLoading = state.pendingEdgeEvidence && model.rows.some(({ raw }) =>
       !state.variableById.has(raw.source_variable_id) || !state.variableById.has(raw.target_variable_id));
     replaceChildren(elements.provenancePanel,
       labelsLoading ? h("div", { className: "small-note", role: "status", textContent: "Loading concept labels…" }) : null,
-      h("table", { className: "provenance-table" },
+      h("table", { className: "provenance-table provenance-table--edge" },
       h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))), h("tbody", {}, rows)));
   }
 

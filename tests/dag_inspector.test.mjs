@@ -20,7 +20,7 @@ test("inspectors deduplicate evidence and preserve direction", () => {
   assert.equal(edge.targetLabel, "A");
   assert.equal(edge.rawCount, 2);
   assert.equal(edge.existingDecision.exclude_reason, "reason");
-  assert.deepEqual(edge.actions.map(a => a.action), ["exclude", "restore"]);
+  assert.deepEqual(edge.actions.map(a => a.action), ["restore"]);
   const provenance = inspector.provenanceModel(link, project, rawById, variables);
   assert.equal(provenance.rows.length, 1);
   assert.deepEqual(provenance.rows[0].source, { concept: "Concept X", classifications: ["A"] });
@@ -38,6 +38,7 @@ test("absent evidence preserves empty provenance and comparison directions", () 
   const link = { edge_id: "e", group_a: "a", group_b: "b", direction_type: "BIDIRECTIONAL",
     a_to_b_raw_link_ids: [], b_to_a_raw_link_ids: [] };
   assert.equal(inspector.edgeInspector(link, project).arrow, "↔");
+  assert.deepEqual(inspector.edgeInspector(link, project).actions.map(a => a.action), ["exclude"]);
   assert.deepEqual(inspector.provenanceModel(link, project, new Map(), new Map()).rows, []);
   const source = { variable_id: "x", display_label: "X" }, target = { variable_id: "y" };
   const rows = new Map([["r", { raw_causal_link_id: "r", causal_link_existence: "absent" }]]);

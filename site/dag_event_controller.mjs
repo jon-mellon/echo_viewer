@@ -17,10 +17,11 @@ export function createDagEventController({
   showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean, startEditSplit,
-  dismissEvidencePane,
+  dismissEvidencePane, showExcludedLinks,
 }) {
 function installHandlers() {
   els.closeEvidencePane.addEventListener("click", dismissEvidencePane);
+  els.showExcludedLinks.addEventListener("click", showExcludedLinks);
   // IV/DV search
   els.ivInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
   els.dvInput.addEventListener("focus", () => { void prefetchVariableSearch(); });

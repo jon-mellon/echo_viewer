@@ -1739,6 +1739,39 @@ h2 {
   white-space: normal;
 }
 
+.provenance-table--edge {
+  table-layout: fixed;
+  min-width: 700px;
+}
+
+.provenance-table--edge th,
+.provenance-table--edge td {
+  overflow-wrap: anywhere;
+}
+
+.provenance-table--edge .provenance-concept,
+.provenance-table--edge .provenance-classification {
+  min-width: 0;
+}
+
+.provenance-table--edge th:nth-child(1) { width: 12%; }
+.provenance-table--edge th:nth-child(2),
+.provenance-table--edge th:nth-child(4) { width: 16%; }
+.provenance-table--edge th:nth-child(3),
+.provenance-table--edge th:nth-child(5) { width: 13%; }
+.provenance-table--edge th:nth-child(6) { width: 8%; }
+.provenance-table--edge th:nth-child(7),
+.provenance-table--edge th:nth-child(8) { width: 11%; }
+
+.excluded-links-list {
+  display: grid;
+  gap: 8px;
+}
+
+.excluded-links-list .action-button {
+  text-align: left;
+}
+
 .brush-box {
   position: absolute;
   border: 1px dashed var(--accent);

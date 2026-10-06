@@ -131,7 +131,7 @@ function initElements() {
     // Map
     "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts",
     "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
+    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
@@ -947,7 +947,7 @@ function renderVariableComparison() {
     const paper = truncate(link.paper_title || link.paper_id, 44);
     const paperCell = doi ? h("a", { href: safeUrl(`https://doi.org/${encodeURIComponent(doi)}`), target: "_blank", rel: "noopener", title: link.paper_title || doi, textContent: paper }) : document.createTextNode(paper);
     return h("tr", {}, h("td", { textContent: link.direction }), h("td", {}, paperCell),
-      h("td", { textContent: link.causal_link_existence || "" }), h("td", { textContent: link.identification_strategy || "" }),
+      h("td", { textContent: link.causal_link_existence || "" }), h("td", { textContent: (link.identification_strategy || "").replaceAll("_", " ") }),
       h("td", { textContent: truncate(link.target_population || "", 60) }));
   });
   const headings = ["Direction", "Paper", "Evidence", "Strategy", "Population"];
@@ -961,6 +961,9 @@ function hasAnyMapping(sourceIds, targetIds) {
 }
 
 function computeVisibleLinks() {
+  const excludedCount = state.project.links.filter(link => link.display_status === "excluded").length;
+  els.showExcludedLinks.hidden = excludedCount === 0;
+  els.showExcludedLinks.textContent = `Excluded links (${excludedCount})`;
   const view = deriveDagView({
     groups: dagGroups(),
     links: state.project.links,
@@ -985,6 +988,27 @@ function computeVisibleLinks() {
   state.colliderPathsByGroup = view.colliders.pathsByGroup;
   state.colliderLinkPairKeys = view.colliders.linkPairKeys;
   state.bottleneckedColliderIds = view.colliders.bottleneckedIds;
+}
+
+function showExcludedLinks() {
+  const links = state.project.links.filter(link => link.display_status === "excluded");
+  if (!links.length) return;
+  state.selectedEdgeId = null;
+  state.selectedEvidenceGroupId = null;
+  els.edgeInspector.className = "edge-inspector excluded-links-list";
+  els.edgeInspector.hidden = false;
+  els.provenancePanel.hidden = true;
+  els.closeEvidencePane.hidden = false;
+  replaceChildren(els.edgeInspector,
+    h("strong", { textContent: "Excluded links" }),
+    ...links.map(link => {
+      const model = inspector.edgeInspector(link, state.project);
+      const button = h("button", { className: "action-button", type: "button",
+        textContent: `${model.sourceLabel} ${model.arrow} ${model.targetLabel}` });
+      button.addEventListener("click", () => inspectDagEdge(link.edge_id));
+      return button;
+    }));
+  refreshDagEdgeSelection();
 }
 
 // ─── DAG vis.js rendering ─────────────────────────────────────────────────────
@@ -1462,6 +1486,7 @@ const eventController = createDagEventController({
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean,
   startEditSplit, dismissEvidencePane,
+  showExcludedLinks,
 });
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────

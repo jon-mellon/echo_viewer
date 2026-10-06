@@ -38,10 +38,9 @@ export function edgeInspector(link, project, diagnosticView = {}) {
     ...directedGroupLabels(link, project.groups, "↔"),
     rawIds, rawCount: rawIds.length,
     existingDecision: project.link_decisions[link.edge_id],
-    actions: [
-      { action: "exclude", label: "Exclude" },
-      { action: "restore", label: "Restore" },
-    ],
+    actions: [link.display_status === "excluded" || project.link_decisions[link.edge_id]?.display_status === "excluded"
+      ? { action: "restore", label: "Restore" }
+      : { action: "exclude", label: "Exclude" }],
   };
 }
 
