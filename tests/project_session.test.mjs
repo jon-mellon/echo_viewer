@@ -38,7 +38,7 @@ test("storage round-trip preserves settings and normalizes legacy project fields
   assert.equal(result.uoaFilterEnabled, false);
   assert.equal(result.changingAnchorSide, "iv");
   assert.equal(result.variableLayoutSource, "custom");
-  assert.equal(result.dagLayoutMode, "organic");
+  assert.equal(result.dagLayoutMode, "auto");
   assert.deepEqual([...result.seeds.iv], ["a"]);
   assert.deepEqual([...result.seeds.dv], ["b"]);
   assert.equal(result.definitionDraft.step, "partition");

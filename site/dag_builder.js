@@ -144,7 +144,7 @@ function initElements() {
     "includedVariables", "neighborSuggestions",
     // Right: DAG workspace
     "dagWorkspaceSection", "dagNetwork",
-    "dagLayoutSelect", "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
+    "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
     "exportProject", "exportWorkingMap", "projectImport", "strictDagStatus",

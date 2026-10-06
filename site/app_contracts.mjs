@@ -59,7 +59,7 @@
  * @property {string} [workflowMode]
  * @property {"iv" | "dv" | null} [changingAnchorSide]
  * @property {string} [variableLayoutSource]
- * @property {"auto" | "hierarchical" | "organic"} [dagLayoutMode]
+ * @property {"auto"} [dagLayoutMode]
  * @property {{iv?: string[], dv?: string[]}} [seeds]
  * @property {JsonValue | null} [definitionDraft]
  * @property {string[]} [undoHistory]

@@ -60,7 +60,7 @@ test("incident links use the canonical snapshot and retain both edge directions"
   expect(fallbackMatches).toBe(true);
 });
 
-test("browser-v2 supports group detail, layout controls, fullscreen and project export", async ({ page }) => {
+test("browser-v2 supports group detail, auto layout, fullscreen and project export", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
   await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
@@ -84,10 +84,8 @@ test("browser-v2 supports group detail, layout controls, fullscreen and project 
   await expect(page.locator("#addEdgeToggle, #addEdgeDrawer")).toHaveCount(0);
   expect(await page.evaluate(() => Object.hasOwn(window.__dagBuilderState.project, "manual_edges"))).toBe(false);
 
-  for (const mode of ["hierarchical", "organic", "auto"]) {
-    await page.locator("#dagLayoutSelect").selectOption(mode);
-    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.dagLayoutMode)).toBe(mode);
-  }
+  await expect(page.locator("#dagLayoutSelect")).toHaveCount(0);
+  expect(await page.evaluate(() => window.__dagBuilderState.dagLayoutMode)).toBe("auto");
   await page.locator("#fullscreenDag").click();
   await expect(page.locator("#fullscreenDag")).toHaveAttribute("aria-pressed", "true");
   await page.keyboard.press("Escape");

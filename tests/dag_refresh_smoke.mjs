@@ -67,11 +67,8 @@ try {
     console.log(`Verified ${visible.length} visible DAG nodes and ${rendered.edges.length} edge segments.`);
   };
   await assertRenderedNodes();
-  for (const mode of ['hierarchical', 'organic', 'auto']) {
-    await page.locator('#dagLayoutSelect').selectOption(mode);
-    assert.equal(await page.evaluate(() => window.__dagBuilderState.dagLayoutMode), mode);
-    await assertRenderedNodes();
-  }
+  assert.equal(await page.locator('#dagLayoutSelect').count(), 0);
+  assert.equal(await page.evaluate(() => window.__dagBuilderState.dagLayoutMode), 'auto');
   const assignments = await page.evaluate(() => {
     const state = window.__dagBuilderState;
     const schema = state.data.grouping_sets.find((set) => set.grouping_set_id === state.data.default_grouping_set_id);

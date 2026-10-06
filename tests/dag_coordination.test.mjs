@@ -21,7 +21,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   const state = {
     project: { groups, links: [], iv_group_id: "a", dv_group_id: "d" },
     componentGroupIds: new Set(groups.map(group => group.group_id)),
-    variableById: new Map(), dagLayoutMode: "hierarchical", selectedEdgeId: null,
+    variableById: new Map(), dagLayoutMode: "auto", selectedEdgeId: null,
     colliderGroupIds: new Set(), colliderPathGroupIds: new Set(),
     confounderGroupIds: new Set(), confounderPathGroupIds: new Set(), visibleLinks: [],
   };
@@ -55,7 +55,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
     }
   }
   const controller = createDagNetworkController({ state,
-    elements: { dagNetwork, dagLayoutSelect: { value: "" } }, visApi: { DataSet, Network },
+    elements: { dagNetwork }, visApi: { DataSet, Network },
     clusterRep: id => id, groupColor: () => "#000", dagGroups: () => groups,
     groupById: id => groups.find(group => group.group_id === id),
     drawMap() {}, setMapMode() {}, renderAll() {}, selectEdge() {},

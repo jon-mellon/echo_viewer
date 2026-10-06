@@ -189,11 +189,6 @@ function installHandlers() {
   });
 
   // DAG SVG zoom controls
-  els.dagLayoutSelect.addEventListener("change", () => {
-    state.dagLayoutMode = els.dagLayoutSelect.value;
-    renderDag();
-    saveProjectLocally();
-  });
   els.dagSvgZoomIn.addEventListener("click", () => {
     dagNetwork.zoomIn();
   });

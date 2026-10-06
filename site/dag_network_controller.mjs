@@ -348,7 +348,6 @@ function renderDag({ reuseGeometry = false } = {}) {
   clearLogicalDagEdgeHover();
   clearConfounderPathHover();
   const groups = dagVisibleGroups();
-  els.dagLayoutSelect.value = state.dagLayoutMode;
 
   const links = state.visibleLinks.filter((link) => !link.is_target_relation);
   if (reuseGeometry && !_dagRenderWorker && _visNetwork) {

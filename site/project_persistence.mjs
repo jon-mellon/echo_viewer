@@ -80,7 +80,7 @@ export function restoreProjectPayload(payload, defaults, currentLayoutSource) {
     workflowMode: restoreWorkflowMode(serialized.workflowMode, phase),
     changingAnchorSide: ["iv", "dv"].includes(serialized.changingAnchorSide) ? serialized.changingAnchorSide : null,
     variableLayoutSource: String(serialized.variableLayoutSource ?? "").trim() || currentLayoutSource,
-    dagLayoutMode: ["auto", "hierarchical", "organic"].includes(serialized.dagLayoutMode) ? serialized.dagLayoutMode : "auto",
+    dagLayoutMode: "auto",
     seeds: { iv: new Set(serialized.seeds?.iv || []), dv: new Set(serialized.seeds?.dv || []) },
     definitionDraft: serialized.definitionDraft || null,
     undoHistory: serialized.undoHistory || [],

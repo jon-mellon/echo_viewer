@@ -30,7 +30,7 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state }) {
   const values = {
     p: PERMALINK_VERSION, schema_url: schemaUrl, data_version: dataVersion,
     iv: state.project.iv_group_id, dv: state.project.dv_group_id,
-    mode: state.workflowMode, layout: state.dagLayoutMode, vlayout: state.variableLayoutSource,
+    mode: state.workflowMode, vlayout: state.variableLayoutSource,
     path: String(state.confounderMaxPathLength),
     selected_group: state.activeGroupId || "", selected_variable: state.selectedVariableId || "",
     selected_edge: state.selectedEdgeId || "", sort: state.groupListSort || "",
@@ -67,7 +67,7 @@ export function applyPermalink(params, state) {
     dv: new Set(dvGroup?.variable_ids || []),
   };
   state.workflowMode = params.get("mode") || "dag";
-  state.dagLayoutMode = ["auto", "hierarchical", "organic"].includes(params.get("layout")) ? params.get("layout") : "auto";
+  state.dagLayoutMode = "auto";
   state.variableLayoutSource = params.get("vlayout") || state.variableLayoutSource;
   state.selectedUoa = null;
   state.uoaFilterEnabled = false;

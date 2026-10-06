@@ -28,6 +28,7 @@ test("compact permalink round trip preserves reproducible view settings", () => 
   assert.equal(applyPermalink(params, restored), true);
   assert.equal(params.get("data_version"), "snapshot-7");
   assert.equal(params.get("schema_url"), "/config/schema/");
+  assert.equal(params.has("layout"), false);
   assert.equal(params.has("uoa"), false);
   assert.equal(params.has("uf"), false);
   assert.equal(restored.project.iv_group_id, "cause");
@@ -41,6 +42,14 @@ test("compact permalink round trip preserves reproducible view settings", () => 
   assert.equal(restored.selectedUoa, null);
   assert.equal(restored.uoaFilterEnabled, false);
   assert.equal(restored.selectedVariableId, "v1");
+  assert.equal(restored.dagLayoutMode, "auto");
+});
+
+test("legacy layout links open with auto layout", () => {
+  const params = new URLSearchParams("p=1&iv=cause&dv=outcome&layout=organic");
+  const state = { project: structuredClone(project), seeds: { iv: new Set(), dv: new Set() } };
+  assert.equal(applyPermalink(params, state), true);
+  assert.equal(state.dagLayoutMode, "auto");
 });
 
 test("edited or imported schemas are not shareable", () => {
