@@ -122,7 +122,11 @@ async function snapshot() {
 async function measure(name, action) {
   const before = await snapshot();
   const startedAt = Date.now();
-  await action();
+  try {
+    await action();
+  } catch (error) {
+    throw new Error(`Profile scenario "${name}" failed:\n${error?.stack || error}`);
+  }
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const after = await snapshot();
   const longTasks = after.longTasks.filter(entry => entry.startTime >= before.at);
@@ -275,12 +279,13 @@ try {
   await measure("select definition variable", async () => {
     if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
     const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
-    const neighborQueries = await page.evaluate(() => performance.getEntriesByName("echo:evidence:neighbors").length);
     await page.locator("#definitionVariableSearch").fill(variableId);
     await page.locator("#definitionVariableResults .result-button").first().click();
-    await page.waitForFunction(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), variableId);
-    await page.waitForFunction(count => performance.getEntriesByName("echo:evidence:neighbors").length > count,
-      neighborQueries);
+    await page.waitForFunction(id => {
+      const state = window.__dagBuilderState;
+      return state.definitionDraft.new_variable_ids.includes(id)
+        && Array.isArray(state.variableById.get(id)?.similarity_neighbors);
+    }, variableId);
     if (mobile) await page.locator('button[data-mobile-panel="variables"]').click();
   });
   await measure("variable map zoom", async () => {
