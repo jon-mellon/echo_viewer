@@ -31,6 +31,7 @@ export function createRenderCoordinator(view) {
     view.renderModeUI();
     view.renderAnchorBar();
     view.renderStatus();
+    view.renderVariablePanel?.();
     view.renderUoaStep();
     view.renderUoaFilterBar();
     view.renderSearch("iv");

@@ -65,6 +65,31 @@ export function createDagSetupGroupController({
     elements.dagWorkspaceSection.hidden = editing;
   }
 
+  function renderVariablePanel() {
+    if (!elements.variablePanel) return;
+    const project = state.project;
+    const iv = groupById(state.project?.iv_group_id);
+    const dv = groupById(state.project?.dv_group_id);
+    const show = state.interfaceMode === "dag2" && anchorHasMembers(state, iv)
+      && anchorHasMembers(state, dv) && !state.definitionDraft;
+    elements.variablePanel.hidden = !show;
+    if (!show) return;
+    const groups = (project?.groups || []).slice()
+      .sort((a, b) => (a.label || a.group_id).localeCompare(b.label || b.group_id));
+    elements.variablePanelCount.textContent = String(groups.length);
+    if (!elements.variablePanelDisclosure.open) return;
+    const openIds = new Set([...elements.variablePanelList.querySelectorAll("details[open]")]
+      .map(detail => detail.dataset.groupId));
+    const scrollTop = elements.variablePanelList.scrollTop;
+    replaceChildren(elements.variablePanelList, groups.map(group =>
+      h("details", { className: "variable-panel-item", dataset: { groupId: group.group_id }, open: openIds.has(group.group_id) },
+        h("summary", {}, h("span", { textContent: group.label || group.group_id }),
+          group.group_id === project.iv_group_id ? h("span", { className: "variable-panel-role", textContent: "IV" }) : null,
+          group.group_id === project.dv_group_id ? h("span", { className: "variable-panel-role", textContent: "DV" }) : null),
+        h("p", { textContent: group.description || "No definition available." }))));
+    elements.variablePanelList.scrollTop = scrollTop;
+  }
+
   function hint() {
     const hints = {
       select_dv: "Search the existing groups for the outcome, or choose Define new group to build a new dependent-variable group from raw variables.",
@@ -220,6 +245,6 @@ export function createDagSetupGroupController({
       : "No schema loaded. Import a schema or create groups manually.";
   }
 
-  return { renderMode, renderAnchorBar, renderRightPanel, hint, renderStatus, renderSetupPicker,
+  return { renderMode, renderAnchorBar, renderRightPanel, renderVariablePanel, hint, renderStatus, renderSetupPicker,
     renderSetupPickers() { renderSetupPicker("dv"); renderSetupPicker("iv"); }, renderGroupList, renderGroupingControls };
 }

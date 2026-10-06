@@ -1384,6 +1384,52 @@ h2 {
   white-space: pre-wrap;
 }
 
+.variable-panel > details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.variable-panel-list {
+  max-height: min(55vh, 520px);
+  margin-top: 12px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+}
+
+.variable-panel-item {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.variable-panel-item summary {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.variable-panel-item summary span:first-child {
+  overflow-wrap: anywhere;
+}
+
+.variable-panel-role {
+  margin-left: 6px;
+  color: var(--blue);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.variable-panel-item p {
+  margin: 8px 0 0 18px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .group-definition-inspector p {
   margin: 8px 0 0;
   line-height: 1.5;

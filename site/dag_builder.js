@@ -118,6 +118,7 @@ function initElements() {
     "definitionReviewStep", "definitionNewLabel", "definitionReviewVariables", "definitionResidualLabels",
     "definitionManualReview", "definitionValidation", "definitionReviewBack", "definitionSave",
     "workflowHint", "dagStatusBadge",
+    "variablePanel", "variablePanelDisclosure", "variablePanelCount", "variablePanelList",
     "anchorBar", "anchorDvLabel", "anchorIvLabel", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn",
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",
@@ -368,6 +369,7 @@ const renderCoordinator = createRenderCoordinator({
   renderSelectedEdge, renderExportStatus, renderMapModeControls,
   renderMapToolbarToggles, renderUndoRedo, drawMap, saveProjectLocally,
   renderModeUI, renderAnchorBar, renderStatus, renderUoaStep, renderUoaFilterBar,
+  renderVariablePanel: () => setupGroupController.renderVariablePanel(),
   renderSearch, renderSetupGroupPickers, renderSeedRows, renderGroupingSetControls,
   renderGroupEditor, renderRightPanel, renderDefinition,
 });
@@ -1310,6 +1312,7 @@ const setupGroupController = createDagSetupGroupController({
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
   searchAnchorGroups,
 });
+els.variablePanelDisclosure?.addEventListener("toggle", () => setupGroupController.renderVariablePanel());
 
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
