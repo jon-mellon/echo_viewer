@@ -155,16 +155,21 @@ export function createDagInspectorController({
         ? h("a", { href: safeUrl(`https://doi.org/${encodeURIComponent(doi)}`), target: "_blank", rel: "noopener", title: raw.paper_title || doi, textContent: title })
         : document.createTextNode(title);
       const cell = (text, className) => h("td", { className, textContent: text });
-      return h("tr", {}, h("td", {}, paper), cell(source.concept, "provenance-concept"),
+      const conceptCell = (concept, variableId) => {
+        if (state.variableById.has(variableId)) return cell(concept, "provenance-concept");
+        return h("td", { className: "provenance-concept" }, state.pendingEdgeEvidence
+          ? h("span", { className: "concept-loading", role: "status" },
+            h("span", { className: "inline-spinner", ariaHidden: "true" }),
+            h("span", { textContent: "Loading…" }))
+          : h("span", { textContent: "Concept unavailable" }));
+      };
+      return h("tr", {}, h("td", {}, paper), conceptCell(source.concept, raw.source_variable_id),
         cell(source.classifications.length ? source.classifications.join("; ") : "Unclassified", "provenance-classification"),
-        cell(target.concept, "provenance-concept"), cell(target.classifications.length ? target.classifications.join("; ") : "Unclassified", "provenance-classification"),
+        conceptCell(target.concept, raw.target_variable_id), cell(target.classifications.length ? target.classifications.join("; ") : "Unclassified", "provenance-classification"),
         cell(raw.causal_link_existence || ""), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(truncate(raw.target_population || "", 60)));
     });
     const headings = ["Paper", "Source concept", "Source classification", "Target concept", "Target classification", "Existence", "Strategy", "Population"];
-    const labelsLoading = state.pendingEdgeEvidence && model.rows.some(({ raw }) =>
-      !state.variableById.has(raw.source_variable_id) || !state.variableById.has(raw.target_variable_id));
     replaceChildren(elements.provenancePanel,
-      labelsLoading ? h("div", { className: "small-note", role: "status", textContent: "Loading concept labels…" }) : null,
       h("table", { className: "provenance-table provenance-table--edge" },
       h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))), h("tbody", {}, rows)));
   }

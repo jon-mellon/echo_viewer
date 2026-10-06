@@ -2011,6 +2011,14 @@ h2 {
   animation: startup-spin 0.8s linear infinite;
 }
 
+.concept-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .inline-spinner { animation: none; border-top-color: #dbe3ee; background: var(--accent); }
 }
