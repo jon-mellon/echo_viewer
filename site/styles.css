@@ -2217,6 +2217,10 @@ h2 {
 }
 
 @media (max-width: 840px) {
+  .fullscreen-toggle {
+    display: none;
+  }
+
   .dag-map-toolbar {
     left: 10px;
     right: 10px;
