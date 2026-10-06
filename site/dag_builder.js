@@ -143,7 +143,7 @@ function initElements() {
     "groupSeedInput", "groupSeedResults",
     "includedVariables", "neighborSuggestions",
     // Right: DAG workspace
-    "dagWorkspaceSection", "dagNetwork", "dagWorkspaceResizer",
+    "dagWorkspaceSection", "dagNetwork",
     "dagLayoutSelect", "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export

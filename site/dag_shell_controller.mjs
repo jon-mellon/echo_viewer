@@ -70,15 +70,20 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
   function installResizers() {
     const shell = document.querySelector(".dag-shell");
     const workspace = elements.dagWorkspaceSection;
-    let leftWidth = 370, rightWidth = 450, footerHeight = 200;
+    const evidencePane = document.querySelector(".dag-ws-footer");
+    const leftPanel = document.querySelector(".dag-left-panel");
+    const mobileLayout = window.matchMedia("(max-width: 840px)");
+    const placeEvidencePane = () => {
+      const parent = mobileLayout.matches ? workspace : leftPanel;
+      if (evidencePane && parent && evidencePane.parentElement !== parent) parent.append(evidencePane);
+    };
+    mobileLayout.addEventListener("change", placeEvidencePane);
+    placeEvidencePane();
+    let leftWidth = 370, rightWidth = 450;
     const applyWidths = () => {
       shell.style.gridTemplateColumns = state.interfaceMode === "dag2"
         ? `${leftWidth}px 5px minmax(0, 1fr)`
         : `${leftWidth}px 5px 1fr 5px ${rightWidth}px`;
-    };
-    const applyFooterHeight = height => {
-      footerHeight = height;
-      workspace?.style.setProperty("--dag-footer-height", `${footerHeight}px`);
     };
     window._dagPanelSetRight = width => { rightWidth = width; applyWidths(); resizeMap(); };
     window._dagPanelGetRight = () => rightWidth;
@@ -108,28 +113,7 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
 
     makeResizer(elements.leftResizer, "left");
     if (state.interfaceMode !== "dag2") makeResizer(elements.rightResizer, "right");
-    if (elements.dagWorkspaceResizer && workspace) {
-      elements.dagWorkspaceResizer.addEventListener("mousedown", event => {
-        event.preventDefault();
-        const startY = event.clientY, startHeight = footerHeight;
-        const workspaceHeight = workspace.getBoundingClientRect().height;
-        elements.dagWorkspaceResizer.classList.add("dragging");
-        function onMove(moveEvent) {
-          applyFooterHeight(Math.max(120, Math.min(workspaceHeight * 0.6, startHeight - (moveEvent.clientY - startY))));
-          getNetwork()?.redraw();
-        }
-        function onUp() {
-          elements.dagWorkspaceResizer.classList.remove("dragging");
-          document.removeEventListener("mousemove", onMove);
-          document.removeEventListener("mouseup", onUp);
-          renderDag();
-        }
-        document.addEventListener("mousemove", onMove);
-        document.addEventListener("mouseup", onUp);
-      });
-    }
     applyWidths();
-    applyFooterHeight(footerHeight);
     installMobilePanelNavigation();
   }
 

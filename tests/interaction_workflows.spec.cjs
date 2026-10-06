@@ -125,6 +125,31 @@ test("exclusion reason survives an evidence inspector refresh", async ({ page })
     window.__dagBuilderState.project.link_decisions[id]?.display_status, edgeId)).toBe("excluded");
 });
 
+test("evidence replaces the desktop sidebar and closing it restores navigation", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(viewer);
+  await ready(page);
+  const pane = page.locator(".dag-ws-footer");
+  await expect(page.locator(".panel-header")).toBeVisible();
+  await expect(pane).toBeHidden();
+  await page.evaluate(async () => {
+    const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
+    await whenDagRendered();
+    inspectDagEdge(renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__"));
+  });
+  await expect(pane).toBeVisible();
+  await expect(page.locator(".panel-header")).toBeHidden();
+  expect(await pane.evaluate(node => node.parentElement.className)).toContain("dag-left-panel");
+  expect((await page.locator(".dag-network-wrapper").boundingBox()).height).toBeGreaterThan(600);
+  await page.locator("#closeEvidencePane").click();
+  await expect(page.locator(".panel-header")).toBeVisible();
+  await expect(pane).toBeHidden();
+
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect.poll(() => pane.evaluate(node => node.parentElement.id)).toBe("dagWorkspaceSection");
+});
+
 test("project export can be imported with its anchors intact", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);

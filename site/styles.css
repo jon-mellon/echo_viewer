@@ -1457,7 +1457,6 @@ h2 {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  --dag-footer-height: 200px;
   padding: 0 !important;
   overflow: hidden;
 }
@@ -1514,21 +1513,6 @@ h2 {
   overflow: hidden;
   position: relative;
 }
-.dag-workspace-resizer {
-  flex: 0 0 8px;
-  cursor: ns-resize;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  background:
-    linear-gradient(to bottom, transparent 0, transparent 2px, rgba(96,112,102,0.22) 2px, rgba(96,112,102,0.22) 3px, transparent 3px, transparent 5px),
-    #f3f5f2;
-}
-.dag-workspace-resizer:hover,
-.dag-workspace-resizer.dragging {
-  background:
-    linear-gradient(to bottom, transparent 0, transparent 2px, rgba(31,122,103,0.35) 2px, rgba(31,122,103,0.35) 3px, transparent 3px, transparent 5px),
-    #eef4f1;
-}
 .dag-network {
   width: 100%;
   height: 100%;
@@ -1540,12 +1524,37 @@ h2 {
 }
 .dag-ws-footer {
   flex-shrink: 0;
-  flex-basis: var(--dag-footer-height);
+  flex-basis: 200px;
   min-height: 120px;
   max-height: 60%;
   overflow-y: auto;
   border-top: 1px solid var(--line);
   padding: 0 14px 8px;
+}
+
+@media (min-width: 841px) {
+  .dag-left-panel > .dag-ws-footer {
+    display: none;
+  }
+
+  .dag-left-panel:has(#closeEvidencePane:not([hidden])) > :not(.dag-ws-footer) {
+    display: none !important;
+  }
+
+  .dag-left-panel:has(#closeEvidencePane:not([hidden])) > .dag-ws-footer {
+    display: block;
+    min-height: 100%;
+    max-height: none;
+    overflow: visible;
+    border-top: 0;
+    padding: 0 14px 16px;
+  }
+
+  .dag-left-panel .provenance-panel {
+    height: auto;
+    max-height: none;
+    overflow-x: auto;
+  }
 }
 
 .evidence-pane-header {
@@ -1922,7 +1931,7 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Edge inspector (now always in right panel) ── */
+/* ── Edge inspector ── */
 
 .edge-inspector {
   margin-top: 12px;
@@ -1937,7 +1946,7 @@ h2 {
   font-style: italic;
 }
 
-/* ── Provenance panel (now in right panel, not bottom) ── */
+/* ── Provenance panel ── */
 
 .provenance-panel {
   margin-top: 10px;
@@ -2141,14 +2150,6 @@ h2 {
 
   .dag-ws-controls > * {
     flex: 0 0 auto;
-  }
-
-  .dag-workspace {
-    --dag-footer-height: auto;
-  }
-
-  .dag-workspace-resizer {
-    display: none;
   }
 
   .dag-ws-footer {
