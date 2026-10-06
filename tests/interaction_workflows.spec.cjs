@@ -187,6 +187,7 @@ test("evidence replaces the desktop sidebar and closing it restores navigation",
 
   await page.setViewportSize({ width: 390, height: 800 });
   await expect.poll(() => pane.evaluate(node => node.parentElement.id)).toBe("dagWorkspaceSection");
+  await expect(pane).toBeHidden();
 });
 
 test("project export can be imported with its anchors intact", async ({ page }) => {

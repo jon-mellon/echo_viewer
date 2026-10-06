@@ -1532,6 +1532,10 @@ h2 {
   padding: 0 14px 8px;
 }
 
+.dag-ws-footer:has(#closeEvidencePane[hidden]) {
+  display: none;
+}
+
 @media (min-width: 841px) {
   .dag-left-panel > .dag-ws-footer {
     display: none;

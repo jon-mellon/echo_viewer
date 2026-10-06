@@ -89,9 +89,8 @@ export function createDagInspectorController({
     if (state.selectedEdgeId === STUDY_DESIGN_EDGE_ID) return renderStudyRelation();
     const link = selectedEdge();
     if (!link) {
-      elements.edgeInspector.className = "edge-inspector empty";
-      elements.edgeInspector.hidden = false;
-      elements.edgeInspector.textContent = "Select an edge to inspect its provenance";
+      elements.edgeInspector.hidden = true;
+      elements.closeEvidencePane.hidden = true;
       return;
     }
     const model = inspector.edgeInspector(link, state.project, diagnosticView());
