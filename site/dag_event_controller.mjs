@@ -4,7 +4,7 @@ import * as mapInteractions from "./map_interactions.mjs";
 export function createDagEventController({
   state, elements: els, dagNetwork,
   renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
-  renderSearch, fitSearchContext, toggleAnchorSearchMode, finishSchemaChoice, changeAnchor,
+  renderSearch, fitSearchContext, prefetchVariableSearch, toggleAnchorSearchMode, finishSchemaChoice, changeAnchor,
   setWorkflowMode, renderGroupList, closeGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
@@ -22,6 +22,8 @@ export function createDagEventController({
 function installHandlers() {
   els.closeEvidencePane.addEventListener("click", dismissEvidencePane);
   // IV/DV search
+  els.ivInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
+  els.dvInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
   els.ivInput.addEventListener("input", () => {
     renderSearch("iv");
     if (state.anchorSearchMode.iv === "new") fitSearchContext("iv");

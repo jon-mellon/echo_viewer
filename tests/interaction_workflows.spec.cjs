@@ -76,6 +76,22 @@ test("definition navigation returns through both Back steps and Cancel", async (
   await page.locator("#definitionCancel").click();
 });
 
+test("variable search catalog starts loading when anchor search gets focus", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  const catalogRequests = [];
+  page.on("request", request => {
+    if (request.url().includes("variable-search-catalog.json")) catalogRequests.push(request.url());
+  });
+  await page.goto(viewer);
+  await ready(page);
+  expect(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("idle");
+  await page.locator("#ivInput").focus();
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("ready");
+  expect(catalogRequests).toHaveLength(1);
+  await page.locator("#ivInput").fill("education");
+  await expect(page.locator("#ivGroupPicker button[data-group-id]").first()).toBeVisible();
+});
+
 test("map context menu changes a definition selection and closes with Escape", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);

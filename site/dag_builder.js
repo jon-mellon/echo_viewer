@@ -1443,7 +1443,8 @@ const exportWorkingMap = () => exportController.exportWorkingMap();
 const eventController = createDagEventController({
   state, elements: els, dagNetwork: dagNetworkController,
   renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
-  renderSearch, fitSearchContext, toggleAnchorSearchMode, finishSchemaChoice, changeAnchor,
+  renderSearch, fitSearchContext, prefetchVariableSearch: loadVariableSearchCatalog,
+  toggleAnchorSearchMode, finishSchemaChoice, changeAnchor,
   setWorkflowMode, renderGroupList, closeGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
