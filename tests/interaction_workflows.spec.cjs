@@ -9,6 +9,23 @@ async function ready(page) {
     && !window.__dagBuilderState?.publishedSchemaHydrating);
 }
 
+test("privacy policy opens without resetting the viewer", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  await page.evaluate(() => { window.__privacyViewerState = window.__dagBuilderState; });
+
+  const [policy] = await Promise.all([
+    page.waitForEvent("popup"),
+    page.locator(".legal-link").click(),
+  ]);
+  await expect(policy).toHaveURL(`${viewer}privacy.html`);
+  await expect(policy.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
+  expect(await page.evaluate(() => window.__dagBuilderState === window.__privacyViewerState)).toBe(true);
+  await policy.close();
+  await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
+});
+
 test("password gate rejects an incorrect entry and unlocks with the preview password", async ({ page }) => {
   await page.goto(viewer);
   await expect(page.locator("#passwordGate")).toBeVisible();
