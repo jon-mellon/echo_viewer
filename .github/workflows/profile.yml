@@ -19,14 +19,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npx playwright install --with-deps chromium firefox
+      - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - run: npm run profile
       - run: PROFILE_DEVICE=mobile npm run profile
-      - run: PROFILE_BROWSER=firefox npm run profile
       - run: PROFILE_SCENARIO=permalink npm run profile
       - run: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile npm run profile
-      - run: PROFILE_SCENARIO=permalink PROFILE_BROWSER=firefox npm run profile
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -34,8 +32,6 @@ jobs:
           path: |
             profile-results/
             profile-results-mobile/
-            profile-results-firefox/
             profile-results-permalink/
             profile-results-permalink-mobile/
-            profile-results-permalink-firefox/
           retention-days: 1
