@@ -37,7 +37,14 @@ export function attachDagInteractions(network, element, actions) {
   let constrainingViewport = false;
   let lastTouchAt = -Infinity;
   let tappedCandidateId = null;
-  const rememberTouch = () => { lastTouchAt = Date.now(); };
+  let touchStart = null;
+  let previousTap = null;
+  let handledTouchDoubleTapAt = -Infinity;
+  const rememberTouch = event => {
+    lastTouchAt = Date.now();
+    const touch = event?.touches?.length === 1 ? event.touches[0] : null;
+    touchStart = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
   const isTouchGesture = event => {
     const source = event?.event?.srcEvent || event?.event;
     if (source?.pointerType) return source.pointerType === "touch";
@@ -51,6 +58,28 @@ export function attachDagInteractions(network, element, actions) {
     if (!tappedCandidateId) return;
     tappedCandidateId = null;
     actions.clearPathHover();
+  };
+  const onTouchEnd = event => {
+    const touch = event.changedTouches?.[0];
+    if (!touch || event.touches?.length || !touchStart) return;
+    const x = touch.clientX, y = touch.clientY;
+    const moved = Math.hypot(x - touchStart.x, y - touchStart.y);
+    touchStart = null;
+    if (moved > 12) { previousTap = null; return; }
+    const rect = element.getBoundingClientRect();
+    const id = network.getNodeAt?.({ x: x - rect.left, y: y - rect.top });
+    const now = Date.now();
+    if (id && actions.hasGroup(id) && previousTap?.id === id
+      && now - previousTap.at <= 400
+      && Math.hypot(x - previousTap.x, y - previousTap.y) <= 24) {
+      event.preventDefault();
+      previousTap = null;
+      handledTouchDoubleTapAt = now;
+      clearTappedCandidate();
+      actions.focusGroup(id);
+      return;
+    }
+    previousTap = id && actions.hasGroup(id) ? { id, x, y, at: now } : null;
   };
   const constrainViewport = () => {
     if (constrainingViewport) return;
@@ -113,6 +142,7 @@ export function attachDagInteractions(network, element, actions) {
       }
     },
     doubleClick(event) {
+      if (isTouchGesture(event) && Date.now() - handledTouchDoubleTapAt < 400) return;
       // vis-network reports the current selection here, which we intentionally
       // clear after a single tap. Hit-test the second tap before treating it as
       // a double-click on empty space.
@@ -150,11 +180,13 @@ export function attachDagInteractions(network, element, actions) {
   handlers.click = clearOnBackgroundTap;
   for (const [name, handler] of Object.entries(handlers)) network.on(name, handler);
   element.addEventListener("touchstart", rememberTouch, { passive: true });
+  element.addEventListener("touchend", onTouchEnd, { passive: false });
   element.addEventListener("pointerdown", rememberTouchPointer);
   element.addEventListener("mouseleave", leave);
   return () => {
     for (const [name, handler] of Object.entries(handlers)) network.off(name, handler);
     element.removeEventListener("touchstart", rememberTouch);
+    element.removeEventListener("touchend", onTouchEnd);
     element.removeEventListener("pointerdown", rememberTouchPointer);
     element.removeEventListener("mouseleave", leave);
   };

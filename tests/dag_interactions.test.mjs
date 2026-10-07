@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { constrainViewPosition } from "../site/dag_interactions.mjs";
+import { attachDagInteractions, constrainViewPosition } from "../site/dag_interactions.mjs";
 
 test("DAG viewport keeps part of the graph visible", () => {
   const bounds = { left: -100, right: 100, top: -50, bottom: 50 };
@@ -32,4 +32,39 @@ test("DAG viewport cannot stop at an empty corner of a sparse extent", () => {
     return x >= 32 && x <= 168 && y >= 32 && y <= 168;
   });
   assert.equal(visible, true);
+});
+
+test("a second touch on a node opens its definition before zoom", () => {
+  const handlers = new Map(), listeners = new Map(), calls = [];
+  const network = {
+    on: (name, handler) => handlers.set(name, handler),
+    off: name => handlers.delete(name),
+    getNodeAt: point => point.x === 30 ? "candidate" : undefined,
+    unselectAll() {},
+  };
+  const element = {
+    addEventListener: (name, handler) => listeners.set(name, handler),
+    removeEventListener: name => listeners.delete(name),
+    getBoundingClientRect: () => ({ left: 10, top: 20 }),
+  };
+  const detach = attachDagInteractions(network, element, {
+    hasGroup: id => id === "candidate", isDiagnosticCandidate: () => true,
+    clearPathHover: () => {}, clearEdgeHover: () => {}, highlightPaths: () => calls.push("paths"),
+    focusGroup: () => calls.push("definition"), zoomToPoint: () => calls.push("zoom"),
+  });
+  const touch = { clientX: 40, clientY: 50 };
+  const tap = () => {
+    listeners.get("touchstart")({ touches: [touch] });
+    let prevented = false;
+    listeners.get("touchend")({ changedTouches: [touch], touches: [], preventDefault: () => { prevented = true; } });
+    return prevented;
+  };
+  assert.equal(tap(), false);
+  assert.equal(tap(), true);
+  assert.deepEqual(calls, ["definition"]);
+  handlers.get("doubleClick")({ nodes: [], edges: [], pointer: { DOM: { x: 30, y: 30 }, canvas: { x: 0, y: 0 } } });
+  assert.deepEqual(calls, ["definition"]);
+  detach();
+  assert.equal(handlers.size, 0);
+  assert.equal(listeners.size, 0);
 });
