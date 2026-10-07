@@ -30,7 +30,10 @@ export function createDagSetupGroupController({
 }) {
   function renderMode() {
     if (state.interfaceMode === "dag2") {
-      elements.setupSection.hidden = false;
+      const iv = groupById(state.project?.iv_group_id);
+      const dv = groupById(state.project?.dv_group_id);
+      elements.setupSection.hidden = anchorHasMembers(state, iv) && anchorHasMembers(state, dv)
+        && !state.changingAnchorSide && !state.definitionDraft;
       elements.groupListPanel.hidden = true;
       elements.groupingPanel.hidden = false;
       return;
