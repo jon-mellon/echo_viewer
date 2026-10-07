@@ -52,7 +52,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     elements.toggleExclusionViolations.classList.toggle("active", state.showExclusionViolations);
     elements.toggleExclusionViolations.setAttribute("aria-pressed", state.showExclusionViolations ? "true" : "false");
     elements.toggleExclusionViolations.textContent = `Exclusion restriction violations (${state.exclusionViolationIds?.size || 0})`;
-    elements.toggleExclusionViolations.title = `Show directed paths from the instrument to the DV through at least one other group, never through the IV, within ${state.confounderMaxPathLength} links.`;
+    elements.toggleExclusionViolations.title = `Show directed paths from the instrument to the DV through at least one other group, never through the IV, within ${state.exclusionMaxPathLength} links.`;
     elements.toggleConfoundersOnly.disabled = !anchorsReady;
     elements.toggleConfoundersOnly.classList.toggle("active", state.showConfoundersOnly);
     elements.toggleConfoundersOnly.setAttribute("aria-pressed", state.showConfoundersOnly ? "true" : "false");
@@ -69,7 +69,9 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
       ? `Show the IV, DV, and ${colliderCount} potential common descendant${colliderCount === 1 ? "" : "s"} reachable from both anchors within ${state.confounderMaxPathLength} directed edge${state.confounderMaxPathLength === 1 ? "" : "s"}. Bidirectional edges are treated pessimistically as possibly running either way.`
       : "Select an IV and DV before filtering to colliders.";
     elements.confounderPathLength.disabled = !anchorsReady;
-    elements.confounderPathLength.value = String(state.confounderMaxPathLength);
+    elements.confounderPathLength.min = state.showExclusionViolations ? "2" : "1";
+    elements.confounderPathLength.value = String(state.showExclusionViolations
+      ? state.exclusionMaxPathLength : state.confounderMaxPathLength);
     elements.confounderPathLength.title = anchorsReady
       && state.showExclusionViolations ? "Maximum number of directed links from the instrument to the DV, through at least one other group and never through the IV." : anchorsReady
       ? `Maximum directed-edge length of each qualifying ${state.showCollidersOnly ? "anchor-to-collider" : "confounder-to-anchor"} path. Intermediate path nodes are shown; a path cannot pass through the other anchor.`

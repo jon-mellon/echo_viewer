@@ -79,6 +79,17 @@ test("an instrument permalink restores the exclusive exclusion view", () => {
   assert.equal(state.showExclusionViolations, true);
   assert.equal(state.showConfoundersOnly, false);
   assert.equal(state.showCollidersOnly, false);
+  assert.equal(state.exclusionMaxPathLength, 2);
+  assert.equal(state.confounderMaxPathLength, 1);
+  state.exclusionMaxPathLength = 4;
+  const href = buildPermalink({ location: { href: "http://localhost:8767/" },
+    schemaUrl: "/config/schema/", dataVersion: "snapshot-7", state });
+  const restored = { project: structuredClone(state.project), seeds: { iv: new Set(), dv: new Set() } };
+  applyPermalink(new URL(href).searchParams, restored);
+  assert.equal(restored.exclusionMaxPathLength, 4);
+  assert.equal(restored.confounderMaxPathLength, 1);
+  applyPermalink(new URLSearchParams("p=1&iv=cause&dv=outcome&instrument=instrument&exclusion_path=1"), restored);
+  assert.equal(restored.exclusionMaxPathLength, 2);
 });
 
 test("edited or imported schemas are not shareable", () => {

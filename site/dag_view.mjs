@@ -20,6 +20,7 @@ export function deriveDagView({
   dvId = null,
   instrumentId = null,
   maxPathLength = 1,
+  exclusionMaxPathLength = maxPathLength,
   excludeBottlenecked = false,
   filterByCausalRelevance = false,
   showConfoundersOnly = false,
@@ -40,7 +41,7 @@ export function deriveDagView({
   const confounderGraph = filterGraphByConfounders(fullGraph, diagnosticOptions);
   const colliderGraph = filterGraphByColliders(fullGraph, diagnosticOptions);
   const exclusionGraph = filterGraphByExclusionViolations(fullGraph, {
-    instrumentId, ivId, dvId, maxPathLength, traversableLink,
+    instrumentId, ivId, dvId, maxPathLength: exclusionMaxPathLength, traversableLink,
   });
   const componentGraph = connectedComponentGraph(connectivityGraph, ivId);
   const canFilterFromIv = filterByCausalRelevance && connectivityGraph.nodeIds.has(ivId);

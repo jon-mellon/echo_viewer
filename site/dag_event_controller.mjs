@@ -156,14 +156,19 @@ function installHandlers() {
   });
   els.confounderPathLength.addEventListener("input", () => {
     const requested = Math.trunc(Number(els.confounderPathLength.value));
-    if (!Number.isFinite(requested) || requested < 1) return;
-    state.confounderMaxPathLength = clampNumber(requested, 1, 99);
-    els.confounderPathLength.value = String(state.confounderMaxPathLength);
+    const minimum = state.showExclusionViolations ? 2 : 1;
+    if (!Number.isFinite(requested) || requested < minimum) return;
+    const field = state.showExclusionViolations ? "exclusionMaxPathLength" : "confounderMaxPathLength";
+    state[field] = clampNumber(requested, minimum, 99);
+    els.confounderPathLength.value = String(state[field]);
     if (!state.showCollidersOnly && !state.showExclusionViolations) state.showConfoundersOnly = true;
     rebuildProject();
   });
   els.confounderPathLength.addEventListener("change", () => {
-    if (!els.confounderPathLength.value) els.confounderPathLength.value = String(state.confounderMaxPathLength);
+    const field = state.showExclusionViolations ? "exclusionMaxPathLength" : "confounderMaxPathLength";
+    if (Number(els.confounderPathLength.value) < (state.showExclusionViolations ? 2 : 1)) {
+      els.confounderPathLength.value = String(state[field]);
+    }
   });
   els.toggleBottleneckedConfounders.addEventListener("click", () => {
     state.excludeBottleneckedConfounders = !state.excludeBottleneckedConfounders;

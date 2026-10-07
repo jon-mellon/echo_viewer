@@ -356,7 +356,7 @@ function renderDag({ reuseGeometry = false } = {}) {
     viewSignature: state.showConfoundersOnly
       ? `confounders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
       : state.showExclusionViolations
-        ? `exclusion:${state.project?.instrument_group_id}:${state.confounderMaxPathLength}`
+        ? `exclusion:${state.project?.instrument_group_id}:${state.exclusionMaxPathLength}`
       : state.showCollidersOnly
         ? `colliders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
         : "all",

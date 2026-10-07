@@ -33,6 +33,7 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state }) {
     instrument: state.project.instrument_group_id || "",
     mode: state.workflowMode, vlayout: state.variableLayoutSource,
     path: String(state.confounderMaxPathLength),
+    exclusion_path: String(state.exclusionMaxPathLength ?? 2),
     selected_group: state.activeGroupId || "", selected_variable: state.selectedVariableId || "",
     selected_edge: state.selectedEdgeId || "", sort: state.groupListSort || "",
     fs: state.fullscreenPanel || "",
@@ -75,6 +76,8 @@ export function applyPermalink(params, state) {
   state.selectedUoa = null;
   state.uoaFilterEnabled = false;
   state.confounderMaxPathLength = Math.max(1, Math.min(99, Number(params.get("path")) || 1));
+  state.exclusionMaxPathLength = Math.max(2, Math.min(99,
+    Number(params.get("exclusion_path")) || (state.project.instrument_group_id ? Number(params.get("path")) : 0) || 2));
   for (const [parameter, field] of Object.entries(booleanFields)) if (params.has(parameter)) state[field] = params.get(parameter) === "1";
   if (!params.has("conf")) state.showConfoundersOnly = !params.has("coll");
   if (!params.has("coll")) state.showCollidersOnly = false;

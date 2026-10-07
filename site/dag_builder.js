@@ -996,6 +996,7 @@ function computeVisibleLinks() {
     dvId: state.project.dv_group_id,
     instrumentId: state.project.instrument_group_id,
     maxPathLength: state.confounderMaxPathLength,
+    exclusionMaxPathLength: state.exclusionMaxPathLength,
     excludeBottlenecked: state.excludeBottleneckedConfounders,
     filterByCausalRelevance: false,
     showConfoundersOnly: state.showConfoundersOnly,

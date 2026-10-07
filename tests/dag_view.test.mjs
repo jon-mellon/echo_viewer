@@ -81,4 +81,8 @@ test("instrument view finds bounded directed exclusion paths without the IV", ()
   assert.deepEqual([...view(2).componentGroupIds].sort(), ["dv", "iv", "k1", "z"]);
   assert.deepEqual(view(2).visibleLinks.map(item => item.edge_id), ["z_k1", "k1_dv"]);
   assert.deepEqual([...view(3).exclusionViolations.violationIds].sort(), ["k1", "k2"]);
+  const separateLengths = deriveDagView({ groups: instrumentGroups, links: instrumentLinks,
+    ivId: "iv", dvId: "dv", instrumentId: "z", maxPathLength: 1,
+    exclusionMaxPathLength: 2, showExclusionViolations: true });
+  assert.deepEqual([...separateLengths.exclusionViolations.violationIds], ["k1"]);
 });
