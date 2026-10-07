@@ -174,7 +174,7 @@ export function createDagInspectorController({
         h("table", { className: "provenance-table provenance-table--edge" },
           h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))),
           h("tbody", {}, section.rows.length ? section.rows.map(renderRow)
-            : h("tr", {}, h("td", { colSpan: headings.length, textContent: "No evidence records for this direction." }))))));
+            : h("tr", {}, h("td", { colSpan: headings.length, textContent: "No evidence records for this direction." })))))));
   }
 
   return { renderEdge, renderProvenance, renderGroupDefinition, selectedEdge, clearPendingExclude };
