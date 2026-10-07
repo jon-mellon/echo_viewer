@@ -218,6 +218,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       applyProjectOperation(next);
       if (draft.role === "instrument") {
         state.showExclusionViolations = true;
+        state.showExogeneity = false;
         state.showConfoundersOnly = false;
         state.showCollidersOnly = false;
       }

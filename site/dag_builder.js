@@ -132,7 +132,7 @@ function initElements() {
     // Map
     "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts",
     "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
+    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
@@ -450,6 +450,7 @@ function assignGroupAsInstrument(groupId) {
     || groupId === state.project.iv_group_id || groupId === state.project.dv_group_id)) return;
   state.project.instrument_group_id = groupId;
   state.showExclusionViolations = Boolean(groupId);
+  state.showExogeneity = false;
   state.showConfoundersOnly = !groupId;
   state.showCollidersOnly = false;
   Object.assign(state, workflow.transition(state, {
@@ -984,6 +985,7 @@ function computeVisibleLinks() {
     || !dagGroups().some(group => group.group_id === instrumentId))) {
     state.project.instrument_group_id = null;
     state.showExclusionViolations = false;
+    state.showExogeneity = false;
     state.showConfoundersOnly = true;
   }
   const excludedCount = state.project.links.filter(link => link.display_status === "excluded").length;
@@ -1002,6 +1004,7 @@ function computeVisibleLinks() {
     showConfoundersOnly: state.showConfoundersOnly,
     showCollidersOnly: state.showCollidersOnly,
     showExclusionViolations: state.showExclusionViolations,
+    showExogeneity: state.showExogeneity,
     hideIrrelevantDiagnosticLinks: state.hideIrrelevantConfounderLinks,
   });
   state.componentGroupIds = view.componentGroupIds;
@@ -1020,6 +1023,11 @@ function computeVisibleLinks() {
   state.exclusionPathIds = view.exclusionViolations.pathIds;
   state.exclusionPathsByGroup = view.exclusionViolations.pathsByGroup;
   state.exclusionLinkPairKeys = view.exclusionViolations.linkPairKeys;
+  state.exogeneityGroupIds = view.exogeneity.confounderIds;
+  state.exogeneityPathGroupIds = view.exogeneity.pathIds;
+  state.exogeneityPathsByGroup = view.exogeneity.pathsByGroup;
+  state.exogeneityLinkPairKeys = view.exogeneity.linkPairKeys;
+  state.bottleneckedExogeneityIds = view.exogeneity.bottleneckedIds;
 }
 
 function showExcludedLinks() {

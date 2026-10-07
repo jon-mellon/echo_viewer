@@ -16,9 +16,11 @@ export function createDagInspectorController({
     showConfoundersOnly: state.showConfoundersOnly,
     showCollidersOnly: state.showCollidersOnly,
     showExclusionViolations: state.showExclusionViolations,
+    showExogeneity: state.showExogeneity,
     confounderPathsByGroup: state.confounderPathsByGroup,
     colliderPathsByGroup: state.colliderPathsByGroup,
     exclusionPathsByGroup: state.exclusionPathsByGroup,
+    exogeneityPathsByGroup: state.exogeneityPathsByGroup,
   });
   const isDoi = id => typeof id === "string" && /^10\.\d{4,}\/\S+/.test(id.trim());
   const edgeSourcesLoading = link => {

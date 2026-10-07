@@ -48,6 +48,7 @@ export function buildPathHighlightModel({
   ivId,
   dvId,
   showConfoundersOnly = false,
+  showExogeneity = false,
   showExclusionViolations = false,
   confounderGroupIds = new Set(),
 }) {
@@ -101,7 +102,9 @@ export function buildPathHighlightModel({
       },
       shadow: false,
       title: `${edge.title || ""}\n${role === "exclusion" ? "Instrument-to-DV exclusion path"
-        : role === "iv" ? "Path to IV" : role === "dv" ? "Path to DV" : "Shared segment of IV and DV paths"}`.trim(),
+        : role === "iv" ? `Path to ${showExogeneity ? "instrument" : "IV"}`
+          : role === "dv" ? "Path to DV"
+            : `Shared segment of ${showExogeneity ? "instrument" : "IV"} and DV paths`}`.trim(),
     });
   }
 
@@ -115,7 +118,7 @@ export function buildPathHighlightModel({
     const toIv = ivNodeIds.has(node.id);
     const toDv = dvNodeIds.has(node.id);
     const isShared = toIv && toDv;
-    const isIntermediateConfounder = showConfoundersOnly
+    const isIntermediateConfounder = (showConfoundersOnly || showExogeneity)
       && node.id !== groupId && node.id !== ivId && node.id !== dvId
       && confounderGroupIds.has(node.id);
     const transientBackground = isIntermediateConfounder ? "#e85d75" : node.color?.background;

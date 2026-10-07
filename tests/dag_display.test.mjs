@@ -87,3 +87,22 @@ test("selected instrument adds a matching study link alongside the existing IV t
   assert.equal(edges[0].width, edges[1].width);
   assert.equal(studyDesignEdgeData(groups, { ...project, instrument_group_id: null }).length, 1);
 });
+
+test("exogeneity colors common causes while keeping the three study anchors", () => {
+  const view = {
+    showExogeneity: true, instrumentId: "z", ivId: "iv", dvId: "dv",
+    exogeneityGroupIds: new Set(["common"]),
+    exogeneityPathGroupIds: new Set(["common", "via", "z", "iv", "dv"]),
+    groupColor: "#123456",
+  };
+  const group = (group_id, type = "candidate") => ({ group_id, type, label: group_id, variable_ids: [] });
+  const candidate = display.visNodeData(group("common"), null, {}, view);
+  const mediator = display.visNodeData(group("via"), null, {}, view);
+  const instrument = display.visNodeData(group("z"), null, {}, view);
+  const iv = display.visNodeData(group("iv", "iv"), null, {}, view);
+  assert.equal(candidate.color.background, "#c62828");
+  assert.equal(mediator.color.background, "#6b7280");
+  assert.equal(instrument.color.background, "#166534");
+  assert.equal(iv.color.background, "#123456");
+  assert.equal(instrument.shape, "ellipse");
+});

@@ -35,7 +35,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     renderAssignmentCoverage();
     for (const [element, active] of [[elements.toggleVariableLabels, state.showVariableLabels],
       [elements.toggleGroupLabels, state.showGroupLabels],
-      [elements.showUnfiltered, !state.showConfoundersOnly && !state.showCollidersOnly && !state.showExclusionViolations]]) {
+      [elements.showUnfiltered, !state.showConfoundersOnly && !state.showCollidersOnly && !state.showExclusionViolations && !state.showExogeneity]]) {
       element.classList.toggle("active", active);
       element.setAttribute("aria-pressed", active ? "true" : "false");
     }
@@ -49,6 +49,12 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     elements.showUnfiltered.hidden = instrumentReady;
     elements.toggleExclusionViolations.hidden = !instrumentReady;
     elements.toggleExclusionViolations.disabled = !instrumentReady;
+    elements.toggleExogeneity.hidden = !instrumentReady;
+    elements.toggleExogeneity.disabled = !instrumentReady;
+    elements.toggleExogeneity.classList.toggle("active", state.showExogeneity);
+    elements.toggleExogeneity.setAttribute("aria-pressed", state.showExogeneity ? "true" : "false");
+    elements.toggleExogeneity.textContent = `Exogeneity (${state.exogeneityGroupIds?.size || 0})`;
+    elements.toggleExogeneity.title = `Show groups with directed paths to both the instrument and outcome within ${state.confounderMaxPathLength} links of each. Bidirectional links may run either way.`;
     elements.toggleExclusionViolations.classList.toggle("active", state.showExclusionViolations);
     elements.toggleExclusionViolations.setAttribute("aria-pressed", state.showExclusionViolations ? "true" : "false");
     elements.toggleExclusionViolations.textContent = `Exclusion restriction violations (${state.exclusionViolationIds?.size || 0})`;
@@ -74,28 +80,30 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
       ? state.exclusionMaxPathLength : state.confounderMaxPathLength);
     elements.confounderPathLength.title = anchorsReady
       && state.showExclusionViolations ? "Maximum number of directed links from the instrument to the DV, through at least one other group and never through the IV." : anchorsReady
-      ? `Maximum directed-edge length of each qualifying ${state.showCollidersOnly ? "anchor-to-collider" : "confounder-to-anchor"} path. Intermediate path nodes are shown; a path cannot pass through the other anchor.`
+      ? `Maximum directed-edge length of each qualifying ${state.showCollidersOnly ? "anchor-to-collider" : state.showExogeneity ? "common-cause-to-instrument-or-DV" : "confounder-to-anchor"} path. Intermediate path nodes are shown; a path cannot pass through the other anchor.`
       : "Select an IV and DV before setting a diagnostic path length.";
-    const bottleneckedIds = state.showCollidersOnly ? state.bottleneckedColliderIds : state.bottleneckedConfounderIds;
+    const bottleneckedIds = state.showExogeneity ? state.bottleneckedExogeneityIds
+      : state.showCollidersOnly ? state.bottleneckedColliderIds : state.bottleneckedConfounderIds;
     const bottleneckedCount = bottleneckedIds?.size || 0;
     const labels = [...(bottleneckedIds || [])].map(id => groupById(id)?.label || id).sort((a, b) => a.localeCompare(b));
-    elements.toggleBottleneckedConfounders.hidden = instrumentReady;
+    elements.toggleBottleneckedConfounders.hidden = instrumentReady && !state.showExogeneity;
     elements.toggleBottleneckedConfounders.disabled = !anchorsReady;
     elements.toggleBottleneckedConfounders.classList.toggle("active", state.excludeBottleneckedConfounders);
     elements.toggleBottleneckedConfounders.setAttribute("aria-pressed", state.excludeBottleneckedConfounders ? "true" : "false");
     elements.toggleBottleneckedConfounders.textContent = `Exclude bottlenecked (${bottleneckedCount})`;
     elements.toggleBottleneckedConfounders.title = anchorsReady
-      ? `${state.excludeBottleneckedConfounders ? "Currently excluding" : "Exclude"} ${bottleneckedCount} ${state.showCollidersOnly ? "collider" : "confounder"} candidate${bottleneckedCount === 1 ? "" : "s"} when every admissible witness-path pair shares an intermediate node within the current maximum path length.${labels.length ? ` Bottlenecked: ${labels.join(", ")}.` : ""}`
+      ? `${state.excludeBottleneckedConfounders ? "Currently excluding" : "Exclude"} ${bottleneckedCount} ${state.showCollidersOnly ? "collider" : state.showExogeneity ? "common-cause" : "confounder"} candidate${bottleneckedCount === 1 ? "" : "s"} when every admissible witness-path pair shares an intermediate node within the current maximum path length.${labels.length ? ` Bottlenecked: ${labels.join(", ")}.` : ""}`
       : "Select an IV and DV before filtering bottlenecked diagnostic candidates.";
-    const linkKeys = state.showCollidersOnly ? state.colliderLinkPairKeys : state.confounderLinkPairKeys;
+    const linkKeys = state.showExogeneity ? state.exogeneityLinkPairKeys
+      : state.showCollidersOnly ? state.colliderLinkPairKeys : state.confounderLinkPairKeys;
     const linkCount = linkKeys?.size || 0;
     elements.toggleIrrelevantConfounderLinks.disabled = !anchorsReady;
-    elements.toggleIrrelevantConfounderLinks.hidden = instrumentReady;
+    elements.toggleIrrelevantConfounderLinks.hidden = instrumentReady && !state.showExogeneity;
     elements.toggleIrrelevantConfounderLinks.classList.toggle("active", state.hideIrrelevantConfounderLinks);
     elements.toggleIrrelevantConfounderLinks.setAttribute("aria-pressed", state.hideIrrelevantConfounderLinks ? "true" : "false");
     elements.toggleIrrelevantConfounderLinks.textContent = `Path links only (${linkCount})`;
     elements.toggleIrrelevantConfounderLinks.title = anchorsReady
-      ? `Keep only the ${linkCount} logical link${linkCount === 1 ? "" : "s"} used by at least one currently displayed ${state.showCollidersOnly ? "collider's anchor-to-collider" : "confounder's candidate-to-anchor"} witness path.`
+      ? `Keep only the ${linkCount} logical link${linkCount === 1 ? "" : "s"} used by at least one currently displayed ${state.showCollidersOnly ? "collider's anchor-to-collider" : state.showExogeneity ? "common cause's paths to the instrument and DV" : "confounder's candidate-to-anchor"} witness path.`
       : "Select an IV and DV before filtering diagnostic-path links.";
     const selectedCount = state.selectedVariableIds?.size || 0;
     if (elements.selectionCount) {

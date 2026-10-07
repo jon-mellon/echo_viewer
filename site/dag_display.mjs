@@ -9,17 +9,18 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const isDv = group.type === "dv";
   const isInstrument = group.group_id === view.instrumentId;
   const isViolation = view.showExclusionViolations && view.exclusionViolationIds?.has(group.group_id);
-  const diagnosticCandidateIds = view.showCollidersOnly
+  const isExogeneityCandidate = view.showExogeneity && view.exogeneityGroupIds?.has(group.group_id);
+  const diagnosticCandidateIds = view.showExogeneity ? view.exogeneityGroupIds : view.showCollidersOnly
     ? view.colliderGroupIds
     : view.confounderGroupIds;
-  const diagnosticPathIds = view.showCollidersOnly
+  const diagnosticPathIds = view.showExogeneity ? view.exogeneityPathGroupIds : view.showCollidersOnly
     ? view.colliderPathGroupIds
     : view.confounderPathGroupIds;
   const diagnosticRole = confounderPathNodeRole({
     confounderIds: diagnosticCandidateIds,
     pathIds: diagnosticPathIds,
   }, group.group_id, {
-    ivId: view.ivId,
+    ivId: view.showExogeneity ? view.instrumentId : view.ivId,
     dvId: view.dvId,
   });
   const isConfounder = view.showConfoundersOnly
@@ -30,17 +31,17 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     && diagnosticRole === "confounder"
     && !isIv
     && !isDv;
-  const isPathMediator = (view.showConfoundersOnly || view.showCollidersOnly)
-    && diagnosticRole === "mediator";
+  const isPathMediator = (view.showConfoundersOnly || view.showCollidersOnly || view.showExogeneity)
+    && diagnosticRole === "mediator" && !isIv && !isDv && !isInstrument;
   const isSelected = group.group_id === view.activeGroupId;
-  const color = isViolation ? "#c62828" : isInstrument ? "#166534" : isConfounder ? "#c62828" : isCollider ? "#7c3aed" : isPathMediator ? "#6b7280" : view.groupColor;
-  const roleTag = isIv ? " (IV)" : isDv ? " (DV)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : "";
+  const color = isViolation ? "#c62828" : isInstrument ? "#166534" : isExogeneityCandidate ? "#c62828" : isConfounder ? "#c62828" : isCollider ? "#7c3aed" : isPathMediator ? "#6b7280" : view.groupColor;
+  const roleTag = isIv ? " (IV)" : isDv ? " (DV)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : isExogeneityCandidate ? " (potential common cause of instrument and DV)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
   return {
     id: group.group_id,
     label: wrapDagLabel(group.label, maxChars),
-    title: isConfounder || isCollider
+    title: isConfounder || isCollider || isExogeneityCandidate
       ? undefined
       : `${escapeHtml(group.label)}${roleTag} · ${group.variable_ids.length || group.member_count || 0} variables${mediatorTag}`,
     x: layoutPoint?.x || 0,
@@ -49,8 +50,8 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     mass: 1 + Math.min(3, Math.sqrt(group.variable_ids.length || group.member_count || 1) / 6),
     color: {
       background: color,
-      border: isSelected ? "#b83b5e" : isViolation ? "#7f1d1d" : isConfounder ? "#7f1d1d" : isCollider ? "#4c1d95" : isPathMediator ? "#374151" : "#fbfcfa",
-      highlight: { background: color, border: isConfounder ? "#4c0d0d" : isCollider ? "#2e1065" : isPathMediator ? "#1f2937" : "#b83b5e" },
+      border: isSelected ? "#b83b5e" : isViolation ? "#7f1d1d" : isConfounder || isExogeneityCandidate ? "#7f1d1d" : isCollider ? "#4c1d95" : isPathMediator ? "#374151" : "#fbfcfa",
+      highlight: { background: color, border: isConfounder || isExogeneityCandidate ? "#4c0d0d" : isCollider ? "#2e1065" : isPathMediator ? "#1f2937" : "#b83b5e" },
       hover: { background: color, border: "#ffffff" },
     },
     shape: (isIv || isDv || isInstrument) ? "ellipse" : "box",
@@ -58,7 +59,7 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     // Light outline keeps dense links visually separated from node bodies.
     shadow: isSelected
       ? { enabled: true, color: "rgba(184,59,94,0.45)", size: 12, x: 0, y: 0 }
-      : isConfounder
+      : isConfounder || isExogeneityCandidate
         ? { enabled: true, color: "rgba(198,40,40,0.34)", size: 11, x: 0, y: 2 }
         : isCollider
           ? { enabled: true, color: "rgba(124,58,237,0.34)", size: 11, x: 0, y: 2 }

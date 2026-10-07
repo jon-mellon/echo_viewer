@@ -86,3 +86,28 @@ test("instrument view finds bounded directed exclusion paths without the IV", ()
     exclusionMaxPathLength: 2, showExclusionViolations: true });
   assert.deepEqual([...separateLengths.exclusionViolations.violationIds], ["k1"]);
 });
+
+test("exogeneity view finds common ancestors of the instrument and outcome", () => {
+  const exogGroups = ["z", "iv", "dv", "common", "via", "through_z", "excluded"].map(group_id => ({ group_id }));
+  const exogLinks = [
+    link("common_via", "common", "via", "A_TO_B"),
+    link("via_z", "via", "z", "A_TO_B"),
+    link("common_dv", "common", "dv", "A_TO_B"),
+    link("z_iv", "z", "iv", "A_TO_B"),
+    link("iv_dv", "iv", "dv", "A_TO_B"),
+    link("through_z", "through_z", "z", "A_TO_B"),
+    link("excluded_z", "excluded", "z", "A_TO_B", { display_status: "excluded" }),
+    link("excluded_dv", "excluded", "dv", "A_TO_B"),
+  ];
+  const view = length => deriveDagView({ groups: exogGroups, links: exogLinks,
+    ivId: "iv", dvId: "dv", instrumentId: "z", maxPathLength: length,
+    showExogeneity: true, hideIrrelevantDiagnosticLinks: true });
+  assert.deepEqual([...view(1).exogeneity.confounderIds], []);
+  const result = view(2);
+  assert.deepEqual([...result.exogeneity.confounderIds], ["common"]);
+  assert.deepEqual([...result.componentGroupIds].sort(), ["common", "dv", "iv", "via", "z"]);
+  assert.deepEqual(result.visibleLinks.map(item => item.edge_id), ["common_via", "via_z", "common_dv"]);
+  assert.deepEqual(result.exogeneity.pathsByGroup.get("common"), {
+    toIv: ["common", "via", "z"], toDv: ["common", "dv"],
+  });
+});

@@ -140,17 +140,25 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
     const parameters = new URL(globalThis.location?.href || "http://localhost/").searchParams;
     const bool = (key, fallback) => parameters.has(key) ? parameters.get(key) === "1" : fallback;
     const ivId = parameters.get("iv"), dvId = parameters.get("dv");
+    const instrumentId = parameters.get("instrument");
+    const instrumentReady = Boolean(instrumentId && instrumentId !== ivId && instrumentId !== dvId
+      && schema.groups.some(group => group.group_id === instrumentId));
+    const showExogeneity = instrumentReady && bool("exog", false);
     const displayed = parameters.get("p") === "1" && ivId && dvId
       ? [...deriveDagView({
           groups: schema.groups,
           links: compiledDag.edges,
           ivId,
           dvId,
+          instrumentId: instrumentReady ? instrumentId : null,
           maxPathLength: Math.max(1, Math.min(99, Number(parameters.get("path")) || 1)),
           excludeBottlenecked: bool("bottle", true),
           filterByCausalRelevance: false,
-          showConfoundersOnly: bool("conf", !parameters.has("coll")),
-          showCollidersOnly: bool("coll", false),
+          showConfoundersOnly: !instrumentReady && bool("conf", !parameters.has("coll")),
+          showCollidersOnly: !instrumentReady && bool("coll", false),
+          showExclusionViolations: instrumentReady && !showExogeneity,
+          showExogeneity,
+          exclusionMaxPathLength: Math.max(2, Math.min(99, Number(parameters.get("exclusion_path")) || 2)),
           hideIrrelevantDiagnosticLinks: bool("paths", true),
         }).componentGroupIds]
       : [ivId, dvId].filter(Boolean);

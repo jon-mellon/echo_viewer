@@ -1,7 +1,7 @@
 export const PERMALINK_VERSION = "1";
 
 const booleanFields = {
-  conf: "showConfoundersOnly", coll: "showCollidersOnly", excl: "showExclusionViolations",
+  conf: "showConfoundersOnly", coll: "showCollidersOnly", excl: "showExclusionViolations", exog: "showExogeneity",
   bottle: "excludeBottleneckedConfounders",
   paths: "hideIrrelevantConfounderLinks", vl: "showVariableLabels", gl: "showGroupLabels",
 };
@@ -81,8 +81,9 @@ export function applyPermalink(params, state) {
   for (const [parameter, field] of Object.entries(booleanFields)) if (params.has(parameter)) state[field] = params.get(parameter) === "1";
   if (!params.has("conf")) state.showConfoundersOnly = !params.has("coll");
   if (!params.has("coll")) state.showCollidersOnly = false;
-  state.showExclusionViolations = Boolean(state.project.instrument_group_id);
-  if (state.showExclusionViolations) {
+  state.showExogeneity = Boolean(state.project.instrument_group_id && params.get("exog") === "1");
+  state.showExclusionViolations = Boolean(state.project.instrument_group_id && !state.showExogeneity);
+  if (state.showExclusionViolations || state.showExogeneity) {
     state.showConfoundersOnly = false;
     state.showCollidersOnly = false;
   }

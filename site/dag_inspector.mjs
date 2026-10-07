@@ -5,11 +5,13 @@ export function diagnosticEvidenceDirection(link, {
   showConfoundersOnly = false,
   showCollidersOnly = false,
   showExclusionViolations = false,
+  showExogeneity = false,
   confounderPathsByGroup = new Map(),
   colliderPathsByGroup = new Map(),
   exclusionPathsByGroup = new Map(),
+  exogeneityPathsByGroup = new Map(),
 } = {}) {
-  if (!link || (!showConfoundersOnly && !showCollidersOnly && !showExclusionViolations)) return null;
+  if (!link || (!showConfoundersOnly && !showCollidersOnly && !showExclusionViolations && !showExogeneity)) return null;
   if (showExclusionViolations) {
     let aToB = false, bToA = false;
     for (const path of exclusionPathsByGroup.values()) for (let index = 0; index < path.length - 1; index += 1) {
@@ -18,8 +20,9 @@ export function diagnosticEvidenceDirection(link, {
     }
     return aToB === bToA ? null : aToB ? "A_TO_B" : "B_TO_A";
   }
-  const pathsByGroup = showConfoundersOnly ? confounderPathsByGroup : colliderPathsByGroup;
-  const pathFields = showConfoundersOnly ? ["toIv", "toDv"] : ["fromIv", "fromDv"];
+  const pathsByGroup = showExogeneity ? exogeneityPathsByGroup
+    : showConfoundersOnly ? confounderPathsByGroup : colliderPathsByGroup;
+  const pathFields = showConfoundersOnly || showExogeneity ? ["toIv", "toDv"] : ["fromIv", "fromDv"];
   let aToB = false;
   let bToA = false;
   for (const paths of pathsByGroup?.values?.() || []) {

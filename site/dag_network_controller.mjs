@@ -135,7 +135,10 @@ function visNodeData(group, layoutPoint, layoutParams = {}) {
   return dagDisplay.visNodeData(group, layoutPoint, layoutParams, {
     showCollidersOnly: state.showCollidersOnly, showConfoundersOnly: state.showConfoundersOnly,
     showExclusionViolations: state.showExclusionViolations,
+    showExogeneity: state.showExogeneity,
     exclusionViolationIds: state.exclusionViolationIds,
+    exogeneityGroupIds: state.exogeneityGroupIds,
+    exogeneityPathGroupIds: state.exogeneityPathGroupIds,
     instrumentId: state.project?.instrument_group_id,
     colliderGroupIds: state.colliderGroupIds, colliderPathGroupIds: state.colliderPathGroupIds,
     confounderGroupIds: state.confounderGroupIds, confounderPathGroupIds: state.confounderPathGroupIds,
@@ -277,11 +280,13 @@ function highlightConnectedDagEdges(nodeId) {
 function highlightConfounderPaths(groupId) {
   if (_dagHoveredConfounderId === groupId) return;
   clearConfounderPathHover();
-  const candidateIds = state.showExclusionViolations ? state.exclusionViolationIds
+  const candidateIds = state.showExogeneity ? state.exogeneityGroupIds
+    : state.showExclusionViolations ? state.exclusionViolationIds
     : state.showCollidersOnly ? state.colliderGroupIds : state.confounderGroupIds;
-  if ((!state.showConfoundersOnly && !state.showCollidersOnly && !state.showExclusionViolations)
+  if ((!state.showConfoundersOnly && !state.showCollidersOnly && !state.showExclusionViolations && !state.showExogeneity)
     || !candidateIds.has(groupId)) return;
-  const rawPaths = state.showExclusionViolations
+  const rawPaths = state.showExogeneity ? state.exogeneityPathsByGroup.get(groupId)
+    : state.showExclusionViolations
     ? state.exclusionPathsByGroup.get(groupId)
     : state.showCollidersOnly
     ? state.colliderPathsByGroup.get(groupId)
@@ -308,11 +313,12 @@ function highlightConfounderPaths(groupId) {
     studyDesignEdgeId: STUDY_DESIGN_EDGE_ID,
     instrumentDesignEdgeId: STUDY_INSTRUMENT_EDGE_ID,
     groupId,
-    ivId: state.project?.iv_group_id,
+    ivId: state.showExogeneity ? state.project?.instrument_group_id : state.project?.iv_group_id,
     dvId: state.project?.dv_group_id,
     showConfoundersOnly: state.showConfoundersOnly,
+    showExogeneity: state.showExogeneity,
     showExclusionViolations: state.showExclusionViolations,
-    confounderGroupIds: state.confounderGroupIds,
+    confounderGroupIds: state.showExogeneity ? state.exogeneityGroupIds : state.confounderGroupIds,
   });
   _dagPathLaneSegments = model.laneSegments;
   _visEdges.update(model.edgeUpdates);
@@ -355,6 +361,8 @@ function renderDag({ reuseGeometry = false } = {}) {
     height: els.dagNetwork.clientHeight || 700,
     viewSignature: state.showConfoundersOnly
       ? `confounders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
+      : state.showExogeneity
+        ? `exogeneity:${state.project?.instrument_group_id}:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
       : state.showExclusionViolations
         ? `exclusion:${state.project?.instrument_group_id}:${state.exclusionMaxPathLength}`
       : state.showCollidersOnly
@@ -542,9 +550,10 @@ function attachDagNetworkHandlers(network) {
     clearPathHover: clearConfounderPathHover,
     highlightPaths: highlightConfounderPaths,
     isDiagnosticCandidate(id) {
-      const ids = state.showExclusionViolations ? state.exclusionViolationIds
+      const ids = state.showExogeneity ? state.exogeneityGroupIds
+        : state.showExclusionViolations ? state.exclusionViolationIds
         : state.showCollidersOnly ? state.colliderGroupIds : state.confounderGroupIds;
-      return (state.showConfoundersOnly || state.showCollidersOnly || state.showExclusionViolations) && ids.has(id);
+      return (state.showConfoundersOnly || state.showCollidersOnly || state.showExclusionViolations || state.showExogeneity) && ids.has(id);
     },
     hasGroup: id => Boolean(groupById(id)),
     logicalEdgeId: id => _dagEdgeSegments.get(id) || id,

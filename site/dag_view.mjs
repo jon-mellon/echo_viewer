@@ -26,6 +26,7 @@ export function deriveDagView({
   showConfoundersOnly = false,
   showCollidersOnly = false,
   showExclusionViolations = false,
+  showExogeneity = false,
   hideIrrelevantDiagnosticLinks = false,
 } = {}) {
   const fullGraph = createGraph(groups.map((group) => group.group_id), links);
@@ -43,12 +44,20 @@ export function deriveDagView({
   const exclusionGraph = filterGraphByExclusionViolations(fullGraph, {
     instrumentId, ivId, dvId, maxPathLength: exclusionMaxPathLength, traversableLink,
   });
+  const exogeneityGraph = filterGraphByConfounders(fullGraph, {
+    ...diagnosticOptions, ivId: instrumentId,
+  });
+  if (instrumentId && fullGraph.nodeIds.has(instrumentId) && fullGraph.nodeIds.has(ivId)) {
+    exogeneityGraph.nodeIds.add(ivId);
+    exogeneityGraph.metadata.pathIds.add(ivId);
+  }
   const componentGraph = connectedComponentGraph(connectivityGraph, ivId);
   const canFilterFromIv = filterByCausalRelevance && connectivityGraph.nodeIds.has(ivId);
   const anchorsReady = fullGraph.nodeIds.has(ivId) && fullGraph.nodeIds.has(dvId) && ivId !== dvId;
 
   let selectedGraph;
-  if (showExclusionViolations && anchorsReady && instrumentId) selectedGraph = exclusionGraph;
+  if (showExogeneity && anchorsReady && instrumentId) selectedGraph = exogeneityGraph;
+  else if (showExclusionViolations && anchorsReady && instrumentId) selectedGraph = exclusionGraph;
   else if (showConfoundersOnly && anchorsReady) selectedGraph = confounderGraph;
   else if (showCollidersOnly && anchorsReady) selectedGraph = colliderGraph;
   else selectedGraph = canFilterFromIv ? componentGraph : fullGraph;
@@ -58,7 +67,9 @@ export function deriveDagView({
   visibleGraph = filterGraphLinks(visibleGraph, (link) => {
     return link.display_status !== "excluded" || link.is_target_relation;
   });
-  if (showExclusionViolations && instrumentId) {
+  if (showExogeneity && instrumentId && hideIrrelevantDiagnosticLinks) {
+    visibleGraph = filterGraphByLinkPairs(visibleGraph, exogeneityGraph.metadata.linkPairKeys);
+  } else if (showExclusionViolations && instrumentId) {
     visibleGraph = filterGraphByLinkPairs(visibleGraph, exclusionGraph.metadata.linkPairKeys);
   } else if (anchorsReady && (showConfoundersOnly || showCollidersOnly) && hideIrrelevantDiagnosticLinks) {
     const retainedPairs = showCollidersOnly
@@ -74,5 +85,6 @@ export function deriveDagView({
     confounders: confounderGraph.metadata,
     colliders: colliderGraph.metadata,
     exclusionViolations: exclusionGraph.metadata,
+    exogeneity: exogeneityGraph.metadata,
   };
 }

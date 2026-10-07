@@ -92,6 +92,21 @@ test("an instrument permalink restores the exclusive exclusion view", () => {
   assert.equal(restored.exclusionMaxPathLength, 2);
 });
 
+test("instrument permalink restores exogeneity when selected", () => {
+  const state = { project: structuredClone(project), seeds: { iv: new Set(), dv: new Set() } };
+  state.project.groups.push({ group_id: "instrument", label: "Instrument", variable_ids: ["v3"] });
+  applyPermalink(new URLSearchParams("p=1&iv=cause&dv=outcome&instrument=instrument&exog=1&path=3"), state);
+  assert.equal(state.showExogeneity, true);
+  assert.equal(state.showExclusionViolations, false);
+  assert.equal(state.confounderMaxPathLength, 3);
+  const href = buildPermalink({ location: { href: "http://localhost:8767/" },
+    schemaUrl: "/config/schema/", dataVersion: "snapshot-7", state });
+  const restored = { project: structuredClone(state.project), seeds: { iv: new Set(), dv: new Set() } };
+  applyPermalink(new URL(href).searchParams, restored);
+  assert.equal(restored.showExogeneity, true);
+  assert.equal(restored.showExclusionViolations, false);
+});
+
 test("edited or imported schemas are not shareable", () => {
   assert.equal(schemaMatchesProject(schema, project), true);
   const edited = structuredClone(project);
