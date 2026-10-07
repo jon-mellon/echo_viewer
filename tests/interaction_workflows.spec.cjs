@@ -184,10 +184,10 @@ test("evidence keeps available fields visible while concept labels load", async 
   });
   expect(edgeId).toBeTruthy();
   await expect(page.locator("#provenancePanel .concept-loading").first()).toBeVisible();
-  const firstRow = page.locator("#provenancePanel tbody tr").first();
-  await expect(firstRow.locator("td").first()).not.toBeEmpty();
-  await expect(firstRow.locator("td").nth(2)).not.toBeEmpty();
-  await expect(firstRow.locator(".concept-loading .inline-spinner").first()).toBeVisible();
+  const loadingRow = page.locator("#provenancePanel tbody tr").filter({ has: page.locator(".concept-loading") }).first();
+  await expect(loadingRow.locator("td").first()).not.toBeEmpty();
+  await expect(loadingRow.locator("td").nth(2)).not.toBeEmpty();
+  await expect(loadingRow.locator(".concept-loading .inline-spinner").first()).toBeVisible();
   expect((await page.locator("#provenancePanel .concept-loading").allTextContents())
     .every(text => text.trim() === "Loading…")).toBe(true);
   await page.evaluate(() => window.__releaseConceptLabels());
