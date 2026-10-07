@@ -241,6 +241,43 @@ test("Map tab returns from mobile evidence to the DAG", async ({ page }) => {
   await expect(page.locator('button[data-mobile-panel="dag"]')).toHaveAttribute("aria-pressed", "true");
 });
 
+test("pinching the mobile variable map zooms the map without selecting a variable", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto(viewer);
+  await ready(page);
+  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await expect(page.locator('#definitionSourceList input[data-source-id]').first()).toBeVisible();
+  await page.locator('#definitionSourceList input[data-source-id]').first().check();
+  await page.locator('#definitionContinue').click();
+  await page.locator('button[data-mobile-panel="variables"]').click();
+  const canvas = page.locator('#dagMapCanvas');
+  await expect(canvas).toBeVisible();
+  await expect.poll(() => canvas.evaluate(node => node.width)).toBeGreaterThan(100);
+  expect(await canvas.evaluate(node => getComputedStyle(node).touchAction)).toBe('none');
+
+  const box = await canvas.boundingBox();
+  const centerX = box.x + box.width / 2;
+  const centerY = box.y + box.height / 2;
+  const before = await page.evaluate(() => window.__dagBuilderState.map.transform.scale);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
+  const point = (x, id) => ({ x, y: centerY, id });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart', touchPoints: [point(centerX - 30, 1)],
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart', touchPoints: [point(centerX - 30, 1), point(centerX + 30, 2)],
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchMove', touchPoints: [point(centerX - 65, 1), point(centerX + 65, 2)],
+  });
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.map.transform.scale)).toBeGreaterThan(before);
+  expect(await page.evaluate(() => window.__dagBuilderState.selectedVariableIds.size)).toBe(0);
+});
+
 test("project export can be imported with its anchors intact", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);

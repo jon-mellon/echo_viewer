@@ -899,6 +899,7 @@ h2 {
   width: 100%;
   height: 100%;
   cursor: grab;
+  touch-action: none;
 }
 
 #dagMapCanvas.brush-mode {
@@ -1516,6 +1517,7 @@ h2 {
 .dag-network {
   width: 100%;
   height: 100%;
+  touch-action: none;
   background:
     radial-gradient(circle at 18% 18%, rgba(32, 129, 112, 0.075), transparent 30%),
     radial-gradient(circle at 86% 22%, rgba(49, 95, 157, 0.065), transparent 28%),

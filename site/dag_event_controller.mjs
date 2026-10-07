@@ -254,6 +254,18 @@ function installHandlers() {
 
 function installMapHandlers() {
   const canvas = state.map.canvas;
+  const touchPoints = new Map();
+  const pinchedPointers = new Set();
+  let pinch = null;
+
+  function pinchGeometry() {
+    const [first, second] = [...touchPoints.values()];
+    return {
+      x: (first.x + second.x) / 2,
+      y: (first.y + second.y) / 2,
+      distance: Math.hypot(second.x - first.x, second.y - first.y),
+    };
+  }
 
   // Suppress browser context menu so right-click can be used for draw+
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
@@ -270,6 +282,20 @@ function installMapHandlers() {
   });
 
   canvas.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "touch") {
+      touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      canvas.setPointerCapture(event.pointerId);
+      if (touchPoints.size >= 2) {
+        for (const id of touchPoints.keys()) pinchedPointers.add(id);
+        pinch = pinchGeometry();
+        state.map.brush = null;
+        state.map.dragging = false;
+        state.map.dragStart = null;
+        state.map.moved = true;
+        canvas.classList.remove("dragging");
+        return;
+      }
+    }
     const rect = canvas.getBoundingClientRect();
     const { x, y } = mapInteractions.eventPoint(event, rect);
 
@@ -329,6 +355,24 @@ function installMapHandlers() {
   });
 
   canvas.addEventListener("pointermove", (event) => {
+    if (touchPoints.has(event.pointerId)) {
+      touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pinch && touchPoints.size >= 2) {
+        const next = pinchGeometry();
+        const rect = canvas.getBoundingClientRect();
+        Object.assign(state.map.transform, constrainMapTransform({
+          ...state.map.transform,
+          tx: state.map.transform.tx + next.x - pinch.x,
+          ty: state.map.transform.ty + next.y - pinch.y,
+        }));
+        if (pinch.distance > 0 && next.distance > 0) {
+          zoomMap(next.x - rect.left, next.y - rect.top, next.distance / pinch.distance, true);
+        }
+        pinch = next;
+        return;
+      }
+      if (pinchedPointers.has(event.pointerId)) return;
+    }
     if (state.map.brush) {
       const rect = canvas.getBoundingClientRect();
       const point = mapInteractions.eventPoint(event, rect);
@@ -349,6 +393,15 @@ function installMapHandlers() {
   });
 
   canvas.addEventListener("pointerup", (event) => {
+    if (touchPoints.has(event.pointerId)) {
+      touchPoints.delete(event.pointerId);
+      if (pinchedPointers.has(event.pointerId)) {
+        pinchedPointers.delete(event.pointerId);
+        pinch = touchPoints.size >= 2 ? pinchGeometry() : null;
+        drawMap();
+        return;
+      }
+    }
     if (state.map.brush) {
       if (state.map.brush.action === "select_vars") {
         applyBrush();
@@ -389,6 +442,17 @@ function installMapHandlers() {
     canvas.classList.remove("dragging");
     // Interactive frames suppress DOM labels. Restore them once panning ends.
     if (moved) drawMap();
+  });
+
+  canvas.addEventListener("pointercancel", (event) => {
+    touchPoints.delete(event.pointerId);
+    pinchedPointers.delete(event.pointerId);
+    pinch = touchPoints.size >= 2 ? pinchGeometry() : null;
+    state.map.brush = null;
+    state.map.dragging = false;
+    state.map.dragStart = null;
+    canvas.classList.remove("dragging");
+    drawMap();
   });
 
   canvas.addEventListener("pointerleave", () => {
