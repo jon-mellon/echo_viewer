@@ -40,9 +40,14 @@ test("DAG2 anchor picker follows missing anchors even when restored workflow fla
   assert.equal(dag2AnchorPickerIsActive(restored, "iv", groupById), false);
   assert.equal(dag2AnchorPickerIsActive(restored, "dv", groupById), true);
   restored.project.dv_group_id = "dv";
+  restored.changingAnchorSide = "instrument";
+  assert.equal(dag2AnchorPickerIsActive(restored, "instrument", groupById), true);
+  assert.equal(dag2AnchorPickerIsActive(restored, "iv", groupById), false);
+  assert.equal(dag2AnchorPickerIsActive(restored, "dv", groupById), false);
   restored.changingAnchorSide = "iv";
   assert.equal(dag2AnchorPickerIsActive(restored, "iv", groupById), true);
   assert.equal(dag2AnchorPickerIsActive(restored, "dv", groupById), false);
+  assert.equal(dag2AnchorPickerIsActive(restored, "instrument", groupById), false);
 });
 
 test("a permalink keeps its restored anchors while published memberships hydrate", () => {

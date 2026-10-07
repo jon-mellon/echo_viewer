@@ -106,9 +106,10 @@ function initElements() {
     "modeSwitcher",
     // Setup section
     "setupSection", "currentStepTitle",
-    "dvSearchBlock", "ivSearchBlock",
+    "dvSearchBlock", "ivSearchBlock", "instrumentSearchBlock",
     "dvInput", "dvInputLabel", "dvDefineNew", "dvSeeds", "dvResults", "dvGroupPicker",
     "ivInput", "ivInputLabel", "ivDefineNew", "ivSeeds", "ivResults", "ivGroupPicker",
+    "instrumentInput", "instrumentDefineNew", "instrumentGroupPicker",
     "schemaChoice", "loadSchema", "skipSchema",
     "definitionBlock", "definitionTitle", "definitionCancel", "definitionSourcesStep",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue",
@@ -119,7 +120,7 @@ function initElements() {
     "definitionManualReview", "definitionValidation", "definitionReviewBack", "definitionSave",
     "workflowHint", "dagStatusBadge",
     "variablePanel", "variablePanelDisclosure", "variablePanelCount", "variablePanelList",
-    "anchorBar", "anchorDvLabel", "anchorIvLabel", "instrumentRow", "instrumentSearch", "instrumentSelect", "instrumentDefineNew", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn",
+    "anchorBar", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn",
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",
     // Grouping schema
@@ -401,22 +402,22 @@ function renderModeUI() {
   setupGroupController.renderMode();
 }
 
-// Show the current IV/DV anchors with a "Change" button outside Setup, so the user can
-// re-pick either anchor at any time. Change returns to the corresponding Setup picker;
-// the current anchor remains intact until a replacement is confirmed.
+// Show the selected groups with Change buttons. Change opens the matching Setup
+// picker; the current selection remains intact until a replacement is confirmed.
 function renderAnchorBar() {
   setupGroupController.renderAnchorBar();
 }
 
 function changeAnchor(side) {
-  const gid = side === "dv" ? state.project?.dv_group_id : state.project?.iv_group_id;
+  const gid = side === "dv" ? state.project?.dv_group_id
+    : side === "instrument" ? state.project?.instrument_group_id : state.project?.iv_group_id;
   const group = groupById(gid);
-  if (!group) return;
+  if (side !== "instrument" && !group) return;
   Object.assign(state, workflow.transition(state, { type: "change-anchor", side, groupId: gid }));
-  const input = side === "dv" ? els.dvInput : els.ivInput;
+  const input = side === "dv" ? els.dvInput : side === "instrument" ? els.instrumentInput : els.ivInput;
   if (input) input.value = "";
   setMapMode("select");
-  fitMap(group.variable_ids);
+  if (group) fitMap(group.variable_ids);
   renderAll({ rebuild: false });
   setTimeout(() => { input?.focus(); }, 60);
 }
@@ -441,6 +442,22 @@ function renderSetupGroupPickers() {
 
 function renderSetupGroupPicker(side) {
   setupGroupController.renderSetupPicker(side);
+}
+
+function assignGroupAsInstrument(groupId) {
+  const group = groupId ? groupById(groupId) : null;
+  if (groupId && (!group?.variable_ids?.length
+    || groupId === state.project.iv_group_id || groupId === state.project.dv_group_id)) return;
+  state.project.instrument_group_id = groupId;
+  state.showExclusionViolations = Boolean(groupId);
+  state.showConfoundersOnly = !groupId;
+  state.showCollidersOnly = false;
+  Object.assign(state, workflow.transition(state, {
+    type: "anchor-selected", side: "instrument", groupId,
+  }));
+  setMapMode("select");
+  if (group) fitMap(group.variable_ids);
+  renderAll();
 }
 
 
@@ -1349,7 +1366,8 @@ const mapUiController = createDagMapUiController({
 
 const setupGroupController = createDagSetupGroupController({
   state, elements: els, escapeHtml, normalized, truncate, groupById,
-  assignGroupAsAnchor, setMapMode, renderAll, roleLabels: ROLE_LABELS, dagProjectView, startDefinition,
+  assignGroupAsAnchor, assignGroupAsInstrument, setMapMode, renderAll,
+  roleLabels: ROLE_LABELS, dagProjectView, startDefinition,
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
   searchAnchorGroups,
 });
@@ -1486,7 +1504,7 @@ const eventController = createDagEventController({
   state, elements: els, dagNetwork: dagNetworkController,
   renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
   renderSearch, fitSearchContext, prefetchVariableSearch: loadVariableSearchCatalog,
-  toggleAnchorSearchMode, finishSchemaChoice, changeAnchor, renderAnchorBar,
+  toggleAnchorSearchMode, finishSchemaChoice, changeAnchor, renderSetupGroupPicker,
   setWorkflowMode, renderGroupList, closeGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,

@@ -10,6 +10,8 @@ export function dag2AnchorPickerIsActive(state, side, groupById) {
   const dvSet = anchorHasMembers(state, dv);
   const changingIv = state.changingAnchorSide === "iv";
   const changingDv = state.changingAnchorSide === "dv";
+  if (side === "instrument") return ivSet && dvSet
+    && state.changingAnchorSide === "instrument";
   return side === "iv"
     ? !ivSet || changingIv
     : ivSet && (!dvSet || changingDv) && !changingIv;
@@ -22,7 +24,8 @@ function anchorHasMembers(state, group) {
 
 export function createDagSetupGroupController({
   state, elements, escapeHtml, normalized, truncate, groupById,
-  assignGroupAsAnchor, setMapMode, renderAll, roleLabels, dagProjectView, startDefinition,
+  assignGroupAsAnchor, assignGroupAsInstrument, setMapMode, renderAll,
+  roleLabels, dagProjectView, startDefinition,
   canEditSplit = () => false, searchAnchorGroups = searchModel.searchAnchorGroups,
 }) {
   function renderMode() {
@@ -54,18 +57,9 @@ export function createDagSetupGroupController({
     if (elements.editSplitDv) elements.editSplitDv.hidden = !dvSet || !canEditSplit(dv);
     if (elements.instrumentRow) {
       elements.instrumentRow.hidden = !ivSet || !dvSet;
-      const selected = state.project.instrument_group_id;
-      const query = normalized(elements.instrumentSearch.value);
-      const options = [h("option", { value: "", textContent: "None" }),
-        ...(state.project.groups || [])
-          .filter(group => group.group_id !== state.project.iv_group_id
-            && group.group_id !== state.project.dv_group_id && anchorHasMembers(state, group))
-          .filter(group => group.group_id === selected
-            || searchModel.anchorGroupSearchMatch(group, query, 0, state.variableById).matches)
-          .sort((a, b) => (a.label || a.group_id).localeCompare(b.label || b.group_id))
-          .map(group => h("option", { value: group.group_id, textContent: group.label || group.group_id }))];
-      replaceChildren(elements.instrumentSelect, options);
-      elements.instrumentSelect.value = options.some(option => option.value === selected) ? selected : "";
+      const instrument = groupById(state.project.instrument_group_id);
+      elements.anchorInstrumentLabel.textContent = instrument?.label || "None";
+      elements.anchorInstrumentLabel.title = instrument?.label || "No instrument selected";
     }
   }
 
@@ -110,6 +104,7 @@ export function createDagSetupGroupController({
       select_dv: "Search the existing groups for the outcome, or choose Define new group to build a new dependent-variable group from raw variables.",
       define_dv: "Use Draw + / Draw − to adjust the dependent-variable group boundary. Confirm when the group is substantively correct.",
       select_iv: "Search the existing groups for the independent variable, or choose Define new group to build a new group from raw variables.",
+      select_instrument: "Choose an optional instrument from an existing group, define a new group, or select None.",
       define_iv: "Adjust the independent-variable group boundary. Confirm when satisfied.",
       schema_choice: "Choose whether to load the default grouping schema. Loaded groups participate in the DAG immediately.",
     };
@@ -129,6 +124,7 @@ export function createDagSetupGroupController({
           : "Only canonical variables from the selected categories are available in the spatial view.";
         elements.ivSearchBlock.hidden = true;
         elements.dvSearchBlock.hidden = true;
+        elements.instrumentSearchBlock.hidden = true;
         elements.schemaChoice.hidden = true;
         return;
       }
@@ -136,18 +132,23 @@ export function createDagSetupGroupController({
       const ivSet = anchorHasMembers(state, iv), dvSet = anchorHasMembers(state, dv);
       const changingIv = state.changingAnchorSide === "iv";
       const changingDv = state.changingAnchorSide === "dv";
+      const changingInstrument = state.changingAnchorSide === "instrument" && ivSet && dvSet;
       elements.currentStepTitle.textContent = !ivSet || changingIv
         ? "Select independent variable"
-        : !dvSet || changingDv ? "Select dependent variable" : "Working causal map";
-      elements.dagStatusBadge.textContent = ivSet && dvSet ? "Ready" : ivSet ? "Select DV" : "Select IV";
-      elements.dagStatusBadge.className = `status-pill${ivSet && dvSet ? " muted" : ""}`;
+        : !dvSet || changingDv ? "Select dependent variable"
+          : changingInstrument ? "Select instrument (optional)" : "Working causal map";
+      elements.dagStatusBadge.textContent = changingInstrument ? "Instrument"
+        : ivSet && dvSet ? "Ready" : ivSet ? "Select DV" : "Select IV";
+      elements.dagStatusBadge.className = `status-pill${ivSet && dvSet && !changingInstrument ? " muted" : ""}`;
       elements.workflowHint.textContent = !ivSet || changingIv
         ? "Choose the independent-variable group from the default schema."
         : !dvSet || changingDv
           ? "Choose the dependent-variable group."
-          : "The overall DAG is ready.";
+          : changingInstrument ? "Choose an instrument, define a new group, or select None."
+            : "The overall DAG is ready.";
       elements.ivSearchBlock.hidden = ivSet && !changingIv;
       elements.dvSearchBlock.hidden = !ivSet || (dvSet && !changingDv) || changingIv;
+      elements.instrumentSearchBlock.hidden = !changingInstrument;
       elements.schemaChoice.hidden = true;
       return;
     }
@@ -157,8 +158,10 @@ export function createDagSetupGroupController({
       return;
     }
     const labels = { select_dv: "Select DV", define_dv: "Define DV", select_iv: "Select IV",
+      select_instrument: "Instrument",
       define_iv: "Define IV", schema_choice: "Schema", build: "Build map" };
     const titles = { select_dv: "Select dependent variable",
+      select_instrument: "Select instrument (optional)",
       define_dv: "Define dependent-variable group", select_iv: "Select independent variable",
       define_iv: "Define independent-variable group", schema_choice: "Load candidate grouping schema?", build: "Build causal map" };
     elements.currentStepTitle.textContent = titles[state.phase] || "Build causal map";
@@ -167,11 +170,13 @@ export function createDagSetupGroupController({
     elements.workflowHint.textContent = hint();
     elements.dvSearchBlock.hidden = state.phase !== "select_dv";
     elements.ivSearchBlock.hidden = state.phase !== "select_iv";
+    elements.instrumentSearchBlock.hidden = state.phase !== "select_instrument";
     elements.schemaChoice.hidden = state.phase !== "schema_choice";
   }
 
   function renderSetupPicker(side) {
-    const container = side === "dv" ? elements.dvGroupPicker : elements.ivGroupPicker;
+    const container = side === "dv" ? elements.dvGroupPicker
+      : side === "instrument" ? elements.instrumentGroupPicker : elements.ivGroupPicker;
     if (!container) return;
     const pickerIsActive = state.interfaceMode === "dag2"
       ? dag2AnchorPickerIsActive(state, side, groupById)
@@ -179,12 +184,15 @@ export function createDagSetupGroupController({
     if (state.definitionDraft || !pickerIsActive) {
       container.hidden = true; container.replaceChildren(); return;
     }
-    const input = side === "dv" ? elements.dvInput : elements.ivInput;
+    const input = side === "dv" ? elements.dvInput
+      : side === "instrument" ? elements.instrumentInput : elements.ivInput;
     const label = side === "dv" ? elements.dvInputLabel : elements.ivInputLabel;
     const toggle = side === "dv" ? elements.dvDefineNew : elements.ivDefineNew;
-    const isNew = state.anchorSearchMode[side] === "new";
-    label.textContent = isNew ? "Search raw variables" : "Search existing groups";
-    toggle.textContent = isNew ? "Back to existing groups" : "Define new group";
+    const isNew = side !== "instrument" && state.anchorSearchMode[side] === "new";
+    if (side !== "instrument") {
+      label.textContent = isNew ? "Search raw variables" : "Search existing groups";
+      toggle.textContent = isNew ? "Back to existing groups" : "Define new group";
+    }
     input.placeholder = isNew ? (side === "dv" ? "Income, prejudice, labor-market outcome" : "Education, religiosity, parental status") : "Search group or constituent variable";
     if (isNew) { container.hidden = true; container.replaceChildren(); return; }
     const searchProject = dagProjectView ? dagProjectView() : state.project;
@@ -194,6 +202,11 @@ export function createDagSetupGroupController({
     const defineRow = h("div", { className: "setup-group-picker-row define-new-row" },
       h("div", {}, h("strong", { textContent: "Define a group" }), h("span", { textContent: "Chop one or more existing categories in the spatial viewer" })),
       h("button", { className: "action-button", type: "button", dataset: { defineSide: side }, textContent: "Define" }));
+    const noneRow = side === "instrument" ? h("div", { className: "setup-group-picker-row" },
+      h("div", {}, h("strong", { textContent: "None" }),
+        h("span", { textContent: "Work without an instrument" })),
+      h("button", { className: "action-button", type: "button",
+        dataset: { selectNone: "true" }, textContent: "Use None" })) : null;
     const rows = groups.map(({ group, variableMatch }) => h("div", { className: "setup-group-picker-row" },
       h("div", {}, h("strong", { textContent: group.label || group.group_id }),
         h("span", { textContent: `${group.variable_ids?.length || 0} vars` }),
@@ -201,7 +214,8 @@ export function createDagSetupGroupController({
         group.description ? h("details", { className: "setup-group-definition" },
           h("summary", { textContent: "Definition" }),
           h("p", { textContent: group.description })) : null),
-      h("button", { className: "action-button", type: "button", dataset: { side, groupId: group.group_id }, textContent: `Use as ${side.toUpperCase()}` })));
+      h("button", { className: "action-button", type: "button", dataset: { side, groupId: group.group_id },
+        textContent: side === "instrument" ? "Use as instrument" : `Use as ${side.toUpperCase()}` })));
     const emptyTitle = query && state.variableSearchStatus === "loading"
       ? "Loading variable search…"
       : query && state.publishedSchemaHydrating
@@ -216,9 +230,12 @@ export function createDagSetupGroupController({
           ? "Existing groups · variable search unavailable"
           : "Existing groups";
     replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: title }),
-      h("div", { className: "setup-group-picker-list" }, defineRow, ...rows));
+      h("div", { className: "setup-group-picker-list" }, noneRow, defineRow, ...rows));
     container.querySelectorAll("button[data-group-id]").forEach(button =>
-      button.addEventListener("click", () => assignGroupAsAnchor(button.dataset.side, button.dataset.groupId)));
+      button.addEventListener("click", () => button.dataset.side === "instrument"
+        ? assignGroupAsInstrument(button.dataset.groupId)
+        : assignGroupAsAnchor(button.dataset.side, button.dataset.groupId)));
+    container.querySelector("button[data-select-none]")?.addEventListener("click", () => assignGroupAsInstrument(null));
     container.querySelector("button[data-define-side]")?.addEventListener("click", event =>
       startDefinition?.(event.currentTarget.dataset.defineSide));
   }
@@ -261,5 +278,6 @@ export function createDagSetupGroupController({
   }
 
   return { renderMode, renderAnchorBar, renderRightPanel, renderVariablePanel, hint, renderStatus, renderSetupPicker,
-    renderSetupPickers() { renderSetupPicker("dv"); renderSetupPicker("iv"); }, renderGroupList, renderGroupingControls };
+    renderSetupPickers() { renderSetupPicker("dv"); renderSetupPicker("iv"); renderSetupPicker("instrument"); },
+    renderGroupList, renderGroupingControls };
 }

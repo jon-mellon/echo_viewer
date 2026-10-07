@@ -1814,9 +1814,7 @@ h2 {
 }
 .anchor-tag.anchor-dv { background: #9b5c2e; }
 .anchor-tag.anchor-iv { background: #315f9d; }
-.anchor-row #instrumentSelect { width: min(100%, 260px); margin-left: auto; }
-.anchor-row #instrumentSearch { width: min(100%, 180px); margin-left: auto; }
-.anchor-row #instrumentSearch + #instrumentSelect { margin-left: 0; }
+.anchor-tag.anchor-instrument { background: #6d4cb3; }
 .anchor-label {
   flex: 1 1 auto;
   overflow: hidden;

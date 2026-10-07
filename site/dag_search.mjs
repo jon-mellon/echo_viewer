@@ -30,6 +30,9 @@ export function anchorGroupSearchMatch(group, query, index, variableById, search
 }
 
 export function availableSetupAnchorGroups(project, side) {
+  if (side === "instrument") return (project?.groups || [])
+    .filter(group => group.variable_ids?.length)
+    .filter(group => group.group_id !== project.iv_group_id && group.group_id !== project.dv_group_id);
   const currentId = side === "dv" ? project.dv_group_id : project.iv_group_id;
   const oppositeId = side === "dv" ? project.iv_group_id : project.dv_group_id;
   return (project?.groups || [])

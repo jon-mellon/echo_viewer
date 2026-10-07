@@ -4,7 +4,8 @@ import * as mapInteractions from "./map_interactions.mjs";
 export function createDagEventController({
   state, elements: els, dagNetwork,
   renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
-  renderSearch, fitSearchContext, prefetchVariableSearch, toggleAnchorSearchMode, finishSchemaChoice, changeAnchor, renderAnchorBar,
+  renderSearch, fitSearchContext, prefetchVariableSearch, toggleAnchorSearchMode, finishSchemaChoice,
+  changeAnchor, renderSetupGroupPicker,
   setWorkflowMode, renderGroupList, closeGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
@@ -22,9 +23,10 @@ export function createDagEventController({
 function installHandlers() {
   els.closeEvidencePane.addEventListener("click", dismissEvidencePane);
   els.showExcludedLinks.addEventListener("click", showExcludedLinks);
-  // IV/DV search
+  // Anchor search
   els.ivInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
   els.dvInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
+  els.instrumentInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
   els.ivInput.addEventListener("input", () => {
     renderSearch("iv");
     if (state.anchorSearchMode.iv === "new") fitSearchContext("iv");
@@ -33,6 +35,7 @@ function installHandlers() {
     renderSearch("dv");
     if (state.anchorSearchMode.dv === "new") fitSearchContext("dv");
   });
+  els.instrumentInput.addEventListener("input", () => renderSetupGroupPicker("instrument"));
   els.ivDefineNew.addEventListener("click", () => toggleAnchorSearchMode("iv"));
   els.dvDefineNew.addEventListener("click", () => toggleAnchorSearchMode("dv"));
 
@@ -40,21 +43,11 @@ function installHandlers() {
   els.loadSchema.addEventListener("click", () => finishSchemaChoice(true));
   els.skipSchema.addEventListener("click", () => finishSchemaChoice(false));
 
-  // Change which group is the IV / DV anchor.
+  // Change the selected groups.
   els.changeDv.addEventListener("click", () => changeAnchor("dv"));
   els.changeIv.addEventListener("click", () => changeAnchor("iv"));
-  els.instrumentSelect.addEventListener("change", () => {
-    const id = els.instrumentSelect.value || null;
-    state.project.instrument_group_id = id && id !== state.project.iv_group_id
-      && id !== state.project.dv_group_id ? id : null;
-    state.showExclusionViolations = Boolean(state.project.instrument_group_id);
-    state.showConfoundersOnly = !state.showExclusionViolations;
-    state.showCollidersOnly = false;
-    saveProjectLocally();
-    rebuildProject();
-  });
+  els.changeInstrument.addEventListener("click", () => changeAnchor("instrument"));
   els.instrumentDefineNew.addEventListener("click", () => startDefinition("instrument"));
-  els.instrumentSearch.addEventListener("input", renderAnchorBar);
   els.editSplitDv?.addEventListener("click", () => startEditSplit(state.project.dv_group_id));
   els.editSplitIv?.addEventListener("click", () => startEditSplit(state.project.iv_group_id));
 

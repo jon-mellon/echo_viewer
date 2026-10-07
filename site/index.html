@@ -43,7 +43,7 @@
           <button class="mode-tab" data-mode="group_review" type="button">Groups</button>
         </nav>
 
-        <!-- Study anchors: change which group is IV / DV at any time -->
+        <!-- Study anchors: change the selected groups at any time -->
         <div id="anchorBar" class="anchor-bar" hidden>
           <div class="anchor-row">
             <span class="anchor-tag anchor-dv">DV</span>
@@ -58,12 +58,9 @@
             <button id="changeIv" class="text-button" type="button">Change</button>
           </div>
           <div class="anchor-row" id="instrumentRow" hidden>
-            <label class="anchor-tag" for="instrumentSelect">Instrument (optional)</label>
-            <input id="instrumentSearch" class="search-input" type="search" placeholder="Search groups" aria-label="Search instrument groups">
-            <select id="instrumentSelect" class="search-input" aria-label="Instrument (optional)">
-              <option value="">None</option>
-            </select>
-            <button id="instrumentDefineNew" class="text-button" type="button">Define new group</button>
+            <span class="anchor-tag anchor-instrument">Instrument</span>
+            <strong id="anchorInstrumentLabel" class="anchor-label">None</strong>
+            <button id="changeInstrument" class="text-button" type="button">Change</button>
           </div>
           <div class="mini-toolbar dag2-history-controls">
             <button id="dag2UndoBtn" class="toolbar-button" type="button" disabled>↩ Undo</button>
@@ -98,6 +95,15 @@
             <div id="ivSeeds" class="seed-row"></div>
             <div id="ivResults" class="search-results"></div>
             <div id="ivGroupPicker" class="setup-group-picker" hidden></div>
+          </div>
+
+          <div id="instrumentSearchBlock" class="search-block" hidden>
+            <div class="anchor-source-header">
+              <label class="dag-label" for="instrumentInput">Search existing groups</label>
+              <button id="instrumentDefineNew" class="text-button" type="button">Define new group</button>
+            </div>
+            <input id="instrumentInput" class="search-input" type="search" placeholder="Search group or constituent variable">
+            <div id="instrumentGroupPicker" class="setup-group-picker"></div>
           </div>
 
           <div id="schemaChoice" class="schema-choice" hidden>
