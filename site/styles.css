@@ -2066,6 +2066,10 @@ h2 {
 }
 
 @media (max-width: 840px) {
+  .dag-network .vis-tooltip {
+    display: none !important;
+  }
+
   .dag-body {
     --mobile-nav-height: 56px;
   }
