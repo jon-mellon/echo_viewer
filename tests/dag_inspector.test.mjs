@@ -23,6 +23,8 @@ test("inspectors deduplicate evidence and preserve direction", () => {
   assert.deepEqual(edge.actions.map(a => a.action), ["restore"]);
   const provenance = inspector.provenanceModel(link, project, rawById, variables);
   assert.equal(provenance.rows.length, 1);
+  assert.deepEqual(provenance.sections.map(section => [section.direction, section.sourceLabel, section.targetLabel, section.rows.length]),
+    [["A_TO_B", "A", "B", 1], ["B_TO_A", "B", "A", 0]]);
   assert.deepEqual(provenance.rows[0].source, { concept: "Concept X", classifications: ["A"] });
   assert.deepEqual(provenance.rows[0].target, { concept: "y", classifications: ["B"] });
   assert.deepEqual(inspector.studyInspector(project, rawById), {
@@ -66,18 +68,20 @@ test("diagnostic evidence puts the witness-path direction before reverse evidenc
     confounderPathsByGroup: new Map([["b", { toIv: ["b", "a"], toDv: ["b", "dv"] }]]),
   };
   assert.equal(inspector.diagnosticEvidenceDirection(link, confounderView), "B_TO_A");
-  assert.deepEqual(inspector.provenanceModel(
-    link, project, rawLinksById, new Map(), confounderView,
-  ).rows.map(row => row.raw.raw_causal_link_id), ["reverse", "shared", "forward"]);
+  const confounderEvidence = inspector.provenanceModel(link, project, rawLinksById, new Map(), confounderView);
+  assert.deepEqual(confounderEvidence.sections.map(section => section.direction), ["B_TO_A", "A_TO_B"]);
+  assert.deepEqual(confounderEvidence.sections.map(section => section.rows.map(row => row.raw.raw_causal_link_id)),
+    [["reverse", "shared"], ["forward"]]);
 
   const colliderView = {
     showCollidersOnly: true,
     colliderPathsByGroup: new Map([["b", { fromIv: ["a", "b"], fromDv: ["dv", "b"] }]]),
   };
   assert.equal(inspector.diagnosticEvidenceDirection(link, colliderView), "A_TO_B");
-  assert.deepEqual(inspector.provenanceModel(
-    link, project, rawLinksById, new Map(), colliderView,
-  ).rows.map(row => row.raw.raw_causal_link_id), ["forward", "shared", "reverse"]);
+  const colliderEvidence = inspector.provenanceModel(link, project, rawLinksById, new Map(), colliderView);
+  assert.deepEqual(colliderEvidence.sections.map(section => section.direction), ["A_TO_B", "B_TO_A"]);
+  assert.deepEqual(colliderEvidence.sections.map(section => section.rows.map(row => row.raw.raw_causal_link_id)),
+    [["forward", "shared"], ["reverse"]]);
 });
 
 test("diagnostic evidence preserves stored order when an edge has no unique witness direction", () => {

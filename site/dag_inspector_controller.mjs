@@ -148,7 +148,7 @@ export function createDagInspectorController({
       replaceChildren(elements.provenancePanel, h("div", { className: "small-note", textContent: "No raw provenance for this edge." }));
       return;
     }
-    const rows = model.rows.map(({ raw, source, target }) => {
+    const renderRow = ({ raw, source, target }) => {
       const doi = isDoi(raw.paper_id) ? raw.paper_id.trim() : null;
       const title = truncate(raw.paper_title || raw.paper_id, 44);
       const paper = doi
@@ -164,14 +164,17 @@ export function createDagInspectorController({
           : h("span", { textContent: "Concept unavailable" }));
       };
       return h("tr", {}, h("td", {}, paper), conceptCell(source.concept, raw.source_variable_id),
-        cell(source.classifications.length ? source.classifications.join("; ") : "Unclassified", "provenance-classification"),
-        conceptCell(target.concept, raw.target_variable_id), cell(target.classifications.length ? target.classifications.join("; ") : "Unclassified", "provenance-classification"),
+        conceptCell(target.concept, raw.target_variable_id),
         cell(raw.causal_link_existence || ""), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(truncate(raw.target_population || "", 60)));
-    });
-    const headings = ["Paper", "Source concept", "Source classification", "Target concept", "Target classification", "Existence", "Strategy", "Population"];
+    };
+    const headings = ["Paper", "Source concept", "Target concept", "Existence", "Strategy", "Population"];
     replaceChildren(elements.provenancePanel,
-      h("table", { className: "provenance-table provenance-table--edge" },
-      h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))), h("tbody", {}, rows)));
+      model.sections.map(section => h("section", { className: "provenance-direction" },
+        h("h3", { textContent: `Evidence for ${section.sourceLabel} → ${section.targetLabel}` }),
+        h("table", { className: "provenance-table provenance-table--edge" },
+          h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))),
+          h("tbody", {}, section.rows.length ? section.rows.map(renderRow)
+            : h("tr", {}, h("td", { colSpan: headings.length, textContent: "No evidence records for this direction." }))))));
   }
 
   return { renderEdge, renderProvenance, renderGroupDefinition, selectedEdge, clearPendingExclude };

@@ -1732,16 +1732,9 @@ h2 {
   overflow-wrap: anywhere;
 }
 
-.provenance-table .provenance-classification {
-  min-width: 150px;
-  color: var(--blue);
-  font-weight: 700;
-  white-space: normal;
-}
-
 .provenance-table--edge {
   table-layout: fixed;
-  min-width: 700px;
+  min-width: 480px;
 }
 
 .provenance-table--edge th,
@@ -1749,19 +1742,26 @@ h2 {
   overflow-wrap: anywhere;
 }
 
-.provenance-table--edge .provenance-concept,
-.provenance-table--edge .provenance-classification {
+.provenance-table--edge .provenance-concept {
   min-width: 0;
 }
 
-.provenance-table--edge th:nth-child(1) { width: 12%; }
+.provenance-table--edge th:nth-child(1) { width: 18%; }
 .provenance-table--edge th:nth-child(2),
-.provenance-table--edge th:nth-child(4) { width: 16%; }
-.provenance-table--edge th:nth-child(3),
-.provenance-table--edge th:nth-child(5) { width: 13%; }
-.provenance-table--edge th:nth-child(6) { width: 8%; }
-.provenance-table--edge th:nth-child(7),
-.provenance-table--edge th:nth-child(8) { width: 11%; }
+.provenance-table--edge th:nth-child(3) { width: 22%; }
+.provenance-table--edge th:nth-child(4) { width: 10%; }
+.provenance-table--edge th:nth-child(5),
+.provenance-table--edge th:nth-child(6) { width: 14%; }
+
+.provenance-direction + .provenance-direction {
+  margin-top: 20px;
+}
+
+.provenance-direction h3 {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 14px;
+}
 
 .excluded-links-list {
   display: grid;

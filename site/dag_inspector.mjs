@@ -71,11 +71,26 @@ export function provenanceVariable(variableId, variables, groups) {
 export function provenanceModel(link, project, rawLinksById, variables, diagnosticView = {}) {
   const edge = edgeInspector(link, project, diagnosticView);
   if (!edge) return null;
-  return { ...edge, rows: edge.rawIds.map(id => rawLinksById.get(id)).filter(Boolean).map(raw => ({
-    raw,
-    source: provenanceVariable(raw.source_variable_id, variables, project.groups),
-    target: provenanceVariable(raw.target_variable_id, variables, project.groups),
-  })) };
+  const groupLabel = id => project.groups.find(group => group.group_id === id)?.label || id;
+  const sections = [
+    { direction: "A_TO_B", sourceLabel: groupLabel(link.group_a), targetLabel: groupLabel(link.group_b), rawIds: link.a_to_b_raw_link_ids || [] },
+    { direction: "B_TO_A", sourceLabel: groupLabel(link.group_b), targetLabel: groupLabel(link.group_a), rawIds: link.b_to_a_raw_link_ids || [] },
+  ];
+  if (diagnosticEvidenceDirection(link, diagnosticView) === "B_TO_A") sections.reverse();
+  const seen = new Set();
+  const populatedSections = sections.map(section => ({
+    ...section,
+    rows: section.rawIds.filter(id => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }).map(id => rawLinksById.get(id)).filter(Boolean).map(raw => ({
+      raw,
+      source: provenanceVariable(raw.source_variable_id, variables, project.groups),
+      target: provenanceVariable(raw.target_variable_id, variables, project.groups),
+    })),
+  }));
+  return { ...edge, sections: populatedSections, rows: populatedSections.flatMap(section => section.rows) };
 }
 
 export function variableComparison(source, target, forwardIds, reverseIds, rawLinksById) {
