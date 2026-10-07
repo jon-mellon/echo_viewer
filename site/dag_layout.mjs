@@ -234,6 +234,7 @@ function computeDagLayoutUncached({
   centroids = new Map(),
   ivId,
   dvId,
+  instrumentId,
   mode = "auto",
   width: containerW,
   height: containerH,
@@ -346,6 +347,7 @@ function computeDagLayoutUncached({
     graphHeight,
     ivId,
     dvId,
+    instrumentId,
   );
 
   for (let pass = 0; pass < 3; pass += 1) {
@@ -358,6 +360,9 @@ function computeDagLayoutUncached({
       ivId,
       dvId,
     );
+    if (fixedAnchorIds.has(instrumentId)) clearDagStudyArrowCorridor(
+      groups, positions, params, graphHeight, fixedAnchorIds, instrumentId, ivId,
+    );
     resolveDagNodeOverlaps(
       groups,
       positions,
@@ -369,6 +374,17 @@ function computeDagLayoutUncached({
     );
   }
 
+  if (fixedAnchorIds.has(instrumentId)) {
+    const otherPoints = [...positions].filter(([id]) => !fixedAnchorIds.has(id)).map(([, point]) => point);
+    const instrument = positions.get(instrumentId);
+    const iv = positions.get(ivId);
+    const dv = positions.get(dvId);
+    instrument.x = Math.min(instrument.x, iv.x - 200,
+      ...otherPoints.map(point => point.x - 130));
+    dv.x = Math.max(dv.x, iv.x + 200,
+      ...otherPoints.map(point => point.x + 130));
+  }
+
   clearDagStudyArrowCorridor(
     groups,
     positions,
@@ -377,6 +393,9 @@ function computeDagLayoutUncached({
     fixedAnchorIds,
     ivId,
     dvId,
+  );
+  if (fixedAnchorIds.has(instrumentId)) clearDagStudyArrowCorridor(
+    groups, positions, params, graphHeight, fixedAnchorIds, instrumentId, ivId,
   );
 
   return {
@@ -393,6 +412,7 @@ function computeDagLayoutUncached({
       layoutMode,
       ivId || "no-iv",
       dvId || "no-dv",
+      instrumentId || "no-instrument",
       viewSignature,
     ].join(":"),
     graphWidth,
@@ -400,7 +420,7 @@ function computeDagLayoutUncached({
   };
 }
 
-function pinDagAnchorPositions(positions, graphWidth, graphHeight, ivId, dvId) {
+function pinDagAnchorPositions(positions, graphWidth, graphHeight, ivId, dvId, instrumentId = null) {
   if (!positions.has(ivId) || !positions.has(dvId) || ivId === dvId) return new Set();
   const points = [...positions.values()];
   const minX = Math.min(...points.map((point) => point.x), -graphWidth / 2);
@@ -409,6 +429,12 @@ function pinDagAnchorPositions(positions, graphWidth, graphHeight, ivId, dvId) {
   const maxY = Math.max(...points.map((point) => point.y), graphHeight / 2);
   const centerX = (minX + maxX) / 2;
   const centerY = (minY + maxY) / 2;
+  if (instrumentId && instrumentId !== ivId && instrumentId !== dvId && positions.has(instrumentId)) {
+    Object.assign(positions.get(instrumentId), { x: minX - 130, y: centerY });
+    Object.assign(positions.get(ivId), { x: centerX, y: centerY });
+    Object.assign(positions.get(dvId), { x: maxX + 130, y: centerY });
+    return new Set([instrumentId, ivId, dvId]);
+  }
   const maxOffset = Math.max(90, graphWidth / 2 - 115);
   const offset = Math.min(maxOffset, Math.max(150, graphWidth * 0.24));
   Object.assign(positions.get(ivId), { x: centerX - offset, y: centerY });
@@ -425,7 +451,7 @@ function clearDagStudyArrowCorridor(
   ivId,
   dvId,
 ) {
-  if (anchorIds.size !== 2) return;
+  if (!anchorIds.has(ivId) || !anchorIds.has(dvId)) return;
   const iv = positions.get(ivId);
   const dv = positions.get(dvId);
   if (!iv || !dv) return;
@@ -1573,6 +1599,7 @@ export function computeDagLayout(args) {
     cache.centroids === centroids &&
     cache.ivId === args.ivId &&
     cache.dvId === args.dvId &&
+    cache.instrumentId === args.instrumentId &&
     cache.mode === mode &&
     cache.width === width &&
     cache.height === height &&
@@ -1592,6 +1619,7 @@ export function computeDagLayout(args) {
     centroids,
     ivId: args.ivId,
     dvId: args.dvId,
+    instrumentId: args.instrumentId,
     mode,
     width,
     height,

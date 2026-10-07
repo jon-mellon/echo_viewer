@@ -120,6 +120,23 @@ test('missing anchors and missing centroids produce finite positions', () => {
   for (const point of layout.positions.values()) assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y));
 });
 
+test('instrument, IV, and DV stay pinned left to right in every layout mode', () => {
+  for (const mode of ['auto', 'hierarchical', 'organic']) {
+    for (const count of [8, 43]) {
+      const input = fixture(count, mode, 800, 700);
+      input.instrumentId = 'g3';
+      const layout = computeDagLayout(input);
+      const instrument = layout.positions.get('g3');
+      const iv = layout.positions.get(input.ivId);
+      const dv = layout.positions.get(input.dvId);
+      assert.ok(instrument.x < iv.x && iv.x < dv.x);
+      assert.equal(instrument.y, iv.y);
+      assert.equal(iv.y, dv.y);
+      assert.ok([...layout.positions].every(([id, point]) => id === 'g3' || point.x > instrument.x));
+    }
+  }
+});
+
 test('routed DAG uses both dimensions of wide and tall canvases', () => {
   for (const [count, width, height] of [[12, 1800, 700], [43, 1800, 700], [12, 700, 1200]]) {
     const input = fixture(count, 'auto', width, height);

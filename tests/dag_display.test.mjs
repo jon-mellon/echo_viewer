@@ -6,6 +6,8 @@ import * as display from "../site/dag_display.mjs";
 import { confounderPathNodeRole } from "../site/dag_graph.mjs";
 import { wrapDagLabel } from "../site/dag_layout.mjs";
 import { directedGroupLabels } from "../site/dag_exports.mjs";
+import { studyDesignEdgeData } from "../site/dag_study_edges.mjs";
+import { STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "../site/dag_inspector_controller.mjs";
 
 test("display records preserve node roles, selection, edge styles and descriptions", () => {
   const groups = [
@@ -71,4 +73,17 @@ test("paper/table labels omit missing internal key parts", () => {
   assert.equal(display.displayPaperTableKey("10.1000/example::unknown"), "10.1000/example");
   assert.equal(display.displayPaperTableKey("unknown::table-2"), "Occurrence table-2");
   assert.equal(display.displayPaperTableKey("unknown::unknown"), "");
+});
+
+test("selected instrument adds a matching study link alongside the existing IV to DV link", () => {
+  const groups = ["z", "iv", "dv"].map(group_id => ({ group_id }));
+  const project = { instrument_group_id: "z", iv_group_id: "iv", dv_group_id: "dv", links: [] };
+  const edges = studyDesignEdgeData(groups, project);
+  assert.deepEqual(edges.map(({ id, from, to }) => ({ id, from, to })), [
+    { id: STUDY_DESIGN_EDGE_ID, from: "iv", to: "dv" },
+    { id: STUDY_INSTRUMENT_EDGE_ID, from: "z", to: "iv" },
+  ]);
+  assert.equal(edges[0].color.color, edges[1].color.color);
+  assert.equal(edges[0].width, edges[1].width);
+  assert.equal(studyDesignEdgeData(groups, { ...project, instrument_group_id: null }).length, 1);
 });

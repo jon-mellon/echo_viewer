@@ -60,3 +60,25 @@ test("missing IV disables causal filtering and excluded evidence obeys connectiv
   assert.equal(excludedForConnectivity({ display_status: "excluded" }), true);
   assert.equal(excludedForConnectivity({ display_status: "excluded", is_target_relation: true }), false);
 });
+
+test("instrument view finds bounded directed exclusion paths without the IV", () => {
+  const instrumentGroups = ["z", "k1", "k2", "iv", "dv", "other"].map(group_id => ({ group_id }));
+  const instrumentLinks = [
+    link("z_k1", "z", "k1", "A_TO_B"),
+    link("k1_dv", "k1", "dv", "A_TO_B"),
+    link("k1_k2", "k1", "k2", "A_TO_B"),
+    link("k2_dv", "k2", "dv", "A_TO_B"),
+    link("z_iv", "z", "iv", "A_TO_B"),
+    link("iv_dv", "iv", "dv", "A_TO_B"),
+    link("z_other", "z", "other", "A_TO_B", { display_status: "excluded" }),
+    link("other_dv", "other", "dv", "A_TO_B"),
+  ];
+  const view = length => deriveDagView({ groups: instrumentGroups, links: instrumentLinks,
+    ivId: "iv", dvId: "dv", instrumentId: "z", maxPathLength: length,
+    showExclusionViolations: true });
+  assert.deepEqual([...view(1).exclusionViolations.violationIds], []);
+  assert.deepEqual([...view(2).exclusionViolations.violationIds], ["k1"]);
+  assert.deepEqual([...view(2).componentGroupIds].sort(), ["dv", "iv", "k1", "z"]);
+  assert.deepEqual(view(2).visibleLinks.map(item => item.edge_id), ["z_k1", "k1_dv"]);
+  assert.deepEqual([...view(3).exclusionViolations.violationIds].sort(), ["k1", "k2"]);
+});

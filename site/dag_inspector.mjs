@@ -4,10 +4,20 @@ import { displayPaperTableKey } from "./dag_display.mjs";
 export function diagnosticEvidenceDirection(link, {
   showConfoundersOnly = false,
   showCollidersOnly = false,
+  showExclusionViolations = false,
   confounderPathsByGroup = new Map(),
   colliderPathsByGroup = new Map(),
+  exclusionPathsByGroup = new Map(),
 } = {}) {
-  if (!link || (!showConfoundersOnly && !showCollidersOnly)) return null;
+  if (!link || (!showConfoundersOnly && !showCollidersOnly && !showExclusionViolations)) return null;
+  if (showExclusionViolations) {
+    let aToB = false, bToA = false;
+    for (const path of exclusionPathsByGroup.values()) for (let index = 0; index < path.length - 1; index += 1) {
+      if (path[index] === link.group_a && path[index + 1] === link.group_b) aToB = true;
+      if (path[index] === link.group_b && path[index + 1] === link.group_a) bToA = true;
+    }
+    return aToB === bToA ? null : aToB ? "A_TO_B" : "B_TO_A";
+  }
   const pathsByGroup = showConfoundersOnly ? confounderPathsByGroup : colliderPathsByGroup;
   const pathFields = showConfoundersOnly ? ["toIv", "toDv"] : ["fromIv", "fromDv"];
   let aToB = false;

@@ -37,6 +37,27 @@ test("highlight model classifies path edges, dims others and preserves inputs", 
   assert.deepEqual({ visibleLinks, edges, nodes }, before);
 });
 
+test("exclusion hover draws the complete instrument-to-DV path in purple", () => {
+  const visibleLinks = [
+    { edge_id: "z_k", group_a: "z", group_b: "k", direction_type: "A_TO_B" },
+    { edge_id: "k_y", group_a: "k", group_b: "y", direction_type: "A_TO_B" },
+  ];
+  const edges = visibleLinks.map(link => ({ id: link.edge_id, from: link.group_a,
+    to: link.group_b, arrows: { to: { enabled: true } }, color: { color: "gray" } }));
+  edges.push({ id: "instrument-study", from: "z", to: "x", color: { color: "green" } });
+  const nodes = ["z", "k", "y", "x"].map(id => ({ id, color: { background: "white" } }));
+  const model = highlights.buildPathHighlightModel({
+    paths: { toIv: [], toDv: ["z", "k", "y"] }, visibleLinks, edges, nodes,
+    groupId: "k", ivId: "x", dvId: "y", showExclusionViolations: true,
+    instrumentDesignEdgeId: "instrument-study",
+  });
+  assert.deepEqual(model.laneSegments.map(segment => segment.color), ["#7c3aed", "#7c3aed"]);
+  assert.equal(model.nodeUpdates.find(node => node.id === "k").color.border, "#7c3aed");
+  assert.equal(model.nodeUpdates.find(node => node.id === "x").opacity, 0.16);
+  assert.ok(model.edgeUpdates.every(edge => edge.id !== "instrument-study"));
+  assert.match(model.edgeUpdates[0].title, /Instrument-to-DV exclusion path/);
+});
+
 test("polyline helpers separate overlapping runs and place clear arrowheads", () => {
   const points = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
   assert.equal(highlights.polylineLength(points), 100);

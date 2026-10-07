@@ -52,6 +52,21 @@ export function createDagSetupGroupController({
     elements.anchorIvLabel.title = ivSet ? iv.label : "";
     if (elements.editSplitIv) elements.editSplitIv.hidden = !ivSet || !canEditSplit(iv);
     if (elements.editSplitDv) elements.editSplitDv.hidden = !dvSet || !canEditSplit(dv);
+    if (elements.instrumentRow) {
+      elements.instrumentRow.hidden = !ivSet || !dvSet;
+      const selected = state.project.instrument_group_id;
+      const query = normalized(elements.instrumentSearch.value);
+      const options = [h("option", { value: "", textContent: "None" }),
+        ...(state.project.groups || [])
+          .filter(group => group.group_id !== state.project.iv_group_id
+            && group.group_id !== state.project.dv_group_id && anchorHasMembers(state, group))
+          .filter(group => group.group_id === selected
+            || searchModel.anchorGroupSearchMatch(group, query, 0, state.variableById).matches)
+          .sort((a, b) => (a.label || a.group_id).localeCompare(b.label || b.group_id))
+          .map(group => h("option", { value: group.group_id, textContent: group.label || group.group_id }))];
+      replaceChildren(elements.instrumentSelect, options);
+      elements.instrumentSelect.value = options.some(option => option.value === selected) ? selected : "";
+    }
   }
 
   function renderRightPanel() {
@@ -84,7 +99,8 @@ export function createDagSetupGroupController({
       h("details", { className: "variable-panel-item", dataset: { groupId: group.group_id }, open: openIds.has(group.group_id) },
         h("summary", {}, h("span", { textContent: group.label || group.group_id }),
           group.group_id === project.iv_group_id ? h("span", { className: "variable-panel-role", textContent: "IV" }) : null,
-          group.group_id === project.dv_group_id ? h("span", { className: "variable-panel-role", textContent: "DV" }) : null),
+          group.group_id === project.dv_group_id ? h("span", { className: "variable-panel-role", textContent: "DV" }) : null,
+          group.group_id === project.instrument_group_id ? h("span", { className: "variable-panel-role", textContent: "Instrument" }) : null),
         h("p", { textContent: group.description || "No definition available." }))));
     elements.variablePanelList.scrollTop = scrollTop;
   }

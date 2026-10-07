@@ -218,6 +218,50 @@ export function filterGraphByColliders(graph, options) {
   );
 }
 
+export function filterGraphByExclusionViolations(graph, { instrumentId, ivId, dvId,
+  maxPathLength = 1, traversableLink = () => true } = {}) {
+  const metadata = { violationIds: new Set(), pathIds: new Set(),
+    pathsByGroup: new Map(), linkPairKeys: new Set() };
+  if (!graph.nodeIds.has(instrumentId) || !graph.nodeIds.has(dvId)
+      || instrumentId === ivId || instrumentId === dvId) return createGraph([], [], metadata);
+  metadata.pathIds.add(instrumentId);
+  if (graph.nodeIds.has(ivId)) metadata.pathIds.add(ivId);
+  metadata.pathIds.add(dvId);
+  const outgoing = directedOutgoing(graph, traversableLink);
+  const incoming = new Map([...graph.nodeIds].map(id => [id, new Set()]));
+  for (const [from, children] of outgoing) for (const to of children) incoming.get(to).add(from);
+  const distanceToDv = new Map([[dvId, 0]]);
+  const queue = [dvId];
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    for (const prior of incoming.get(current) || []) {
+      if (prior === ivId || distanceToDv.has(prior)) continue;
+      distanceToDv.set(prior, distanceToDv.get(current) + 1);
+      queue.push(prior);
+    }
+  }
+  const walk = (path) => {
+    const current = path.at(-1);
+    if (path.length - 1 >= Math.min(maxPathLength, graph.nodeIds.size - 1)
+      || path.length - 1 + (distanceToDv.get(current) ?? Infinity) > maxPathLength) return;
+    for (const next of outgoing.get(current) || []) {
+      if (next === ivId || path.includes(next) || next === instrumentId) continue;
+      const candidate = [...path, next];
+      if (next === dvId) {
+        if (candidate.length < 3) continue;
+        for (const id of candidate.slice(1, -1)) {
+          metadata.violationIds.add(id);
+          if (!metadata.pathsByGroup.has(id)) metadata.pathsByGroup.set(id, candidate);
+        }
+        candidate.forEach(id => metadata.pathIds.add(id));
+        pathPairKeys(candidate).forEach(key => metadata.linkPairKeys.add(key));
+      } else walk(candidate);
+    }
+  };
+  walk([instrumentId]);
+  return filterGraphNodes(createGraph(graph.nodeIds, graph.links, metadata), metadata.pathIds);
+}
+
 function reverseDirection(direction) {
   if (direction === "A_TO_B") return "B_TO_A";
   if (direction === "B_TO_A") return "A_TO_B";

@@ -19,7 +19,7 @@ export function withoutGroupReviewStatus(group) {
 export function createProject({ projectId, groupingSetId }) {
   return {
     project_id: projectId, active_grouping_set_id: groupingSetId,
-    iv_group_id: 'g_iv', dv_group_id: 'g_dv', groups: [], links: [],
+    iv_group_id: 'g_iv', dv_group_id: 'g_dv', instrument_group_id: null, groups: [], links: [],
     decisions: [], filters: {}, grouping_imports: [],
     grouping_exports: [], carve_outs: [], link_decisions: {},
     rejected_variables: [], publication: null,
@@ -41,7 +41,9 @@ export function promoteAnchor(project, side, groupId, timestamp) {
   const key = `${side}_group_id`;
   const opposite = side === 'dv' ? project.iv_group_id : project.dv_group_id;
   if (groupId === opposite || !project.groups.some(g => g.group_id === groupId)) return project;
-  return { ...project, [key]: groupId, groups: project.groups.map(group => {
+  return { ...project, [key]: groupId,
+    instrument_group_id: project.instrument_group_id === groupId ? null : project.instrument_group_id,
+    groups: project.groups.map(group => {
     if (group.group_id === groupId) return { ...group, type: side, updated_at: timestamp };
     if (group.group_id === project[key]) return { ...group, type: null };
     return group;
@@ -95,7 +97,8 @@ export function snapshotProject(project, phase) {
   return JSON.stringify({ groups: project.groups, link_decisions: project.link_decisions,
     rejected_variables: project.rejected_variables,
     restored_variable_ids: project.restored_variable_ids, decisions: project.decisions,
-    iv_group_id: project.iv_group_id, dv_group_id: project.dv_group_id, phase });
+    iv_group_id: project.iv_group_id, dv_group_id: project.dv_group_id,
+    instrument_group_id: project.instrument_group_id, phase });
 }
 
 export function restoreSnapshot(project, json) {
@@ -106,7 +109,8 @@ export function restoreSnapshot(project, json) {
     restored_variable_ids: snap.restored_variable_ids || [],
     decisions: snap.decisions || [],
     iv_group_id: snap.iv_group_id || project.iv_group_id,
-    dv_group_id: snap.dv_group_id || project.dv_group_id }, phase: snap.phase };
+    dv_group_id: snap.dv_group_id || project.dv_group_id,
+    instrument_group_id: snap.instrument_group_id || null }, phase: snap.phase };
 }
 
 export function replaceSchemaGroups(project, groupingSet, clusterOf, clusterMembers) {
@@ -117,7 +121,12 @@ export function replaceSchemaGroups(project, groupingSet, clusterOf, clusterMemb
     const id = previous?.source_group_id || project[`${side}_group_id`];
     anchors[`${side}_group_id`] = schemaIds.has(id) ? id : `g_${side}`;
   }
-  return { ...project, ...anchors, active_grouping_set_id: groupingSet.grouping_set_id,
+  const instrumentId = project.groups.find(group => group.group_id === project.instrument_group_id)?.source_group_id
+    || project.instrument_group_id;
+  return { ...project, ...anchors,
+    instrument_group_id: schemaIds.has(instrumentId) && instrumentId !== anchors.iv_group_id
+      && instrumentId !== anchors.dv_group_id ? instrumentId : null,
+    active_grouping_set_id: groupingSet.grouping_set_id,
     groups: groupingSet.groups.map(group => ({ ...withoutGroupReviewStatus(group),
       variable_ids: [...(group.variable_ids || [])], seed_variable_ids: [...(group.variable_ids || [])],
       type: group.group_id === anchors.iv_group_id
@@ -284,6 +293,7 @@ export function splitCategories(project, {
   };
   const next = { ...project, groups: [...nextGroups, newGroup],
     ...(["iv", "dv"].includes(role) ? { [`${role}_group_id`]: newGroupId } : {}),
+    ...(role === "instrument" ? { instrument_group_id: newGroupId } : {}),
     decisions: [...(project.decisions || []), {
       decision_id: `decision_${(project.decisions || []).length + 1}`,
       type: "split_categories", timestamp,

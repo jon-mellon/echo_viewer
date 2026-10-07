@@ -225,6 +225,8 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, gr
   const hasGraph = (visibleLinks || []).length > 0;
   const ivLabel = groupById(project?.iv_group_id)?.label || "Independent variable";
   const dvLabel = groupById(project?.dv_group_id)?.label || "Dependent variable";
+  const instrumentLabel = project?.instrument_group_id
+    ? groupById(project.instrument_group_id)?.label || project.instrument_group_id : null;
 
   const md = [
     `---`,
@@ -235,6 +237,7 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, gr
     ``,
     `**IV:** ${ivLabel}  `,
     `**DV:** ${dvLabel}`,
+    ...(instrumentLabel ? [`**Instrument:** ${instrumentLabel}`] : []),
     ``,
     `*Constructed with DAG Builder [@${METHOD_BIB_KEY}].*`,
     ...(input.permalink ? [``, `[View the public causal map](<${String(input.permalink).replace(/[\r\n]/g, "")}>)`] : []),
@@ -272,6 +275,8 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
   const hasGraph = (visibleLinks || []).length > 0;
   const ivLabel = groupById(project?.iv_group_id)?.label || "Independent variable";
   const dvLabel = groupById(project?.dv_group_id)?.label || "Dependent variable";
+  const instrumentLabel = project?.instrument_group_id
+    ? groupById(project.instrument_group_id)?.label || project.instrument_group_id : null;
 
   const tex = [
     `\\documentclass{article}`,
@@ -296,6 +301,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     ``,
     `\\noindent\\textbf{IV:} ${texEscape(ivLabel)}\\\\`,
     `\\textbf{DV:} ${texEscape(dvLabel)}`,
+    ...(instrumentLabel ? [`\\textbf{Instrument:} ${texEscape(instrumentLabel)}`] : []),
     ``,
     `This causal map was constructed using the DAG Builder method \\citep{${METHOD_BIB_KEY}}.`,
     ...(input.permalink ? [``, `\\noindent Public causal map: \\url{${String(input.permalink).replace(/[\r\n]/g, "")}}`] : []),
@@ -363,6 +369,7 @@ export function buildWorkingMapPayload({ project, visibleLinks, rejectedVariable
   const visibleGroupIds = new Set([
     project.iv_group_id,
     project.dv_group_id,
+    ...(project.instrument_group_id ? [project.instrument_group_id] : []),
     ...visibleLinks.flatMap((link) => [link.group_a, link.group_b]),
   ]);
   return {
@@ -370,6 +377,7 @@ export function buildWorkingMapPayload({ project, visibleLinks, rejectedVariable
     exported_at: timestamp,
     iv_group_id: project.iv_group_id,
     dv_group_id: project.dv_group_id,
+    ...(project.instrument_group_id ? { instrument_group_id: project.instrument_group_id } : {}),
     groups: project.groups.filter(group => group.variable_ids?.length).filter((group) => visibleGroupIds.has(group.group_id)),
     links: visibleLinks,
     rejected_variables: rejectedVariables,

@@ -70,6 +70,17 @@ test("a collider permalink works when confounders is the app default", () => {
   assert.equal(state.showCollidersOnly, true);
 });
 
+test("an instrument permalink restores the exclusive exclusion view", () => {
+  const state = { project: structuredClone(project), showConfoundersOnly: true,
+    seeds: { iv: new Set(), dv: new Set() } };
+  state.project.groups.push({ group_id: "instrument", label: "Instrument", variable_ids: ["v3"] });
+  applyPermalink(new URLSearchParams("p=1&iv=cause&dv=outcome&instrument=instrument&conf=1&coll=1"), state);
+  assert.equal(state.project.instrument_group_id, "instrument");
+  assert.equal(state.showExclusionViolations, true);
+  assert.equal(state.showConfoundersOnly, false);
+  assert.equal(state.showCollidersOnly, false);
+});
+
 test("edited or imported schemas are not shareable", () => {
   assert.equal(schemaMatchesProject(schema, project), true);
   const edited = structuredClone(project);

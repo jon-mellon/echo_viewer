@@ -6,6 +6,7 @@ const EDGE_PALETTE = {
   iv: { color: "#d32f2f", shadow: "rgba(211,47,47,0.34)" },
   dv: { color: "#1976d2", shadow: "rgba(25,118,210,0.34)" },
   shared: { color: "#d18b08", shadow: "rgba(209,139,8,0.38)" },
+  exclusion: { color: "#7c3aed", shadow: "rgba(124,58,237,0.38)" },
 };
 
 export function addPathDirectionTargets(targetsByPair, path = []) {
@@ -42,10 +43,12 @@ export function buildPathHighlightModel({
   nodes = [],
   edgeSegments = new Map(),
   studyDesignEdgeId,
+  instrumentDesignEdgeId,
   groupId,
   ivId,
   dvId,
   showConfoundersOnly = false,
+  showExclusionViolations = false,
   confounderGroupIds = new Set(),
 }) {
   const ivPairKeys = pathPairKeys(paths.toIv);
@@ -61,14 +64,15 @@ export function buildPathHighlightModel({
     const key = pairKey(link.group_a, link.group_b);
     const toIv = ivPairKeys.has(key);
     const toDv = dvPairKeys.has(key);
-    if (toIv || toDv) logicalEdgeRole.set(link.edge_id, toIv && toDv ? "shared" : toIv ? "iv" : "dv");
+    if (toIv || toDv) logicalEdgeRole.set(link.edge_id,
+      showExclusionViolations ? "exclusion" : toIv && toDv ? "shared" : toIv ? "iv" : "dv");
   }
 
   const visibleLinkById = new Map(visibleLinks.map((link) => [link.edge_id, link]));
   const edgeUpdates = [];
   const laneSegments = [];
   for (const edge of edges) {
-    if (edge.id === studyDesignEdgeId) continue;
+    if (edge.id === studyDesignEdgeId || edge.id === instrumentDesignEdgeId) continue;
     const logicalEdgeId = edgeSegments.get(edge.id) || edge.id;
     const role = logicalEdgeRole.get(logicalEdgeId);
     if (!role) {
@@ -96,7 +100,8 @@ export function buildPathHighlightModel({
         from: { ...(arrows?.from || {}), enabled: false },
       },
       shadow: false,
-      title: `${edge.title || ""}\n${role === "iv" ? "Path to IV" : role === "dv" ? "Path to DV" : "Shared segment of IV and DV paths"}`.trim(),
+      title: `${edge.title || ""}\n${role === "exclusion" ? "Instrument-to-DV exclusion path"
+        : role === "iv" ? "Path to IV" : role === "dv" ? "Path to DV" : "Shared segment of IV and DV paths"}`.trim(),
     });
   }
 
@@ -114,7 +119,8 @@ export function buildPathHighlightModel({
       && node.id !== groupId && node.id !== ivId && node.id !== dvId
       && confounderGroupIds.has(node.id);
     const transientBackground = isIntermediateConfounder ? "#e85d75" : node.color?.background;
-    const palette = isShared ? EDGE_PALETTE.shared : toIv ? EDGE_PALETTE.iv : EDGE_PALETTE.dv;
+    const palette = showExclusionViolations ? EDGE_PALETTE.exclusion
+      : isShared ? EDGE_PALETTE.shared : toIv ? EDGE_PALETTE.iv : EDGE_PALETTE.dv;
     nodeUpdates.push({
       id: node.id,
       opacity: 1,
@@ -244,10 +250,13 @@ function drawPathLaneArrow(context, point, angle, color, scale) {
   context.restore();
 }
 
-export function drawPathLanes(context, { segments = [], positions = {}, boxes = [], scale = 1, ivId, dvId }) {
+export function drawPathLanes(context, { segments = [], positions = {}, boxes = [], scale = 1,
+  ivId, dvId, instrumentId }) {
   const occupied = [];
   const iv = positions[ivId], dv = positions[dvId];
   if (iv && dv) occupied.push([iv, dv]);
+  const instrument = positions[instrumentId];
+  if (instrument && iv) occupied.push([instrument, iv]);
   const logicalEdges = new Map();
   for (const segment of segments) {
     if (!logicalEdges.has(segment.logicalEdgeId)) logicalEdges.set(segment.logicalEdgeId, []);

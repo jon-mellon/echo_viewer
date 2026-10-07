@@ -18,7 +18,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   };
 
   function startDefinition(role) {
-    if (state.interfaceMode !== "dag2" || !["iv", "dv"].includes(role)) return;
+    if (state.interfaceMode !== "dag2" || !["iv", "dv", "instrument"].includes(role)) return;
     // Start the query engine while the user chooses a source. The source load
     // still awaits this setup and reports any error through its normal path.
     void prewarmEvidence().catch(() => {});
@@ -216,6 +216,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         splitId: draft.split_id,
       });
       applyProjectOperation(next);
+      if (draft.role === "instrument") {
+        state.showExclusionViolations = true;
+        state.showConfoundersOnly = false;
+        state.showCollidersOnly = false;
+      }
       state.definitionDraft = null;
       state.selectedVariableIds.clear();
       state.activeGroupId = null;

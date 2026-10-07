@@ -4,7 +4,7 @@ import * as mapInteractions from "./map_interactions.mjs";
 export function createDagEventController({
   state, elements: els, dagNetwork,
   renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
-  renderSearch, fitSearchContext, prefetchVariableSearch, toggleAnchorSearchMode, finishSchemaChoice, changeAnchor,
+  renderSearch, fitSearchContext, prefetchVariableSearch, toggleAnchorSearchMode, finishSchemaChoice, changeAnchor, renderAnchorBar,
   setWorkflowMode, renderGroupList, closeGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
@@ -17,7 +17,7 @@ export function createDagEventController({
   showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean, startEditSplit,
-  dismissEvidencePane, showExcludedLinks,
+  dismissEvidencePane, showExcludedLinks, startDefinition,
 }) {
 function installHandlers() {
   els.closeEvidencePane.addEventListener("click", dismissEvidencePane);
@@ -43,6 +43,18 @@ function installHandlers() {
   // Change which group is the IV / DV anchor.
   els.changeDv.addEventListener("click", () => changeAnchor("dv"));
   els.changeIv.addEventListener("click", () => changeAnchor("iv"));
+  els.instrumentSelect.addEventListener("change", () => {
+    const id = els.instrumentSelect.value || null;
+    state.project.instrument_group_id = id && id !== state.project.iv_group_id
+      && id !== state.project.dv_group_id ? id : null;
+    state.showExclusionViolations = Boolean(state.project.instrument_group_id);
+    state.showConfoundersOnly = !state.showExclusionViolations;
+    state.showCollidersOnly = false;
+    saveProjectLocally();
+    rebuildProject();
+  });
+  els.instrumentDefineNew.addEventListener("click", () => startDefinition("instrument"));
+  els.instrumentSearch.addEventListener("input", renderAnchorBar);
   els.editSplitDv?.addEventListener("click", () => startEditSplit(state.project.dv_group_id));
   els.editSplitIv?.addEventListener("click", () => startEditSplit(state.project.iv_group_id));
 
@@ -126,18 +138,27 @@ function installHandlers() {
     drawMap();
   });
   els.showUnfiltered.addEventListener("click", () => {
+    state.showExclusionViolations = false;
     state.showConfoundersOnly = false;
     state.showCollidersOnly = false;
     rebuildProject();
   });
   els.toggleConfoundersOnly.addEventListener("click", () => {
+    state.showExclusionViolations = false;
     state.showConfoundersOnly = true;
     state.showCollidersOnly = false;
     rebuildProject();
   });
   els.toggleCollidersOnly.addEventListener("click", () => {
+    state.showExclusionViolations = false;
     state.showCollidersOnly = true;
     state.showConfoundersOnly = false;
+    rebuildProject();
+  });
+  els.toggleExclusionViolations.addEventListener("click", () => {
+    state.showExclusionViolations = true;
+    state.showConfoundersOnly = false;
+    state.showCollidersOnly = false;
     rebuildProject();
   });
   els.confounderPathLength.addEventListener("input", () => {
@@ -145,7 +166,7 @@ function installHandlers() {
     if (!Number.isFinite(requested) || requested < 1) return;
     state.confounderMaxPathLength = clampNumber(requested, 1, 99);
     els.confounderPathLength.value = String(state.confounderMaxPathLength);
-    if (!state.showCollidersOnly) state.showConfoundersOnly = true;
+    if (!state.showCollidersOnly && !state.showExclusionViolations) state.showConfoundersOnly = true;
     rebuildProject();
   });
   els.confounderPathLength.addEventListener("change", () => {

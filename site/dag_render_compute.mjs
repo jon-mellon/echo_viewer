@@ -16,7 +16,7 @@ function nodeBounds(layout) {
 
 function routeDag(input, layout) {
   const corridor = studyArrowCorridor({
-    ivId: input.ivId, dvId: input.dvId,
+    ivId: input.instrumentId || input.ivId, dvId: input.dvId,
     positions: layout.positions, boxes: layout.boxes,
     fontSize: layout.params.fontSize,
   });

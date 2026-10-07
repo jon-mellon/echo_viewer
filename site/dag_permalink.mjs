@@ -1,7 +1,7 @@
 export const PERMALINK_VERSION = "1";
 
 const booleanFields = {
-  conf: "showConfoundersOnly", coll: "showCollidersOnly",
+  conf: "showConfoundersOnly", coll: "showCollidersOnly", excl: "showExclusionViolations",
   bottle: "excludeBottleneckedConfounders",
   paths: "hideIrrelevantConfounderLinks", vl: "showVariableLabels", gl: "showGroupLabels",
 };
@@ -30,6 +30,7 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state }) {
   const values = {
     p: PERMALINK_VERSION, schema_url: schemaUrl, data_version: dataVersion,
     iv: state.project.iv_group_id, dv: state.project.dv_group_id,
+    instrument: state.project.instrument_group_id || "",
     mode: state.workflowMode, vlayout: state.variableLayoutSource,
     path: String(state.confounderMaxPathLength),
     selected_group: state.activeGroupId || "", selected_variable: state.selectedVariableId || "",
@@ -54,6 +55,8 @@ export function applyPermalink(params, state) {
   if (!iv || !dv || iv === dv) throw new Error("Permalink IV or DV is absent from the referenced schema.");
   state.project.iv_group_id = iv;
   state.project.dv_group_id = dv;
+  const instrument = resolveGroup(params.get("instrument"));
+  state.project.instrument_group_id = instrument && instrument !== iv && instrument !== dv ? instrument : null;
   for (const group of groups) {
     if (group.group_id === iv) group.type = "iv";
     else if (group.group_id === dv) group.type = "dv";
@@ -75,6 +78,11 @@ export function applyPermalink(params, state) {
   for (const [parameter, field] of Object.entries(booleanFields)) if (params.has(parameter)) state[field] = params.get(parameter) === "1";
   if (!params.has("conf")) state.showConfoundersOnly = !params.has("coll");
   if (!params.has("coll")) state.showCollidersOnly = false;
+  state.showExclusionViolations = Boolean(state.project.instrument_group_id);
+  if (state.showExclusionViolations) {
+    state.showConfoundersOnly = false;
+    state.showCollidersOnly = false;
+  }
   if (state.showConfoundersOnly && state.showCollidersOnly) {
     state.showCollidersOnly = false;
   }

@@ -3,6 +3,7 @@ import * as projectOps from "./dag_project.mjs";
 import { h, replaceChildren, safeUrl } from "./dom_builder.mjs";
 
 export const STUDY_DESIGN_EDGE_ID = "__study_design_iv_to_dv__";
+export const STUDY_INSTRUMENT_EDGE_ID = "__study_design_instrument_to_iv__";
 
 export function createDagInspectorController({
   state, elements, truncate, nowIso, takeSnapshot,
@@ -14,8 +15,10 @@ export function createDagInspectorController({
   const diagnosticView = () => ({
     showConfoundersOnly: state.showConfoundersOnly,
     showCollidersOnly: state.showCollidersOnly,
+    showExclusionViolations: state.showExclusionViolations,
     confounderPathsByGroup: state.confounderPathsByGroup,
     colliderPathsByGroup: state.colliderPathsByGroup,
+    exclusionPathsByGroup: state.exclusionPathsByGroup,
   });
   const isDoi = id => typeof id === "string" && /^10\.\d{4,}\/\S+/.test(id.trim());
   const edgeSourcesLoading = link => {
@@ -56,6 +59,19 @@ export function createDagInspectorController({
   }
 
   function renderStudyRelation() {
+    if (state.selectedEdgeId === STUDY_INSTRUMENT_EDGE_ID) {
+      const instrument = state.project?.groups.find(group => group.group_id === state.project.instrument_group_id);
+      const iv = state.project?.groups.find(group => group.group_id === state.project.iv_group_id);
+      if (!instrument || !iv) return;
+      elements.edgeInspector.className = "edge-inspector";
+      elements.edgeInspector.hidden = false;
+      elements.closeEvidencePane.hidden = false;
+      elements.provenancePanel.hidden = true;
+      replaceChildren(elements.edgeInspector,
+        h("strong", { textContent: `${instrument.label} → ${iv.label}` }),
+        h("div", { textContent: "Selected instrument relationship; not itself an evidence link." }));
+      return;
+    }
     const model = inspector.studyInspector(state.project, state.rawLinksById);
     if (!model) return;
     const { sourceLabel, targetLabel, rawIds, keys } = model;
@@ -86,7 +102,8 @@ export function createDagInspectorController({
   }
 
   function renderEdge() {
-    if (state.selectedEdgeId === STUDY_DESIGN_EDGE_ID) return renderStudyRelation();
+    if (state.selectedEdgeId === STUDY_DESIGN_EDGE_ID
+      || state.selectedEdgeId === STUDY_INSTRUMENT_EDGE_ID) return renderStudyRelation();
     const link = selectedEdge();
     if (!link) {
       elements.edgeInspector.hidden = true;

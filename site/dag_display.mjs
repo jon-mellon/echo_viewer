@@ -7,6 +7,8 @@ import { escapeHtml } from "./text_utils.mjs";
 export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const isIv = group.type === "iv";
   const isDv = group.type === "dv";
+  const isInstrument = group.group_id === view.instrumentId;
+  const isViolation = view.showExclusionViolations && view.exclusionViolationIds?.has(group.group_id);
   const diagnosticCandidateIds = view.showCollidersOnly
     ? view.colliderGroupIds
     : view.confounderGroupIds;
@@ -31,8 +33,8 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const isPathMediator = (view.showConfoundersOnly || view.showCollidersOnly)
     && diagnosticRole === "mediator";
   const isSelected = group.group_id === view.activeGroupId;
-  const color = isConfounder ? "#c62828" : isCollider ? "#7c3aed" : isPathMediator ? "#6b7280" : view.groupColor;
-  const roleTag = isIv ? " (IV)" : isDv ? " (DV)" : "";
+  const color = isViolation ? "#c62828" : isInstrument ? "#166534" : isConfounder ? "#c62828" : isCollider ? "#7c3aed" : isPathMediator ? "#6b7280" : view.groupColor;
+  const roleTag = isIv ? " (IV)" : isDv ? " (DV)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
   return {
@@ -47,11 +49,11 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     mass: 1 + Math.min(3, Math.sqrt(group.variable_ids.length || group.member_count || 1) / 6),
     color: {
       background: color,
-      border: isSelected ? "#b83b5e" : isConfounder ? "#7f1d1d" : isCollider ? "#4c1d95" : isPathMediator ? "#374151" : "#fbfcfa",
+      border: isSelected ? "#b83b5e" : isViolation ? "#7f1d1d" : isConfounder ? "#7f1d1d" : isCollider ? "#4c1d95" : isPathMediator ? "#374151" : "#fbfcfa",
       highlight: { background: color, border: isConfounder ? "#4c0d0d" : isCollider ? "#2e1065" : isPathMediator ? "#1f2937" : "#b83b5e" },
       hover: { background: color, border: "#ffffff" },
     },
-    shape: (isIv || isDv) ? "ellipse" : "box",
+    shape: (isIv || isDv || isInstrument) ? "ellipse" : "box",
     borderWidth: isSelected ? 3 : 2.4,
     // Light outline keeps dense links visually separated from node bodies.
     shadow: isSelected

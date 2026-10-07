@@ -57,6 +57,14 @@
             <button id="editSplitIv" class="text-button" type="button" hidden>Edit split</button>
             <button id="changeIv" class="text-button" type="button">Change</button>
           </div>
+          <div class="anchor-row" id="instrumentRow" hidden>
+            <label class="anchor-tag" for="instrumentSelect">Instrument (optional)</label>
+            <input id="instrumentSearch" class="search-input" type="search" placeholder="Search groups" aria-label="Search instrument groups">
+            <select id="instrumentSelect" class="search-input" aria-label="Instrument (optional)">
+              <option value="">None</option>
+            </select>
+            <button id="instrumentDefineNew" class="text-button" type="button">Define new group</button>
+          </div>
           <div class="mini-toolbar dag2-history-controls">
             <button id="dag2UndoBtn" class="toolbar-button" type="button" disabled>↩ Undo</button>
             <button id="dag2RedoBtn" class="toolbar-button" type="button" disabled>Redo ↪</button>
@@ -284,6 +292,7 @@
               <button id="showUnfiltered" class="toolbar-button" type="button" aria-pressed="false" title="Show all groups without a confounder or collider filter">Unfiltered</button>
               <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the IV, DV, and groups that could point into both; bidirectional edges count in either direction">Confounders only</button>
               <button id="toggleCollidersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the IV, DV, and groups that both could point into; bidirectional edges count in either direction">Colliders only</button>
+              <button id="toggleExclusionViolations" class="toolbar-button" type="button" aria-pressed="false" hidden>Exclusion restriction violations</button>
               <label class="path-length-control" for="confounderPathLength" title="Maximum number of directed edges allowed on each path from a confounder to the IV and DV">
                 <span>Max path</span>
                 <input id="confounderPathLength" class="path-length-input" type="number" min="1" max="99" step="1" value="1" inputmode="numeric" aria-label="Maximum confounder path length">

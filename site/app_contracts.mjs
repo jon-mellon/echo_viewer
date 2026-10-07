@@ -35,6 +35,7 @@
  * @property {string} active_grouping_set_id
  * @property {string} iv_group_id
  * @property {string} dv_group_id
+ * @property {string | null} [instrument_group_id]
  * @property {Group[]} groups
  * @property {JsonValue[]} links
  * @property {JsonValue[]} decisions

@@ -56,6 +56,16 @@ export function createDagProjectController({
       schema: state.interfaceMode === "dag2" ? null : currentSchema(),
       clusterOf: state.clusterOf, clusterMembers: state.clusterMembers,
     }));
+    const instrument = state.project?.instrument_group_id;
+    if (instrument && state.project.groups.some(group => group.group_id === instrument)
+      && instrument !== state.project.iv_group_id && instrument !== state.project.dv_group_id) {
+      state.showExclusionViolations = true;
+      state.showConfoundersOnly = false;
+      state.showCollidersOnly = false;
+    } else {
+      state.project.instrument_group_id = null;
+      state.showExclusionViolations = false;
+    }
     Object.assign(state, workflow.transition(state, { type: "clear-editor" }));
     invalidateMapCaches();
   }

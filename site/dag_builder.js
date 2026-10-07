@@ -119,7 +119,7 @@ function initElements() {
     "definitionManualReview", "definitionValidation", "definitionReviewBack", "definitionSave",
     "workflowHint", "dagStatusBadge",
     "variablePanel", "variablePanelDisclosure", "variablePanelCount", "variablePanelList",
-    "anchorBar", "anchorDvLabel", "anchorIvLabel", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn",
+    "anchorBar", "anchorDvLabel", "anchorIvLabel", "instrumentRow", "instrumentSearch", "instrumentSelect", "instrumentDefineNew", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn",
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",
     // Grouping schema
@@ -131,7 +131,7 @@ function initElements() {
     // Map
     "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts",
     "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
+    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
@@ -961,6 +961,14 @@ function hasAnyMapping(sourceIds, targetIds) {
 }
 
 function computeVisibleLinks() {
+  const instrumentId = state.project.instrument_group_id;
+  if (instrumentId && (instrumentId === state.project.iv_group_id
+    || instrumentId === state.project.dv_group_id
+    || !dagGroups().some(group => group.group_id === instrumentId))) {
+    state.project.instrument_group_id = null;
+    state.showExclusionViolations = false;
+    state.showConfoundersOnly = true;
+  }
   const excludedCount = state.project.links.filter(link => link.display_status === "excluded").length;
   els.showExcludedLinks.hidden = excludedCount === 0;
   els.showExcludedLinks.textContent = `Excluded links (${excludedCount})`;
@@ -969,11 +977,13 @@ function computeVisibleLinks() {
     links: state.project.links,
     ivId: state.project.iv_group_id,
     dvId: state.project.dv_group_id,
+    instrumentId: state.project.instrument_group_id,
     maxPathLength: state.confounderMaxPathLength,
     excludeBottlenecked: state.excludeBottleneckedConfounders,
     filterByCausalRelevance: false,
     showConfoundersOnly: state.showConfoundersOnly,
     showCollidersOnly: state.showCollidersOnly,
+    showExclusionViolations: state.showExclusionViolations,
     hideIrrelevantDiagnosticLinks: state.hideIrrelevantConfounderLinks,
   });
   state.componentGroupIds = view.componentGroupIds;
@@ -988,6 +998,10 @@ function computeVisibleLinks() {
   state.colliderPathsByGroup = view.colliders.pathsByGroup;
   state.colliderLinkPairKeys = view.colliders.linkPairKeys;
   state.bottleneckedColliderIds = view.colliders.bottleneckedIds;
+  state.exclusionViolationIds = view.exclusionViolations.violationIds;
+  state.exclusionPathIds = view.exclusionViolations.pathIds;
+  state.exclusionPathsByGroup = view.exclusionViolations.pathsByGroup;
+  state.exclusionLinkPairKeys = view.exclusionViolations.linkPairKeys;
 }
 
 function showExcludedLinks() {
@@ -1472,7 +1486,7 @@ const eventController = createDagEventController({
   state, elements: els, dagNetwork: dagNetworkController,
   renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
   renderSearch, fitSearchContext, prefetchVariableSearch: loadVariableSearchCatalog,
-  toggleAnchorSearchMode, finishSchemaChoice, changeAnchor,
+  toggleAnchorSearchMode, finishSchemaChoice, changeAnchor, renderAnchorBar,
   setWorkflowMode, renderGroupList, closeGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
@@ -1485,7 +1499,7 @@ const eventController = createDagEventController({
   showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean,
-  startEditSplit, dismissEvidencePane,
+  startEditSplit, startDefinition, dismissEvidencePane,
   showExcludedLinks,
 });
 

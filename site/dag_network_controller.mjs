@@ -5,7 +5,8 @@ import { attachDagInteractions } from "./dag_interactions.mjs";
 import * as dagDisplay from "./dag_display.mjs";
 import * as workflow from "./dag_workflow.mjs";
 import * as dagPathHighlights from "./dag_path_highlights.mjs";
-import { STUDY_DESIGN_EDGE_ID } from "./dag_inspector_controller.mjs";
+import { STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "./dag_inspector_controller.mjs";
+import { studyDesignEdgeData } from "./dag_study_edges.mjs";
 
 export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId, links, visualData) {
   if (previousId === selectedId) return [];
@@ -133,6 +134,9 @@ function dagStudyArrowCorridor({ ivId, dvId, positions, boxes, fontSize = 12 }) 
 function visNodeData(group, layoutPoint, layoutParams = {}) {
   return dagDisplay.visNodeData(group, layoutPoint, layoutParams, {
     showCollidersOnly: state.showCollidersOnly, showConfoundersOnly: state.showConfoundersOnly,
+    showExclusionViolations: state.showExclusionViolations,
+    exclusionViolationIds: state.exclusionViolationIds,
+    instrumentId: state.project?.instrument_group_id,
     colliderGroupIds: state.colliderGroupIds, colliderPathGroupIds: state.colliderPathGroupIds,
     confounderGroupIds: state.confounderGroupIds, confounderPathGroupIds: state.confounderPathGroupIds,
     ivId: state.project?.iv_group_id, dvId: state.project?.dv_group_id,
@@ -160,7 +164,7 @@ function refreshEdgeSelection({ redraw = true } = {}) {
 function routedDagData(groups, links, layout) {
   const boxes = layout.boxes;
   const corridor = dagStudyArrowCorridor({
-    ivId: state.project?.iv_group_id,
+    ivId: state.project?.instrument_group_id || state.project?.iv_group_id,
     dvId: state.project?.dv_group_id,
     positions: layout.positions,
     boxes,
@@ -190,36 +194,6 @@ function routedDagDataFromRoutes(groups, routes, layout) {
   return { ...routed, nodeData: [...nodeData, ...routed.nodeData] };
 }
 
-function studyDesignEdgeData(groups) {
-  const groupIds = new Set(groups.map((group) => group.group_id));
-  const ivId = state.project?.iv_group_id;
-  const dvId = state.project?.dv_group_id;
-  if (!groupIds.has(ivId) || !groupIds.has(dvId) || ivId === dvId) return null;
-  const evidence = state.project?.links?.find((link) => link.is_target_relation);
-  const evidenceCount = evidence
-    ? new Set([...(evidence.a_to_b_raw_link_ids || []), ...(evidence.b_to_a_raw_link_ids || [])]).size
-    : 0;
-  return {
-    id: STUDY_DESIGN_EDGE_ID,
-    from: ivId,
-    to: dvId,
-    arrows: { to: { enabled: true, scaleFactor: 1.15 } },
-    color: {
-      color: "#168a52",
-      highlight: "#168a52",
-      hover: "#168a52",
-      inherit: false,
-      opacity: 1,
-    },
-    width: 5.5,
-    selectionWidth: 0,
-    chosen: true,
-    smooth: { enabled: false },
-    shadow: { enabled: true, color: "rgba(22,138,82,0.32)", size: 8, x: 0, y: 1 },
-    title: `Selected study relationship: IV → DV (not an evidence link). ${evidenceCount} evidence record(s) attached.`,
-  };
-}
-
 function dagVisibleGroups() {
   const groups = dagGroups();
   return groups.filter((group) => state.componentGroupIds.has(group.group_id));
@@ -240,6 +214,7 @@ function drawConfounderPathLanes(context) {
     scale,
     ivId: state.project?.iv_group_id,
     dvId: state.project?.dv_group_id,
+    instrumentId: state.project?.instrument_group_id,
   });
 }
 
@@ -272,6 +247,7 @@ function highlightLogicalDagEdges(logicalEdgeIds) {
   if (unchanged || !_visEdges) return;
   clearLogicalDagEdgeHover();
   nextIds.delete(STUDY_DESIGN_EDGE_ID);
+  nextIds.delete(STUDY_INSTRUMENT_EDGE_ID);
   if (!nextIds.size) return;
 
   const segmentIds = _visEdges.getIds().filter(
@@ -301,14 +277,18 @@ function highlightConnectedDagEdges(nodeId) {
 function highlightConfounderPaths(groupId) {
   if (_dagHoveredConfounderId === groupId) return;
   clearConfounderPathHover();
-  const candidateIds = state.showCollidersOnly
-    ? state.colliderGroupIds
-    : state.confounderGroupIds;
-  if ((!state.showConfoundersOnly && !state.showCollidersOnly) || !candidateIds.has(groupId)) return;
-  const rawPaths = state.showCollidersOnly
+  const candidateIds = state.showExclusionViolations ? state.exclusionViolationIds
+    : state.showCollidersOnly ? state.colliderGroupIds : state.confounderGroupIds;
+  if ((!state.showConfoundersOnly && !state.showCollidersOnly && !state.showExclusionViolations)
+    || !candidateIds.has(groupId)) return;
+  const rawPaths = state.showExclusionViolations
+    ? state.exclusionPathsByGroup.get(groupId)
+    : state.showCollidersOnly
     ? state.colliderPathsByGroup.get(groupId)
     : state.confounderPathsByGroup.get(groupId);
-  const paths = state.showCollidersOnly && rawPaths
+  const paths = state.showExclusionViolations && rawPaths
+    ? { toIv: [], toDv: rawPaths }
+    : state.showCollidersOnly && rawPaths
     ? { toIv: rawPaths.fromIv, toDv: rawPaths.fromDv }
     : rawPaths;
   if (!paths || !_visNodes || !_visEdges) return;
@@ -326,10 +306,12 @@ function highlightConfounderPaths(groupId) {
     nodes: _visNodes.get(),
     edgeSegments: _dagEdgeSegments,
     studyDesignEdgeId: STUDY_DESIGN_EDGE_ID,
+    instrumentDesignEdgeId: STUDY_INSTRUMENT_EDGE_ID,
     groupId,
     ivId: state.project?.iv_group_id,
     dvId: state.project?.dv_group_id,
     showConfoundersOnly: state.showConfoundersOnly,
+    showExclusionViolations: state.showExclusionViolations,
     confounderGroupIds: state.confounderGroupIds,
   });
   _dagPathLaneSegments = model.laneSegments;
@@ -367,11 +349,14 @@ function renderDag({ reuseGeometry = false } = {}) {
     centroids: groups.map(group => [group.group_id, groupMapCentroid(group)]),
     ivId: state.project?.iv_group_id,
     dvId: state.project?.dv_group_id,
+    instrumentId: state.project?.instrument_group_id,
     mode: state.dagLayoutMode,
     width: els.dagNetwork.clientWidth || 630,
     height: els.dagNetwork.clientHeight || 700,
     viewSignature: state.showConfoundersOnly
       ? `confounders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
+      : state.showExclusionViolations
+        ? `exclusion:${state.project?.instrument_group_id}:${state.confounderMaxPathLength}`
       : state.showCollidersOnly
         ? `colliders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
         : "all",
@@ -422,8 +407,7 @@ function applyDagRender(groups, layout, routes) {
   const { nodeData, edgeData, edgeSegments } = routedDagDataFromRoutes(groups, routes, layout);
   const previousNodeData = _dagNodeDataById;
   _dagNodeDataById = new Map(nodeData.map(node => [node.id, node]));
-  const designEdge = studyDesignEdgeData(groups);
-  if (designEdge) edgeData.push(designEdge);
+  edgeData.push(...studyDesignEdgeData(groups, state.project));
   _dagEdgeSegments = edgeSegments;
   _renderedSelectedEdgeId = state.selectedEdgeId;
 
@@ -558,8 +542,9 @@ function attachDagNetworkHandlers(network) {
     clearPathHover: clearConfounderPathHover,
     highlightPaths: highlightConfounderPaths,
     isDiagnosticCandidate(id) {
-      const ids = state.showCollidersOnly ? state.colliderGroupIds : state.confounderGroupIds;
-      return (state.showConfoundersOnly || state.showCollidersOnly) && ids.has(id);
+      const ids = state.showExclusionViolations ? state.exclusionViolationIds
+        : state.showCollidersOnly ? state.colliderGroupIds : state.confounderGroupIds;
+      return (state.showConfoundersOnly || state.showCollidersOnly || state.showExclusionViolations) && ids.has(id);
     },
     hasGroup: id => Boolean(groupById(id)),
     logicalEdgeId: id => _dagEdgeSegments.get(id) || id,

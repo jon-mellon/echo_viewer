@@ -3,6 +3,7 @@ import {
   createGraph,
   filterGraphByColliders,
   filterGraphByConfounders,
+  filterGraphByExclusionViolations,
   filterGraphByLinkPairs,
   filterGraphLinks,
   filterGraphNodes,
@@ -17,11 +18,13 @@ export function deriveDagView({
   links = [],
   ivId = null,
   dvId = null,
+  instrumentId = null,
   maxPathLength = 1,
   excludeBottlenecked = false,
   filterByCausalRelevance = false,
   showConfoundersOnly = false,
   showCollidersOnly = false,
+  showExclusionViolations = false,
   hideIrrelevantDiagnosticLinks = false,
 } = {}) {
   const fullGraph = createGraph(groups.map((group) => group.group_id), links);
@@ -36,12 +39,16 @@ export function deriveDagView({
   };
   const confounderGraph = filterGraphByConfounders(fullGraph, diagnosticOptions);
   const colliderGraph = filterGraphByColliders(fullGraph, diagnosticOptions);
+  const exclusionGraph = filterGraphByExclusionViolations(fullGraph, {
+    instrumentId, ivId, dvId, maxPathLength, traversableLink,
+  });
   const componentGraph = connectedComponentGraph(connectivityGraph, ivId);
   const canFilterFromIv = filterByCausalRelevance && connectivityGraph.nodeIds.has(ivId);
   const anchorsReady = fullGraph.nodeIds.has(ivId) && fullGraph.nodeIds.has(dvId) && ivId !== dvId;
 
   let selectedGraph;
-  if (showConfoundersOnly && anchorsReady) selectedGraph = confounderGraph;
+  if (showExclusionViolations && anchorsReady && instrumentId) selectedGraph = exclusionGraph;
+  else if (showConfoundersOnly && anchorsReady) selectedGraph = confounderGraph;
   else if (showCollidersOnly && anchorsReady) selectedGraph = colliderGraph;
   else selectedGraph = canFilterFromIv ? componentGraph : fullGraph;
 
@@ -50,7 +57,9 @@ export function deriveDagView({
   visibleGraph = filterGraphLinks(visibleGraph, (link) => {
     return link.display_status !== "excluded" || link.is_target_relation;
   });
-  if (anchorsReady && (showConfoundersOnly || showCollidersOnly) && hideIrrelevantDiagnosticLinks) {
+  if (showExclusionViolations && instrumentId) {
+    visibleGraph = filterGraphByLinkPairs(visibleGraph, exclusionGraph.metadata.linkPairKeys);
+  } else if (anchorsReady && (showConfoundersOnly || showCollidersOnly) && hideIrrelevantDiagnosticLinks) {
     const retainedPairs = showCollidersOnly
       ? colliderGraph.metadata.linkPairKeys
       : confounderGraph.metadata.linkPairKeys;
@@ -63,5 +72,6 @@ export function deriveDagView({
     visibleLinks: visibleGraph.links,
     confounders: confounderGraph.metadata,
     colliders: colliderGraph.metadata,
+    exclusionViolations: exclusionGraph.metadata,
   };
 }
