@@ -181,6 +181,8 @@ test("concepts used by visible DAG links appear before other group concepts", as
     assert.deepEqual(labelRequests[0], ["v12", "v11", ...ids.slice(0, 8)]);
     assert.match(elements.edgeInspector.textContent, /Concept v12/);
     assert.equal(elements.edgeInspector.findAll("li").length, 10);
+    assert.equal(elements.edgeInspector.findAll("li")[2].className, "group-concept-boundary",
+      "the dashed divider follows concepts used by visible links");
 
     state.visibleLinks = [{ group_a: "g1", group_b: "g2", a_to_b_raw_link_ids: ["r3"] }];
     controller.renderGroupDefinition();
@@ -188,6 +190,34 @@ test("concepts used by visible DAG links appear before other group concepts", as
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(endpointRequests.length, 1, "known raw link endpoints are reused");
     assert.equal(elements.edgeInspector.findAll("li")[0].findAll("span")[0].textContent, "Concept v11");
+    assert.equal(elements.edgeInspector.findAll("li")[1].className, "group-concept-boundary");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("visible concept boundary appears at the start of the next page", async () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName) };
+  try {
+    const ids = Array.from({ length: 11 }, (_, index) => `v${index + 1}`);
+    const state = {
+      project: { groups: [{ group_id: "g1", label: "Variable", variable_ids: ids }] },
+      selectedEvidenceGroupId: "g1",
+      variableById: new Map(ids.map(id => [id, { concept_label: id }])),
+      rawLinksById: new Map(ids.slice(0, 10).map(id => [id,
+        { raw_causal_link_id: id, source_variable_id: id, target_variable_id: "other" }])),
+      visibleLinks: [{ group_a: "g1", group_b: "g2", a_to_b_raw_link_ids: ids.slice(0, 10) }],
+    };
+    const elements = { edgeInspector: new Element("div"), closeEvidencePane: new Element("button"),
+      provenancePanel: new Element("div") };
+    const controller = createDagInspectorController({ state, elements });
+    controller.renderGroupDefinition();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(elements.edgeInspector.findAll("ol")[0].className, "");
+    elements.edgeInspector.querySelector("[data-concept-page='next']").click();
+    assert.equal(elements.edgeInspector.findAll("ol")[0].className,
+      "group-concept-boundary-at-page-start");
   } finally {
     globalThis.document = previousDocument;
   }

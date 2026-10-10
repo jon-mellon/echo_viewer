@@ -1478,6 +1478,23 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.group-concepts .group-concept-boundary,
+.group-concepts .group-concept-boundary-at-page-start {
+  position: relative;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.group-concepts .group-concept-boundary::before,
+.group-concepts .group-concept-boundary-at-page-start::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -22px;
+  right: 0;
+  border-top: 1px dashed var(--line);
+}
+
 .group-concept-exclude {
   margin-left: 6px;
   padding: 0 3px;

@@ -146,14 +146,21 @@ export function createDagInspectorController({
         h("strong", { textContent: `Underlying concepts${count ? ` (${count})` : ""}` }),
         priority?.matchedCount ? h("div", { className: "small-note",
           textContent: "Concepts used by visible DAG links first" }) : null,
-        pageIds.length ? h("ol", { start: start + 1 }, pageIds.map(id => {
+        pageIds.length ? h("ol", {
+          start: start + 1,
+          className: priority?.matchedCount > 0 && priority.matchedCount === start && start < ids.length
+            ? "group-concept-boundary-at-page-start" : "",
+        }, pageIds.map((id, index) => {
           const knownLabel = conceptLabels.get(id)
             || state.variableById?.get(id)?.concept_label
             || state.variableById?.get(id)?.display_label;
           const label = knownLabel || (loading ? "Loading…" : id);
           const canExclude = Boolean(knownLabel && (resolvedConceptIds.has(id)
             || state.variableById?.get(id)?.concept_label || state.variableById?.get(id)?.display_label));
-          return h("li", {}, h("span", { textContent: label }), canExclude ? h("button", {
+          return h("li", {
+            className: priority?.matchedCount === start + index && index > 0
+              ? "group-concept-boundary" : "",
+          }, h("span", { textContent: label }), canExclude ? h("button", {
             className: "group-concept-exclude", type: "button", dataset: { excludeConceptId: id },
             attrs: { "aria-label": `Exclude ${label} from ${group.label || group.group_id}` },
             title: `Exclude ${label}`,
