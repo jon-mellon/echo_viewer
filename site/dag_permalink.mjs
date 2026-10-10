@@ -15,6 +15,7 @@ export function permalinkInput(location = globalThis.location) {
 export function schemaMatchesProject(schema, project) {
   if (!schema || !project || schema.grouping_set_id !== project.active_grouping_set_id) return false;
   if (Object.keys(project.link_decisions || {}).length) return false;
+  if (JSON.stringify(project.finding_decisions || {}) !== JSON.stringify(schema.finding_decisions || {})) return false;
   const source = new Map((schema.groups || []).map(group => [group.group_id, group]));
   if ((project.groups || []).length !== source.size) return false;
   return project.groups.every(group => {

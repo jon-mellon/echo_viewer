@@ -1782,7 +1782,7 @@ h2 {
 
 .provenance-table--edge {
   table-layout: fixed;
-  min-width: 480px;
+  min-width: 620px;
 }
 
 .provenance-table--edge th,
@@ -1800,6 +1800,21 @@ h2 {
 .provenance-table--edge th:nth-child(4) { width: 10%; }
 .provenance-table--edge th:nth-child(5),
 .provenance-table--edge th:nth-child(6) { width: 14%; }
+.provenance-table--edge th:nth-child(7) { width: 12%; }
+
+.finding-exclude-button {
+  color: #b42318;
+  background: transparent;
+  border: 0;
+  font-size: 20px;
+  cursor: pointer;
+}
+.finding-excluded { opacity: 0.65; }
+.finding-excluded-label { font-size: 12px; }
+.finding-reason-row { padding: 8px; }
+.finding-reason-row select, .finding-reason-row textarea { display: block; max-width: 100%; margin-bottom: 6px; }
+.finding-reason-row textarea[hidden] { display: none; }
+.excluded-finding-item { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
 
 .provenance-direction + .provenance-direction {
   margin-top: 20px;

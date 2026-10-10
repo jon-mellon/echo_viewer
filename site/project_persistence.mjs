@@ -72,6 +72,7 @@ export function restoreProjectPayload(payload, defaults, currentLayoutSource) {
       rejected_variables: Array.isArray(serialized.rejected_variables) ? serialized.rejected_variables : [],
       restored_variable_ids: serialized.restored_variable_ids || [],
       link_decisions: serialized.link_decisions || {},
+      finding_decisions: serialized.finding_decisions || {},
       carve_outs: Array.isArray(serialized.carve_outs) ? serialized.carve_outs : [],
     },
     selectedUoa,

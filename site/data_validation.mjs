@@ -74,7 +74,7 @@ export function validateProjectPayload(payload) {
     "groups", "links", "decisions", "grouping_imports", "grouping_exports", "carve_outs",
     "rejected_variables", "restored_variable_ids", "undoHistory", "actionLog",
   ]) requireArray(payload, key, "Project payload");
-  for (const key of ["filters", "link_decisions", "seeds", "definitionDraft"]) {
+  for (const key of ["filters", "link_decisions", "finding_decisions", "seeds", "definitionDraft"]) {
     requireRecord(payload, key, "Project payload", { nullable: key === "definitionDraft" });
   }
   requireRecord(payload, "publication", "Project payload", { nullable: true });
@@ -108,6 +108,24 @@ export function validateGroupingSchema(schema) {
       if (Object.hasOwn(decision, "exclude_reason")
         && typeof decision.exclude_reason !== "string") {
         throw new Error(`Invalid exclusion reason for ${edgeId}.`);
+      }
+    }
+  }
+  if (Object.hasOwn(schema, "finding_decisions")) {
+    if (!isRecord(schema.finding_decisions)) throw new Error("Grouping schema.finding_decisions must be an object.");
+    for (const [rawId, decision] of Object.entries(schema.finding_decisions)) {
+      if (!rawId || !isRecord(decision) || decision.display_status !== "excluded") {
+        throw new Error(`Invalid finding decision for ${rawId}.`);
+      }
+      if (Object.hasOwn(decision, "reason_code")
+        && !["not_relevant_to_target_population", "other"].includes(decision.reason_code)) {
+        throw new Error(`Invalid finding exclusion reason for ${rawId}.`);
+      }
+      if (Object.hasOwn(decision, "reason_text") && typeof decision.reason_text !== "string") {
+        throw new Error(`Invalid finding exclusion text for ${rawId}.`);
+      }
+      if (decision.reason_code === "other" && !decision.reason_text?.trim()) {
+        throw new Error(`Other exclusion requires text for ${rawId}.`);
       }
     }
   }

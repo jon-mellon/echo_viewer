@@ -30,8 +30,9 @@ export function aggregateGroupLinks({ project, linkLookup, rawLinksById }) {
   const groups = project.groups.filter(g => g.variable_ids?.length);
   const iv = project.groups.find(g => g.group_id === project.iv_group_id);
   const dv = project.groups.find(g => g.group_id === project.dv_group_id);
-  const evidenceByEdge = indexGroupLinkEvidence(groups, iv, dv, linkLookup);
-  return [...evidenceByEdge.values()].map(({ groupA, groupB, targetPair, aToB, bToA }) => {
+  const evidenceByEdge = indexGroupLinkEvidence(groups, iv, dv, linkLookup, project.finding_decisions || {});
+  return [...evidenceByEdge.values()].filter(({ targetPair, aToB, bToA }) =>
+    targetPair || aToB.length || bToA.length).map(({ groupA, groupB, targetPair, aToB, bToA }) => {
     const edgeId = edgeKey(groupA.group_id, groupB.group_id);
     const decision = normalizeLinkDecision(project.link_decisions[edgeId]) || null;
     return {
@@ -57,7 +58,7 @@ export function aggregateGroupLinks({ project, linkLookup, rawLinksById }) {
 // Index only group pairs that have evidence. The previous implementation scanned
 // every group pair and every cross-product of their members, even though causal
 // mappings are sparse. Rank tuples retain rawLinksBetween's exact evidence order.
-function indexGroupLinkEvidence(groups, iv, dv, linkLookup) {
+function indexGroupLinkEvidence(groups, iv, dv, linkLookup, findingDecisions) {
   const groupById = new Map(groups.map(group => [group.group_id, group]));
   const owners = new Map();
   const positions = new Map();
@@ -99,6 +100,7 @@ function indexGroupLinkEvidence(groups, iv, dv, linkLookup) {
       const targetPosition = positions.get(targetGroup.group_id).get(targetId);
       for (let rawPosition = 0; rawPosition < rawIds.length; rawPosition += 1) {
         const rawId = rawIds[rawPosition];
+        if (findingDecisions[rawId]?.display_status === "excluded") continue;
         const rank = [sourcePosition, targetPosition, rawPosition];
         const prior = ranks.get(rawId);
         if (!prior || compareRank(rank, prior) < 0) ranks.set(rawId, rank);

@@ -55,12 +55,20 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       const before = owners(base), after = owners(local);
       const changed = [...new Set([...before.keys(), ...after.keys()])]
         .filter(id => before.get(id) !== after.get(id));
-      const incidentRawLinks = changed.length ? await dagDataSource.loadIncidentRawLinks(changed) : [];
+      const findingIds = [...new Set([...Object.keys(base.finding_decisions || {}),
+        ...Object.keys(local.finding_decisions || {})])].filter(id =>
+        (base.finding_decisions?.[id]?.display_status === "excluded")
+          !== (local.finding_decisions?.[id]?.display_status === "excluded"));
+      const incidentRawLinks = [...new Map((await Promise.all([
+        changed.length ? dagDataSource.loadIncidentRawLinks(changed) : [],
+        findingIds.length ? dagDataSource.loadRawLinksByIds(findingIds) : [],
+      ])).flat().map(link => [link.raw_causal_link_id, link])).values()];
       const incremented = incrementCompiledDag({
         compiledDag: state.data.compiled_dag, oldSchema: base, newSchema: local,
         incidentRawLinks,
         project: { groups: local.groups, iv_group_id: permalink.get("iv"),
-          dv_group_id: permalink.get("dv"), link_decisions: local.link_decisions || {} },
+          dv_group_id: permalink.get("dv"), link_decisions: local.link_decisions || {},
+          finding_decisions: local.finding_decisions || {} },
       });
       const compiled = { ...incremented, edges: (incremented.edges || []).map(edge => {
         const decision = normalizeLinkDecision(local.link_decisions?.[edge.edge_id]) || null;
@@ -88,6 +96,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     loadLatestSchemaGroups();
     state.project.link_decisions = structuredClone((localRecord?.schema
       || state.data.grouping_sets?.[0])?.link_decisions || {});
+    state.project.finding_decisions = structuredClone((localRecord?.schema
+      || state.data.grouping_sets?.[0])?.finding_decisions || {});
     normalizeProjectDuplicateAssignments();
     if (state.interfaceMode === "dag2") {
       state.phase = "select_iv";
@@ -141,6 +151,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.data.grouping_sets = [schema];
         state.data.default_grouping_set_id = schema.grouping_set_id;
         state.project.link_decisions = structuredClone(schema.link_decisions || {});
+        state.project.finding_decisions = structuredClone(schema.finding_decisions || {});
         loadLatestSchemaGroups();
         normalizeProjectDuplicateAssignments();
         // Compiled nodes and routes already describe this publication. Hydrating

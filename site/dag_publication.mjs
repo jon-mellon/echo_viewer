@@ -5,7 +5,7 @@ import { ensureAnonymousPublicationUser } from "/dag_anonymous_auth.mjs";
 import { setSafeUrl } from "/dom_builder.mjs";
 import { createCompiledArtifacts, evidenceSnapshotForSchema, fullCompileDag,
   COMPILED_DAG_PATH, COMPILED_MANIFEST_PATH, DAG_COMPILER_VERSION } from "/compiled_dag.mjs";
-import { publicCompiledDag, publicLinkDecisions, publicSchemaProjection } from "/public_schema_projection.mjs";
+import { publicCompiledDag, publicLinkDecisions, publicFindingDecisions, publicSchemaProjection } from "/public_schema_projection.mjs";
 
 export const CANONICAL_BASELINE_ID = "a0118906-2366-4cc8-8809-bafdf3860c23";
 export const CANONICAL_BASELINE_HASH = "0afd5f28c1b5456c47cfba84467bea1d62c6dc923a5851281a98d461f60066b4";
@@ -61,7 +61,8 @@ export async function publishWorkingSchema({
   const storagePrefix = `${user.id}/${publicationId}`;
   const evidenceSnapshot = evidenceSnapshotForSchema(publicSchema);
   const publicProject = { ...(compileInput?.project || {}),
-    link_decisions: publicLinkDecisions(publicSchema.link_decisions) };
+    link_decisions: publicLinkDecisions(publicSchema.link_decisions),
+    finding_decisions: publicFindingDecisions(publicSchema.finding_decisions) };
   const dag = compiledDag
     ? publicCompiledDag(compiledDag, publicSchema.link_decisions)
     : fullCompileDag({ schema: publicSchema, ...(compileInput || {}), project: publicProject });

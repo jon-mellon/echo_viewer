@@ -137,7 +137,7 @@ function initElements() {
     // Map
     "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts",
     "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
+    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
@@ -745,9 +745,11 @@ function applyProjectOperation(next) {
       group.variable_ids, group.excluded_nearby_variable_ids]),
     rejected: project?.rejected_variables || [],
     decisions: project?.link_decisions || {},
+    findings: project?.finding_decisions || {},
   });
   const schemaChanged = oldProject && structural(oldProject) !== structural(next);
-  const asSchema = project => ({ groups: (project?.groups || []).map(group => ({
+  const asSchema = project => ({ finding_decisions: project?.finding_decisions || {},
+    groups: (project?.groups || []).map(group => ({
     group_id: group.group_id, label: group.label || "", variable_ids: [...(group.variable_ids || [])],
     ...(Number.isFinite(group.similarity_coherence) ? { similarity_coherence: group.similarity_coherence } : {}),
   })) });
@@ -770,9 +772,13 @@ function applyProjectOperation(next) {
     const before = owner(oldSchema), after = owner(newSchema);
     const changedIds = [...new Set([...before.keys(), ...after.keys()])]
       .filter(id => before.get(id) !== after.get(id));
+    const changedRawIds = [...new Set([...Object.keys(oldSchema.finding_decisions),
+      ...Object.keys(newSchema.finding_decisions)])].filter(id =>
+      (oldSchema.finding_decisions[id]?.display_status === "excluded")
+        !== (newSchema.finding_decisions[id]?.display_status === "excluded"));
     const revision = (state.compiledDagRevision || 0) + 1;
     state.compiledDagRevision = revision;
-    if (!changedIds.length && !state.compiledDagUpdating) {
+    if (!changedIds.length && !changedRawIds.length && !state.compiledDagUpdating) {
       state.compiledDag = incrementCompiledDag({ compiledDag: state.compiledDag, oldSchema, newSchema,
         incidentRawLinks: [], project: next });
     } else {
@@ -781,9 +787,16 @@ function applyProjectOperation(next) {
       state.compiledUpdateTargetSchema = newSchema;
       state.compiledUpdateChangedIds ||= new Set();
       for (const id of changedIds) state.compiledUpdateChangedIds.add(id);
+      state.compiledUpdateChangedRawIds ||= new Set();
+      for (const id of changedRawIds) state.compiledUpdateChangedRawIds.add(id);
       const batchedIds = [...state.compiledUpdateChangedIds];
+      const batchedRawIds = [...state.compiledUpdateChangedRawIds];
       const batchBaseSchema = state.compiledUpdateBaseSchema;
-      const updatePromise = dagDataSource.loadIncidentRawLinks(batchedIds).then(incidentRawLinks => {
+      const updatePromise = Promise.all([
+        batchedIds.length ? dagDataSource.loadIncidentRawLinks(batchedIds) : [],
+        batchedRawIds.length ? dagDataSource.loadRawLinksByIds(batchedRawIds) : [],
+      ]).then(parts => {
+        const incidentRawLinks = [...new Map(parts.flat().map(link => [link.raw_causal_link_id, link])).values()];
         if (state.compiledDagRevision !== revision) return;
         for (const link of incidentRawLinks) {
           if (!state.rawLinksById.has(link.raw_causal_link_id)) state.rawLinks.push(link);
@@ -797,6 +810,7 @@ function applyProjectOperation(next) {
         state.compiledUpdateBaseSchema = null;
         state.compiledUpdateTargetSchema = null;
         state.compiledUpdateChangedIds = null;
+        state.compiledUpdateChangedRawIds = null;
         state.compiledDagUpdating = false;
         renderAll();
       }).catch(error => {
@@ -806,6 +820,7 @@ function applyProjectOperation(next) {
         state.compiledUpdateBaseSchema = null;
         state.compiledUpdateTargetSchema = null;
         state.compiledUpdateChangedIds = null;
+        state.compiledUpdateChangedRawIds = null;
         console.warn("Incremental DAG update failed; a full local recomputation is required.", error);
       }).finally(() => {
         if (state.compiledDagUpdatePromise === updatePromise) state.compiledDagUpdatePromise = null;
@@ -1125,6 +1140,9 @@ function computeVisibleLinks() {
   const excludedCount = state.project.links.filter(link => link.display_status === "excluded").length;
   els.showExcludedLinks.hidden = excludedCount === 0;
   els.showExcludedLinks.textContent = `Excluded links (${excludedCount})`;
+  const excludedFindingCount = Object.keys(state.project.finding_decisions || {}).length;
+  els.showExcludedFindings.hidden = excludedFindingCount === 0;
+  els.showExcludedFindings.textContent = `Excluded findings (${excludedFindingCount})`;
   const view = deriveDagView({
     groups: dagGroups(),
     links: state.project.links,
@@ -1185,6 +1203,56 @@ function showExcludedLinks() {
   refreshDagEdgeSelection();
 }
 
+function persistFindingDecision() {
+  if (state.activeGroupId && !persistentViewer.editorOpen) {
+    void persistentViewer.commitDecision().then(() =>
+      publicationController.workingCopyChanged()).catch(error =>
+      console.error("Could not save finding exclusion", error));
+  }
+}
+
+async function showExcludedFindings() {
+  const ids = Object.keys(state.project.finding_decisions || {});
+  if (!ids.length) return;
+  state.selectedEdgeId = null;
+  state.selectedEvidenceGroupId = null;
+  els.edgeInspector.className = "edge-inspector excluded-links-list";
+  els.edgeInspector.hidden = false;
+  els.provenancePanel.hidden = true;
+  els.closeEvidencePane.hidden = false;
+  replaceChildren(els.edgeInspector, h("strong", { textContent: "Excluded findings" }),
+    h("div", { className: "small-note", textContent: "Loading findings…" }));
+  refreshDagEdgeSelection();
+  try {
+    const missing = ids.filter(id => !state.rawLinksById.has(id));
+    if (missing.length) for (const raw of await dagDataSource.loadRawLinksByIds(missing)) {
+      state.rawLinksById.set(raw.raw_causal_link_id, raw);
+    }
+  } catch (error) {
+    console.warn("Could not load excluded findings.", error);
+  }
+  if (state.selectedEdgeId || state.selectedEvidenceGroupId || els.edgeInspector.hidden) return;
+  replaceChildren(els.edgeInspector, h("strong", { textContent: "Excluded findings" }),
+    ...ids.filter(id => state.project.finding_decisions?.[id]).map(id => {
+      const raw = state.rawLinksById.get(id);
+      const source = state.variableById.get(raw?.source_variable_id)?.concept_label || raw?.source_variable_id || "";
+      const target = state.variableById.get(raw?.target_variable_id)?.concept_label || raw?.target_variable_id || "";
+      const label = raw ? `${truncate(raw.paper_title || raw.paper_id || id, 44)} · ${source} → ${target}` : id;
+      const restore = h("button", { className: "text-button", type: "button", textContent: "Restore" });
+      restore.addEventListener("click", () => {
+        const before = takeSnapshot();
+        if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
+        addDecision("finding_restored", { raw_causal_link_id: id });
+        addToUndoHistory("Restored finding", before, "finding-decision");
+        renderAll();
+        persistFindingDecision();
+        if (Object.keys(state.project.finding_decisions || {}).length) void showExcludedFindings();
+        else { els.edgeInspector.hidden = true; els.closeEvidencePane.hidden = true; }
+      });
+      return h("div", { className: "excluded-finding-item" }, h("span", { textContent: label }), restore);
+    }));
+}
+
 // ─── DAG vis.js rendering ─────────────────────────────────────────────────────
 
 function clampNumber(...args) { return dagNetworkController.clampNumber(...args); }
@@ -1230,10 +1298,19 @@ function excludeGroupConcept(groupId, variableId, label) {
 function renderSelectedEdge() {
   if (!state.selectedEdgeId && state.selectedEvidenceGroupId && inspectorController.renderGroupDefinition()) return;
   const selected = (state.project?.links || []).find(edge => edge.edge_id === state.selectedEdgeId);
-  const rawIds = [...new Set([...(selected?.a_to_b_raw_link_ids || []), ...(selected?.b_to_a_raw_link_ids || [])])];
+  const owners = new Map((state.project?.groups || []).flatMap(group =>
+    (group.variable_ids || []).map(id => [id, group.group_id])));
+  const rawIds = [...new Set([...(selected?.a_to_b_raw_link_ids || []), ...(selected?.b_to_a_raw_link_ids || []),
+    ...(selected ? Object.keys(state.project.finding_decisions || {}) : [])])];
   const missing = rawIds.filter(id => !state.rawLinksById.has(id));
   const loadedVariableIds = () => [...new Set(rawIds.flatMap(id => {
     const link = state.rawLinksById.get(id);
+    if (selected && state.project.finding_decisions?.[id]) {
+      const sourceOwner = owners.get(link?.source_variable_id);
+      const targetOwner = owners.get(link?.target_variable_id);
+      if (!((sourceOwner === selected.group_a && targetOwner === selected.group_b)
+        || (sourceOwner === selected.group_b && targetOwner === selected.group_a))) return [];
+    }
     return link ? [link.source_variable_id, link.target_variable_id] : [];
   }).filter(Boolean))];
   const missingVariables = loadedVariableIds().filter(id => !state.variableById.has(id));
@@ -1515,7 +1592,8 @@ const projectController = createDagProjectController({
 
 const inspectorController = createDagInspectorController({
   state, elements: els, truncate, nowIso, takeSnapshot,
-  applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision,
+  applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision, renderAll,
+  persistFindingDecision,
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
   excludeConcept: excludeGroupConcept,
@@ -1715,7 +1793,7 @@ const eventController = createDagEventController({
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean,
   startEditSplit, startDefinition, dismissEvidencePane,
-  showExcludedLinks,
+  showExcludedLinks, showExcludedFindings,
 });
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────

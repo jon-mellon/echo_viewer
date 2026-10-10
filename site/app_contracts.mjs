@@ -44,6 +44,7 @@
  * @property {JsonValue[]} grouping_exports
  * @property {JsonValue[]} carve_outs
  * @property {Record<string, LinkDecision>} link_decisions
+ * @property {Record<string, {display_status: string, reason_code?: string, reason_text?: string, timestamp?: string}>} finding_decisions
  * @property {JsonValue[]} rejected_variables
  * @property {string[]} [restored_variable_ids]
  * @property {JsonValue | null} publication
@@ -101,6 +102,7 @@
  * @property {Record<string, JsonValue>} [cache_compatibility]
  * @property {Record<string, JsonValue>} [built_against]
  * @property {Record<string, JsonValue>} [migration_provenance]
+ * @property {Record<string, JsonValue>} [finding_decisions]
  */
 
 /**

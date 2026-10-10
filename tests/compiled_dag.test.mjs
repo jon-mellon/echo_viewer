@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { COMPILED_DAG_PATH, DAG_COMPILER_VERSION, createCompiledArtifacts, dagEquals,
   fullCompileDag, incrementCompiledDag, validateCompiledArtifact } from "../site/compiled_dag.mjs";
 import { applyLinkDecisions } from "../site/dag_link_aggregation.mjs";
+import { provenanceModel } from "../site/dag_inspector.mjs";
 
 const group = (group_id, variable_ids, label = group_id) => ({ group_id, label, variable_ids });
 const schema = groups => ({ groups });
@@ -52,6 +53,35 @@ test("removing a group's final concept removes its evidence links", () => {
   const updated = incremental(next);
   assert.equal(updated.nodes.find(node => node.group_id === "a").member_count, 0);
   assert.equal(updated.edges.some(edge => edge.group_a === "a" || edge.group_b === "a"), false);
+});
+
+test("excluding and restoring individual findings changes counts and can remove an edge", () => {
+  const smallRaw = [link("one", "v1", "v3"), link("two", "v1", "v3")];
+  const smallBase = schema([group("a", ["v1"]), group("b", ["v3"])]);
+  const first = { ...smallBase, finding_decisions: { one: { display_status: "excluded" } } };
+  const all = { ...smallBase, finding_decisions: { one: { display_status: "excluded" },
+    two: { display_status: "excluded" } } };
+  const original = fullCompileDag({ schema: smallBase, rawLinks: smallRaw });
+  const afterFirst = incrementCompiledDag({ compiledDag: original, oldSchema: smallBase,
+    newSchema: first, incidentRawLinks: [smallRaw[0]] });
+  assert.deepEqual(afterFirst.edges[0].a_to_b_raw_link_ids, ["two"]);
+  const afterAll = incrementCompiledDag({ compiledDag: afterFirst, oldSchema: first,
+    newSchema: all, incidentRawLinks: [smallRaw[1]] });
+  assert.equal(afterAll.edges.length, 0);
+  assert.deepEqual(counts(afterAll), counts(fullCompileDag({ schema: all, rawLinks: smallRaw })));
+  const restored = incrementCompiledDag({ compiledDag: afterAll, oldSchema: all,
+    newSchema: smallBase, incidentRawLinks: smallRaw });
+  assert.deepEqual(counts(restored), counts(original));
+});
+
+test("excluded findings remain reviewable in an edge evidence pane", () => {
+  const findings = [link("one", "v1", "v3"), link("two", "v1", "v3")];
+  const schemaWithExclusion = { groups: [group("a", ["v1"]), group("b", ["v3"])],
+    finding_decisions: { one: { display_status: "excluded" } } };
+  const edge = fullCompileDag({ schema: schemaWithExclusion, rawLinks: findings }).edges[0];
+  const project = { ...schemaWithExclusion, link_decisions: {} };
+  const model = provenanceModel(edge, project, new Map(findings.map(row => [row.raw_causal_link_id, row])), new Map());
+  assert.deepEqual(model.sections[0].rows.map(row => row.raw.raw_causal_link_id), ["two", "one"]);
 });
 
 test("multiple connected moved variables are deduplicated", () => {

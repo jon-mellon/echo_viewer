@@ -41,7 +41,8 @@ export function projectForSchema(schema, project = {}) {
     groups,
     iv_group_id: ids.has(project.iv_group_id) ? project.iv_group_id : "",
     dv_group_id: ids.has(project.dv_group_id) ? project.dv_group_id : "",
-    link_decisions: project.link_decisions || {},
+    link_decisions: project.link_decisions || schema.link_decisions || {},
+    finding_decisions: schema.finding_decisions || project.finding_decisions || {},
   };
 }
 
@@ -134,8 +135,14 @@ export function incrementCompiledDag({ compiledDag, oldSchema, newSchema, incide
   const newOwner = membership(newSchema);
   const changed = new Set([...new Set([...oldOwner.keys(), ...newOwner.keys()])]
     .filter(id => oldOwner.get(id) !== newOwner.get(id)));
+  const oldFindings = oldSchema.finding_decisions || {};
+  const newFindings = newSchema.finding_decisions || {};
+  const changedFindings = new Set([...new Set([...Object.keys(oldFindings), ...Object.keys(newFindings)])]
+    .filter(id => (oldFindings[id]?.display_status === "excluded")
+      !== (newFindings[id]?.display_status === "excluded")));
   const incident = [...new Map((incidentRawLinks || [])
-    .filter(link => changed.has(link.source_variable_id) || changed.has(link.target_variable_id))
+    .filter(link => changed.has(link.source_variable_id) || changed.has(link.target_variable_id)
+      || changedFindings.has(link.raw_causal_link_id))
     .map(link => [link.raw_causal_link_id, link])).values()];
   const affectedPairs = new Set();
   for (const link of incident) {

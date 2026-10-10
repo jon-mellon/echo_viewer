@@ -85,9 +85,16 @@ export function provenanceModel(link, project, rawLinksById, variables, diagnost
   const edge = edgeInspector(link, project, diagnosticView);
   if (!edge) return null;
   const groupLabel = id => project.groups.find(group => group.group_id === id)?.label || id;
+  const owners = new Map(project.groups.flatMap(group => (group.variable_ids || []).map(id => [id, group.group_id])));
+  const excluded = Object.keys(project.finding_decisions || {}).map(id => rawLinksById.get(id)).filter(Boolean);
+  const excludedFor = (source, target) => excluded.filter(raw =>
+    owners.get(raw.source_variable_id) === source && owners.get(raw.target_variable_id) === target)
+    .map(raw => raw.raw_causal_link_id);
   const sections = [
-    { direction: "A_TO_B", sourceLabel: groupLabel(link.group_a), targetLabel: groupLabel(link.group_b), rawIds: link.a_to_b_raw_link_ids || [] },
-    { direction: "B_TO_A", sourceLabel: groupLabel(link.group_b), targetLabel: groupLabel(link.group_a), rawIds: link.b_to_a_raw_link_ids || [] },
+    { direction: "A_TO_B", sourceLabel: groupLabel(link.group_a), targetLabel: groupLabel(link.group_b),
+      rawIds: [...(link.a_to_b_raw_link_ids || []), ...excludedFor(link.group_a, link.group_b)] },
+    { direction: "B_TO_A", sourceLabel: groupLabel(link.group_b), targetLabel: groupLabel(link.group_a),
+      rawIds: [...(link.b_to_a_raw_link_ids || []), ...excludedFor(link.group_b, link.group_a)] },
   ];
   if (diagnosticEvidenceDirection(link, diagnosticView) === "B_TO_A") sections.reverse();
   const seen = new Set();
@@ -103,7 +110,8 @@ export function provenanceModel(link, project, rawLinksById, variables, diagnost
       target: provenanceVariable(raw.target_variable_id, variables, project.groups),
     })),
   }));
-  return { ...edge, sections: populatedSections, rows: populatedSections.flatMap(section => section.rows) };
+  return { ...edge, rawIds: [...seen], sections: populatedSections,
+    rows: populatedSections.flatMap(section => section.rows) };
 }
 
 export function variableComparison(source, target, forwardIds, reverseIds, rawLinksById) {

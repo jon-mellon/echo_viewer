@@ -43,3 +43,23 @@ test("final schema folder and compiled DAG bytes contain no exclusion reason", a
     assert.ok(!text.includes("exclude_reason"));
   }
 });
+
+test("finding exclusion reasons remain local while public status is retained", async () => {
+  const reason = "PRIVATE OTHER REASON 104";
+  const schema = { schema_version: "groupings-v3", grouping_set_id: "test",
+    membership_unit: "canonical_variable", groups: [],
+    finding_decisions: { finding1: { display_status: "excluded", reason_code: "other",
+      reason_text: reason, timestamp: "2026-01-01" },
+    finding2: { display_status: "excluded", reason_code: "not_relevant_to_target_population" } } };
+  const safe = publicSchemaProjection(schema);
+  assert.deepEqual(safe.finding_decisions, {
+    finding1: { display_status: "excluded" }, finding2: { display_status: "excluded" },
+  });
+  const files = await writeGroupingSchemaFolder(safe);
+  for (const bytes of files.values()) {
+    const body = new TextDecoder().decode(bytes);
+    assert.ok(!body.includes(reason));
+    assert.ok(!body.includes("reason_code"));
+    assert.ok(!body.includes("target_population"));
+  }
+});

@@ -8,12 +8,15 @@ export const STUDY_INSTRUMENT_EDGE_ID = "__study_design_instrument_to_iv__";
 export function createDagInspectorController({
   state, elements, truncate, nowIso, takeSnapshot,
   applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision,
+  renderAll = () => {},
+  persistFindingDecision = () => {},
   loadConceptLabels = async () => [],
   loadVisibleLinkEndpoints = async () => [],
   excludeConcept = () => {},
 }) {
   const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
   let pendingExclude = null;
+  let pendingFindingId = null;
   const conceptLabels = new Map();
   const pendingConceptPages = new Map();
   const failedConceptPages = new Set();
@@ -318,11 +321,58 @@ export function createDagInspectorController({
             h("span", { textContent: "Loading…" }))
           : h("span", { textContent: "Concept unavailable" }));
       };
-      return h("tr", {}, h("td", {}, paper), conceptCell(source.concept, raw.source_variable_id),
+      const id = raw.raw_causal_link_id;
+      const decision = state.project.finding_decisions?.[id];
+      const excluded = decision?.display_status === "excluded";
+      const action = h("button", { className: excluded ? "text-button" : "finding-exclude-button",
+        type: "button", textContent: excluded ? "Restore" : "×",
+        title: excluded ? "Restore finding" : "Exclude finding",
+        attrs: { "aria-label": `${excluded ? "Restore" : "Exclude"} finding ${id}` } });
+      action.addEventListener("click", () => {
+        if (excluded) {
+          const before = takeSnapshot();
+          if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
+          addDecision("finding_restored", { raw_causal_link_id: id });
+          addToUndoHistory("Restored finding", before, "finding-decision");
+          renderAll();
+          persistFindingDecision();
+        } else {
+          pendingFindingId = pendingFindingId === id ? null : id;
+          renderProvenance();
+        }
+      });
+      const row = h("tr", { className: excluded ? "finding-excluded" : "" }, h("td", {}, paper), conceptCell(source.concept, raw.source_variable_id),
         conceptCell(target.concept, raw.target_variable_id),
-        cell(raw.causal_link_existence || ""), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(truncate(raw.target_population || "", 60)));
+        cell(raw.causal_link_existence || ""), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(truncate(raw.target_population || "", 60)),
+        h("td", {}, excluded ? h("span", { className: "finding-excluded-label", textContent: "Excluded " }) : null, action));
+      if (pendingFindingId !== id) return row;
+      const reason = h("select", { attrs: { "aria-label": "Finding exclusion reason" } },
+        h("option", { value: "not_relevant_to_target_population", textContent: "Not relevant to target population" }),
+        h("option", { value: "other", textContent: "Other" }));
+      const detail = h("textarea", { className: "dag-textarea", rows: 2,
+        placeholder: "Enter the reason (kept private)", attrs: { "aria-label": "Other exclusion reason" } });
+      detail.hidden = true;
+      reason.addEventListener("change", () => { detail.hidden = reason.value !== "other"; });
+      const confirm = h("button", { className: "primary-button", type: "button", textContent: "Confirm exclusion" });
+      confirm.addEventListener("click", () => {
+        const reasonText = detail.value.trim();
+        if (reason.value === "other" && !reasonText) { detail.focus(); return; }
+        const before = takeSnapshot();
+        const findingDecision = { display_status: "excluded", reason_code: reason.value,
+          ...(reason.value === "other" ? { reason_text: reasonText } : {}), timestamp: nowIso() };
+        if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, findingDecision)) === false) return;
+        pendingFindingId = null;
+        addDecision("finding_excluded", { raw_causal_link_id: id });
+        addToUndoHistory("Excluded finding", before, "finding-decision");
+        renderAll();
+        persistFindingDecision();
+      });
+      const cancel = h("button", { className: "text-button", type: "button", textContent: "Cancel" });
+      cancel.addEventListener("click", () => { pendingFindingId = null; renderProvenance(); });
+      return [row, h("tr", {}, h("td", { colSpan: 7, className: "finding-reason-row" },
+        reason, detail, confirm, cancel))];
     };
-    const headings = ["Paper", "Source concept", "Target concept", "Existence", "Strategy", "Population"];
+    const headings = ["Paper", "Source concept", "Target concept", "Existence", "Strategy", "Population", "Decision"];
     replaceChildren(elements.provenancePanel,
       model.sections.map(section => h("section", { className: "provenance-direction" },
         h("h3", { textContent: `Evidence for ${section.sourceLabel} → ${section.targetLabel}` }),

@@ -18,11 +18,12 @@ export function createDagEventController({
   showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean, startEditSplit,
-  dismissEvidencePane, showExcludedLinks, startDefinition,
+  dismissEvidencePane, showExcludedLinks, showExcludedFindings, startDefinition,
 }) {
 function installHandlers() {
   els.closeEvidencePane.addEventListener("click", dismissEvidencePane);
   els.showExcludedLinks.addEventListener("click", showExcludedLinks);
+  els.showExcludedFindings.addEventListener("click", showExcludedFindings);
   // Anchor search
   els.ivInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
   els.dvInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
