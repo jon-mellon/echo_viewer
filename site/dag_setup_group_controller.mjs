@@ -28,10 +28,23 @@ export function createDagSetupGroupController({
   roleLabels, dagProjectView, startDefinition,
   canEditSplit = () => false, searchAnchorGroups = searchModel.searchAnchorGroups,
   beginEditor = () => {},
+  loadConceptLabels = async () => [], loadVisibleLinkEndpoints = async () => [],
+  excludeConcept = () => {},
 }) {
   const variablePageSize = 10;
   let variablePage = 0;
   const expandedVariableIds = new Set();
+  const conceptPageSize = 10;
+  const conceptPages = new Map();
+  const conceptLabels = new Map();
+  const resolvedConceptIds = new Set();
+  const pendingConceptPages = new Map();
+  const failedConceptPages = new Set();
+  const orderedConceptsByView = new Map();
+  const rawEndpointsById = new Map();
+  const pendingConceptViews = new Map();
+  const failedConceptViews = new Set();
+  const conceptHosts = new Map();
   function renderMode() {
     if (state.interfaceMode === "dag2") {
       const iv = groupById(state.project?.iv_group_id);
@@ -81,6 +94,125 @@ export function createDagSetupGroupController({
     elements.dagWorkspaceSection.hidden = editing;
   }
 
+  function renderVariableConcepts(group) {
+    const host = conceptHosts.get(group.group_id);
+    if (!host) return;
+    const ids = group.variable_ids || [];
+    const visibleRawIds = [...new Set((state.visibleLinks || [])
+      .filter(link => link.group_a === group.group_id || link.group_b === group.group_id)
+      .flatMap(link => [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))];
+    const viewKey = JSON.stringify([group.group_id, ids, visibleRawIds]);
+    const saved = conceptPages.get(group.group_id);
+    const page = saved?.viewKey === viewKey ? saved.page : 0;
+    const priorityPending = ids.length && visibleRawIds.length
+      && !orderedConceptsByView.has(viewKey) && !failedConceptViews.has(viewKey);
+    const priority = orderedConceptsByView.get(viewKey);
+    const orderedIds = priority?.ids || ids;
+    const currentPage = Math.min(page, Math.max(0, Math.ceil(orderedIds.length / conceptPageSize) - 1));
+    conceptPages.set(group.group_id, { viewKey, page: currentPage });
+    const start = currentPage * conceptPageSize;
+    const pageIds = priorityPending ? [] : orderedIds.slice(start, start + conceptPageSize);
+    const missing = pageIds.filter(id => !conceptLabels.has(id) && !state.variableById?.has(id));
+    const pageKey = JSON.stringify([group.group_id, pageIds]);
+    const loading = missing.length && !failedConceptPages.has(pageKey);
+    const count = ids.length || (state.publishedSchemaHydrating ? Number(group.member_count) || 0 : 0);
+
+    replaceChildren(host,
+      h("strong", { textContent: `Underlying concepts${count ? ` (${count})` : ""}` }),
+      priority?.matchedCount ? h("div", { className: "small-note",
+        textContent: "Concepts used by visible DAG links first" }) : null,
+      pageIds.length ? h("ol", {
+        start: start + 1,
+        className: priority?.matchedCount > 0 && priority.matchedCount === start && start < ids.length
+          ? "group-concept-boundary-at-page-start" : "",
+      }, pageIds.map((id, index) => {
+        const knownLabel = conceptLabels.get(id)
+          || state.variableById?.get(id)?.concept_label
+          || state.variableById?.get(id)?.display_label;
+        const label = knownLabel || (loading ? "Loading…" : id);
+        const canExclude = Boolean(knownLabel && (resolvedConceptIds.has(id)
+          || state.variableById?.get(id)?.concept_label || state.variableById?.get(id)?.display_label));
+        const button = canExclude ? h("button", {
+          className: "group-concept-exclude", type: "button",
+          attrs: { "aria-label": `Exclude ${label} from ${group.label || group.group_id}` },
+          title: `Exclude ${label}`,
+          disabled: state.publishedSchemaHydrating || state.publishedSchemaLoadFailed,
+          textContent: "×",
+        }) : null;
+        button?.addEventListener("click", () => excludeConcept(group.group_id, id, label));
+        return h("li", {
+          className: priority?.matchedCount === start + index && index > 0
+            ? "group-concept-boundary" : "",
+        }, h("span", { textContent: label }), button);
+      })) : h("div", { className: "small-note", role: "status", textContent: priorityPending
+        ? "Finding concepts used in this view…"
+        : state.publishedSchemaHydrating ? "Loading concepts…" : "No underlying concepts." }),
+      failedConceptViews.has(viewKey) ? h("button", {
+        className: "text-button", type: "button", textContent: "Could not prioritize concepts. Retry",
+        onclick: () => { failedConceptViews.delete(viewKey); renderVariableConcepts(group); },
+      }) : null,
+      failedConceptPages.has(pageKey) ? h("button", {
+        className: "text-button", type: "button", textContent: "Could not load concepts. Retry",
+        onclick: () => { failedConceptPages.delete(pageKey); renderVariableConcepts(group); },
+      }) : null,
+      !priorityPending && ids.length > conceptPageSize ? h("div", { className: "group-concept-pagination" },
+        h("button", { className: "toolbar-button", type: "button", disabled: currentPage === 0,
+          textContent: "Previous", onclick: () => {
+            conceptPages.set(group.group_id, { viewKey, page: currentPage - 1 });
+            renderVariableConcepts(group);
+          } }),
+        h("span", { textContent: `${start + 1}–${Math.min(start + conceptPageSize, ids.length)} of ${ids.length}` }),
+        h("button", { className: "toolbar-button", type: "button",
+          disabled: start + conceptPageSize >= ids.length, textContent: "Next", onclick: () => {
+            conceptPages.set(group.group_id, { viewKey, page: currentPage + 1 });
+            renderVariableConcepts(group);
+          } })) : null);
+
+    if (priorityPending && !pendingConceptViews.has(viewKey)) {
+      const pending = Promise.resolve().then(async () => {
+        const known = visibleRawIds.map(id => state.rawLinksById?.get(id) || rawEndpointsById.get(id)).filter(Boolean);
+        const missingRawIds = visibleRawIds.filter(id => !state.rawLinksById?.has(id) && !rawEndpointsById.has(id));
+        const endpoints = missingRawIds.length ? await loadVisibleLinkEndpoints(missingRawIds) : [];
+        for (const row of endpoints) rawEndpointsById.set(row.raw_causal_link_id, row);
+        const counts = new Map();
+        const members = new Set(ids);
+        for (const row of [...known, ...endpoints]) {
+          for (const id of [row.source_variable_id, row.target_variable_id]) {
+            if (members.has(id)) counts.set(id, (counts.get(id) || 0) + 1);
+          }
+        }
+        orderedConceptsByView.set(viewKey, { ids: [...ids].sort((a, b) =>
+          (counts.get(b) || 0) - (counts.get(a) || 0)), matchedCount: counts.size });
+      }).catch(error => {
+        failedConceptViews.add(viewKey);
+        console.warn("Could not prioritize concepts for the Variables list.", error);
+      }).finally(() => {
+        pendingConceptViews.delete(viewKey);
+        const current = state.project?.groups.find(item => item.group_id === group.group_id);
+        if (current && conceptHosts.has(group.group_id)) renderVariableConcepts(current);
+      });
+      pendingConceptViews.set(viewKey, pending);
+    }
+    if (loading && !pendingConceptPages.has(pageKey)) {
+      const pending = Promise.resolve().then(() => loadConceptLabels(missing)).then(rows => {
+        for (const row of rows) {
+          const label = row.concept_label || row.display_label;
+          if (label) resolvedConceptIds.add(row.variable_id);
+          conceptLabels.set(row.variable_id, label || row.variable_id);
+        }
+        for (const id of missing) if (!conceptLabels.has(id)) conceptLabels.set(id, id);
+      }).catch(error => {
+        failedConceptPages.add(pageKey);
+        console.warn("Could not load concepts in the Variables list.", error);
+      }).finally(() => {
+        pendingConceptPages.delete(pageKey);
+        const current = state.project?.groups.find(item => item.group_id === group.group_id);
+        if (current && conceptHosts.has(group.group_id)) renderVariableConcepts(current);
+      });
+      pendingConceptPages.set(pageKey, pending);
+    }
+  }
+
   function renderVariablePanel() {
     if (!elements.variablePanel) return;
     const project = state.project;
@@ -100,13 +232,27 @@ export function createDagSetupGroupController({
     variablePage = Math.min(variablePage, Math.max(0, Math.ceil(groups.length / variablePageSize) - 1));
     const start = variablePage * variablePageSize;
     const scrollTop = elements.variablePanelList.scrollTop;
-    replaceChildren(elements.variablePanelList, groups.slice(start, start + variablePageSize).map(group =>
-      h("details", { className: "variable-panel-item", dataset: { groupId: group.group_id }, open: expandedVariableIds.has(group.group_id) },
+    conceptHosts.clear();
+    replaceChildren(elements.variablePanelList, groups.slice(start, start + variablePageSize).map(group => {
+      const concepts = h("div", { className: "group-concepts variable-panel-concepts" });
+      conceptHosts.set(group.group_id, concepts);
+      const detail = h("details", { className: "variable-panel-item", dataset: { groupId: group.group_id }, open: expandedVariableIds.has(group.group_id) },
         h("summary", {}, h("span", { textContent: group.label || group.group_id }),
           group.group_id === project.iv_group_id ? h("span", { className: "variable-panel-role", textContent: "IV" }) : null,
           group.group_id === project.dv_group_id ? h("span", { className: "variable-panel-role", textContent: "DV" }) : null,
           group.group_id === project.instrument_group_id ? h("span", { className: "variable-panel-role", textContent: "Instrument" }) : null),
-        h("p", { textContent: group.description || "No definition available." }))));
+        h("p", { textContent: group.description || "No definition available." }), concepts);
+      detail.addEventListener("toggle", () => {
+        if (detail.open) {
+          expandedVariableIds.add(group.group_id);
+          renderVariableConcepts(group);
+        } else expandedVariableIds.delete(group.group_id);
+      });
+      return detail;
+    }));
+    for (const group of groups.slice(start, start + variablePageSize)) {
+      if (expandedVariableIds.has(group.group_id)) renderVariableConcepts(group);
+    }
     elements.variablePanelList.scrollTop = scrollTop;
     elements.variablePanelPagination.hidden = groups.length <= variablePageSize;
     if (groups.length > variablePageSize) {

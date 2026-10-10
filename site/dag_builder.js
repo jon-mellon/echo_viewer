@@ -1640,6 +1640,9 @@ const setupGroupController = createDagSetupGroupController({
   roleLabels: ROLE_LABELS, dagProjectView, startDefinition,
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
   searchAnchorGroups, beginEditor: () => persistentViewer.beginEditor(),
+  loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
+  loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
+  excludeConcept: excludeGroupConcept,
 });
 
 const dagNetworkController = createDagNetworkController({

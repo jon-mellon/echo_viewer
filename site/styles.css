@@ -1456,6 +1456,15 @@ h2 {
   white-space: pre-wrap;
 }
 
+.variable-panel-concepts {
+  margin: 12px 0 4px 18px;
+  font-size: 11px;
+}
+
+.variable-panel-concepts .group-concept-pagination {
+  flex-wrap: wrap;
+}
+
 .group-definition-inspector p {
   margin: 8px 0 0;
   line-height: 1.5;
