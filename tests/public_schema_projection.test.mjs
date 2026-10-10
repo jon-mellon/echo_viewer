@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { publicCompiledDag, publicSchemaProjection } from "../site/public_schema_projection.mjs";
 import { writeGroupingSchemaFolder } from "../site/grouping_schema_writer.mjs";
 import { createCompiledArtifacts } from "../site/compiled_dag.mjs";
+import { validateGroupingSchema } from "../site/data_validation.mjs";
 
 test("publication keeps exclusion status while stripping private reasons", () => {
   const marker = "PRIVATE LEGAL REASON 73";
@@ -44,7 +45,7 @@ test("final schema folder and compiled DAG bytes contain no exclusion reason", a
   }
 });
 
-test("finding exclusion reasons remain local while public status is retained", async () => {
+test("publication keeps the finding reason category but omits free text", async () => {
   const reason = "PRIVATE OTHER REASON 104";
   const schema = { schema_version: "groupings-v3", grouping_set_id: "test",
     membership_unit: "canonical_variable", groups: [],
@@ -53,13 +54,17 @@ test("finding exclusion reasons remain local while public status is retained", a
     finding2: { display_status: "excluded", reason_code: "not_relevant_to_target_population" } } };
   const safe = publicSchemaProjection(schema);
   assert.deepEqual(safe.finding_decisions, {
-    finding1: { display_status: "excluded" }, finding2: { display_status: "excluded" },
+    finding1: { display_status: "excluded", reason_code: "other" },
+    finding2: { display_status: "excluded", reason_code: "not_relevant_to_target_population" },
   });
+  assert.doesNotThrow(() => validateGroupingSchema(safe));
+  assert.throws(() => validateGroupingSchema({ ...safe, finding_decisions: {
+    finding1: { display_status: "excluded", reason_code: "other", reason_text: " " },
+  } }), /text must not be blank/);
   const files = await writeGroupingSchemaFolder(safe);
   for (const bytes of files.values()) {
     const body = new TextDecoder().decode(bytes);
     assert.ok(!body.includes(reason));
-    assert.ok(!body.includes("reason_code"));
-    assert.ok(!body.includes("target_population"));
+    assert.ok(!body.includes("reason_text"));
   }
 });

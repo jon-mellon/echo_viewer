@@ -1238,6 +1238,9 @@ async function showExcludedFindings() {
       const source = state.variableById.get(raw?.source_variable_id)?.concept_label || raw?.source_variable_id || "";
       const target = state.variableById.get(raw?.target_variable_id)?.concept_label || raw?.target_variable_id || "";
       const label = raw ? `${truncate(raw.paper_title || raw.paper_id || id, 44)} · ${source} → ${target}` : id;
+      const code = state.project.finding_decisions[id]?.reason_code;
+      const reason = code === "not_relevant_to_target_population" ? "Not relevant to target population"
+        : code === "other" ? "Other" : "";
       const restore = h("button", { className: "text-button", type: "button", textContent: "Restore" });
       restore.addEventListener("click", () => {
         const before = takeSnapshot();
@@ -1249,7 +1252,8 @@ async function showExcludedFindings() {
         if (Object.keys(state.project.finding_decisions || {}).length) void showExcludedFindings();
         else { els.edgeInspector.hidden = true; els.closeEvidencePane.hidden = true; }
       });
-      return h("div", { className: "excluded-finding-item" }, h("span", { textContent: label }), restore);
+      return h("div", { className: "excluded-finding-item" },
+        h("span", { textContent: `${label}${reason ? ` · ${reason}` : ""}` }), restore);
     }));
 }
 

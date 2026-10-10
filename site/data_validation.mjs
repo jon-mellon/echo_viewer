@@ -124,8 +124,8 @@ export function validateGroupingSchema(schema) {
       if (Object.hasOwn(decision, "reason_text") && typeof decision.reason_text !== "string") {
         throw new Error(`Invalid finding exclusion text for ${rawId}.`);
       }
-      if (decision.reason_code === "other" && !decision.reason_text?.trim()) {
-        throw new Error(`Other exclusion requires text for ${rawId}.`);
+      if (Object.hasOwn(decision, "reason_text") && !decision.reason_text.trim()) {
+        throw new Error(`Finding exclusion text must not be blank for ${rawId}.`);
       }
     }
   }

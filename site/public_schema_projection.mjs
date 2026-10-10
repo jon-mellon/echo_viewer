@@ -8,7 +8,11 @@ export function publicLinkDecisions(decisions = {}) {
 
 export function publicFindingDecisions(decisions = {}) {
   return Object.fromEntries(Object.entries(decisions).flatMap(([rawId, decision]) =>
-    decision?.display_status === "excluded" ? [[rawId, { display_status: "excluded" }]] : []));
+    decision?.display_status === "excluded" ? [[rawId, {
+      display_status: "excluded",
+      ...(["not_relevant_to_target_population", "other"].includes(decision.reason_code)
+        ? { reason_code: decision.reason_code } : {}),
+    }]] : []));
 }
 
 export function publicSchemaProjection(schema) {

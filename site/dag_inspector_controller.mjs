@@ -324,6 +324,8 @@ export function createDagInspectorController({
       const id = raw.raw_causal_link_id;
       const decision = state.project.finding_decisions?.[id];
       const excluded = decision?.display_status === "excluded";
+      const reasonLabel = decision?.reason_code === "not_relevant_to_target_population"
+        ? "Not relevant to target population" : decision?.reason_code === "other" ? "Other" : "";
       const action = h("button", { className: excluded ? "text-button" : "finding-exclude-button",
         type: "button", textContent: excluded ? "Restore" : "×",
         title: excluded ? "Restore finding" : "Exclude finding",
@@ -344,7 +346,8 @@ export function createDagInspectorController({
       const row = h("tr", { className: excluded ? "finding-excluded" : "" }, h("td", {}, paper), conceptCell(source.concept, raw.source_variable_id),
         conceptCell(target.concept, raw.target_variable_id),
         cell(raw.causal_link_existence || ""), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(truncate(raw.target_population || "", 60)),
-        h("td", {}, excluded ? h("span", { className: "finding-excluded-label", textContent: "Excluded " }) : null, action));
+        h("td", {}, excluded ? h("span", { className: "finding-excluded-label",
+          textContent: `Excluded${reasonLabel ? `: ${reasonLabel}` : ""} ` }) : null, action));
       if (pendingFindingId !== id) return row;
       const reason = h("select", { attrs: { "aria-label": "Finding exclusion reason" } },
         h("option", { value: "not_relevant_to_target_population", textContent: "Not relevant to target population" }),
