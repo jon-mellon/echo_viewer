@@ -1,6 +1,6 @@
 // Owns cross-feature shell layout: fullscreen focus and draggable panel sizes.
 import { DAG_FIT_OPTIONS } from "./dag_network_controller.mjs";
-export function createDagShellController({ state, elements, resizeMap, fitMap, renderDag, getNetwork, dismissEvidencePane }) {
+export function createDagShellController({ state, elements, resizeMap, fitMap, renderDag, getNetwork, isDagFullyVisible, dismissEvidencePane }) {
   let showInstalledMobilePanel = null;
 
   function showMobilePanel(panel) {
@@ -94,12 +94,16 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     function makeResizer(element, side) {
       element.addEventListener("mousedown", event => {
         event.preventDefault();
+        const resizeDag = state.interfaceMode === "dag2" || side === "right";
+        const refitDag = resizeDag && isDagFullyVisible();
         const startX = event.clientX;
         const startWidth = side === "left" ? leftWidth : rightWidth;
+        let moved = false;
         element.classList.add("dragging");
         function onMove(moveEvent) {
           const sign = side === "left" ? 1 : -1;
           const width = Math.max(240, Math.min(950, startWidth + sign * (moveEvent.clientX - startX)));
+          moved ||= width !== startWidth;
           if (side === "left") leftWidth = width; else rightWidth = width;
           applyWidths();
         }
@@ -108,6 +112,7 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
           document.removeEventListener("mousemove", onMove);
           document.removeEventListener("mouseup", onUp);
           resizeMap();
+          if (moved && refitDag) setTimeout(() => getNetwork()?.fit(DAG_FIT_OPTIONS), 50);
         }
         document.addEventListener("mousemove", onMove);
         document.addEventListener("mouseup", onUp);

@@ -49,6 +49,22 @@ function visOptionSignature(params = {}) {
 // by empty canvas even when there is room to display them larger.
 export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: Number.MAX_VALUE };
 
+export function isDagFullyVisible(network, boxes, viewport) {
+  if (!network || !boxes.length || !viewport.clientWidth || !viewport.clientHeight) return false;
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  for (const box of boxes) {
+    left = Math.min(left, box.left);
+    top = Math.min(top, box.top);
+    right = Math.max(right, box.right);
+    bottom = Math.max(bottom, box.bottom);
+  }
+  const topLeft = network.canvasToDOM({ x: left, y: top });
+  const bottomRight = network.canvasToDOM({ x: right, y: bottom });
+  return topLeft.x >= -1 && topLeft.y >= -1 &&
+    bottomRight.x <= viewport.clientWidth + 1 &&
+    bottomRight.y <= viewport.clientHeight + 1;
+}
+
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
   drawMap, setMapMode, renderAll, selectEdge, selectGroup, onViewportChange = () => {},
@@ -597,6 +613,7 @@ function edgeHoverText(link) {
     renderedEdgeIds: () => [...new Set((_visEdges?.getIds() || []).map(id => _dagEdgeSegments.get(id) || id))],
     isEdgeRendered: edgeId => Boolean(_visEdges?.getIds().some(id => (_dagEdgeSegments.get(id) || id) === edgeId)),
     getNetwork: () => _visNetwork, getNodes: () => _visNodes, getEdges: () => _visEdges,
+    isFullyVisible: () => isDagFullyVisible(_visNetwork, dagBounds()?.boxes || [], els.dagNetwork),
     getPathLaneSegments: () => _dagPathLaneSegments,
     zoomIn: () => _visNetwork?.moveTo({ scale: _visNetwork.getScale() * 1.3 }),
     zoomOut: () => _visNetwork?.moveTo({ scale: Math.max(minimumDagScale(), _visNetwork.getScale() / 1.3) }),

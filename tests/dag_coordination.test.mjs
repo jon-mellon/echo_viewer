@@ -2,7 +2,66 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { attachDagInteractions } from "../site/dag_interactions.mjs";
 import { createRenderCoordinator } from "../site/render_coordinator.mjs";
-import { applyLogicalEdgeHover, createDagNetworkController, selectionUpdatesForSegments } from "../site/dag_network_controller.mjs";
+import { applyLogicalEdgeHover, createDagNetworkController, isDagFullyVisible, selectionUpdatesForSegments } from "../site/dag_network_controller.mjs";
+import { createDagShellController } from "../site/dag_shell_controller.mjs";
+
+test("DAG visibility checks every rendered node against the current viewport", () => {
+  const boxes = [
+    { left: 10, top: 10, right: 40, bottom: 40 },
+    { left: 60, top: 10, right: 90, bottom: 40 },
+  ];
+  const network = {
+    canvasToDOM: point => point,
+  };
+  const viewport = { clientWidth: 100, clientHeight: 50 };
+  assert.equal(isDagFullyVisible(network, boxes, viewport), true);
+  boxes[1].right = 110;
+  assert.equal(isDagFullyVisible(network, boxes, viewport), false);
+  assert.equal(isDagFullyVisible(network, [], viewport), false);
+});
+
+test("resizing the DAG refits a fully visible graph and preserves a cropped view", async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  const documentHandlers = new Map();
+  const makeElement = () => ({
+    style: {}, classList: { add() {}, remove() {} },
+    addEventListener(name, handler) { this.handlers ??= new Map(); this.handlers.set(name, handler); },
+  });
+  const shell = makeElement(), leftResizer = makeElement(), rightResizer = makeElement();
+  globalThis.document = {
+    querySelector: selector => selector === ".dag-shell" ? shell : null,
+    querySelectorAll: () => [],
+    addEventListener: (name, handler) => documentHandlers.set(name, handler),
+    removeEventListener: name => documentHandlers.delete(name),
+  };
+  globalThis.window = { matchMedia: () => ({ matches: false, addEventListener() {} }) };
+  let fullyVisible = true, fitCalls = 0;
+  const network = { fit: () => fitCalls++ };
+  try {
+    createDagShellController({
+      state: { interfaceMode: "dag2" },
+      elements: { dagWorkspaceSection: makeElement(), leftResizer, rightResizer },
+      resizeMap() {}, fitMap() {}, renderDag() {}, getNetwork: () => network,
+      isDagFullyVisible: () => fullyVisible, dismissEvidencePane() {},
+    }).installResizers();
+    const drag = (visibleAfterMove) => {
+      leftResizer.handlers.get("mousedown")({ clientX: 400, preventDefault() {} });
+      documentHandlers.get("mousemove")({ clientX: 500 });
+      fullyVisible = visibleAfterMove;
+      documentHandlers.get("mouseup")();
+    };
+    drag(false);
+    await new Promise(resolve => setTimeout(resolve, 60));
+    assert.equal(fitCalls, 1);
+    drag(false);
+    await new Promise(resolve => setTimeout(resolve, 60));
+    assert.equal(fitCalls, 1);
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+  }
+});
 
 test("connected edge hover updates routed segments in one batch", () => {
   const calls = [];
@@ -53,6 +112,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
       const index = groups.findIndex(group => group.group_id === id);
       return { left: index * 400, right: index * 400 + 100, top: 0, bottom: 40 };
     }
+    canvasToDOM(point) { return point; }
   }
   const controller = createDagNetworkController({ state,
     elements: { dagNetwork }, visApi: { DataSet, Network },
@@ -63,6 +123,8 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   controller.renderDag();
   await controller.whenRendered();
   const firstScale = controller.minimumDagScale();
+  controller.isFullyVisible();
+  assert.equal(networks[0].boundingBoxCalls, networks[0].data.nodes.getIds().length);
   controller.minimumDagScale();
   networks[0].handlers.get("zoom")();
   assert.equal(networks[0].boundingBoxCalls, networks[0].data.nodes.getIds().length);
