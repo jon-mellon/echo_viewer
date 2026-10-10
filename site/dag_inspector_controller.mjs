@@ -8,9 +8,16 @@ export const STUDY_INSTRUMENT_EDGE_ID = "__study_design_instrument_to_iv__";
 export function createDagInspectorController({
   state, elements, truncate, nowIso, takeSnapshot,
   applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision,
+  loadConceptLabels = async () => [],
 }) {
   const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
   let pendingExclude = null;
+  const conceptLabels = new Map();
+  const pendingConceptPages = new Map();
+  const failedConceptPages = new Set();
+  let conceptGroupId = null;
+  let conceptPage = 0;
+  const conceptPageSize = 10;
   const clearPendingExclude = () => { pendingExclude = null; };
   const diagnosticView = () => ({
     showConfoundersOnly: state.showConfoundersOnly,
@@ -91,6 +98,18 @@ export function createDagInspectorController({
   function renderGroupDefinition() {
     const group = state.project?.groups.find(item => item.group_id === state.selectedEvidenceGroupId);
     if (!group) return false;
+    if (conceptGroupId !== group.group_id) {
+      conceptGroupId = group.group_id;
+      conceptPage = 0;
+    }
+    const ids = group.variable_ids || [];
+    const count = ids.length || (state.publishedSchemaHydrating ? Number(group.member_count) || 0 : 0);
+    conceptPage = Math.min(conceptPage, Math.max(0, Math.ceil(ids.length / conceptPageSize) - 1));
+    const start = conceptPage * conceptPageSize;
+    const pageIds = ids.slice(start, start + conceptPageSize);
+    const missing = pageIds.filter(id => !conceptLabels.has(id) && !state.variableById?.has(id));
+    const pageKey = JSON.stringify(pageIds);
+    const loading = missing.length && !failedConceptPages.has(pageKey);
     elements.edgeInspector.className = "edge-inspector group-definition-inspector";
     elements.edgeInspector.hidden = false;
     elements.closeEvidencePane.hidden = false;
@@ -99,7 +118,54 @@ export function createDagInspectorController({
       h("strong", { textContent: group.label || group.group_id }),
       h("div", { className: "small-note", textContent: "Group definition" }),
       h("p", { textContent: group.description || (state.publishedSchemaHydrating
-        ? "Definition loading…" : "No definition available for this group.") }));
+        ? "Definition loading…" : "No definition available for this group.") }),
+      h("div", { className: "group-concepts" },
+        h("strong", { textContent: `Underlying concepts${count ? ` (${count})` : ""}` }),
+        pageIds.length ? h("ol", { start: start + 1 }, pageIds.map(id => h("li", {
+          textContent: conceptLabels.get(id)
+            || state.variableById?.get(id)?.concept_label
+            || state.variableById?.get(id)?.display_label
+            || (loading ? "Loading…" : id),
+        }))) : h("div", { className: "small-note", role: "status", textContent: state.publishedSchemaHydrating
+          ? "Loading concepts…" : "No underlying concepts." }),
+        failedConceptPages.has(pageKey) ? h("button", {
+          className: "text-button", type: "button", dataset: { conceptRetry: "" },
+          textContent: "Could not load concepts. Retry",
+        }) : null,
+        ids.length > conceptPageSize ? h("div", { className: "group-concept-pagination" },
+          h("button", { className: "toolbar-button", type: "button", dataset: { conceptPage: "previous" },
+            disabled: conceptPage === 0, textContent: "Previous" }),
+          h("span", { textContent: `${start + 1}–${Math.min(start + conceptPageSize, ids.length)} of ${ids.length}` }),
+          h("button", { className: "toolbar-button", type: "button", dataset: { conceptPage: "next" },
+            disabled: start + conceptPageSize >= ids.length, textContent: "Next" })) : null));
+    elements.edgeInspector.querySelector("[data-concept-page='previous']")?.addEventListener("click", () => {
+      conceptPage -= 1;
+      renderGroupDefinition();
+    });
+    elements.edgeInspector.querySelector("[data-concept-page='next']")?.addEventListener("click", () => {
+      conceptPage += 1;
+      renderGroupDefinition();
+    });
+    elements.edgeInspector.querySelector("[data-concept-retry]")?.addEventListener("click", () => {
+      failedConceptPages.delete(pageKey);
+      renderGroupDefinition();
+    });
+    if (loading && !pendingConceptPages.has(pageKey)) {
+      // Start after the description has been put in the DOM. Concept retrieval
+      // can initialize the evidence engine without delaying the inspector.
+      const pending = Promise.resolve().then(() => loadConceptLabels(missing)).then(rows => {
+        for (const row of rows) conceptLabels.set(row.variable_id,
+          row.concept_label || row.display_label || row.variable_id);
+        for (const id of missing) if (!conceptLabels.has(id)) conceptLabels.set(id, id);
+      }).catch(error => {
+        failedConceptPages.add(pageKey);
+        console.warn("Could not load underlying concepts.", error);
+      }).finally(() => {
+        pendingConceptPages.delete(pageKey);
+        if (state.selectedEvidenceGroupId === group.group_id && !state.selectedEdgeId) renderGroupDefinition();
+      });
+      pendingConceptPages.set(pageKey, pending);
+    }
     return true;
   }
 

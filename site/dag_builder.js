@@ -1497,6 +1497,7 @@ const projectController = createDagProjectController({
 const inspectorController = createDagInspectorController({
   state, elements: els, truncate, nowIso, takeSnapshot,
   applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision,
+  loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
 });
 
 const mapViewController = createDagMapViewController({

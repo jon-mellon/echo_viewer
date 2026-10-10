@@ -1452,6 +1452,29 @@ h2 {
   white-space: pre-wrap;
 }
 
+.group-concepts {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.group-concepts ol {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.group-concepts li {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+
+.group-concept-pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 /* ── DAG workspace (right panel) ── */
 .dag-workspace {
   flex: 1;
