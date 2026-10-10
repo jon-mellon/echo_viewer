@@ -49,6 +49,7 @@ function installHandlers() {
   els.changeIv.addEventListener("click", () => changeAnchor("iv"));
   els.changeInstrument.addEventListener("click", () => changeAnchor("instrument"));
   els.instrumentDefineNew.addEventListener("click", () => startDefinition("instrument"));
+  els.variableDefineNew?.addEventListener("click", () => startDefinition("candidate"));
   els.editSplitDv?.addEventListener("click", () => startEditSplit(state.project.dv_group_id));
   els.editSplitIv?.addEventListener("click", () => startEditSplit(state.project.iv_group_id));
 

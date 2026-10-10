@@ -124,3 +124,32 @@ test("expanded Variables row loads concepts in pages and keeps the definition vi
     globalThis.document = previousDocument;
   }
 });
+
+test("Variables list opens the shared split editor for editable groups", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName) };
+  try {
+    const groups = [
+      { group_id: "original", label: "Original", variable_ids: ["v1"] },
+      { group_id: "split", label: "Split", variable_ids: ["v2"] },
+    ];
+    const state = { interfaceMode: "dag2", project: { groups, iv_group_id: "original", dv_group_id: "split" } };
+    const elements = { variablePanel: new Element("section"), variablePanelCount: new Element("span"),
+      variablePanelList: new Element("div"), variablePanelPagination: new Element("div") };
+    const opened = [];
+    const controller = createDagSetupGroupController({ state, elements,
+      groupById: id => groups.find(group => group.group_id === id),
+      canEditSplit: group => group.group_id === "split",
+      startEditSplit: id => opened.push(id),
+    });
+
+    controller.renderVariablePanel();
+    const rows = elements.variablePanelList.findAll("details");
+    assert.equal(rows[0].findAll("button").length, 0);
+    assert.equal(rows[1].findAll("button")[0].textContent, "Edit split");
+    rows[1].findAll("button")[0].click();
+    assert.deepEqual(opened, ["split"]);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});

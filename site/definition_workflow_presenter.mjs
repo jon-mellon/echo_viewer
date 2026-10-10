@@ -20,7 +20,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionBlock.hidden = !draft;
     if (!draft) return;
     els.definitionTitle.textContent = draft.mode === "edit" ? "Edit split"
-      : `Define new ${draft.role.toUpperCase()}`;
+      : draft.role === "candidate" ? "Define new variable" : `Define new ${draft.role.toUpperCase()}`;
     els.definitionSourcesStep.hidden = draft.step !== "sources";
     els.definitionPartitionStep.hidden = draft.step !== "partition";
     els.definitionReviewStep.hidden = draft.step !== "review";
@@ -97,7 +97,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       els.definitionResidualLabels.querySelectorAll("input[data-residual-id]").forEach(input =>
         input.addEventListener("input", () => onResidualLabel(input.dataset.residualId, input.value)));
       els.definitionSave.textContent = draft.mode === "edit" ? "Update split"
-        : `Save and use as ${draft.role.toUpperCase()}`;
+        : draft.role === "candidate" ? "Save variable" : `Save and use as ${draft.role.toUpperCase()}`;
     }
   }
 

@@ -35,6 +35,26 @@ test('an editable split preserves IDs and returns deselected variables to their 
   assert.equal(edited.decisions.at(-1).type, 'split_categories_updated');
 });
 
+test('a variable defined from the list leaves the current anchors in place', () => {
+  const project = ops.createProject({ projectId: 'test', groupingSetId: 'schema' });
+  project.groups = [
+    { group_id: 'iv', label: 'Independent', variable_ids: ['i1'] },
+    { group_id: 'dv', label: 'Outcome', variable_ids: ['d1'] },
+    { group_id: 'source', label: 'Source', variable_ids: ['s1', 's2'] },
+  ];
+  project.iv_group_id = 'iv';
+  project.dv_group_id = 'dv';
+  const result = ops.splitCategories(project, {
+    sourceGroupIds: ['source'], newGroupId: 'defined', newLabel: 'Defined variable',
+    residualLabels: { source: 'Other source' }, newVariableIds: ['s1'],
+    timestamp, role: 'candidate',
+  });
+  assert.equal(result.iv_group_id, 'iv');
+  assert.equal(result.dv_group_id, 'dv');
+  assert.equal(result.groups.find(group => group.group_id === 'defined').type, 'candidate');
+  assert.ok(ops.editableSplitContext(result, 'defined'));
+});
+
 test('a split without reconstructable provenance is not editable', () => {
   const project = ops.createProject({ projectId: 'test', groupingSetId: 'schema' });
   project.groups = [

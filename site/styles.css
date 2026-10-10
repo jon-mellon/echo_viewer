@@ -1395,6 +1395,16 @@ h2 {
   list-style: none;
 }
 
+.variable-panel-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.variable-panel-edit {
+  margin: 6px 0 2px 18px;
+}
+
 .variable-panel > details > summary::-webkit-details-marker {
   display: none;
 }

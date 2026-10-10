@@ -124,7 +124,7 @@ function initElements() {
     "definitionReviewStep", "definitionNewLabel", "definitionReviewVariables", "definitionResidualLabels",
     "definitionManualReview", "definitionValidation", "definitionReviewBack", "definitionSave",
     "workflowHint", "dagStatusBadge",
-    "variablePanel", "variablePanelDisclosure", "variablePanelCount", "variablePanelList", "variablePanelPagination",
+    "variablePanel", "variableDefineNew", "variablePanelDisclosure", "variablePanelCount", "variablePanelList", "variablePanelPagination",
     "anchorBar", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn",
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",
@@ -1637,7 +1637,7 @@ const mapUiController = createDagMapUiController({
 const setupGroupController = createDagSetupGroupController({
   state, elements: els, escapeHtml, normalized, truncate, groupById,
   assignGroupAsAnchor, assignGroupAsInstrument, setMapMode, renderAll,
-  roleLabels: ROLE_LABELS, dagProjectView, startDefinition,
+  roleLabels: ROLE_LABELS, dagProjectView, startDefinition, startEditSplit,
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
   searchAnchorGroups, beginEditor: () => persistentViewer.beginEditor(),
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),

@@ -25,7 +25,7 @@ function anchorHasMembers(state, group) {
 export function createDagSetupGroupController({
   state, elements, escapeHtml, normalized, truncate, groupById,
   assignGroupAsAnchor, assignGroupAsInstrument, setMapMode, renderAll,
-  roleLabels, dagProjectView, startDefinition,
+  roleLabels, dagProjectView, startDefinition, startEditSplit,
   canEditSplit = () => false, searchAnchorGroups = searchModel.searchAnchorGroups,
   beginEditor = () => {},
   loadConceptLabels = async () => [], loadVisibleLinkEndpoints = async () => [],
@@ -236,12 +236,15 @@ export function createDagSetupGroupController({
     replaceChildren(elements.variablePanelList, groups.slice(start, start + variablePageSize).map(group => {
       const concepts = h("div", { className: "group-concepts variable-panel-concepts" });
       conceptHosts.set(group.group_id, concepts);
+      const editButton = canEditSplit(group) ? h("button", { className: "text-button variable-panel-edit", type: "button",
+        textContent: "Edit split", title: `Edit the split containing ${group.label || group.group_id}` }) : null;
+      editButton?.addEventListener("click", () => startEditSplit?.(group.group_id));
       const detail = h("details", { className: "variable-panel-item", dataset: { groupId: group.group_id }, open: expandedVariableIds.has(group.group_id) },
         h("summary", {}, h("span", { textContent: group.label || group.group_id }),
           group.group_id === project.iv_group_id ? h("span", { className: "variable-panel-role", textContent: "IV" }) : null,
           group.group_id === project.dv_group_id ? h("span", { className: "variable-panel-role", textContent: "DV" }) : null,
           group.group_id === project.instrument_group_id ? h("span", { className: "variable-panel-role", textContent: "Instrument" }) : null),
-        h("p", { textContent: group.description || "No definition available." }), concepts);
+        h("p", { textContent: group.description || "No definition available." }), editButton, concepts);
       detail.addEventListener("toggle", () => {
         if (detail.open) {
           expandedVariableIds.add(group.group_id);
@@ -283,7 +286,8 @@ export function createDagSetupGroupController({
     if (state.interfaceMode === "dag2") {
       if (state.definitionDraft) {
         elements.currentStepTitle.textContent = state.definitionDraft.mode === "edit" ? "Edit split"
-          : `Define new ${state.definitionDraft.role.toUpperCase()}`;
+          : state.definitionDraft.role === "candidate" ? "Define new variable"
+            : `Define new ${state.definitionDraft.role.toUpperCase()}`;
         elements.dagStatusBadge.textContent = state.definitionDraft.step === "sources" ? "Sources"
           : state.definitionDraft.step === "partition" ? "Construct" : "Review";
         elements.dagStatusBadge.className = "status-pill";
