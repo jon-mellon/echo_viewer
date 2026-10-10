@@ -124,7 +124,7 @@ function initElements() {
     "definitionReviewStep", "definitionNewLabel", "definitionReviewVariables", "definitionResidualLabels",
     "definitionManualReview", "definitionValidation", "definitionReviewBack", "definitionSave",
     "workflowHint", "dagStatusBadge",
-    "variablePanel", "variablePanelDisclosure", "variablePanelCount", "variablePanelList",
+    "variablePanel", "variablePanelDisclosure", "variablePanelCount", "variablePanelList", "variablePanelPagination",
     "anchorBar", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn",
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",

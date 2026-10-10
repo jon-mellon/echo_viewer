@@ -29,6 +29,9 @@ export function createDagSetupGroupController({
   canEditSplit = () => false, searchAnchorGroups = searchModel.searchAnchorGroups,
   beginEditor = () => {},
 }) {
+  const variablePageSize = 10;
+  let variablePage = 0;
+  const expandedVariableIds = new Set();
   function renderMode() {
     if (state.interfaceMode === "dag2") {
       const iv = groupById(state.project?.iv_group_id);
@@ -90,17 +93,32 @@ export function createDagSetupGroupController({
     const groups = (project?.groups || []).slice()
       .sort((a, b) => (a.label || a.group_id).localeCompare(b.label || b.group_id));
     elements.variablePanelCount.textContent = String(groups.length);
-    const openIds = new Set([...elements.variablePanelList.querySelectorAll("details[open]")]
-      .map(detail => detail.dataset.groupId));
+    for (const detail of elements.variablePanelList.querySelectorAll("details[data-group-id]")) {
+      if (detail.open) expandedVariableIds.add(detail.dataset.groupId);
+      else expandedVariableIds.delete(detail.dataset.groupId);
+    }
+    variablePage = Math.min(variablePage, Math.max(0, Math.ceil(groups.length / variablePageSize) - 1));
+    const start = variablePage * variablePageSize;
     const scrollTop = elements.variablePanelList.scrollTop;
-    replaceChildren(elements.variablePanelList, groups.map(group =>
-      h("details", { className: "variable-panel-item", dataset: { groupId: group.group_id }, open: openIds.has(group.group_id) },
+    replaceChildren(elements.variablePanelList, groups.slice(start, start + variablePageSize).map(group =>
+      h("details", { className: "variable-panel-item", dataset: { groupId: group.group_id }, open: expandedVariableIds.has(group.group_id) },
         h("summary", {}, h("span", { textContent: group.label || group.group_id }),
           group.group_id === project.iv_group_id ? h("span", { className: "variable-panel-role", textContent: "IV" }) : null,
           group.group_id === project.dv_group_id ? h("span", { className: "variable-panel-role", textContent: "DV" }) : null,
           group.group_id === project.instrument_group_id ? h("span", { className: "variable-panel-role", textContent: "Instrument" }) : null),
         h("p", { textContent: group.description || "No definition available." }))));
     elements.variablePanelList.scrollTop = scrollTop;
+    elements.variablePanelPagination.hidden = groups.length <= variablePageSize;
+    if (groups.length > variablePageSize) {
+      const previous = h("button", { className: "toolbar-button", type: "button", disabled: variablePage === 0,
+        textContent: "Previous" });
+      const next = h("button", { className: "toolbar-button", type: "button",
+        disabled: start + variablePageSize >= groups.length, textContent: "Next" });
+      previous.addEventListener("click", () => { variablePage -= 1; renderVariablePanel(); elements.variablePanelList.scrollTop = 0; });
+      next.addEventListener("click", () => { variablePage += 1; renderVariablePanel(); elements.variablePanelList.scrollTop = 0; });
+      replaceChildren(elements.variablePanelPagination, previous,
+        h("span", { textContent: `${start + 1}–${Math.min(start + variablePageSize, groups.length)} of ${groups.length}` }), next);
+    } else elements.variablePanelPagination.replaceChildren();
   }
 
   function hint() {

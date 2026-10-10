@@ -1416,6 +1416,16 @@ h2 {
   border-top: 1px solid var(--line);
 }
 
+.variable-panel-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .variable-panel-item {
   padding: 9px 0;
   border-bottom: 1px solid var(--line);
