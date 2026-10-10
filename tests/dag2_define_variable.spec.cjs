@@ -106,3 +106,51 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   expect(undone.restored).toEqual(undone.originals);
   browserErrors.check();
 });
+
+test("Variables list definition and split editing are reachable on desktop and mobile", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+  });
+  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState?.publishedSchemaHydrated
+    && !window.__dagBuilderState?.publishedSchemaHydrating);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
+  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await expect(page.locator("#variableDefineNew")).toBeVisible();
+
+  await page.locator("#variableDefineNew").click();
+  await expect(page.locator("#definitionTitle")).toHaveText("Define new variable");
+  expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.role)).toBe("candidate");
+  const source = page.locator("#definitionSourceList input[data-source-id]").nth(2);
+  await source.check();
+  await page.locator("#definitionContinue").click();
+  const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
+  await page.locator("#definitionVariableSearch").fill(variableId);
+  await page.locator("#definitionVariableResults .result-button").first().click();
+  await page.locator("#definitionReview").click();
+  await page.locator("#definitionNewLabel").fill("Browser list variable");
+  await page.locator("#definitionResidualLabels input").fill("Browser list residual");
+  await page.locator("#definitionSave").click();
+  await expect(page.locator("#variableDefineNew")).toBeVisible();
+  const splitId = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .find(group => group.label === "Browser list variable")?.group_id);
+  expect(splitId).toBeTruthy();
+  const splitRow = page.locator(`#variablePanelList details[data-group-id="${splitId}"]`);
+  await splitRow.locator("summary").click();
+  await splitRow.getByRole("button", { name: "Edit split" }).click();
+  await expect(page.locator("#definitionTitle")).toHaveText("Edit split");
+  await page.locator("#definitionCancel").click();
+
+  await page.setViewportSize({ width: 390, height: 800 });
+  await expect(page.locator("#variableDefineNew")).toBeVisible();
+  await page.locator("#variableDefineNew").click();
+  await expect(page.locator("#definitionTitle")).toHaveText("Define new variable");
+  await page.locator("#definitionCancel").click();
+  await splitRow.getByRole("button", { name: "Edit split" }).click();
+  await expect(page.locator("#definitionTitle")).toHaveText("Edit split");
+  await page.locator("#definitionCancel").click();
+});
