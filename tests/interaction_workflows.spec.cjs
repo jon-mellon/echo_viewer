@@ -26,6 +26,60 @@ test("privacy policy opens without resetting the viewer", async ({ page }) => {
   await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
 });
 
+test("selecting evidence in full screen returns to the standard layout", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  expect(anchors).toHaveLength(2);
+  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
+  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+
+  await page.locator("#fullscreenDag").click();
+  await expect(page.locator("#fullscreenDag")).toHaveAttribute("aria-pressed", "true");
+  const edgeId = await page.evaluate(async () => {
+    const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
+    await whenDagRendered();
+    const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__");
+    inspectDagEdge(id);
+    return id;
+  });
+  expect(edgeId).toBeTruthy();
+  await expect(page.locator("#fullscreenDag")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("#edgeInspector")).toBeVisible();
+});
+
+test("selecting a variable in full screen returns to the standard layout", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await page.locator("#definitionSourceList input[data-source-id]").first().check();
+  await page.locator("#definitionContinue").click();
+  await expect(page.locator("#dagMapCanvas")).toBeVisible();
+  await page.locator("#fullscreenVariableMap").click();
+  await expect(page.locator("#fullscreenVariableMap")).toHaveAttribute("aria-pressed", "true");
+  const point = await page.evaluate(() => {
+    const state = window.__dagBuilderState;
+    const rect = state.map.canvas.getBoundingClientRect();
+    const { scale, tx, ty } = state.map.transform;
+    for (const variable of state.variableById.values()) {
+      const x = variable.map_x * scale + tx;
+      const y = variable.map_y * scale + ty;
+      if (Number.isFinite(x) && Number.isFinite(y)
+        && x > 30 && y > 100 && x < rect.width - 30 && y < rect.height - 30) {
+        return { id: variable.variable_id, x: rect.left + x, y: rect.top + y };
+      }
+    }
+    return null;
+  });
+  expect(point).toBeTruthy();
+  await page.mouse.click(point.x, point.y);
+  await expect(page.locator("#fullscreenVariableMap")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".dag-left-panel")).toBeVisible();
+});
+
 test("password gate rejects an incorrect entry and unlocks with the preview password", async ({ page }) => {
   await page.goto(viewer);
   await expect(page.locator("#passwordGate")).toBeVisible();

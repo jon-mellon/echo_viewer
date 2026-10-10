@@ -1647,12 +1647,14 @@ const dagNetworkController = createDagNetworkController({
   drawMap, setMapMode, renderAll,
   onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
   selectEdge: () => {
+    if (state.fullscreenPanel) setFullscreenPanel(null);
     state.selectedEvidenceGroupId = null;
     // The interaction clears vis's segment selection and redraws the network.
     renderCoordinator.selectEdge({ redraw: false });
     persistentViewer.viewerChanged();
   },
   selectGroup: id => {
+    if (state.fullscreenPanel) setFullscreenPanel(null);
     state.selectedEdgeId = null;
     state.comparisonVariableIds = [];
     state.selectedEvidenceGroupId = id;
@@ -1664,6 +1666,7 @@ const dagNetworkController = createDagNetworkController({
 // Programmatic edge selection keeps browser regression tests on the same
 // inspector path as a graph click, without depending on canvas coordinates.
 export function inspectDagEdge(edgeId) {
+  if (state.fullscreenPanel) setFullscreenPanel(null);
   state.selectedEvidenceGroupId = null;
   state.selectedEdgeId = edgeId;
   renderCoordinator.selectEdge();

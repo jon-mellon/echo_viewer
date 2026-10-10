@@ -423,6 +423,7 @@ function installMapHandlers() {
     if (!moved) {
       const point = nearestVariable(event.clientX, event.clientY, 16);
       if (point) {
+        if (state.fullscreenPanel) setFullscreenPanel(null);
         const variableId = clusterRep(point.variable_id);
         const priorId = clusterRep(state.selectedVariableId || "");
         if (event.shiftKey && priorId && priorId !== variableId) {
