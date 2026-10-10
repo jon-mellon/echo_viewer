@@ -12,6 +12,7 @@ export function createDagGroupEditorController({
   searchVariables, clusterMemberIds, rejectedVariableIdSet, uoaMatches,
   fitSearchContext, applyActiveGroupingSet, rebuildProject, createDensityCandidateGroup,
   escapeHtml, truncate, hydrateVariableDetails = async () => {}, onAnchorsReady = () => {},
+  beginEditor = () => {},
 }) {
 function notifyWhenAnchorsReady() {
   if (state.interfaceMode !== "dag2") return;
@@ -21,6 +22,7 @@ function notifyWhenAnchorsReady() {
 }
 
 function beginTargetGroup(side) {
+  beginEditor();
   const isDv = side === "dv";
   const groupId = `g_${side}_${Date.now()}`;
   const input = isDv ? els.dvInput : els.ivInput;
@@ -99,6 +101,7 @@ function activeGroup() {
 }
 
 function createCustomGroup() {
+  beginEditor();
   const before = takeSnapshot();
   const groupId = `g_custom_${Date.now()}`;
   ensureGroup({
@@ -338,6 +341,7 @@ function finishSchemaChoice(loadSchema) {
       fitMap(groupById(firstCandidate.group_id)?.variable_ids || []);
     }
   } else {
+    beginEditor();
     const group = createDensityCandidateGroup();
     if (group) {
       Object.assign(state, workflow.transition(state, { type: "open-editor", groupId: group.group_id }));

@@ -88,8 +88,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   expect(await page.evaluate(groupId => window.__dagBuilderState.project.groups
     .find(group => group.group_id === groupId).label, splitGroupId))
     .toBe("Browser test construct updated");
-  await expect.poll(() => page.evaluate(() => Math.max(0, ...Object.values(localStorage)
-    .map(value => { try { return JSON.parse(value).undoHistory?.length || 0; } catch { return 0; } }))),
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.undoHistory.length),
   { timeout: 1000 }).toBeGreaterThan(0);
   await page.locator("#dag2UndoBtn").click();
   expect(await page.evaluate(groupId => window.__dagBuilderState.project.groups

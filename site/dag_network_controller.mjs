@@ -51,7 +51,7 @@ export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: Number.MAX_VALU
 
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, selectEdge, selectGroup,
+  drawMap, setMapMode, renderAll, selectEdge, selectGroup, onViewportChange = () => {},
 }) {
 // ─── DAG visApi.js rendering ─────────────────────────────────────────────────────
 
@@ -541,6 +541,7 @@ let detachDagInteractions = null;
 function attachDagNetworkHandlers(network) {
   detachDagInteractions?.();
   detachDagInteractions = attachDagInteractions(network, els.dagNetwork, {
+    onViewportChange,
     minimumScale: minimumDagScale,
     contentBounds: () => dagBounds()?.contentBounds || null,
     drawPathLanes: drawConfounderPathLanes,

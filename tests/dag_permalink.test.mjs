@@ -119,3 +119,11 @@ test("a permalink fails explicitly when its anchors are absent", () => {
   const params = new URLSearchParams("p=1&iv=missing&dv=outcome");
   assert.throws(() => applyPermalink(params, { project: structuredClone(project) }), /absent/);
 });
+
+test("a fresh published setup URL restores without selected anchors", () => {
+  const state = { project: structuredClone(project), seeds: { iv: new Set(), dv: new Set() } };
+  applyPermalink(new URLSearchParams("p=1&mode=setup&schema=published-version"), state);
+  assert.equal(state.project.iv_group_id, "");
+  assert.equal(state.project.dv_group_id, "");
+  assert.equal(state.phase, "select_iv");
+});

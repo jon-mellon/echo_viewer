@@ -87,8 +87,29 @@ export function validateGroupingSchema(schema) {
   assertSafeJson(schema, "Grouping schema");
   if (!Array.isArray(schema.groups)) throw new Error("Grouping schema.groups must be an array.");
   validateGroups(schema.groups, "Grouping schema");
+  const owners = new Map();
+  for (const group of schema.groups) for (const variableId of group.variable_ids) {
+    const prior = owners.get(variableId);
+    if (prior && prior !== group.group_id) {
+      throw new Error(`Canonical variable ${variableId} belongs to both ${prior} and ${group.group_id}.`);
+    }
+    owners.set(variableId, group.group_id);
+  }
   if (Object.hasOwn(schema, "rejected_variables") && !Array.isArray(schema.rejected_variables)) {
     throw new Error("Grouping schema.rejected_variables must be an array.");
+  }
+  if (Object.hasOwn(schema, "link_decisions")) {
+    if (!isRecord(schema.link_decisions)) throw new Error("Grouping schema.link_decisions must be an object.");
+    for (const [edgeId, decision] of Object.entries(schema.link_decisions)) {
+      if (!edgeId || !isRecord(decision)
+        || !["excluded", "hidden", "active_by_default"].includes(decision.display_status)) {
+        throw new Error(`Invalid link decision for ${edgeId}.`);
+      }
+      if (Object.hasOwn(decision, "exclude_reason")
+        && typeof decision.exclude_reason !== "string") {
+        throw new Error(`Invalid exclusion reason for ${edgeId}.`);
+      }
+    }
   }
   return schema;
 }

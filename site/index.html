@@ -42,6 +42,21 @@
           <button class="mode-tab active" data-mode="setup" type="button">Setup</button>
           <button class="mode-tab" data-mode="group_review" type="button">Groups</button>
         </nav>
+        <div class="panel-section">
+          <div id="localSaveStatus" role="status" aria-live="polite"></div>
+          <button id="retryLocalSave" class="text-button" type="button" hidden>Retry save</button>
+          <button id="saveIndependentCopy" class="text-button" type="button" hidden>Save independent copy</button>
+          <div class="mini-toolbar">
+            <button id="previousSessions" class="text-button" type="button" aria-expanded="false" aria-controls="previousSessionsPanel">Previous Sessions</button>
+            <button id="exportLocalDraft" class="text-button" type="button" title="Includes private edge exclusion reasons">Export private draft</button>
+            <label class="text-button" for="importLocalDraft">Import draft</label>
+            <input id="importLocalDraft" type="file" accept="application/json,.json" hidden>
+          </div>
+          <div id="previousSessionsPanel" class="previous-sessions-panel" hidden>
+            <p class="dag-label">Previous views in this browser</p>
+            <div id="previousSessionsList"></div>
+          </div>
+        </div>
 
         <!-- Study anchors: change the selected groups at any time -->
         <div id="anchorBar" class="anchor-bar" hidden>
@@ -260,7 +275,10 @@
         <section id="groupEditorSection" class="panel-section group-editor-section">
           <div class="section-title">
             <h2 id="groupEditorTitle">Group</h2>
-            <button id="cancelGroupEdit" class="text-button" type="button">Close</button>
+            <div>
+              <button id="discardGroupEdit" class="text-button" type="button">Discard</button>
+              <button id="cancelGroupEdit" class="text-button" type="button">Done</button>
+            </div>
           </div>
           <div id="groupEditorHint" class="workflow-hint"></div>
           <p id="groupDescription" class="group-description" hidden></p>

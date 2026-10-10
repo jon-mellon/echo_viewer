@@ -6,7 +6,7 @@ export function createDagEventController({
   renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
   renderSearch, fitSearchContext, prefetchVariableSearch, toggleAnchorSearchMode, finishSchemaChoice,
   changeAnchor, renderSetupGroupPicker,
-  setWorkflowMode, renderGroupList, closeGroupEditor, selectActiveAnchor,
+  setWorkflowMode, renderGroupList, closeGroupEditor, discardGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
   saveProjectLocally, applyActiveGroupingSet, rebuildProject, exportGroupingFolder,
@@ -64,6 +64,7 @@ function installHandlers() {
 
   // Group editor (right panel)
   els.cancelGroupEdit.addEventListener("click", closeGroupEditor);
+  els.discardGroupEdit?.addEventListener("click", discardGroupEditor);
   els.useGroupAsAnchor.addEventListener("click", selectActiveAnchor);
   els.addNeighbors.addEventListener("click", addTopNeighborsToActiveGroup);
   els.removeNeighbors.addEventListener("click", removeTopNeighborsFromActiveGroup);

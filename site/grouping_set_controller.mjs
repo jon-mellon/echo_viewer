@@ -67,6 +67,8 @@ export function createGroupingSetController({ state, elements, publicationContro
       membership_unit: GROUPING_MEMBERSHIP_UNIT,
       ...(source.migration_provenance ? { migration_provenance: structuredClone(source.migration_provenance) } : {}),
       groups, rejected_variables,
+      ...(Object.keys(state.project.link_decisions || {}).length
+        ? { link_decisions: structuredClone(state.project.link_decisions) } : {}),
       ...(Object.hasOwn(source, "hidden_variable_ids") || hidden_variable_ids.length
         ? { hidden_variable_ids }
         : {}),

@@ -2,12 +2,17 @@ import { dagDataSource } from "./dag_data_source.mjs?v=browser-v2";
 import { schemaPublicationId } from "./dag_data_config.mjs";
 import { applyPermalink, permalinkInput } from "./dag_permalink.mjs";
 import { createProjectBootstrapPresenter } from "./project_bootstrap_presenter.mjs";
+import { loadLocalSchema } from "./local_schema_store.mjs";
+import { incrementCompiledDag } from "./compiled_dag.mjs";
+import { normalizeLinkDecision } from "./dag_link_aggregation.mjs";
+import { validateGroupingSchema } from "./data_validation.mjs";
 
 export function createProjectBootstrap({ state, initElements, installHandlers, installDefinitionHandlers,
-  resizeMap, restoreProjectLocally, initializeProject, loadLatestSchemaGroups,
-  normalizeProjectDuplicateAssignments, saveProjectLocally, publicationController, renderAll,
+  resizeMap, initializeProject, loadLatestSchemaGroups,
+  normalizeProjectDuplicateAssignments, publicationController, renderAll,
   constrainMapTransform, drawMap, fitMap, dagNetworkController, buildDuplicateClusters,
-  linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {} }) {
+  linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {},
+  onLocalSchemaLoaded = () => {} }) {
   const presenter = createProjectBootstrapPresenter({});
   const setStartupStage = message => presenter.setStartupStage(message);
   const finishStartupLoading = () => presenter.finishStartupLoading();
@@ -19,11 +24,56 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     installHandlers();
     installDefinitionHandlers();
     resizeMap();
+    const requested = new URL(window.location.href);
+    if (requested.searchParams.has("new")) {
+      history.replaceState(null, "", "/");
+    } else if (requested.pathname === "/" && !requested.search && !requested.hash) {
+      history.replaceState(null, "", requested.href);
+    }
     const permalink = permalinkInput();
+    const localId = permalink?.get("local_schema") || "";
+    const localRecord = localId ? await loadLocalSchema(localId) : null;
+    if (localId && (!localRecord || !localRecord.schema?.groups)) {
+      throw new Error("Local schema unavailable. This URL needs a draft stored in this browser. Import a draft or open a published view.");
+    }
+    if (localRecord) validateGroupingSchema(localRecord.schema);
     const publicationId = schemaPublicationId();
+    if (localRecord && (!permalink.get("schema")
+      || localRecord.basePublicationId !== publicationId)) {
+      throw new Error("Local schema does not match the published base in this URL.");
+    }
     const dataStart = performance.now();
     await loadDagData(permalink?.get("vlayout") || "");
     performance.measure("echo:startup:data", { start: dataStart, end: performance.now() });
+    if (localRecord) {
+      const publishedSchema = state.data.grouping_sets?.[0];
+      const complete = await state.data.load_published_schema?.();
+      const base = complete?.schema || publishedSchema;
+      const local = localRecord.schema;
+      const owners = schema => new Map((schema.groups || []).flatMap(group =>
+        (group.variable_ids || []).map(id => [id, group.group_id])));
+      const before = owners(base), after = owners(local);
+      const changed = [...new Set([...before.keys(), ...after.keys()])]
+        .filter(id => before.get(id) !== after.get(id));
+      const incidentRawLinks = changed.length ? await dagDataSource.loadIncidentRawLinks(changed) : [];
+      const incremented = incrementCompiledDag({
+        compiledDag: state.data.compiled_dag, oldSchema: base, newSchema: local,
+        incidentRawLinks,
+        project: { groups: local.groups, iv_group_id: permalink.get("iv"),
+          dv_group_id: permalink.get("dv"), link_decisions: local.link_decisions || {} },
+      });
+      const compiled = { ...incremented, edges: (incremented.edges || []).map(edge => {
+        const decision = normalizeLinkDecision(local.link_decisions?.[edge.edge_id]) || null;
+        return { ...edge, display_status: decision?.display_status || "active_by_default",
+          user_decision: decision };
+      }) };
+      state.data = { ...state.data, grouping_sets: [local],
+        default_grouping_set_id: local.grouping_set_id,
+        compiled_dag: compiled, load_published_schema: null };
+      state.compiledDag = compiled;
+      state.compiledDagValid = true;
+      onLocalSchemaLoaded(localRecord);
+    }
     if (state.data.load_published_schema) {
       state.publishedSchemaHydrating = true;
       state.publishedSchemaHydrated = false;
@@ -34,31 +84,32 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     state.selectedUoa = null;
     state.uoaFilterEnabled = false;
     setStartupStage("Preparing workspace…");
-    const restored = permalink || publicationId ? false : restoreProjectLocally();
-    if (restored && state.definitionDraft && state.interfaceMode === "dag2"
-        && !presenter.confirmResumeDefinition()) {
-      state.definitionDraft = null;
-      saveProjectLocally();
+    initializeProject();
+    loadLatestSchemaGroups();
+    state.project.link_decisions = structuredClone((localRecord?.schema
+      || state.data.grouping_sets?.[0])?.link_decisions || {});
+    normalizeProjectDuplicateAssignments();
+    if (state.interfaceMode === "dag2") {
+      state.phase = "select_iv";
+      state.workflowMode = "setup";
+      state.selectedUoa = null;
+      state.uoaFilterEnabled = false;
     }
-    if (!restored) {
-      initializeProject();
-      loadLatestSchemaGroups();
-      normalizeProjectDuplicateAssignments();
-      if (state.interfaceMode === "dag2") {
-        state.phase = "select_iv";
-        state.workflowMode = "setup";
-        state.selectedUoa = null;
-        state.uoaFilterEnabled = false;
-      }
-      if (permalink) {
-        applyPermalink(permalink, state);
-        state.phase = "build";
-      }
+    if (permalink) {
+      applyPermalink(permalink, state);
+      if (state.project.iv_group_id && state.project.dv_group_id) state.phase = "build";
     }
     if (state.data.publication_source && !state.project.publication) {
       state.project.publication = {
         ...state.data.publication_source,
         permalink: new URL(`/?schema=${state.data.publication_source.publication_id}`, window.location.origin).href,
+      };
+    }
+    if (localRecord?.lastPublishedId) {
+      state.project.publication = {
+        publication_id: localRecord.lastPublishedId,
+        content_hash: localRecord.lastPublishedHash,
+        permalink: new URL(`/?schema=${localRecord.lastPublishedId}`, window.location.origin).href,
       };
     }
     if (state.interfaceMode === "dag2") publicationController.initialize();
@@ -89,6 +140,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       const applyLoadedSchema = schema => {
         state.data.grouping_sets = [schema];
         state.data.default_grouping_set_id = schema.grouping_set_id;
+        state.project.link_decisions = structuredClone(schema.link_decisions || {});
         loadLatestSchemaGroups();
         normalizeProjectDuplicateAssignments();
         // Compiled nodes and routes already describe this publication. Hydrating

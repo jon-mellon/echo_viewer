@@ -2427,3 +2427,22 @@ h2 {
     bottom: calc(var(--mobile-nav-height) + max(6px, env(safe-area-inset-bottom)));
   }
 }
+.previous-sessions-panel {
+  margin-top: 0.7rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border, #d6dcd9);
+  border-radius: 0.5rem;
+  background: var(--surface-2, #f7f9f8);
+}
+.previous-sessions-panel[hidden] { display: none; }
+.previous-session-entry {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  text-align: left;
+}
+.previous-session-meta {
+  display: block;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}

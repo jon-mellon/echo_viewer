@@ -14,7 +14,7 @@ export function createDagMapUiController({
   addVariableSetToGroup, removeVariableFromGroup, beginTargetGroup, setMapMode,
   renderAll, rebuildProject, invalidateMapCaches, rejectedVariableEntries,
   rejectedVariableIdSet, isRejectedVariable, clean, escapeHtml, truncate,
-  groupColors: GROUP_COLORS, groupPalette: GROUP_PALETTE,
+  groupColors: GROUP_COLORS, groupPalette: GROUP_PALETTE, schemaChanged = () => {},
 }) {
 function drawMap({ includeLabels = true } = {}) {
   beginDraw(includeLabels);
@@ -564,6 +564,7 @@ function restoreRejectedVariable(variableId) {
     member_variable_ids: memberIds,
     restored_group_ids: entry.previous_group_ids || [],
   });
+  schemaChanged();
 }
 
 function contextMenuTargetGroups(variableId) {

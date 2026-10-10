@@ -27,6 +27,7 @@ export function createDagSetupGroupController({
   assignGroupAsAnchor, assignGroupAsInstrument, setMapMode, renderAll,
   roleLabels, dagProjectView, startDefinition,
   canEditSplit = () => false, searchAnchorGroups = searchModel.searchAnchorGroups,
+  beginEditor = () => {},
 }) {
   function renderMode() {
     if (state.interfaceMode === "dag2") {
@@ -263,6 +264,7 @@ export function createDagSetupGroupController({
     elements.groupList.querySelectorAll("button").forEach(button => button.addEventListener("click", () => {
       const group = groupById(button.closest(".group-row").dataset.groupId);
       if (!group) return;
+      beginEditor();
       Object.assign(state, workflow.transition(state, { type: "open-editor", groupId: group.group_id }));
       setMapMode("select"); renderAll();
     }));

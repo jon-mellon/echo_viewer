@@ -5,6 +5,7 @@ import { ensureAnonymousPublicationUser } from "/dag_anonymous_auth.mjs";
 import { setSafeUrl } from "/dom_builder.mjs";
 import { createCompiledArtifacts, evidenceSnapshotForSchema, fullCompileDag,
   COMPILED_DAG_PATH, COMPILED_MANIFEST_PATH, DAG_COMPILER_VERSION } from "/compiled_dag.mjs";
+import { publicCompiledDag, publicLinkDecisions, publicSchemaProjection } from "/public_schema_projection.mjs";
 
 export const CANONICAL_BASELINE_ID = "a0118906-2366-4cc8-8809-bafdf3860c23";
 export const CANONICAL_BASELINE_HASH = "0afd5f28c1b5456c47cfba84467bea1d62c6dc923a5851281a98d461f60066b4";
@@ -37,7 +38,7 @@ async function findOwnedPublication(client, ownerId, contentHash) {
 }
 
 export async function canonicalizeWorkingSchema(schema, cryptoApi = globalThis.crypto) {
-  const files = await writeGroupingSchemaFolder(schema, cryptoApi);
+  const files = await writeGroupingSchemaFolder(publicSchemaProjection(schema), cryptoApi);
   return { files, contentHash: await canonicalFolderHash(files, cryptoApi) };
 }
 
@@ -51,14 +52,19 @@ export async function publishWorkingSchema({
   onProgress = () => {},
 }) {
   const user = await ensureAnonymousPublicationUser(client);
-  const canonical = await canonicalizeWorkingSchema(schema, cryptoApi);
+  const publicSchema = publicSchemaProjection(schema);
+  const canonical = await canonicalizeWorkingSchema(publicSchema, cryptoApi);
   const existing = await findOwnedPublication(client, user.id, canonical.contentHash);
   if (existing) return { ...existing, publicationId: existing.id, contentHash: existing.content_hash, reused: true };
 
   const publicationId = cryptoApi.randomUUID();
   const storagePrefix = `${user.id}/${publicationId}`;
-  const evidenceSnapshot = evidenceSnapshotForSchema(schema);
-  const dag = compiledDag || fullCompileDag({ schema, ...(compileInput || {}) });
+  const evidenceSnapshot = evidenceSnapshotForSchema(publicSchema);
+  const publicProject = { ...(compileInput?.project || {}),
+    link_decisions: publicLinkDecisions(publicSchema.link_decisions) };
+  const dag = compiledDag
+    ? publicCompiledDag(compiledDag, publicSchema.link_decisions)
+    : fullCompileDag({ schema: publicSchema, ...(compileInput || {}), project: publicProject });
   const compiled = await createCompiledArtifacts({ publicationId, schemaHash: canonical.contentHash,
     evidenceSnapshot, dag, cryptoApi });
   const files = new Map(canonical.files);

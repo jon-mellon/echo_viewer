@@ -24,7 +24,8 @@ export function schemaMatchesProject(schema, project) {
   });
 }
 
-export function buildPermalink({ location, schemaUrl, dataVersion, state }) {
+export function buildPermalink({ location, schemaUrl, dataVersion, state,
+  localSchemaId = "", publishedSchemaId = "" }) {
   const url = new URL(location.href);
   url.search = "";
   const values = {
@@ -44,6 +45,8 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state }) {
   };
   for (const [parameter, field] of Object.entries(booleanFields)) values[parameter] = state[field] ? "1" : "0";
   for (const [key, value] of Object.entries(values)) if (value !== "") url.searchParams.set(key, value);
+  if (publishedSchemaId) url.searchParams.set("schema", publishedSchemaId);
+  if (localSchemaId) url.searchParams.set("local_schema", localSchemaId);
   return url.href;
 }
 
@@ -53,9 +56,12 @@ export function applyPermalink(params, state) {
   const resolveGroup = id => groups.find(group => group.group_id === id || group.source_group_id === id)?.group_id;
   const iv = resolveGroup(params.get("iv"));
   const dv = resolveGroup(params.get("dv"));
-  if (!iv || !dv || iv === dv) throw new Error("Permalink IV or DV is absent from the referenced schema.");
-  state.project.iv_group_id = iv;
-  state.project.dv_group_id = dv;
+  const partialSetup = params.get("mode") === "setup" && (!iv || !dv);
+  if ((!iv || !dv || iv === dv) && !partialSetup) {
+    throw new Error("Permalink IV or DV is absent from the referenced schema.");
+  }
+  state.project.iv_group_id = iv || "";
+  state.project.dv_group_id = dv || "";
   const instrument = resolveGroup(params.get("instrument"));
   state.project.instrument_group_id = instrument && instrument !== iv && instrument !== dv ? instrument : null;
   for (const group of groups) {
@@ -70,6 +76,7 @@ export function applyPermalink(params, state) {
     iv: new Set(ivGroup?.variable_ids || []),
     dv: new Set(dvGroup?.variable_ids || []),
   };
+  if (partialSetup) state.phase = iv ? "select_dv" : "select_iv";
   state.workflowMode = params.get("mode") || "dag";
   state.dagLayoutMode = "auto";
   state.variableLayoutSource = params.get("vlayout") || state.variableLayoutSource;

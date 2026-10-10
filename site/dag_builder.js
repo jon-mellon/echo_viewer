@@ -33,8 +33,11 @@ import { createGroupingSetController } from "/grouping_set_controller.mjs";
 import { createProjectBootstrap } from "/project_bootstrap.mjs?v=compiled-first-v2";
 import { dagDataSource } from "/dag_data_source.mjs?v=browser-v2";
 import { incrementCompiledDag } from "/compiled_dag.mjs";
+import { createPersistentViewer } from "/persistent_viewer.mjs";
+import { importDraftFile, makeDraftExport } from "/draft_exchange.mjs";
+import { listPreviousSessions } from "/local_schema_store.mjs";
 import { escapeHtml } from "/text_utils.mjs";
-import { h, replaceChildren, safeUrl } from "/dom_builder.mjs";
+import { h, replaceChildren, safeUrl, setSafeUrl } from "/dom_builder.mjs";
 import { hydrateSearchResult, variableSearchCatalog } from "/variable_search_catalog.mjs";
 
 
@@ -65,6 +68,8 @@ const GROUP_PALETTE = [
 
 // The current interface has one canonical entry point at the site root.
 const state = createDagAppState("dag2");
+let schemaBatchDepth = 0;
+let schemaCommitQueued = false;
 const PROJECT_STORAGE_PREFIX = state.interfaceMode === "dag2" ? "dag2-project-v1" : "dag-builder-project-v2";
 
 window.__dagBuilderState = state;
@@ -138,6 +143,9 @@ function initElements() {
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
     // Right: group editor
     "groupEditorSection", "groupEditorTitle", "groupEditorHint", "groupDescription", "cancelGroupEdit",
+    "discardGroupEdit", "localSaveStatus", "retryLocalSave", "saveIndependentCopy",
+    "exportLocalDraft", "importLocalDraft", "previousSessions", "previousSessionsPanel",
+    "previousSessionsList",
     "groupLabelInput", "groupNotesInput", "useGroupAsAnchor",
     "zoomGroup", "editSplit",
     "addNeighbors", "removeNeighbors", "clearGroupSelection",
@@ -157,6 +165,60 @@ function initElements() {
   }
   state.map.canvas = els.dagMapCanvas;
   state.map.ctx = state.map.canvas.getContext("2d");
+  els.exportLocalDraft?.addEventListener("click", exportLocalDraft);
+  els.previousSessions?.addEventListener("click", async () => {
+    const panel = els.previousSessionsPanel;
+    if (!panel.hidden) {
+      panel.hidden = true;
+      els.previousSessions.setAttribute("aria-expanded", "false");
+      return;
+    }
+    try {
+      await persistentViewer.flushUrl();
+      const sessions = (await listPreviousSessions())
+        .filter(record => record.id !== persistentViewer.sessionId);
+      replaceChildren(els.previousSessionsList);
+      if (!sessions.length) replaceChildren(els.previousSessionsList,
+        h("p", { textContent: "No previous views saved in this browser." }));
+      for (const record of sessions) {
+        const url = new URL(record.url, window.location.origin);
+        if (url.origin !== window.location.origin || url.searchParams.get("p") !== "1") continue;
+        const button = h("button", { type: "button", className: "text-button previous-session-entry" },
+          h("strong", { textContent: record.title || "Untitled view" }),
+          h("span", { className: "previous-session-meta",
+            textContent: `${url.searchParams.has("local_schema") ? "Local draft" : "Published schema"} · ${new Date(record.updatedAt).toLocaleString()}` }));
+        button.addEventListener("click", () => {
+          if ((persistentViewer.editorDirty || state.definitionDraft)
+            && !window.confirm("Discard uncommitted changes and open this previous view?")) return;
+          sessionStorage.setItem("echo-pending-session-restore",
+            JSON.stringify({ id: record.id, url: url.href }));
+          window.location.assign(url.href);
+        });
+        els.previousSessionsList.append(button);
+      }
+      panel.hidden = false;
+      els.previousSessions.setAttribute("aria-expanded", "true");
+    } catch (error) { els.localSaveStatus.textContent = `Could not list previous views — ${error.message}`; }
+  });
+  els.retryLocalSave?.addEventListener("click", () => {
+    if (persistentViewer.editorOpen) void closeGroupEditor();
+    else void persistentViewer.commitDecision().catch(error => console.error("Retry save failed", error));
+  });
+  els.saveIndependentCopy?.addEventListener("click", async () => {
+    try {
+      const editorWasOpen = persistentViewer.editorOpen;
+      await persistentViewer.saveIndependentCopy();
+      if (editorWasOpen) groupEditorController.closeGroupEditor();
+      publicationController.workingCopyChanged();
+    } catch (error) { els.localSaveStatus.textContent = `Not saved — ${error.message}`; }
+  });
+  els.importLocalDraft?.addEventListener("change", async event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (persistentViewer.editorDirty && !window.confirm("Discard editor changes and import this draft?")) return;
+    try { window.location.assign(await importDraftFile(file)); }
+    catch (error) { els.localSaveStatus.textContent = `Import failed — ${error.message}`; }
+  });
 }
 
 function init() { return projectBootstrap.init(); }
@@ -273,12 +335,11 @@ function projectPayload() {
 }
 
 function persistProjectLocally() {
-  projectController.save();
+  persistentViewer.viewerChanged();
 }
 
 function saveProjectLocally() {
-  persistProjectLocally();
-  if (state.interfaceMode === "dag2") publicationController.workingCopyChanged();
+  persistentViewer.viewerChanged();
 }
 
 function restoreProjectLocally() {
@@ -301,10 +362,12 @@ function addToUndoHistory(description, before, renderKind) {
 
 function undo() {
   projectController.undo();
+  void persistentViewer.commitDecision().catch(error => console.error("Could not save undo", error));
 }
 
 function redo() {
   projectController.redo();
+  void persistentViewer.commitDecision().catch(error => console.error("Could not save redo", error));
 }
 
 function renderUndoRedo() {
@@ -377,6 +440,7 @@ const renderCoordinator = createRenderCoordinator({
 
 function renderAll(options) {
   renderCoordinator.renderAll(options);
+  persistentViewer.viewerChanged();
   // Enrich references opportunistically while the user works. Export actions
   // await the same de-duplicated, rate-limited requests before downloading.
   exportController.warmBibliography();
@@ -674,12 +738,32 @@ function applyProjectOperation(next) {
     return false;
   }
   const oldProject = state.project;
+  const anchorChanged = oldProject && ["iv_group_id", "dv_group_id", "instrument_group_id"]
+    .some(key => oldProject[key] !== next[key]);
+  const structural = project => JSON.stringify({
+    groups: (project?.groups || []).map(group => [group.group_id, group.label, group.notes,
+      group.variable_ids, group.excluded_nearby_variable_ids]),
+    rejected: project?.rejected_variables || [],
+    decisions: project?.link_decisions || {},
+  });
+  const schemaChanged = oldProject && structural(oldProject) !== structural(next);
   const asSchema = project => ({ groups: (project?.groups || []).map(group => ({
     group_id: group.group_id, label: group.label || "", variable_ids: [...(group.variable_ids || [])],
     ...(Number.isFinite(group.similarity_coherence) ? { similarity_coherence: group.similarity_coherence } : {}),
   })) });
   const oldSchema = asSchema(oldProject);
   projectController.applyOperation(next);
+  if (anchorChanged) publicationController?.workingCopyChanged?.();
+  if (schemaChanged && !state.activeGroupId && !state.definitionDraft && !schemaBatchDepth
+    && !persistentViewer.editorOpen && !schemaCommitQueued) {
+    schemaCommitQueued = true;
+    queueMicrotask(() => {
+      schemaCommitQueued = false;
+      void persistentViewer.commitDecision().then(() =>
+        publicationController?.workingCopyChanged?.()).catch(error =>
+          console.error("Could not save schema change", error));
+    });
+  }
   if (state.compiledDagValid && state.compiledDag && oldProject) {
     const newSchema = asSchema(next);
     const owner = schema => new Map(schema.groups.flatMap(group => group.variable_ids.map(id => [id, group.group_id])));
@@ -741,7 +825,20 @@ function activeGroup() {
   return groupEditorController.activeGroup();
 }
 function createCustomGroup() { return groupEditorController.createCustomGroup(); }
-function closeGroupEditor() { return groupEditorController.closeGroupEditor(); }
+async function closeGroupEditor() {
+  try {
+    await persistentViewer.finishEditor();
+    groupEditorController.closeGroupEditor();
+    publicationController.workingCopyChanged();
+  } catch (error) {
+    console.error("Could not commit schema editor changes", error);
+  }
+}
+
+function discardGroupEditor() {
+  persistentViewer.discardEditor();
+  groupEditorController.closeGroupEditor();
+}
 const loadedNeighborRecords = new WeakSet();
 const pendingNeighborRecords = new WeakMap();
 
@@ -860,6 +957,43 @@ function activeGroupingSet() { return groupingSetController.active(); }
 function copyPermalink() { return groupingSetController.copyPermalink(); }
 
 function currentWorkingGroupingSchema() { return groupingSetController.workingSchema(); }
+
+const persistentViewer = createPersistentViewer({
+  state,
+  getSchema: currentWorkingGroupingSchema,
+  getViewport: () => {
+    const network = dagNetworkController.getNetwork();
+    state.dagViewport = network
+      ? { scale: network.getScale(), position: network.getViewPosition() } : null;
+  },
+  status: message => {
+    if (els.localSaveStatus) els.localSaveStatus.textContent = message;
+    if (els.retryLocalSave) els.retryLocalSave.hidden = !message.startsWith("Not saved");
+    if (els.saveIndependentCopy) els.saveIndependentCopy.hidden =
+      !message.includes("Schema revision changed");
+  },
+  onDiscard: invalidateMapCaches,
+});
+
+function exportLocalDraft() {
+  const schema = currentWorkingGroupingSchema();
+  const payload = makeDraftExport({
+    schema, url: persistentViewer.currentUrl("export-pending") || window.location.href,
+    basePublicationId: state.data?.publication_source?.publication_id || "",
+    basePublicationHash: state.data?.publication_source?.content_hash || "",
+  });
+  const objectUrl = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)],
+    { type: "application/json" }));
+  const link = document.createElement("a");
+  setSafeUrl(link, "href", objectUrl);
+  link.download = `echo-draft-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 30000);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") persistentViewer.flushUrl();
+});
 
 function renderGroupingSetControls() {
   setupGroupController.renderGroupingControls();
@@ -1282,10 +1416,24 @@ function scheduleSettledMapDraw(delayMs = 100) {
   mapViewController.scheduleSettled(delayMs);
 }
 
-function drawMap(options) { return mapUiController.drawMap(options); }
+function drawMap(options) {
+  const result = mapUiController.drawMap(options);
+  persistentViewer.viewerChanged(true);
+  return result;
+}
 function drawMapPoints(ctx, width, height) { return mapUiController.drawMapPoints(ctx, width, height); }
 function ensureGlobalVoronoiCells() { return mapUiController.ensureGlobalVoronoiCells(); }
-function applyBrush() { return mapUiController.applyBrush(); }
+function applyBrush() {
+  schemaBatchDepth += 1;
+  try { return mapUiController.applyBrush(); }
+  finally {
+    schemaBatchDepth -= 1;
+    if (!schemaBatchDepth && !state.definitionDraft && !state.activeGroupId) {
+      void persistentViewer.commitDecision().catch(error =>
+        console.error("Could not save brush edits", error));
+    }
+  }
+}
 function groupColor(group) { return mapUiController.groupColor(group); }
 function repAtPoint(clientX, clientY) { return mapUiController.repAtPoint(clientX, clientY); }
 function clearHoverIntent() { return mapUiController.clearHoverIntent(); }
@@ -1328,6 +1476,11 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),
   hydrateNeighbors: hydrateVariableNeighbors,
+  commitSchema: async () => {
+    await persistentViewer.commitDecision();
+    publicationController.workingCopyChanged();
+  },
+  onCommitFailureRestored: () => persistentViewer.clearSaveFailure(),
   prewarmEvidence: async () => {
     await dagDataSource.ensureEvidenceConnection();
     // DuckDB fetches the remote layout metadata when it creates this view.
@@ -1357,6 +1510,7 @@ const groupEditorController = createDagGroupEditorController({
   searchVariables, clusterMemberIds, rejectedVariableIdSet, uoaMatches,
   fitSearchContext, applyActiveGroupingSet, rebuildProject, createDensityCandidateGroup,
   escapeHtml, truncate, hydrateVariableDetails,
+  beginEditor: () => persistentViewer.beginEditor(),
   onAnchorsReady: () => shellController.showMobilePanel("dag"),
 });
 
@@ -1371,6 +1525,8 @@ const mapUiController = createDagMapUiController({
   renderAll, rebuildProject, invalidateMapCaches, rejectedVariableEntries,
   rejectedVariableIdSet, isRejectedVariable, clean, escapeHtml, truncate,
   groupColors: GROUP_COLORS, groupPalette: GROUP_PALETTE,
+  schemaChanged: () => { void persistentViewer.commitDecision().catch(error =>
+    console.error("Could not save restored variable", error)); },
 });
 
 const setupGroupController = createDagSetupGroupController({
@@ -1378,22 +1534,25 @@ const setupGroupController = createDagSetupGroupController({
   assignGroupAsAnchor, assignGroupAsInstrument, setMapMode, renderAll,
   roleLabels: ROLE_LABELS, dagProjectView, startDefinition,
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
-  searchAnchorGroups,
+  searchAnchorGroups, beginEditor: () => persistentViewer.beginEditor(),
 });
 
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
   drawMap, setMapMode, renderAll,
+  onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
   selectEdge: () => {
     state.selectedEvidenceGroupId = null;
     // The interaction clears vis's segment selection and redraws the network.
     renderCoordinator.selectEdge({ redraw: false });
+    persistentViewer.viewerChanged();
   },
   selectGroup: id => {
     state.selectedEdgeId = null;
     state.comparisonVariableIds = [];
     state.selectedEvidenceGroupId = id;
     renderCoordinator.selectEdge();
+    persistentViewer.viewerChanged();
   },
 });
 
@@ -1463,7 +1622,8 @@ publicationController = createPublicationController({
   },
   getWorkingSchema: currentWorkingGroupingSchema,
   getCompiledDag: () => state.compiledDagValid && !state.compiledDagUpdating ? state.compiledDag : null,
-  canPublish: () => !state.publishedSchemaHydrating && !state.publishedSchemaLoadFailed,
+  canPublish: () => !state.publishedSchemaHydrating && !state.publishedSchemaLoadFailed
+    && persistentViewer.canPublish,
   getCompileInput: async () => {
     if (state.compiledDagValid && !state.compiledDagUpdating) {
       return { project: dagProjectView(), linkLookup: state.linkLookup, rawLinksById: state.rawLinksById };
@@ -1477,7 +1637,10 @@ publicationController = createPublicationController({
     state.dagViewport = network ? { scale: network.getScale(), position: network.getViewPosition() } : null;
     return state;
   },
-  setPublicationState: publication => { state.project.publication = publication; },
+  setPublicationState: publication => {
+    state.project.publication = publication;
+    void persistentViewer.markPublished(publication);
+  },
   saveWorkingState: persistProjectLocally,
 });
 
@@ -1493,7 +1656,10 @@ const projectBootstrap = createProjectBootstrap({
   normalizeProjectDuplicateAssignments, saveProjectLocally, publicationController,
   renderAll, constrainMapTransform, drawMap, fitMap, dagNetworkController,
   buildDuplicateClusters, linkKey, pairKey, loadVariableSearchCatalog,
+  onLocalSchemaLoaded: record => persistentViewer.setLoadedRecord(record),
   onReady: () => {
+    persistentViewer.start();
+    void publicationController.refreshPublicationState();
     if (!state.project?.links?.some(link => (link.a_to_b_raw_link_ids?.length || 0)
       + (link.b_to_a_raw_link_ids?.length || 0) > 0)) return;
     const prewarm = () => { void dagDataSource.ensureEvidenceConnection().catch(() => {}); };
@@ -1514,7 +1680,7 @@ const eventController = createDagEventController({
   renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
   renderSearch, fitSearchContext, prefetchVariableSearch: loadVariableSearchCatalog,
   toggleAnchorSearchMode, finishSchemaChoice, changeAnchor, renderSetupGroupPicker,
-  setWorkflowMode, renderGroupList, closeGroupEditor, selectActiveAnchor,
+  setWorkflowMode, renderGroupList, closeGroupEditor, discardGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
   saveProjectLocally, applyActiveGroupingSet, rebuildProject, exportGroupingFolder,
@@ -1532,6 +1698,16 @@ const eventController = createDagEventController({
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 
-init().catch((error) => replaceChildren(document.body,
-  h("main", { className: "panel-section" }, h("h1", { textContent: "DAG Builder" }),
-    h("p", { textContent: error?.message || error }))));
+init().catch((error) => {
+  const missing = String(error?.message || error).startsWith("Local schema unavailable");
+  const input = h("input", { type: "file", accept: "application/json,.json" });
+  if (missing) input.addEventListener("change", async () => {
+    try { if (input.files?.[0]) window.location.assign(await importDraftFile(input.files[0])); }
+    catch (importError) { window.alert(`Could not import draft: ${importError.message}`); }
+  });
+  replaceChildren(document.body,
+    h("main", { className: "panel-section" }, h("h1", { textContent: missing ? "Local schema unavailable" : "Echo could not open this view" }),
+      h("p", { textContent: error?.message || error }),
+      missing ? h("label", { textContent: "Import draft" }, input) : null,
+      missing ? h("a", { href: "/?new=1", textContent: "Start new view" }) : null));
+});

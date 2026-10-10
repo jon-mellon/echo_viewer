@@ -7,7 +7,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails = async () => {}, hydrateNeighbors = async () => {},
-  prewarmEvidence = async () => {} }) {
+  prewarmEvidence = async () => {}, commitSchema = async () => {},
+  onCommitFailureRestored = () => {} }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
   const renderDraft = ({ redrawMap = false } = {}) => {
@@ -192,12 +193,14 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     return presenter.render();
   }
 
-  function saveDefinition() {
+  async function saveDefinition() {
     const draft = state.definitionDraft;
     if (!draft) return;
     draft.new_label = clean(draft.new_label);
     draft.residual_labels = Object.fromEntries(Object.entries(draft.residual_labels)
       .map(([groupId, label]) => [groupId, clean(label)]));
+    const previousProject = structuredClone(state.project);
+    const previousCompiledDag = state.compiledDag ? structuredClone(state.compiledDag) : null;
     try {
       for (const snap of draft.source_snapshot) {
         const current = groupById(snap.group_id);
@@ -216,6 +219,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         splitId: draft.split_id,
       });
       applyProjectOperation(next);
+      await commitSchema();
       if (draft.role === "instrument") {
         state.showExclusionViolations = true;
         state.showExogeneity = false;
@@ -235,6 +239,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       setMapMode("select");
       renderAll();
     } catch (error) {
+      state.compiledDagRevision = (state.compiledDagRevision || 0) + 1;
+      state.compiledDag = previousCompiledDag;
+      state.compiledDagUpdating = false;
+      state.project = previousProject;
+      onCommitFailureRestored();
+      invalidateMapCaches();
+      renderDraft({ redrawMap: true });
       presenter.showValidationError(error);
     }
   }
