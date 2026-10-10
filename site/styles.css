@@ -1468,6 +1468,29 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.group-concept-exclude {
+  margin-left: 6px;
+  padding: 0 3px;
+  border: 0;
+  background: transparent;
+  color: #b42332;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.group-concept-exclude:hover,
+.group-concept-exclude:focus-visible {
+  color: #801827;
+  background: #fce8eb;
+  border-radius: 3px;
+}
+
+.group-concept-exclude:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .group-concept-pagination {
   display: flex;
   align-items: center;

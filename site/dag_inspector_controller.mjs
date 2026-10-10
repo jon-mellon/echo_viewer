@@ -9,13 +9,20 @@ export function createDagInspectorController({
   state, elements, truncate, nowIso, takeSnapshot,
   applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision,
   loadConceptLabels = async () => [],
+  loadVisibleLinkEndpoints = async () => [],
+  excludeConcept = () => {},
 }) {
   const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
   let pendingExclude = null;
   const conceptLabels = new Map();
   const pendingConceptPages = new Map();
   const failedConceptPages = new Set();
+  const orderedConceptsByView = new Map();
+  const rawEndpointsById = new Map();
+  const pendingConceptViews = new Map();
+  const failedConceptViews = new Set();
   let conceptGroupId = null;
+  let conceptViewKey = null;
   let conceptPage = 0;
   const conceptPageSize = 10;
   const clearPendingExclude = () => { pendingExclude = null; };
@@ -104,9 +111,21 @@ export function createDagInspectorController({
     }
     const ids = group.variable_ids || [];
     const count = ids.length || (state.publishedSchemaHydrating ? Number(group.member_count) || 0 : 0);
-    conceptPage = Math.min(conceptPage, Math.max(0, Math.ceil(ids.length / conceptPageSize) - 1));
+    const visibleRawIds = [...new Set((state.visibleLinks || [])
+      .filter(link => link.group_a === group.group_id || link.group_b === group.group_id)
+      .flatMap(link => [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))];
+    const viewKey = JSON.stringify([group.group_id, ids, visibleRawIds]);
+    if (conceptViewKey !== viewKey) {
+      conceptViewKey = viewKey;
+      conceptPage = 0;
+    }
+    const priorityPending = ids.length && visibleRawIds.length
+      && !orderedConceptsByView.has(viewKey) && !failedConceptViews.has(viewKey);
+    const priority = orderedConceptsByView.get(viewKey);
+    const orderedIds = priority?.ids || ids;
+    conceptPage = Math.min(conceptPage, Math.max(0, Math.ceil(orderedIds.length / conceptPageSize) - 1));
     const start = conceptPage * conceptPageSize;
-    const pageIds = ids.slice(start, start + conceptPageSize);
+    const pageIds = priorityPending ? [] : orderedIds.slice(start, start + conceptPageSize);
     const missing = pageIds.filter(id => !conceptLabels.has(id) && !state.variableById?.has(id));
     const pageKey = JSON.stringify(pageIds);
     const loading = missing.length && !failedConceptPages.has(pageKey);
@@ -121,18 +140,33 @@ export function createDagInspectorController({
         ? "Definition loading…" : "No definition available for this group.") }),
       h("div", { className: "group-concepts" },
         h("strong", { textContent: `Underlying concepts${count ? ` (${count})` : ""}` }),
-        pageIds.length ? h("ol", { start: start + 1 }, pageIds.map(id => h("li", {
-          textContent: conceptLabels.get(id)
+        priority?.matchedCount ? h("div", { className: "small-note",
+          textContent: "Concepts used by visible DAG links first" }) : null,
+        pageIds.length ? h("ol", { start: start + 1 }, pageIds.map(id => {
+          const label = conceptLabels.get(id)
             || state.variableById?.get(id)?.concept_label
             || state.variableById?.get(id)?.display_label
-            || (loading ? "Loading…" : id),
-        }))) : h("div", { className: "small-note", role: "status", textContent: state.publishedSchemaHydrating
-          ? "Loading concepts…" : "No underlying concepts." }),
+            || (loading ? "Loading…" : id);
+          return h("li", {}, h("span", { textContent: label }), h("button", {
+            className: "group-concept-exclude", type: "button", dataset: { excludeConceptId: id },
+            attrs: { "aria-label": `Exclude ${label} from ${group.label || group.group_id}` },
+            title: `Exclude ${label}`,
+            disabled: state.publishedSchemaHydrating || state.publishedSchemaLoadFailed
+              || (loading && !conceptLabels.has(id) && !state.variableById?.has(id)),
+            textContent: "×",
+          }));
+        })) : h("div", { className: "small-note", role: "status", textContent: priorityPending
+          ? "Finding concepts used in this view…"
+          : state.publishedSchemaHydrating ? "Loading concepts…" : "No underlying concepts." }),
+        failedConceptViews.has(viewKey) ? h("button", {
+          className: "text-button", type: "button", dataset: { conceptPriorityRetry: "" },
+          textContent: "Could not prioritize concepts. Retry",
+        }) : null,
         failedConceptPages.has(pageKey) ? h("button", {
           className: "text-button", type: "button", dataset: { conceptRetry: "" },
           textContent: "Could not load concepts. Retry",
         }) : null,
-        ids.length > conceptPageSize ? h("div", { className: "group-concept-pagination" },
+        !priorityPending && ids.length > conceptPageSize ? h("div", { className: "group-concept-pagination" },
           h("button", { className: "toolbar-button", type: "button", dataset: { conceptPage: "previous" },
             disabled: conceptPage === 0, textContent: "Previous" }),
           h("span", { textContent: `${start + 1}–${Math.min(start + conceptPageSize, ids.length)} of ${ids.length}` }),
@@ -150,6 +184,42 @@ export function createDagInspectorController({
       failedConceptPages.delete(pageKey);
       renderGroupDefinition();
     });
+    elements.edgeInspector.querySelector("[data-concept-priority-retry]")?.addEventListener("click", () => {
+      failedConceptViews.delete(viewKey);
+      renderGroupDefinition();
+    });
+    elements.edgeInspector.querySelectorAll("[data-exclude-concept-id]").forEach(button => {
+      button.addEventListener("click", () => {
+        const id = button.dataset.excludeConceptId;
+        excludeConcept(group.group_id, id, conceptLabels.get(id)
+          || state.variableById?.get(id)?.concept_label
+          || state.variableById?.get(id)?.display_label || id);
+      });
+    });
+    if (priorityPending && !pendingConceptViews.has(viewKey)) {
+      const pending = Promise.resolve().then(async () => {
+        const known = visibleRawIds.map(id => state.rawLinksById?.get(id) || rawEndpointsById.get(id)).filter(Boolean);
+        const missingRawIds = visibleRawIds.filter(id => !state.rawLinksById?.has(id) && !rawEndpointsById.has(id));
+        const endpoints = missingRawIds.length ? await loadVisibleLinkEndpoints(missingRawIds) : [];
+        for (const row of endpoints) rawEndpointsById.set(row.raw_causal_link_id, row);
+        const counts = new Map();
+        const members = new Set(ids);
+        for (const row of [...known, ...endpoints]) {
+          for (const id of [row.source_variable_id, row.target_variable_id]) {
+            if (members.has(id)) counts.set(id, (counts.get(id) || 0) + 1);
+          }
+        }
+        orderedConceptsByView.set(viewKey, { ids: [...ids].sort((a, b) =>
+          (counts.get(b) || 0) - (counts.get(a) || 0)), matchedCount: counts.size });
+      }).catch(error => {
+        failedConceptViews.add(viewKey);
+        console.warn("Could not prioritize concepts for the current view.", error);
+      }).finally(() => {
+        pendingConceptViews.delete(viewKey);
+        if (state.selectedEvidenceGroupId === group.group_id && !state.selectedEdgeId) renderGroupDefinition();
+      });
+      pendingConceptViews.set(viewKey, pending);
+    }
     if (loading && !pendingConceptPages.has(pageKey)) {
       // Start after the description has been put in the DOM. Concept retrieval
       // can initialize the evidence engine without delaying the inspector.

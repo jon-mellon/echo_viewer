@@ -47,6 +47,13 @@ test("one moved variable and edge-to-zero match full counts", () => {
   assert.deepEqual(counts(incremental(next)), counts(fullCompileDag({ schema: next, rawLinks: raw })));
 });
 
+test("removing a group's final concept removes its evidence links", () => {
+  const next = schema([group("a", []), ...base.groups.slice(1)]);
+  const updated = incremental(next);
+  assert.equal(updated.nodes.find(node => node.group_id === "a").member_count, 0);
+  assert.equal(updated.edges.some(edge => edge.group_a === "a" || edge.group_b === "a"), false);
+});
+
 test("multiple connected moved variables are deduplicated", () => {
   const next = schema([group("a", ["v1"]), group("b", ["v2"]), group("c", ["v3", "v4"])]);
   assert.deepEqual(counts(incremental(next, [...raw, raw[2], raw[2]])), counts(fullCompileDag({ schema: next, rawLinks: raw })));

@@ -204,6 +204,20 @@ export class ParquetManifestDagDataSource {
       WHERE raw_causal_link_id IN (${placeholders})`, rawLinkIds);
   }
 
+  async loadRawLinkEndpointsByIds(rawLinkIds) {
+    if (!rawLinkIds?.length) return [];
+    await this.ensureEvidenceConnection();
+    const canonicalUrl = this.canonicalEvidenceRelationUrl("causal_link_occurrences");
+    if (!canonicalUrl) await this.ensureBrowserRelation("causal_link_occurrences");
+    const relation = canonicalUrl
+      ? `read_parquet('${canonicalUrl.replaceAll("'", "''")}')`
+      : "causal_link_occurrences";
+    const placeholders = rawLinkIds.map(() => "?").join(",");
+    return queryRows(this.connection,
+      `SELECT raw_causal_link_id, source_variable_id, target_variable_id FROM ${relation}
+        WHERE raw_causal_link_id IN (${placeholders})`, rawLinkIds);
+  }
+
   async loadNeighbors(variableIds) {
     const start = performance.now();
     await this.ensureEvidenceConnection();

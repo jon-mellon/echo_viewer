@@ -1209,6 +1209,24 @@ function renderSelectedEdgePanels() {
   inspectorController.renderProvenance();
 }
 
+function excludeGroupConcept(groupId, variableId, label) {
+  const group = groupById(groupId);
+  if (!group?.variable_ids.includes(variableId)) return;
+  if (state.publishedSchemaHydrating || state.publishedSchemaLoadFailed) return;
+  if (!window.confirm(`Exclude “${label}” from “${group.label || groupId}”? This removes the concept from the schema and updates the DAG.`)) return;
+  const before = takeSnapshot();
+  const next = projectOps.removeMembers(state.project, groupId, [variableId], nowIso());
+  if (applyProjectOperation(next) === false) return;
+  addDecision("concept_excluded", { group_id: groupId, variable_id: variableId });
+  addToUndoHistory(`Excluded concept from "${group.label || groupId}"`, before);
+  renderAll();
+  if (state.activeGroupId && !persistentViewer.editorOpen) {
+    void persistentViewer.commitDecision().then(() =>
+      publicationController.workingCopyChanged()).catch(error =>
+      console.error("Could not save concept exclusion", error));
+  }
+}
+
 function renderSelectedEdge() {
   if (!state.selectedEdgeId && state.selectedEvidenceGroupId && inspectorController.renderGroupDefinition()) return;
   const selected = (state.project?.links || []).find(edge => edge.edge_id === state.selectedEdgeId);
@@ -1305,7 +1323,8 @@ function addDecision(type, payload) {
 
 function dagGroups() {
   return dagProjectView().groups.filter((g) => g.variable_ids?.length
-    || (state.compiledDagValid && Number(g.member_count) > 0));
+    || ((state.publishedSchemaHydrating || state.publishedSchemaLoadFailed)
+      && Number(g.member_count) > 0));
 }
 
 function dagProjectView() {
@@ -1498,6 +1517,8 @@ const inspectorController = createDagInspectorController({
   state, elements: els, truncate, nowIso, takeSnapshot,
   applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision,
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
+  loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
+  excludeConcept: excludeGroupConcept,
 });
 
 const mapViewController = createDagMapViewController({
