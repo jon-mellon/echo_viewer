@@ -57,11 +57,14 @@ test("group definition renders before concepts and paginates ten at a time", asy
 
     assert.equal(controller.renderGroupDefinition(), true);
     assert.match(elements.edgeInspector.textContent, /Existing definition/);
+    assert.equal(elements.edgeInspector.querySelectorAll("[data-exclude-concept-id]").length, 0,
+      "exclude controls wait for concept labels");
     assert.equal(requests.length, 0, "concept retrieval starts after the definition is rendered");
     await new Promise(resolve => setImmediate(resolve));
     assert.deepEqual(requests[0], ids.slice(0, 10));
     assert.equal(elements.edgeInspector.findAll("li").length, 10);
     assert.match(elements.edgeInspector.textContent, /Concept v1/);
+    assert.equal(elements.edgeInspector.querySelectorAll("[data-exclude-concept-id]").length, 10);
 
     elements.edgeInspector.querySelector("[data-concept-page='next']").click();
     assert.match(elements.edgeInspector.textContent, /Existing definition/);
@@ -76,6 +79,53 @@ test("group definition renders before concepts and paginates ten at a time", asy
 
     elements.edgeInspector.querySelector("[data-concept-page='previous']").click();
     assert.equal(requests.length, 3, "previously loaded pages are cached");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("a concept without a loaded label has no exclude control", async () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName) };
+  try {
+    const state = { project: { groups: [{ group_id: "g1", label: "Variable", variable_ids: ["v1"] }] },
+      selectedEvidenceGroupId: "g1", variableById: new Map() };
+    const elements = { edgeInspector: new Element("div"), closeEvidencePane: new Element("button"),
+      provenancePanel: new Element("div") };
+    const controller = createDagInspectorController({ state, elements, loadConceptLabels: async () => [] });
+    controller.renderGroupDefinition();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.match(elements.edgeInspector.textContent, /v1/);
+    assert.equal(elements.edgeInspector.querySelectorAll("[data-exclude-concept-id]").length, 0);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("a finding's exclude control waits for both concept labels", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName),
+    createTextNode: text => ({ textContent: text }) };
+  try {
+    const raw = { raw_causal_link_id: "r1", paper_id: "paper", source_variable_id: "v1",
+      target_variable_id: "v2", causal_link_existence: "present" };
+    const edge = { edge_id: "a__b", group_a: "a", group_b: "b", edge_source: "mapping_derived",
+      a_to_b_raw_link_ids: ["r1"], b_to_a_raw_link_ids: [] };
+    const state = { project: { groups: [{ group_id: "a", variable_ids: ["v1"] },
+      { group_id: "b", variable_ids: ["v2"] }], links: [edge], link_decisions: {}, finding_decisions: {} },
+    selectedEdgeId: "a__b", rawLinksById: new Map([["r1", raw]]), variableById: new Map(),
+    pendingEdgeEvidence: true };
+    const elements = { edgeInspector: new Element("div"), closeEvidencePane: new Element("button"),
+      provenancePanel: new Element("div") };
+    const controller = createDagInspectorController({ state, elements, truncate: text => text });
+    controller.renderProvenance();
+    assert.equal(elements.provenancePanel.findAll("button").length, 0);
+    state.variableById.set("v1", { concept_label: "Source" });
+    controller.renderProvenance();
+    assert.equal(elements.provenancePanel.findAll("button").length, 0);
+    state.variableById.set("v2", { concept_label: "Target" });
+    controller.renderProvenance();
+    assert.equal(elements.provenancePanel.findAll("button")[0].textContent, "×");
   } finally {
     globalThis.document = previousDocument;
   }

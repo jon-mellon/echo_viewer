@@ -18,6 +18,7 @@ export function createDagInspectorController({
   let pendingExclude = null;
   let pendingFindingId = null;
   const conceptLabels = new Map();
+  const resolvedConceptIds = new Set();
   const pendingConceptPages = new Map();
   const failedConceptPages = new Set();
   const orderedConceptsByView = new Map();
@@ -146,18 +147,19 @@ export function createDagInspectorController({
         priority?.matchedCount ? h("div", { className: "small-note",
           textContent: "Concepts used by visible DAG links first" }) : null,
         pageIds.length ? h("ol", { start: start + 1 }, pageIds.map(id => {
-          const label = conceptLabels.get(id)
+          const knownLabel = conceptLabels.get(id)
             || state.variableById?.get(id)?.concept_label
-            || state.variableById?.get(id)?.display_label
-            || (loading ? "Loading…" : id);
-          return h("li", {}, h("span", { textContent: label }), h("button", {
+            || state.variableById?.get(id)?.display_label;
+          const label = knownLabel || (loading ? "Loading…" : id);
+          const canExclude = Boolean(knownLabel && (resolvedConceptIds.has(id)
+            || state.variableById?.get(id)?.concept_label || state.variableById?.get(id)?.display_label));
+          return h("li", {}, h("span", { textContent: label }), canExclude ? h("button", {
             className: "group-concept-exclude", type: "button", dataset: { excludeConceptId: id },
             attrs: { "aria-label": `Exclude ${label} from ${group.label || group.group_id}` },
             title: `Exclude ${label}`,
-            disabled: state.publishedSchemaHydrating || state.publishedSchemaLoadFailed
-              || (loading && !conceptLabels.has(id) && !state.variableById?.has(id)),
+            disabled: state.publishedSchemaHydrating || state.publishedSchemaLoadFailed,
             textContent: "×",
-          }));
+          }) : null);
         })) : h("div", { className: "small-note", role: "status", textContent: priorityPending
           ? "Finding concepts used in this view…"
           : state.publishedSchemaHydrating ? "Loading concepts…" : "No underlying concepts." }),
@@ -227,8 +229,11 @@ export function createDagInspectorController({
       // Start after the description has been put in the DOM. Concept retrieval
       // can initialize the evidence engine without delaying the inspector.
       const pending = Promise.resolve().then(() => loadConceptLabels(missing)).then(rows => {
-        for (const row of rows) conceptLabels.set(row.variable_id,
-          row.concept_label || row.display_label || row.variable_id);
+        for (const row of rows) {
+          const label = row.concept_label || row.display_label;
+          if (label) resolvedConceptIds.add(row.variable_id);
+          conceptLabels.set(row.variable_id, label || row.variable_id);
+        }
         for (const id of missing) if (!conceptLabels.has(id)) conceptLabels.set(id, id);
       }).catch(error => {
         failedConceptPages.add(pageKey);
@@ -313,8 +318,10 @@ export function createDagInspectorController({
         ? h("a", { href: safeUrl(`https://doi.org/${encodeURIComponent(doi)}`), target: "_blank", rel: "noopener", title: raw.paper_title || doi, textContent: title })
         : document.createTextNode(title);
       const cell = (text, className) => h("td", { className, textContent: text });
+      const loadedConceptLabel = variableId => state.variableById.get(variableId)?.concept_label
+        || state.variableById.get(variableId)?.display_label;
       const conceptCell = (concept, variableId) => {
-        if (state.variableById.has(variableId)) return cell(concept, "provenance-concept");
+        if (loadedConceptLabel(variableId)) return cell(concept, "provenance-concept");
         return h("td", { className: "provenance-concept" }, state.pendingEdgeEvidence
           ? h("span", { className: "concept-loading", role: "status" },
             h("span", { className: "inline-spinner", ariaHidden: "true" }),
@@ -326,11 +333,13 @@ export function createDagInspectorController({
       const excluded = decision?.display_status === "excluded";
       const reasonLabel = decision?.reason_code === "not_relevant_to_target_population"
         ? "Not relevant to target population" : decision?.reason_code === "other" ? "Other" : "";
-      const action = h("button", { className: excluded ? "text-button" : "finding-exclude-button",
+      const canDecide = Boolean((raw.paper_title || raw.paper_id)
+        && loadedConceptLabel(raw.source_variable_id) && loadedConceptLabel(raw.target_variable_id));
+      const action = canDecide ? h("button", { className: excluded ? "text-button" : "finding-exclude-button",
         type: "button", textContent: excluded ? "Restore" : "×",
         title: excluded ? "Restore finding" : "Exclude finding",
-        attrs: { "aria-label": `${excluded ? "Restore" : "Exclude"} finding ${id}` } });
-      action.addEventListener("click", () => {
+        attrs: { "aria-label": `${excluded ? "Restore" : "Exclude"} finding ${id}` } }) : null;
+      action?.addEventListener("click", () => {
         if (excluded) {
           const before = takeSnapshot();
           if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
@@ -348,7 +357,7 @@ export function createDagInspectorController({
         cell(raw.causal_link_existence || ""), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(truncate(raw.target_population || "", 60)),
         h("td", {}, excluded ? h("span", { className: "finding-excluded-label",
           textContent: `Excluded${reasonLabel ? `: ${reasonLabel}` : ""} ` }) : null, action));
-      if (pendingFindingId !== id) return row;
+      if (pendingFindingId !== id || !canDecide) return row;
       const reason = h("select", { attrs: { "aria-label": "Finding exclusion reason" } },
         h("option", { value: "not_relevant_to_target_population", textContent: "Not relevant to target population" }),
         h("option", { value: "other", textContent: "Other" }));
