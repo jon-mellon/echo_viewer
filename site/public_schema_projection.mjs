@@ -10,7 +10,7 @@ export function publicFindingDecisions(decisions = {}) {
   return Object.fromEntries(Object.entries(decisions).flatMap(([rawId, decision]) =>
     decision?.display_status === "excluded" ? [[rawId, {
       display_status: "excluded",
-      ...(["not_relevant_to_target_population", "other"].includes(decision.reason_code)
+      ...(["not_relevant_to_target_population", "concept_miscategorized", "other"].includes(decision.reason_code)
         ? { reason_code: decision.reason_code } : {}),
     }]] : []));
 }

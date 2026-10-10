@@ -332,7 +332,8 @@ export function createDagInspectorController({
       const decision = state.project.finding_decisions?.[id];
       const excluded = decision?.display_status === "excluded";
       const reasonLabel = decision?.reason_code === "not_relevant_to_target_population"
-        ? "Not relevant to target population" : decision?.reason_code === "other" ? "Other" : "";
+        ? "Not relevant to target population" : decision?.reason_code === "concept_miscategorized"
+          ? "Concept miscategorized" : decision?.reason_code === "other" ? "Other" : "";
       const canDecide = Boolean((raw.paper_title || raw.paper_id)
         && loadedConceptLabel(raw.source_variable_id) && loadedConceptLabel(raw.target_variable_id));
       const action = canDecide ? h("button", { className: excluded ? "text-button" : "finding-exclude-button",
@@ -360,6 +361,7 @@ export function createDagInspectorController({
       if (pendingFindingId !== id || !canDecide) return row;
       const reason = h("select", { attrs: { "aria-label": "Finding exclusion reason" } },
         h("option", { value: "not_relevant_to_target_population", textContent: "Not relevant to target population" }),
+        h("option", { value: "concept_miscategorized", textContent: "Concept miscategorized" }),
         h("option", { value: "other", textContent: "Other" }));
       const detail = h("textarea", { className: "dag-textarea", rows: 2,
         placeholder: "Enter the reason (kept private)", attrs: { "aria-label": "Other exclusion reason" } });

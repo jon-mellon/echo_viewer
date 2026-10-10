@@ -143,6 +143,7 @@ export function createPublicationController({
 
   function refreshPublishVisibility() {
     elements.publish.hidden = !client || !hasPublishableChanges;
+    elements.publish.disabled = busy || !canPublish();
   }
 
   async function currentCanonical() {
@@ -202,6 +203,11 @@ export function createPublicationController({
 
   function workingCopyChanged() {
     clearTimeout(statusTimer);
+    // Invalidate a hash comparison started before this edit. Its stale result
+    // must not hide the publish action after a new exclusion.
+    statusRevision += 1;
+    hasPublishableChanges = true;
+    refreshPublishVisibility();
     statusTimer = setTimeout(() => void refreshPublicationState(), 150);
   }
 

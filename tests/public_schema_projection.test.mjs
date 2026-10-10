@@ -51,11 +51,13 @@ test("publication keeps the finding reason category but omits free text", async 
     membership_unit: "canonical_variable", groups: [],
     finding_decisions: { finding1: { display_status: "excluded", reason_code: "other",
       reason_text: reason, timestamp: "2026-01-01" },
-    finding2: { display_status: "excluded", reason_code: "not_relevant_to_target_population" } } };
+    finding2: { display_status: "excluded", reason_code: "not_relevant_to_target_population" },
+    finding3: { display_status: "excluded", reason_code: "concept_miscategorized" } } };
   const safe = publicSchemaProjection(schema);
   assert.deepEqual(safe.finding_decisions, {
     finding1: { display_status: "excluded", reason_code: "other" },
     finding2: { display_status: "excluded", reason_code: "not_relevant_to_target_population" },
+    finding3: { display_status: "excluded", reason_code: "concept_miscategorized" },
   });
   assert.doesNotThrow(() => validateGroupingSchema(safe));
   assert.throws(() => validateGroupingSchema({ ...safe, finding_decisions: {

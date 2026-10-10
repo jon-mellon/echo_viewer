@@ -117,7 +117,10 @@ test("a finding's exclude control waits for both concept labels", () => {
     pendingEdgeEvidence: true };
     const elements = { edgeInspector: new Element("div"), closeEvidencePane: new Element("button"),
       provenancePanel: new Element("div") };
-    const controller = createDagInspectorController({ state, elements, truncate: text => text });
+    const controller = createDagInspectorController({ state, elements, truncate: text => text,
+      takeSnapshot: () => "before", nowIso: () => "2026-10-10T00:00:00Z",
+      applyProjectOperation: next => { state.project = next; },
+      addDecision() {}, addToUndoHistory() {}, renderAll() {} });
     controller.renderProvenance();
     assert.equal(elements.provenancePanel.findAll("button").length, 0);
     state.variableById.set("v1", { concept_label: "Source" });
@@ -126,6 +129,15 @@ test("a finding's exclude control waits for both concept labels", () => {
     state.variableById.set("v2", { concept_label: "Target" });
     controller.renderProvenance();
     assert.equal(elements.provenancePanel.findAll("button")[0].textContent, "×");
+    elements.provenancePanel.findAll("button")[0].click();
+    assert.ok(elements.provenancePanel.findAll("option")
+      .some(option => option.textContent === "Concept miscategorized"));
+    elements.provenancePanel.findAll("select")[0].value = "concept_miscategorized";
+    elements.provenancePanel.findAll("textarea")[0].value = "";
+    elements.provenancePanel.findAll("button")
+      .find(button => button.textContent === "Confirm exclusion").click();
+    assert.equal(state.project.finding_decisions.r1.reason_code, "concept_miscategorized");
+    assert.equal(state.project.finding_decisions.r1.reason_text, undefined);
   } finally {
     globalThis.document = previousDocument;
   }

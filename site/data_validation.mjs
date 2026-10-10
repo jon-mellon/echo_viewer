@@ -118,7 +118,7 @@ export function validateGroupingSchema(schema) {
         throw new Error(`Invalid finding decision for ${rawId}.`);
       }
       if (Object.hasOwn(decision, "reason_code")
-        && !["not_relevant_to_target_population", "other"].includes(decision.reason_code)) {
+        && !["not_relevant_to_target_population", "concept_miscategorized", "other"].includes(decision.reason_code)) {
         throw new Error(`Invalid finding exclusion reason for ${rawId}.`);
       }
       if (Object.hasOwn(decision, "reason_text") && typeof decision.reason_text !== "string") {

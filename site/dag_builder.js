@@ -755,7 +755,7 @@ function applyProjectOperation(next) {
   })) });
   const oldSchema = asSchema(oldProject);
   projectController.applyOperation(next);
-  if (anchorChanged) publicationController?.workingCopyChanged?.();
+  if (schemaChanged || anchorChanged) publicationController?.workingCopyChanged?.();
   if (schemaChanged && !state.activeGroupId && !state.definitionDraft && !schemaBatchDepth
     && !persistentViewer.editorOpen && !schemaCommitQueued) {
     schemaCommitQueued = true;
@@ -1240,7 +1240,8 @@ async function showExcludedFindings() {
       const label = raw ? `${truncate(raw.paper_title || raw.paper_id || id, 44)} · ${source} → ${target}` : id;
       const code = state.project.finding_decisions[id]?.reason_code;
       const reason = code === "not_relevant_to_target_population" ? "Not relevant to target population"
-        : code === "other" ? "Other" : "";
+        : code === "concept_miscategorized" ? "Concept miscategorized"
+          : code === "other" ? "Other" : "";
       const restore = h("button", { className: "text-button", type: "button", textContent: "Restore" });
       restore.addEventListener("click", () => {
         const before = takeSnapshot();
