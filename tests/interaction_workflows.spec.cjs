@@ -322,6 +322,8 @@ test("pinching the mobile variable map zooms the map without selecting a variabl
   await page.locator('#definitionSourceList input[data-source-id]').first().check();
   await page.locator('#definitionContinue').click();
   await page.locator('button[data-mobile-panel="variables"]').click();
+  await expect(page.locator('button[data-mobile-panel="dag"]')).toBeHidden();
+  await expect(page.locator('.mobile-panel-nav .mobile-panel-tab:visible')).toHaveCount(2);
   const canvas = page.locator('#dagMapCanvas');
   await expect(canvas).toBeVisible();
   await expect.poll(() => canvas.evaluate(node => node.width)).toBeGreaterThan(100);

@@ -2340,12 +2340,12 @@ h2 {
     display: none;
   }
 
-  .dag-body.defining-variable .mobile-panel-nav {
-    grid-template-columns: repeat(3, minmax(0, 112px));
-  }
-
   .dag-body.defining-variable .mobile-variable-tab {
     display: block;
+  }
+
+  .dag-body.defining-variable .mobile-panel-tab[data-mobile-panel="dag"] {
+    display: none;
   }
 
   .dag-ws-header {

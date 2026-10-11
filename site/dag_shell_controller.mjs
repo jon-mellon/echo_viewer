@@ -13,7 +13,9 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     const tabs = [...document.querySelectorAll("[data-mobile-panel]")];
     if (!tabs.length) return;
 
-    const showPanel = panel => {
+    const showPanel = requestedPanel => {
+      const panel = requestedPanel === "dag" && document.body.classList.contains("defining-variable")
+        ? "controls" : requestedPanel;
       document.body.dataset.mobilePanel = panel;
       for (const tab of tabs) {
         const active = tab.dataset.mobilePanel === panel;
@@ -42,6 +44,8 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     }
     new MutationObserver(() => {
       if (document.body.dataset.mobilePanel === "variables" && !document.body.classList.contains("defining-variable")) {
+        showPanel("controls");
+      } else if (document.body.dataset.mobilePanel === "dag" && document.body.classList.contains("defining-variable")) {
         showPanel("controls");
       }
     }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
