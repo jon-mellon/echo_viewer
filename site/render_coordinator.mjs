@@ -5,6 +5,7 @@ export function createRenderCoordinator(view) {
     view.buildCandidateQueue();
     view.aggregateGroupLinks();
     view.computeVisibleLinks();
+    view.renderConfounderStatuses?.();
     view.renderGroupList();
     view.renderRejectedVariablesPanel();
     view.renderDag({ reuseGeometry: reuseDagGeometry });
@@ -21,6 +22,7 @@ export function createRenderCoordinator(view) {
   function rebuildLinkDecision() {
     view.aggregateGroupLinks();
     view.computeVisibleLinks();
+    view.renderConfounderStatuses?.();
     view.renderDag({ reuseGeometry: true });
     view.renderSelectedEdge();
     view.renderExportStatus();

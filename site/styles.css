@@ -849,6 +849,11 @@ h2 {
   overflow-y: auto;
 }
 
+.confounder-status-list { display: grid; gap: 10px; }
+.confounder-status-row { display: grid; gap: 5px; padding: 9px; border: 1px solid var(--line); border-radius: 7px; }
+.confounder-status-row label { font-weight: 700; overflow-wrap: anywhere; }
+.confounder-status-row select, .confounder-status-row input { width: 100%; min-width: 0; }
+
 .dag2-history-controls {
   display: none;
 }

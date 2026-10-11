@@ -98,6 +98,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       || state.data.grouping_sets?.[0])?.link_decisions || {});
     state.project.finding_decisions = structuredClone((localRecord?.schema
       || state.data.grouping_sets?.[0])?.finding_decisions || {});
+    state.project.confounder_statuses = structuredClone((localRecord?.schema
+      || state.data.grouping_sets?.[0])?.confounder_statuses || {});
     normalizeProjectDuplicateAssignments();
     if (state.interfaceMode === "dag2") {
       state.phase = "select_iv";
@@ -152,6 +154,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.data.default_grouping_set_id = schema.grouping_set_id;
         state.project.link_decisions = structuredClone(schema.link_decisions || {});
         state.project.finding_decisions = structuredClone(schema.finding_decisions || {});
+        state.project.confounder_statuses = structuredClone(schema.confounder_statuses || {});
         loadLatestSchemaGroups();
         normalizeProjectDuplicateAssignments();
         // Compiled nodes and routes already describe this publication. Hydrating

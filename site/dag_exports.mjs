@@ -1,5 +1,6 @@
 import { PROJECT_FORMAT_VERSION, WORKING_MAP_FORMAT_VERSION } from "./app_contracts.mjs";
 import { escapeHtml } from "./text_utils.mjs";
+import { CONFOUNDER_STATUSES, confounderRows } from "./confounder_status.mjs";
 
 /** @typedef {import("./app_contracts.mjs").SerializedProjectPayload} SerializedProjectPayload */
 
@@ -203,6 +204,20 @@ function escapeMarkdownCell(value) {
   return escapeHtml(String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|"));
 }
 
+export function buildConfoundersTable(fmt, { project, confounderGroupIds }) {
+  const rows = confounderRows(project, confounderGroupIds);
+  if (!rows.length) return fmt === "md" ? "_No potential confounders._\n" : "\\textit{No potential confounders.}\n";
+  const status = row => row.status === "other" && row.text
+    ? `Other: ${row.text}` : CONFOUNDER_STATUSES[row.status];
+  return fmt === "md"
+    ? ["| Potential confounder | Status |", "|----------------------|--------|",
+      ...rows.map(row => `| ${escapeMarkdownCell(row.label)} | ${escapeMarkdownCell(status(row))} |`)].join("\n") + "\n"
+    : ["\\begin{longtable}{@{}p{0.4\\textwidth}p{0.54\\textwidth}@{}}",
+      "\\toprule", "Potential confounder & Status \\\\", "\\midrule", "\\endhead",
+      ...rows.map(row => `  ${texEscape(row.label)} & ${texEscape(status(row))} \\\\`),
+      "\\bottomrule", "\\end{longtable}"].join("\n") + "\n";
+}
+
 const FINDING_REASONS = {
   not_relevant_to_target_population: "Not relevant to target population",
   concept_miscategorized: "Concept miscategorized",
@@ -286,6 +301,9 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, gr
     `## Causal Links`,
     ``,
     buildLinksTable("md", input, keyMap),
+    ...(input.confounderGroupIds ? [
+      `## Potential Confounders`, ``, buildConfoundersTable("md", input), ``,
+    ] : []),
     ...(buildExcludedLinksTable("md", project) ? [
       `## Excluded Links`,
       ``,
@@ -361,6 +379,9 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     ``,
     buildLinksTable("tex", input, keyMap),
     ``,
+    ...(input.confounderGroupIds ? [
+      `\\section{Potential Confounders}`, ``, buildConfoundersTable("tex", input), ``,
+    ] : []),
     ...(buildExcludedLinksTable("tex", project) ? [
       `\\section{Excluded Links}`,
       ``,

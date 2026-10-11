@@ -74,7 +74,7 @@ export function validateProjectPayload(payload) {
     "groups", "links", "decisions", "grouping_imports", "grouping_exports", "carve_outs",
     "rejected_variables", "restored_variable_ids", "undoHistory", "actionLog",
   ]) requireArray(payload, key, "Project payload");
-  for (const key of ["filters", "link_decisions", "finding_decisions", "seeds", "definitionDraft"]) {
+  for (const key of ["filters", "link_decisions", "finding_decisions", "confounder_statuses", "seeds", "definitionDraft"]) {
     requireRecord(payload, key, "Project payload", { nullable: key === "definitionDraft" });
   }
   requireRecord(payload, "publication", "Project payload", { nullable: true });
@@ -126,6 +126,19 @@ export function validateGroupingSchema(schema) {
       }
       if (Object.hasOwn(decision, "reason_text") && !decision.reason_text.trim()) {
         throw new Error(`Finding exclusion text must not be blank for ${rawId}.`);
+      }
+    }
+  }
+  if (Object.hasOwn(schema, "confounder_statuses")) {
+    if (!isRecord(schema.confounder_statuses)) throw new Error("Grouping schema.confounder_statuses must be an object.");
+    for (const [key, decision] of Object.entries(schema.confounder_statuses)) {
+      if (!isRecord(decision) || !["unaddressed", "explicitly_controlled",
+        "accounted_for_by_design", "other"].includes(decision.status)) {
+        throw new Error(`Invalid confounder status for ${key}.`);
+      }
+      if (Object.hasOwn(decision, "text") && (decision.status !== "other"
+        || typeof decision.text !== "string" || !decision.text.trim())) {
+        throw new Error(`Invalid confounder status text for ${key}.`);
       }
     }
   }

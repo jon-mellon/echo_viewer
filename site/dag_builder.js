@@ -37,6 +37,7 @@ import { createPersistentViewer } from "/persistent_viewer.mjs";
 import { importDraftFile, makeDraftExport } from "/draft_exchange.mjs";
 import { listPreviousSessions } from "/local_schema_store.mjs";
 import { escapeHtml } from "/text_utils.mjs";
+import { CONFOUNDER_STATUSES, confounderRows } from "/confounder_status.mjs";
 import { h, replaceChildren, safeUrl, setSafeUrl } from "/dom_builder.mjs";
 import { hydrateSearchResult, variableSearchCatalog } from "/variable_search_catalog.mjs";
 
@@ -152,7 +153,7 @@ function initElements() {
     "groupSeedInput", "groupSeedResults",
     "includedVariables", "neighborSuggestions",
     // Right: DAG workspace
-    "dagWorkspaceSection", "dagNetwork",
+    "dagWorkspaceSection", "dagNetwork", "confounderConfig", "confounderStatusList",
     "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
@@ -427,7 +428,7 @@ function installDagHandlers() {
 // ─── Render orchestration ──────────────────────────────────────────────────────
 
 const renderCoordinator = createRenderCoordinator({
-  buildCandidateQueue, aggregateGroupLinks, computeVisibleLinks, renderGroupList,
+  buildCandidateQueue, aggregateGroupLinks, computeVisibleLinks, renderConfounderStatuses, renderGroupList,
   renderRejectedVariablesPanel, renderDag, refreshDagEdgeSelection,
   renderVariableComparison,
   renderSelectedEdge, renderExportStatus, renderMapModeControls,
@@ -488,6 +489,49 @@ function changeAnchor(side) {
 
 function renderRightPanel() {
   setupGroupController.renderRightPanel();
+  renderConfounderStatuses();
+}
+
+function renderConfounderStatuses() {
+  const visible = state.interfaceMode === "dag2" && state.showConfoundersOnly
+    && !els.dagWorkspaceSection.hidden && !state.project.instrument_group_id
+    && Boolean(groupById(state.project.iv_group_id)?.variable_ids?.length)
+    && Boolean(groupById(state.project.dv_group_id)?.variable_ids?.length);
+  els.confounderConfig.hidden = !visible;
+  if (!visible) return;
+  const rows = confounderRows(state.project, state.confounderGroupIds);
+  if (!rows.length) {
+    replaceChildren(els.confounderStatusList,
+      h("p", { className: "small-note", textContent: "No potential confounders in this view." }));
+    return;
+  }
+  replaceChildren(els.confounderStatusList, rows.map(row => {
+    const select = h("select", { className: "select-input", attrs: { "aria-label": `Status for ${row.label}` } },
+      Object.entries(CONFOUNDER_STATUSES).map(([value, label]) =>
+        h("option", { value, textContent: label })));
+    select.value = row.status;
+    const explanation = h("input", { className: "search-input", type: "text",
+      value: row.text, placeholder: "Describe how this confounder is handled",
+      attrs: { "aria-label": `Other status for ${row.label}` } });
+    explanation.hidden = row.status !== "other";
+    const save = () => {
+      const before = takeSnapshot();
+      state.project.confounder_statuses ||= {};
+      state.project.confounder_statuses[row.key] = {
+        status: select.value,
+        ...(select.value === "other" && explanation.value.trim()
+          ? { text: explanation.value.trim() } : {}),
+      };
+      projectController.record(`Set confounder status: ${row.label}`, before);
+      publicationController.workingCopyChanged();
+      void persistentViewer.commitDecision().catch(error =>
+        console.error("Could not save confounder status", error));
+    };
+    select.addEventListener("change", () => { explanation.hidden = select.value !== "other"; save(); });
+    explanation.addEventListener("change", save);
+    return h("div", { className: "confounder-status-row" },
+      h("label", { textContent: row.label }, select), explanation);
+  }));
 }
 
 // ─── Setup phase rendering ────────────────────────────────────────────────────

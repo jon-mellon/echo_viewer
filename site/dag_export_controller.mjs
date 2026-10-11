@@ -29,6 +29,7 @@ export function createDagExportController({
   function captureInput() {
     return structuredClone({
       project: state.project, visibleLinks: state.visibleLinks,
+      confounderGroupIds: [...(state.confounderGroupIds || [])],
       rawLinksById: state.rawLinksById, cacheCompatibility: state.data.cache_compatibility,
       rejectedVariables: rejectedVariableEntries(), hiddenVariableIds: [...rejectedVariableIdSet()],
       canonicalByVariableId: [...state.clusterOf.entries()],

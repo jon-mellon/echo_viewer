@@ -1,4 +1,5 @@
 // Only these decision fields are permitted in public schema and graph artifacts.
+import { publicConfounderStatuses } from "./confounder_status.mjs";
 export function publicLinkDecisions(decisions = {}) {
   return Object.fromEntries(Object.entries(decisions).flatMap(([edgeId, decision]) => {
     const status = decision?.display_status === "hidden" ? "excluded" : decision?.display_status;
@@ -16,7 +17,8 @@ export function publicFindingDecisions(decisions = {}) {
 }
 
 export function publicSchemaProjection(schema) {
-  const { link_decisions: _localDecisions, finding_decisions: _localFindings, ...rest } = schema;
+  const { link_decisions: _localDecisions, finding_decisions: _localFindings,
+    confounder_statuses: _localConfounders, ...rest } = schema;
   const linkDecisions = publicLinkDecisions(schema.link_decisions);
   const findingDecisions = publicFindingDecisions(schema.finding_decisions);
   return {
@@ -24,6 +26,8 @@ export function publicSchemaProjection(schema) {
     groups: (schema.groups || []).map(group => ({ ...group })),
     ...(Object.keys(linkDecisions).length ? { link_decisions: linkDecisions } : {}),
     ...(Object.keys(findingDecisions).length ? { finding_decisions: findingDecisions } : {}),
+    ...(Object.keys(publicConfounderStatuses(schema.confounder_statuses)).length
+      ? { confounder_statuses: publicConfounderStatuses(schema.confounder_statuses) } : {}),
   };
 }
 

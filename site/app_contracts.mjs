@@ -45,6 +45,7 @@
  * @property {JsonValue[]} carve_outs
  * @property {Record<string, LinkDecision>} link_decisions
  * @property {Record<string, {display_status: string, reason_code?: string, reason_text?: string, timestamp?: string}>} finding_decisions
+ * @property {Record<string, {status: string, text?: string}>} confounder_statuses
  * @property {JsonValue[]} rejected_variables
  * @property {string[]} [restored_variable_ids]
  * @property {JsonValue | null} publication

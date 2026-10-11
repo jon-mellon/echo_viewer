@@ -4,6 +4,21 @@ import { publicCompiledDag, publicSchemaProjection } from "../site/public_schema
 import { writeGroupingSchemaFolder } from "../site/grouping_schema_writer.mjs";
 import { createCompiledArtifacts } from "../site/compiled_dag.mjs";
 import { validateGroupingSchema } from "../site/data_validation.mjs";
+import { confounderKey } from "../site/confounder_status.mjs";
+
+test("public schema keeps confounder status but omits local explanation", async () => {
+  const key = confounderKey("iv", "dv", "c");
+  const marker = "PRIVATE CONFOUNDER EXPLANATION";
+  const schema = { schema_version: "groupings-v3", grouping_set_id: "test",
+    membership_unit: "canonical_variable", groups: [],
+    confounder_statuses: { [key]: { status: "other", text: marker } } };
+  const safe = publicSchemaProjection(schema);
+  assert.deepEqual(safe.confounder_statuses[key], { status: "other" });
+  assert.doesNotThrow(() => validateGroupingSchema(safe));
+  const files = await writeGroupingSchemaFolder(safe);
+  for (const bytes of files.values()) assert.ok(!new TextDecoder().decode(bytes).includes(marker));
+  assert.equal(schema.confounder_statuses[key].text, marker);
+});
 
 test("publication keeps exclusion status while stripping private reasons", () => {
   const marker = "PRIVATE LEGAL REASON 73";

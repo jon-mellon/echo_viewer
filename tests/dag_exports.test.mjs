@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as exports from '../site/dag_exports.mjs';
 import { makeZip } from '../site/dag_export_zip.mjs';
 import { legacyExports, legacyZip } from './fixtures/legacy_dag_exports.mjs';
+import { confounderKey } from '../site/confounder_status.mjs';
 
 const timestamp = '2026-09-09T12:00:00Z';
 function fixture() {
@@ -48,6 +49,20 @@ test('document exports record excluded links and findings with available reasons
   assert.match(tex, /\\section\{Excluded Links\}[\s\S]*Confounded \| uncertain \\& sensitive/);
   assert.match(tex, /\\section\{Excluded Findings\}[\s\S]*Other: Wrong sample/);
   assert.doesNotMatch(tex, /Excluded Variables|low\\_quality/);
+});
+
+test('document exports include each potential confounder and its local status text', () => {
+  const { input, metadata } = fixture();
+  input.confounderGroupIds = ['other'];
+  input.project.groups[2].label = 'Age & cohort | time';
+  input.project.confounder_statuses = {
+    [confounderKey('iv', 'dv', 'other')]: { status: 'other', text: 'Matched by age & year | cohort' },
+  };
+  const bib = exports.buildBibText(exports.collectAllDagDois(input), metadata);
+  const md = exports.buildMarkdownFiles(input, bib)[0].data;
+  const tex = exports.buildLatexFiles(input, bib)[0].data;
+  assert.match(md, /Age &amp; cohort \\\| time \| Other: Matched by age &amp; year \\\| cohort/);
+  assert.match(tex, /Age \\& cohort \| time & Other: Matched by age \\& year \| cohort/);
 });
 
 for (const scenario of ['normal', 'empty', 'bidirectional', 'missing-group', 'svg']) {

@@ -2,6 +2,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readProject, writeProject, restoreProjectPayload, projectStorageKey } from "../site/project_persistence.mjs";
 import { recordHistory, historyStep } from "../site/project_history.mjs";
+import { createProject, snapshotProject, restoreSnapshot } from "../site/dag_project.mjs";
+import { confounderKey } from "../site/confounder_status.mjs";
+
+test("confounder status and local text survive project restoration and undo snapshots", () => {
+  const key = confounderKey("iv", "dv", "c");
+  const decision = { status: "other", text: "Handled with a time fixed effect" };
+  const project = createProject({ projectId: "p", groupingSetId: "s" });
+  project.confounder_statuses[key] = decision;
+  const restored = restoreProjectPayload({ schema_version: "dag-builder-project-v1",
+    groups: [], confounder_statuses: project.confounder_statuses }, project, "default");
+  assert.deepEqual(restored.project.confounder_statuses[key], decision);
+  const snapshot = snapshotProject(project, "build");
+  project.confounder_statuses[key] = { status: "unaddressed" };
+  assert.deepEqual(restoreSnapshot(project, snapshot).project.confounder_statuses[key], decision);
+});
 
 test("storage round-trip preserves settings and normalizes legacy project fields", () => {
   const data = new Map();
