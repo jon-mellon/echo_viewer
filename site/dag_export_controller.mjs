@@ -5,7 +5,7 @@ import { setSafeUrl } from "./dom_builder.mjs";
 export const MAX_REFERENCE_ENRICHMENTS = 24;
 
 export function referenceEnrichmentRequests(dois) {
-  return [...new Set([exportData.METHOD_DOI, ...dois.slice(0, MAX_REFERENCE_ENRICHMENTS)])];
+  return [...new Set([exportData.METHOD_DOI, ...dois])];
 }
 
 // Browser-side export orchestration. Pure serialization stays in dag_exports;
@@ -80,7 +80,9 @@ export function createDagExportController({
 
   function warmBibliography(input = captureInput()) {
     const { requested } = requestedDois(input);
-    for (const doi of requested) void fetchCrossRef(doi);
+    // Keep speculative background traffic bounded; an explicit export fetches
+    // metadata for every cited DOI and reuses anything already cached here.
+    for (const doi of requested.slice(0, MAX_REFERENCE_ENRICHMENTS + 1)) void fetchCrossRef(doi);
   }
 
   async function prepareExportInput() {

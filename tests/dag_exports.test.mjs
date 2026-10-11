@@ -135,6 +135,24 @@ test('Markdown export embeds and references the rendered causal-map image', () =
   assert.deepEqual(files.find(file => file.name === 'dag-graph.png')?.data, png);
 });
 
+test('Markdown and LaTeX exports both include enriched references beyond the preload limit', () => {
+  const { input } = fixture();
+  const dois = Array.from({ length: 25 }, (_, index) => `10.1234/paper-${index}`);
+  input.visibleLinks[0].a_to_b_raw_link_ids = dois.map((_, index) => `paper-${index}`);
+  input.visibleLinks[0].b_to_a_raw_link_ids = [];
+  input.rawLinksById = new Map(dois.map((doi, index) => [`paper-${index}`, { paper_id: doi }]));
+  const bibliography = exports.buildBibText(exports.collectAllDagDois(input), new Map([
+    [dois[24], { author: [{ family: 'Taylor' }], published: { 'date-parts': [[2025]] },
+      title: ['Last paper'], type: 'journal-article' }],
+  ]));
+  for (const buildFiles of [exports.buildMarkdownFiles, exports.buildLatexFiles]) {
+    const files = buildFiles(input, bibliography);
+    assert.match(files.find(file => file.name === 'references.bib').data,
+      /@article\{taylor2025,[\s\S]*title   = \{Last paper\}/);
+    assert.match(files[0].data, /taylor2025/);
+  }
+});
+
 test('DOI collection rejects identifiers containing trailing injected content', () => {
   const input = {
     visibleLinks: [{ a_to_b_raw_link_ids: ['safe', 'unsafe'], b_to_a_raw_link_ids: [] }],

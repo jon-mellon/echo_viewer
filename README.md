@@ -27,9 +27,10 @@ All six suites run on every pull request and before a GitHub Pages deployment.
 `npm run test:browser` additionally checks the password gate, definition
 Back/Cancel/Save/edit flows, public link sharing, project import/export, and
 bibliography, Markdown, and LaTeX downloads. It runs in the same required jobs.
-Document exports enrich at most 24 paper references through Crossref so a
-large DAG does not wait for thousands of rate limited requests; every DOI remains
-in the exported bibliography.
+The viewer preloads metadata for up to 24 paper references through Crossref.
+When exporting a document, it fetches metadata for every cited DOI, which can
+take longer for large DAGs. References whose metadata cannot be fetched retain
+their DOI in the exported bibliography.
 Each run writes a summary and Playwright trace to its browser-specific results
 directory. Chromium also writes a CPU profile. Open that profile in Chrome
 DevTools Performance, or inspect a trace with
