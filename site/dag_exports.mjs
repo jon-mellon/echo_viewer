@@ -161,23 +161,21 @@ export function buildLinksTable(fmt, { visibleLinks, project, rawLinksById }, ke
 }
 
 export function buildExcludedLinksTable(fmt, project) {
-  const groupById = id => project.groups.find(group => group.group_id === id);
-
-  const excluded = Object.values(project.link_decisions || {})
-    .filter(d => d.display_status === "excluded");
+  const excluded = Object.entries(project.link_decisions || {})
+    .filter(([, decision]) => decision?.display_status === "excluded" || decision?.display_status === "hidden");
   if (!excluded.length) return null;
 
-  const rows = excluded.map(d => {
-    const link = project.links.find(l => l.edge_id === d.edge_id);
-    const a = link ? groupById(link.group_a) : null;
-    const b = link ? groupById(link.group_b) : null;
-    const aLabel = a?.label || d.edge_id.split("->")[0] || d.edge_id;
-    const bLabel = b?.label || d.edge_id.split("->")[1] || "";
-    const reason = d.exclude_reason || "(no reason recorded)";
+  const rows = excluded.map(([edgeId, decision]) => {
+    const link = (project.links || []).find(candidate => candidate.edge_id === edgeId);
+    const [firstId, secondId] = edgeId.includes("__") ? edgeId.split("__") : edgeId.split("->");
+    const label = id => project.groups.find(group => group.group_id === id)?.label || id || "";
+    const { sourceLabel, targetLabel } = link ? directedGroupLabels(link, project.groups)
+      : { sourceLabel: label(firstId) || edgeId, targetLabel: label(secondId) };
+    const reason = decision.exclude_reason?.trim() || "(no reason recorded)";
     if (fmt === "md") {
-      return `| ${escapeHtml(aLabel)} | ${escapeHtml(bLabel)} | ${escapeHtml(reason)} |`;
+      return `| ${escapeMarkdownCell(sourceLabel)} | ${escapeMarkdownCell(targetLabel)} | ${escapeMarkdownCell(reason)} |`;
     } else {
-      return `  ${texEscape(aLabel)} & ${texEscape(bLabel)} & ${texEscape(reason)} \\\\`;
+      return `  ${texEscape(sourceLabel)} & ${texEscape(targetLabel)} & ${texEscape(reason)} \\\\`;
     }
   });
 
@@ -199,6 +197,42 @@ export function buildExcludedLinksTable(fmt, project) {
       "\\end{longtable}",
     ].join("\n") + "\n";
   }
+}
+
+function escapeMarkdownCell(value) {
+  return escapeHtml(String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|"));
+}
+
+const FINDING_REASONS = {
+  not_relevant_to_target_population: "Not relevant to target population",
+  concept_miscategorized: "Concept miscategorized",
+  other: "Other",
+};
+
+export function buildExcludedFindingsTable(fmt, { project, rawLinksById }) {
+  const excluded = Object.entries(project.finding_decisions || {})
+    .filter(([, decision]) => decision?.display_status === "excluded");
+  if (!excluded.length) return null;
+  const rows = excluded.map(([id, decision]) => {
+    const finding = rawLinksById?.get(id);
+    const paper = finding?.paper_title || finding?.paper_id || "—";
+    const relation = finding
+      ? `${finding.source_variable_id || "?"} → ${finding.target_variable_id || "?"}`
+      : id;
+    const reason = [
+      FINDING_REASONS[decision.reason_code] || "",
+      decision.reason_text?.trim() || "",
+    ].filter(Boolean).join(": ") || "(no reason recorded)";
+    return fmt === "md"
+      ? `| ${escapeMarkdownCell(id)} | ${escapeMarkdownCell(paper)} | ${escapeMarkdownCell(relation)} | ${escapeMarkdownCell(reason)} |`
+      : `  ${texEscape(id)} & ${texEscape(paper)} & ${texEscape(relation)} & ${texEscape(reason)} \\\\`;
+  });
+  return fmt === "md"
+    ? ["| Finding ID | Paper | Variable link | Reason for exclusion |",
+      "|------------|-------|---------------|----------------------|", ...rows].join("\n") + "\n"
+    : ["\\begin{longtable}{@{}p{0.16\\textwidth}p{0.25\\textwidth}p{0.25\\textwidth}p{0.27\\textwidth}@{}}",
+      "\\toprule", "Finding ID & Paper & Variable link & Reason for exclusion \\\\",
+      "\\midrule", "\\endhead", ...rows, "\\bottomrule", "\\end{longtable}"].join("\n") + "\n";
 }
 
 function texEscape(s) {
@@ -258,6 +292,13 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, gr
       `The following edges were reviewed and excluded from the working causal map.`,
       ``,
       buildExcludedLinksTable("md", project),
+    ] : []),
+    ...(buildExcludedFindingsTable("md", input) ? [
+      `## Excluded Findings`,
+      ``,
+      `The following individual evidence findings were excluded.`,
+      ``,
+      buildExcludedFindingsTable("md", input),
     ] : []),
     `# References`,
     ``,
@@ -326,6 +367,14 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
       `The following edges were reviewed and excluded from the working causal map.`,
       ``,
       buildExcludedLinksTable("tex", project),
+      ``,
+    ] : []),
+    ...(buildExcludedFindingsTable("tex", input) ? [
+      `\\section{Excluded Findings}`,
+      ``,
+      `The following individual evidence findings were excluded.`,
+      ``,
+      buildExcludedFindingsTable("tex", input),
       ``,
     ] : []),
     `\\bibliographystyle{plainnat}`,

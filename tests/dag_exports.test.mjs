@@ -13,15 +13,42 @@ function fixture() {
     { group_id: 'dv', label: 'Tax_50%', variable_ids: ['v2'], type: 'dv' },
     { group_id: 'other', label: 'Other', variable_ids: ['v3'], notes: 'note' },
   ], links, manual_edges: [],
-    grouping_exports: [], link_decisions: { iv__dv: { edge_id: 'iv__dv', display_status: 'excluded', exclude_reason: 'Reason & details' } } };
+    grouping_exports: [], link_decisions: {} };
   const input = { project, visibleLinks: links,
     rawLinksById: new Map([['r1', { paper_id: '10.1234/one' }], ['r2', { paper_id: '10.1234/two' }]]),
-    cacheCompatibility: { version: 'test' }, rejectedVariables: [{ variable_id: 'bad', member_variable_ids: ['bad', 'bad2'] }],
+    cacheCompatibility: { version: 'test' }, rejectedVariables: [],
     hiddenVariableIds: ['bad', 'bad2'], selectedUoa: 'person', phase: 'build', workflowMode: 'group_review',
     seeds: { iv: new Set(['v1']), dv: new Set(['v2']) }, dagLayoutMode: 'auto' };
   const metadata = new Map([['10.1234/one', { author: [{ family: 'Smith', given: 'A' }], published: { 'date-parts': [[2020]] }, title: ['Test paper'], type: 'journal-article' }]]);
   return { input, metadata };
 }
+
+test('document exports record excluded links and findings with available reasons', () => {
+  const { input, metadata } = fixture();
+  input.project.link_decisions = {
+    iv__dv: { display_status: 'excluded', exclude_reason: 'Confounded | uncertain & sensitive' },
+    other__missing: { display_status: 'excluded' },
+  };
+  input.project.finding_decisions = {
+    r1: { display_status: 'excluded', reason_code: 'other', reason_text: 'Wrong sample | cohort' },
+    unknown: { display_status: 'excluded', reason_code: 'concept_miscategorized' },
+  };
+  input.rawLinksById.get('r1').paper_title = 'A & B';
+  input.rawLinksById.get('r1').source_variable_id = 'v1';
+  input.rawLinksById.get('r1').target_variable_id = 'v2';
+  input.rejectedVariables = [{ variable_id: 'bad', label: 'Low | quality', reason: 'low_quality' }];
+  const bibliography = exports.buildBibText(exports.collectAllDagDois(input), metadata);
+  const md = exports.buildMarkdownFiles(input, bibliography)[0].data;
+  const tex = exports.buildLatexFiles(input, bibliography)[0].data;
+  assert.match(md, /## Excluded Links[\s\S]*Tax_50% \| Income &amp; wealth \| Confounded \\\| uncertain &amp; sensitive/);
+  assert.match(md, /Other \| missing \| \(no reason recorded\)/);
+  assert.match(md, /## Excluded Findings[\s\S]*r1 \| A &amp; B \| v1 → v2 \| Other: Wrong sample \\\| cohort/);
+  assert.match(md, /unknown \| — \| unknown \| Concept miscategorized/);
+  assert.doesNotMatch(md, /Excluded Variables|Low \\\| quality/);
+  assert.match(tex, /\\section\{Excluded Links\}[\s\S]*Confounded \| uncertain \\& sensitive/);
+  assert.match(tex, /\\section\{Excluded Findings\}[\s\S]*Other: Wrong sample/);
+  assert.doesNotMatch(tex, /Excluded Variables|low\\_quality/);
+});
 
 for (const scenario of ['normal', 'empty', 'bidirectional', 'missing-group', 'svg']) {
   test(`${scenario}: export text and JSON match previous output without changing inputs`, async () => {

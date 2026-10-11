@@ -1708,17 +1708,23 @@ const exportController = createDagExportController({
     }
     aggregateGroupLinks();
     computeVisibleLinks();
-    const rawIds = [...new Set((state.visibleLinks || []).flatMap(link => [
-      ...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || []),
-    ]))];
-    const missing = rawIds.filter(id => !state.rawLinksById.has(id));
-    if (!missing.length) return;
-    const links = await dagDataSource.loadRawLinksByIds(missing);
-    for (const link of links) {
-      state.rawLinksById.set(link.raw_causal_link_id, link);
-      if (!state.rawLinks.some(existing => existing.raw_causal_link_id === link.raw_causal_link_id)) {
-        state.rawLinks.push(link);
+    const loadMissing = async ids => {
+      const missing = [...new Set(ids)].filter(id => !state.rawLinksById.has(id));
+      if (!missing.length) return;
+      for (const link of await dagDataSource.loadRawLinksByIds(missing)) {
+        state.rawLinksById.set(link.raw_causal_link_id, link);
+        if (!state.rawLinks.some(existing => existing.raw_causal_link_id === link.raw_causal_link_id)) {
+          state.rawLinks.push(link);
+        }
       }
+    };
+    await loadMissing((state.visibleLinks || []).flatMap(link => [
+      ...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || []),
+    ]));
+    try {
+      await loadMissing(Object.keys(state.project.finding_decisions || {}));
+    } catch (error) {
+      console.warn("Could not load some excluded finding details for export.", error);
     }
   },
 });
