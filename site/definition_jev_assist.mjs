@@ -184,9 +184,9 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
         if (revision !== runRevision || draft !== getDraft()) return;
         const batch = records.slice(offset, offset + BATCH_SIZE);
         const questions = Object.fromEntries(batch.map((record, index) => [`v${index}`, {
-          type: "choice", instructions: `Classify the variable at records[${index}] against target_definition. Use its label and text.`,
-          criteria: { new: "Belongs in the new variable described by target_definition",
-            leftover: "Does not belong in the new variable described by target_definition" },
+          type: "choice", instructions: `Classify the source variable at records[${index}] using its label and text. Choose new only when it clearly fits target_definition. Leftover is the remainder of the selected source variables, not a separately defined opposite concept. Put uncertain or ambiguous matches in leftover for human review.`,
+          criteria: { new: "Clearly belongs in the new variable described by target_definition",
+            leftover: "Does not clearly belong in the new variable described by target_definition, including uncertain matches" },
         }]));
         const body = await openRouterJson("/api/alpha/decisions", key, { method: "POST",
           body: JSON.stringify({ model: MODEL,

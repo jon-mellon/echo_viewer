@@ -315,6 +315,8 @@ for (const device of [
         decisions += 1;
         const body = request.postDataJSON();
         expect(body.model).toBe("typesafe/jev-1.13");
+        expect(Object.values(body.questions)[0].instructions).toContain("not a separately defined opposite concept");
+        expect(Object.values(body.questions)[0].criteria.leftover).toContain("uncertain matches");
         const answers = Object.fromEntries(Object.keys(body.questions).map(id => [id,
           { type: "choice", choice: "new", probabilities: { new: 0.9, leftover: 0.1 } }]));
         return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify({ answers }) });
