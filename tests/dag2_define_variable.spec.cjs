@@ -154,3 +154,45 @@ test("Variables list definition and split editing are reachable on desktop and m
   await expect(page.locator("#definitionTitle")).toHaveText("Edit split");
   await page.locator("#definitionCancel").click();
 });
+
+test("a new variable can be defined through the mobile controls", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.addInitScript(() => {
+    localStorage.clear();
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+  });
+  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState?.publishedSchemaHydrated
+    && !window.__dagBuilderState?.publishedSchemaHydrating);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
+  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('.mobile-panel-tab[data-mobile-panel="controls"]').click();
+  await page.locator("#variableDefineNew").click();
+  await expect(page.locator("#definitionTitle")).toBeInViewport();
+  await expect(page.locator("#groupingPanel")).toBeHidden();
+
+  const sourceRow = page.locator("#definitionSourceList .definition-source-row").nth(2);
+  await sourceRow.click({ position: { x: 30, y: 20 } });
+  await expect(sourceRow.locator("input")).toBeChecked();
+  await expect(page.locator("#definitionContinue")).toBeInViewport();
+  await page.locator("#definitionContinue").click();
+  await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+  await expect(page.locator("#definitionTitle")).toBeInViewport();
+
+  const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
+  await page.locator("#definitionVariableSearch").fill(variableId);
+  await page.locator("#definitionVariableResults .result-button").first().click();
+  await page.locator("#definitionReview").click();
+  await expect(page.locator("#definitionReviewStep")).toBeVisible();
+  await expect(page.locator("#definitionTitle")).toBeInViewport();
+  await page.locator("#definitionNewLabel").fill("Mobile browser variable");
+  await page.locator("#definitionResidualLabels input").fill("Mobile browser residual");
+  await page.locator("#definitionSave").click();
+  await expect(page.locator("#definitionBlock")).toBeHidden();
+  expect(await page.evaluate(() => window.__dagBuilderState.project.groups
+    .some(group => group.label === "Mobile browser variable"))).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

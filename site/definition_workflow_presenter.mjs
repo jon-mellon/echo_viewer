@@ -5,10 +5,14 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
   definitionSources, definitionResidualIds, definitionCanReview, searchVariables, visibleVariables,
   clusterDisplayVariable, definitionNeighbors, resizeMap, fitMap,
   onSourceSelection, onToggleVariable, onResidualLabel }) {
+  let renderedStep = null;
   function render() {
     const draft = state.definitionDraft;
+    const stepChanged = draft?.step !== renderedStep;
+    renderedStep = draft?.step || null;
     const wasSpatial = document.body.classList.contains("defining-variable");
     const isSpatial = Boolean(draft && draft.step !== "sources");
+    document.body.classList.toggle("definition-active", Boolean(draft));
     document.body.classList.toggle("defining-variable", isSpatial);
     // The map is display:none in the normal DAG2 layout, so its initial canvas
     // backing store is 1x1. Resize only after the browser has laid out the
@@ -19,6 +23,9 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     });
     els.definitionBlock.hidden = !draft;
     if (!draft) return;
+    if (stepChanged && window.matchMedia?.("(max-width: 840px)").matches) {
+      requestAnimationFrame(() => { document.querySelector(".dag-left-panel")?.scrollTo(0, 0); });
+    }
     els.definitionTitle.textContent = draft.mode === "edit" ? "Edit split"
       : draft.role === "candidate" ? "Define new variable" : `Define new ${draft.role.toUpperCase()}`;
     els.definitionSourcesStep.hidden = draft.step !== "sources";
@@ -32,7 +39,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
         searchModel.anchorGroupSearchMatch(group, query, index, state.variableById))
         .filter(item => item.group.variable_ids?.length && item.matches).slice(0, 60);
       replaceChildren(els.definitionSourceList, groups.map(({ group, variableMatch }) =>
-        h("div", { className: "definition-source-row" }, h("label", {},
+        h("label", { className: "definition-source-row" }, h("span", { className: "definition-source-copy" },
           h("span", { className: "definition-source-main" }, h("strong", { textContent: group.label || group.group_id }),
             h("span", { textContent: `${new Set(group.variable_ids.map(clusterRep)).size} canonical` })),
           variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched: ${truncate(variableMatch, 72)}` }) : null),

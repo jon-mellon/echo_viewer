@@ -780,9 +780,11 @@ h2 {
 .definition-source-row {
   padding: 8px;
   border-bottom: 1px solid var(--line);
+  min-height: 44px;
+  cursor: pointer;
 }
 
-.definition-source-row label {
+.definition-source-copy {
   min-width: 0;
   flex: 1;
 }
@@ -2175,6 +2177,22 @@ h2 {
 }
 
 @media (max-width: 840px) {
+  .dag-body.definition-active .dag-left-panel > :not(#setupSection) {
+    display: none !important;
+  }
+
+  .dag-body.definition-active #setupSection > .section-title {
+    display: none;
+  }
+
+  .dag-body.definition-active #definitionContinue,
+  .dag-body.definition-active #definitionReview,
+  .dag-body.definition-active #definitionSave {
+    position: sticky;
+    bottom: 8px;
+    z-index: 2;
+  }
+
   .dag-network .vis-tooltip {
     display: none !important;
   }
