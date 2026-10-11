@@ -849,7 +849,7 @@ h2 {
   overflow-y: auto;
 }
 
-.confounder-status-list { display: grid; gap: 10px; }
+.confounder-status-list { display: grid; gap: 10px; max-height: min(55vh, 520px); overflow-y: auto; }
 .confounder-status-row { display: grid; gap: 5px; padding: 9px; border: 1px solid var(--line); border-radius: 7px; }
 .confounder-status-row label { font-weight: 700; overflow-wrap: anywhere; }
 .confounder-status-row select, .confounder-status-row input { width: 100%; min-width: 0; }
@@ -1392,7 +1392,8 @@ h2 {
   white-space: pre-wrap;
 }
 
-.variable-panel > details > summary {
+.variable-panel > details > summary,
+.confounder-config > details > summary {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1412,17 +1413,20 @@ h2 {
   margin: 6px 0 2px 18px;
 }
 
-.variable-panel > details > summary::-webkit-details-marker {
+.variable-panel > details > summary::-webkit-details-marker,
+.confounder-config > details > summary::-webkit-details-marker {
   display: none;
 }
 
-.variable-panel > details > summary::after {
+.variable-panel > details > summary::after,
+.confounder-config > details > summary::after {
   content: "▾";
   margin-left: auto;
   color: var(--muted);
 }
 
-.variable-panel > details:not([open]) > summary::after {
+.variable-panel > details:not([open]) > summary::after,
+.confounder-config > details:not([open]) > summary::after {
   content: "▸";
 }
 

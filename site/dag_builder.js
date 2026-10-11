@@ -153,7 +153,7 @@ function initElements() {
     "groupSeedInput", "groupSeedResults",
     "includedVariables", "neighborSuggestions",
     // Right: DAG workspace
-    "dagWorkspaceSection", "dagNetwork", "confounderConfig", "confounderStatusList",
+    "dagWorkspaceSection", "dagNetwork", "confounderConfig", "confounderDisclosure", "confounderSummary", "confounderStatusList",
     "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
@@ -166,6 +166,7 @@ function initElements() {
   }
   state.map.canvas = els.dagMapCanvas;
   state.map.ctx = state.map.canvas.getContext("2d");
+  els.confounderDisclosure.addEventListener("toggle", renderConfounderStatuses);
   els.exportLocalDraft?.addEventListener("click", exportLocalDraft);
   els.previousSessions?.addEventListener("click", async () => {
     const panel = els.previousSessionsPanel;
@@ -500,6 +501,11 @@ function renderConfounderStatuses() {
   els.confounderConfig.hidden = !visible;
   if (!visible) return;
   const rows = confounderRows(state.project, state.confounderGroupIds);
+  els.confounderSummary.textContent = `Confounder status (${rows.length})`;
+  if (!els.confounderDisclosure.open) {
+    els.confounderStatusList.replaceChildren();
+    return;
+  }
   if (!rows.length) {
     replaceChildren(els.confounderStatusList,
       h("p", { className: "small-note", textContent: "No potential confounders in this view." }));

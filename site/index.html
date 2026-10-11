@@ -167,12 +167,6 @@
           <div id="workflowHint" class="workflow-hint"></div>
         </section>
 
-        <section id="confounderConfig" class="panel-section confounder-config" hidden>
-          <div class="section-title"><h2>Confounders</h2></div>
-          <p class="small-note">Record how each potential confounder is handled in this study.</p>
-          <div id="confounderStatusList" class="confounder-status-list"></div>
-        </section>
-
         <section id="variablePanel" class="panel-section variable-panel" hidden>
           <div class="variable-panel-header">
             <button id="variableDefineNew" class="toolbar-button" type="button">+ Define new variable</button>
@@ -181,6 +175,14 @@
             <summary>Variables <span id="variablePanelCount" class="status-pill muted">0</span></summary>
             <div id="variablePanelList" class="variable-panel-list"></div>
             <div id="variablePanelPagination" class="variable-panel-pagination" hidden></div>
+          </details>
+        </section>
+
+        <section id="confounderConfig" class="panel-section confounder-config" hidden>
+          <details id="confounderDisclosure">
+            <summary id="confounderSummary">Confounder status</summary>
+            <p class="small-note">Record how each potential confounder is handled in this study.</p>
+            <div id="confounderStatusList" class="confounder-status-list"></div>
           </details>
         </section>
 
