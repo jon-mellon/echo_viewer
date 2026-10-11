@@ -282,68 +282,73 @@ test("mobile spatial editor adds and removes a variable with a tap", async ({ br
   }
 });
 
-test("mobile Jev split resumes after OAuth and rejects a key above the $5 lifetime cap", async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
-  const page = await context.newPage();
-  let limit = 6;
-  let decisions = 0;
-  await page.route("https://openrouter.ai/auth?**", async route => {
-    const authUrl = new URL(route.request().url());
-    const callback = new URL(authUrl.searchParams.get("callback_url"));
-    callback.searchParams.set("code", "test-code");
-    callback.searchParams.set("state", authUrl.searchParams.get("state"));
-    await route.fulfill({ status: 302, headers: { location: callback.href } });
-  });
-  await page.route("https://openrouter.ai/api/**", async route => {
-    const request = route.request();
-    const headers = { "access-control-allow-origin": "*",
-      "access-control-allow-methods": "GET, POST, OPTIONS",
-      "access-control-allow-headers": "authorization, content-type" };
-    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
-    if (request.url().endsWith("/auth/keys")) {
-      return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify({ key: "sk-or-test" }) });
-    }
-    if (request.url().endsWith("/v1/key")) {
-      return route.fulfill({ headers, contentType: "application/json",
-        body: JSON.stringify({ data: { limit, limit_reset: null, limit_remaining: limit } }) });
-    }
-    if (request.url().endsWith("/alpha/decisions")) {
-      decisions += 1;
-      const body = request.postDataJSON();
-      expect(body.model).toBe("typesafe/jev-1.13");
-      const answers = Object.fromEntries(Object.keys(body.questions).map(id => [id,
-        { type: "choice", choice: "new", probabilities: { new: 0.9, leftover: 0.1 } }]));
-      return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify({ answers }) });
-    }
-    throw new Error(`Unexpected OpenRouter request: ${request.url()}`);
-  });
-  try {
-    await page.addInitScript(() => {
-      sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+for (const device of [
+  { name: "mobile", context: { viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true } },
+  { name: "desktop", context: { viewport: { width: 1280, height: 900 } } },
+]) {
+  test(`${device.name} Jev split resumes after OAuth and rejects a key above the $5 lifetime cap`, async ({ browser }) => {
+    const context = await browser.newContext(device.context);
+    const page = await context.newPage();
+    let limit = 6;
+    let decisions = 0;
+    await page.route("https://openrouter.ai/auth?**", async route => {
+      const authUrl = new URL(route.request().url());
+      const callback = new URL(authUrl.searchParams.get("callback_url"));
+      callback.searchParams.set("code", "test-code");
+      callback.searchParams.set("state", authUrl.searchParams.get("state"));
+      await route.fulfill({ status: 302, headers: { location: callback.href } });
     });
-    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
-      && window.__dagBuilderState?.publishedSchemaHydrated);
-    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
-    await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
-    await page.locator("#definitionContinue").click();
-    await expect(page.locator("#definitionPartitionStep")).toBeVisible();
-    await page.locator("#definitionAiDescription").fill("School based measures of academic achievement");
-    await page.locator("#definitionAiConnect").click();
-    await expect(page.locator("#definitionPartitionStep")).toBeVisible();
-    await expect(page.locator("#definitionAiDescription")).toHaveValue("School based measures of academic achievement");
-    await expect(page.locator("#definitionAiStatus")).toContainText("Lower its limit to $5");
-    await expect(page.locator("#definitionAiRun")).toBeDisabled();
-    limit = 5;
-    await page.locator("#definitionAiRecheck").click();
-    await expect(page.locator("#definitionAiRun")).toBeEnabled();
-    await page.locator("#definitionAiRun").click();
-    await expect(page.locator("#definitionAiPreview")).toBeVisible();
-    expect(decisions).toBeGreaterThan(0);
-    expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
-    await page.locator("#definitionAiApply").click();
-    expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBeGreaterThan(0);
-  } finally {
-    await context.close();
-  }
-});
+    await page.route("https://openrouter.ai/api/**", async route => {
+      const request = route.request();
+      const headers = { "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS",
+        "access-control-allow-headers": "authorization, content-type" };
+      if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+      if (request.url().endsWith("/auth/keys")) {
+        return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify({ key: "sk-or-test" }) });
+      }
+      if (request.url().endsWith("/v1/key")) {
+        return route.fulfill({ headers, contentType: "application/json",
+          body: JSON.stringify({ data: { limit, limit_reset: null, limit_remaining: limit } }) });
+      }
+      if (request.url().endsWith("/alpha/decisions")) {
+        decisions += 1;
+        const body = request.postDataJSON();
+        expect(body.model).toBe("typesafe/jev-1.13");
+        const answers = Object.fromEntries(Object.keys(body.questions).map(id => [id,
+          { type: "choice", choice: "new", probabilities: { new: 0.9, leftover: 0.1 } }]));
+        return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify({ answers }) });
+      }
+      throw new Error(`Unexpected OpenRouter request: ${request.url()}`);
+    });
+    try {
+      await page.addInitScript(() => {
+        sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+      });
+      await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+        && window.__dagBuilderState?.publishedSchemaHydrated);
+      await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+      await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
+      await page.locator("#definitionContinue").click();
+      await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+      await page.locator("#definitionAiDescription").fill("School based measures of academic achievement");
+      await page.locator("#definitionAiConnect").click();
+      await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+      await expect(page.locator("#definitionAiDescription")).toHaveValue("School based measures of academic achievement");
+      await expect(page.locator("#definitionAiStatus")).toContainText("Lower its limit to $5");
+      await expect(page.locator("#definitionAiRun")).toBeDisabled();
+      limit = 5;
+      await page.locator("#definitionAiRecheck").click();
+      await expect(page.locator("#definitionAiRun")).toBeEnabled();
+      await page.locator("#definitionAiRun").click();
+      await expect(page.locator("#definitionAiPreview")).toBeVisible();
+      expect(decisions).toBeGreaterThan(0);
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
+      await page.locator("#definitionAiApply").click();
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBeGreaterThan(0);
+    } finally {
+      await context.close();
+    }
+  });
+}
