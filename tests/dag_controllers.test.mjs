@@ -245,6 +245,26 @@ test("export controller waits for lazy evidence before taking its snapshot", asy
   assert.equal(input.rawLinksById.get("r1").paper_id, "10.1234/loaded");
 });
 
+test("document export resolves readable labels for excluded finding endpoints", async () => {
+  const state = createDagAppState();
+  state.data = { cache_compatibility: {} };
+  state.project = { groups: [], finding_decisions: { r1: { display_status: "excluded" } } };
+  state.rawLinksById.set("r1", { source_variable_id: "v1", target_variable_id: "v2" });
+  state.variableById = new Map([["v1", { concept_label: "Starting age" }]]);
+  const controller = createDagExportController({
+    state, elements: { exportBib: {}, exportMd: {}, exportTex: {} },
+    rejectedVariableEntries: () => [], rejectedVariableIdSet: () => new Set(),
+    projectPayload: () => ({}), aggregateGroupLinks() {}, computeVisibleLinks() {}, nowIso: () => "",
+    loadFindingVariableLabels: async ids => {
+      assert.deepEqual(ids, ["v2"]);
+      return new Map([["v2", "Education"]]);
+    },
+  });
+  const input = await controller.prepareExportInput();
+  assert.equal(input.variableLabelsById.get("v1"), "Starting age");
+  assert.equal(input.variableLabelsById.get("v2"), "Education");
+});
+
 test("document export stops before evidence loading when no public permalink is available", async () => {
   const state = createDagAppState();
   state.data = { cache_compatibility: {} };

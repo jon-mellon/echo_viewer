@@ -161,9 +161,11 @@ export function buildLinksTable(fmt, { visibleLinks, project, rawLinksById }, ke
   }
 }
 
-export function buildExcludedLinksTable(fmt, project) {
+export function buildExcludedLinksTable(fmt, project, relevantIds = null) {
+  const allowed = relevantIds === null ? null : new Set(relevantIds);
   const excluded = Object.entries(project.link_decisions || {})
-    .filter(([, decision]) => decision?.display_status === "excluded" || decision?.display_status === "hidden");
+    .filter(([id, decision]) => (!allowed || allowed.has(id))
+      && (decision?.display_status === "excluded" || decision?.display_status === "hidden"));
   if (!excluded.length) return null;
 
   const rows = excluded.map(([edgeId, decision]) => {
@@ -204,6 +206,11 @@ function escapeMarkdownCell(value) {
   return escapeHtml(String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|"));
 }
 
+function escapeMarkdownProse(value) {
+  return escapeHtml(String(value ?? "").replace(/\s+/g, " ").trim())
+    .replace(/([\\`*_{}\[\]])/g, "\\$1");
+}
+
 export function buildConfoundersTable(fmt, { project, confounderGroupIds }) {
   const rows = confounderRows(project, confounderGroupIds);
   if (!rows.length) return fmt === "md" ? "_No potential confounders._\n" : "\\textit{No potential confounders.}\n";
@@ -224,30 +231,34 @@ const FINDING_REASONS = {
   other: "Other",
 };
 
-export function buildExcludedFindingsTable(fmt, { project, rawLinksById }) {
+export function buildExcludedFindingsList(fmt, { project, rawLinksById, variableLabelsById,
+  relevantExcludedFindingIds = null }) {
+  const allowed = relevantExcludedFindingIds === null ? null : new Set(relevantExcludedFindingIds);
   const excluded = Object.entries(project.finding_decisions || {})
-    .filter(([, decision]) => decision?.display_status === "excluded");
+    .filter(([id, decision]) => (!allowed || allowed.has(id)) && decision?.display_status === "excluded");
   if (!excluded.length) return null;
+  const groupLabels = new Map((project.groups || []).flatMap(group =>
+    (group.variable_ids || []).map(id => [id, group.label || group.group_id])));
+  const variableLabel = id => variableLabelsById?.get(id) || groupLabels.get(id) || id || "Unknown variable";
   const rows = excluded.map(([id, decision]) => {
     const finding = rawLinksById?.get(id);
-    const paper = finding?.paper_title || finding?.paper_id || "—";
+    const paper = finding?.paper_title || finding?.paper_id || "Paper unavailable";
     const relation = finding
-      ? `${finding.source_variable_id || "?"} → ${finding.target_variable_id || "?"}`
-      : id;
+      ? `${variableLabel(finding.source_variable_id)} → ${variableLabel(finding.target_variable_id)}`
+      : "Link unavailable";
     const reason = [
       FINDING_REASONS[decision.reason_code] || "",
       decision.reason_text?.trim() || "",
     ].filter(Boolean).join(": ") || "(no reason recorded)";
     return fmt === "md"
-      ? `| ${escapeMarkdownCell(id)} | ${escapeMarkdownCell(paper)} | ${escapeMarkdownCell(relation)} | ${escapeMarkdownCell(reason)} |`
-      : `  ${texEscape(id)} & ${texEscape(paper)} & ${texEscape(relation)} & ${texEscape(reason)} \\\\`;
+      ? `**Paper:** ${escapeMarkdownProse(paper)}  \n**Link:** ${escapeMarkdownProse(relation)}  \n**Reason:** ${escapeMarkdownProse(reason)}`
+      : `\\noindent\\textbf{Paper:} ${texEscape(paper)}\\par\n`
+        + `\\noindent\\textbf{Link:} ${texEscape(relation)}\\par\n`
+        + `\\noindent\\textbf{Reason:} ${texEscape(reason)}\\par`;
   });
   return fmt === "md"
-    ? ["| Finding ID | Paper | Variable link | Reason for exclusion |",
-      "|------------|-------|---------------|----------------------|", ...rows].join("\n") + "\n"
-    : ["\\begin{longtable}{@{}p{0.16\\textwidth}p{0.25\\textwidth}p{0.25\\textwidth}p{0.27\\textwidth}@{}}",
-      "\\toprule", "Finding ID & Paper & Variable link & Reason for exclusion \\\\",
-      "\\midrule", "\\endhead", ...rows, "\\bottomrule", "\\end{longtable}"].join("\n") + "\n";
+    ? rows.join("\n\n") + "\n"
+    : rows.join("\n\\medskip\n\n") + "\n";
 }
 
 function texEscape(s) {
@@ -304,19 +315,19 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, gr
     ...(input.confounderGroupIds ? [
       `## Potential Confounders`, ``, buildConfoundersTable("md", input), ``,
     ] : []),
-    ...(buildExcludedLinksTable("md", project) ? [
+    ...(buildExcludedLinksTable("md", project, input.relevantExcludedLinkIds ?? null) ? [
       `## Excluded Links`,
       ``,
-      `The following edges were reviewed and excluded from the working causal map.`,
+      `These excluded edges would otherwise appear in this view of the working causal map.`,
       ``,
-      buildExcludedLinksTable("md", project),
+      buildExcludedLinksTable("md", project, input.relevantExcludedLinkIds ?? null),
     ] : []),
-    ...(buildExcludedFindingsTable("md", input) ? [
+    ...(buildExcludedFindingsList("md", input) ? [
       `## Excluded Findings`,
       ``,
-      `The following individual evidence findings were excluded.`,
+      `These excluded evidence findings would otherwise appear in this view.`,
       ``,
-      buildExcludedFindingsTable("md", input),
+      buildExcludedFindingsList("md", input),
     ] : []),
     `# References`,
     ``,
@@ -382,20 +393,20 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     ...(input.confounderGroupIds ? [
       `\\section{Potential Confounders}`, ``, buildConfoundersTable("tex", input), ``,
     ] : []),
-    ...(buildExcludedLinksTable("tex", project) ? [
+    ...(buildExcludedLinksTable("tex", project, input.relevantExcludedLinkIds ?? null) ? [
       `\\section{Excluded Links}`,
       ``,
-      `The following edges were reviewed and excluded from the working causal map.`,
+      `These excluded edges would otherwise appear in this view of the working causal map.`,
       ``,
-      buildExcludedLinksTable("tex", project),
+      buildExcludedLinksTable("tex", project, input.relevantExcludedLinkIds ?? null),
       ``,
     ] : []),
-    ...(buildExcludedFindingsTable("tex", input) ? [
+    ...(buildExcludedFindingsList("tex", input) ? [
       `\\section{Excluded Findings}`,
       ``,
-      `The following individual evidence findings were excluded.`,
+      `These excluded evidence findings would otherwise appear in this view.`,
       ``,
-      buildExcludedFindingsTable("tex", input),
+      buildExcludedFindingsList("tex", input),
       ``,
     ] : []),
     `\\bibliographystyle{plainnat}`,

@@ -4,6 +4,7 @@ import * as exports from '../site/dag_exports.mjs';
 import { makeZip } from '../site/dag_export_zip.mjs';
 import { legacyExports, legacyZip } from './fixtures/legacy_dag_exports.mjs';
 import { confounderKey } from '../site/confounder_status.mjs';
+import { relevantExclusions } from '../site/dag_export_relevance.mjs';
 
 const timestamp = '2026-09-09T12:00:00Z';
 function fixture() {
@@ -43,12 +44,88 @@ test('document exports record excluded links and findings with available reasons
   const tex = exports.buildLatexFiles(input, bibliography)[0].data;
   assert.match(md, /## Excluded Links[\s\S]*Tax_50% \| Income &amp; wealth \| Confounded \\\| uncertain &amp; sensitive/);
   assert.match(md, /Other \| missing \| \(no reason recorded\)/);
-  assert.match(md, /## Excluded Findings[\s\S]*r1 \| A &amp; B \| v1 → v2 \| Other: Wrong sample \\\| cohort/);
-  assert.match(md, /unknown \| — \| unknown \| Concept miscategorized/);
+  assert.match(md, /## Excluded Findings[\s\S]*\*\*Paper:\*\* A &amp; B/);
+  assert.ok(md.includes('**Link:** Income &amp; wealth → Tax\\_50%'));
+  assert.ok(md.includes('**Reason:** Other: Wrong sample | cohort'));
+  assert.match(md, /\*\*Paper:\*\* Paper unavailable[\s\S]*\*\*Link:\*\* Link unavailable[\s\S]*\*\*Reason:\*\* Concept miscategorized/);
+  assert.doesNotMatch(md, /Finding ID|\| Paper \|/);
   assert.doesNotMatch(md, /Excluded Variables|Low \\\| quality/);
   assert.match(tex, /\\section\{Excluded Links\}[\s\S]*Confounded \| uncertain \\& sensitive/);
-  assert.match(tex, /\\section\{Excluded Findings\}[\s\S]*Other: Wrong sample/);
+  assert.match(tex, /\\section\{Excluded Findings\}[\s\S]*\\textbf\{Paper:\} A \\& B[\s\S]*\\textbf\{Link:\} Income \\& wealth[\s\S]*\\textbf\{Reason:\} Other: Wrong sample/);
+  assert.doesNotMatch(tex, /Finding ID|\\begin\{longtable\}[\s\S]*Finding ID/);
   assert.doesNotMatch(tex, /Excluded Variables|low\\_quality/);
+});
+
+test('excluded findings appear only when restoring them would put their edge in this DAG view', () => {
+  const groups = [
+    { group_id: 'iv', variable_ids: ['vi'] }, { group_id: 'dv', variable_ids: ['vd'] },
+    { group_id: 'c', variable_ids: ['vc1', 'vc2'] }, { group_id: 'z', variable_ids: ['vz'] },
+  ];
+  const links = [
+    { edge_id: 'c__iv', group_a: 'c', group_b: 'iv', direction_type: 'A_TO_B', display_status: 'active_by_default' },
+    { edge_id: 'iv__dv', group_a: 'iv', group_b: 'dv', direction_type: 'A_TO_B',
+      display_status: 'active_by_default', is_target_relation: true },
+  ];
+  const project = { groups, links, iv_group_id: 'iv', dv_group_id: 'dv',
+    finding_decisions: Object.fromEntries(['relevant', 'irrelevant', 'internal', 'stale']
+      .map(id => [id, { display_status: 'excluded', reason_code: 'other' }])) };
+  const rawLinksById = new Map([
+    ['relevant', { source_variable_id: 'vc1', target_variable_id: 'vd', paper_title: 'Relevant paper' }],
+    ['irrelevant', { source_variable_id: 'vz', target_variable_id: 'vd', paper_title: 'Irrelevant paper' }],
+    ['internal', { source_variable_id: 'vc1', target_variable_id: 'vc2', paper_title: 'Internal paper' }],
+  ]);
+  const relevance = relevantExclusions({ project, groups, links, rawLinksById,
+    viewOptions: { showConfoundersOnly: true, hideIrrelevantDiagnosticLinks: true } });
+  assert.deepEqual(relevance.findingIds, ['relevant']);
+  const md = exports.buildExcludedFindingsList('md', { project, rawLinksById,
+    relevantExcludedFindingIds: relevance.findingIds });
+  assert.match(md, /Relevant paper/);
+  assert.doesNotMatch(md, /Irrelevant paper|Internal paper|stale/);
+});
+
+test('an excluded finding stays out when its edge is independently excluded', () => {
+  const groups = ['iv', 'dv', 'c'].map(group_id => ({ group_id, variable_ids: [group_id] }));
+  const links = [
+    { edge_id: 'c__iv', group_a: 'c', group_b: 'iv', direction_type: 'A_TO_B', display_status: 'active_by_default' },
+    { edge_id: 'c__dv', group_a: 'c', group_b: 'dv', direction_type: 'A_TO_B', display_status: 'excluded' },
+  ];
+  const project = { groups, links, iv_group_id: 'iv', dv_group_id: 'dv',
+    link_decisions: { c__dv: { display_status: 'excluded' } },
+    finding_decisions: { finding: { display_status: 'excluded' } } };
+  const rawLinksById = new Map([['finding', { source_variable_id: 'c', target_variable_id: 'dv' }]]);
+  const relevance = relevantExclusions({ project, groups, links, rawLinksById,
+    viewOptions: { showConfoundersOnly: true } });
+  assert.deepEqual(relevance.findingIds, []);
+});
+
+test('excluded links appear only when restoring them would put their edge in this DAG view', () => {
+  const groups = ['iv', 'dv', 'c', 'z'].map(group_id => ({ group_id, variable_ids: [group_id] }));
+  const links = [
+    { edge_id: 'c__iv', group_a: 'c', group_b: 'iv', direction_type: 'A_TO_B', display_status: 'active_by_default' },
+    { edge_id: 'c__dv', group_a: 'c', group_b: 'dv', direction_type: 'A_TO_B', display_status: 'excluded' },
+    { edge_id: 'dv__z', group_a: 'z', group_b: 'dv', direction_type: 'A_TO_B', display_status: 'excluded' },
+    { edge_id: 'iv__dv', group_a: 'iv', group_b: 'dv', direction_type: 'A_TO_B',
+      display_status: 'active_by_default', is_target_relation: true },
+  ];
+  const project = { groups, links, iv_group_id: 'iv', dv_group_id: 'dv',
+    link_decisions: { c__dv: { display_status: 'excluded' }, dv__z: { display_status: 'excluded' } } };
+  const relevance = relevantExclusions({ project, groups, links, rawLinksById: new Map(),
+    viewOptions: { showConfoundersOnly: true, hideIrrelevantDiagnosticLinks: true } });
+  assert.deepEqual(relevance.linkIds, ['c__dv']);
+  assert.match(exports.buildExcludedLinksTable('md', project, relevance.linkIds), /c \| dv/);
+  assert.doesNotMatch(exports.buildExcludedLinksTable('md', project, relevance.linkIds), /z/);
+});
+
+test('document exports omit exclusion sections with no counterfactually visible entries', () => {
+  const { input, metadata } = fixture();
+  input.project.link_decisions = { other__missing: { display_status: 'excluded' } };
+  input.project.finding_decisions = { unrelated: { display_status: 'excluded' } };
+  input.relevantExcludedLinkIds = [];
+  input.relevantExcludedFindingIds = [];
+  const bib = exports.buildBibText(exports.collectAllDagDois(input), metadata);
+  assert.doesNotMatch(exports.buildMarkdownFiles(input, bib)[0].data, /## Excluded Links|## Excluded Findings/);
+  assert.doesNotMatch(exports.buildLatexFiles(input, bib)[0].data,
+    /\\section\{Excluded Links\}|\\section\{Excluded Findings\}/);
 });
 
 test('document exports include each potential confounder and its local status text', () => {

@@ -16,6 +16,8 @@ export function createDagExportController({
   getDagSvgString = () => null,
   getDagPngBytes = async () => null,
   ensureEvidenceLoaded = async () => {},
+  getExclusionRelevance = () => null,
+  loadFindingVariableLabels = async () => new Map(),
   getPublicPermalink = async () => null,
   fetchImpl = (...args) => fetch(...args),
   alertImpl = message => window.alert(message),
@@ -27,10 +29,18 @@ export function createDagExportController({
   const CROSSREF_INTERVAL_MS = 210; // Public pool: at most five requests per second.
 
   function captureInput() {
+    const excludedVariableIds = Object.keys(state.project.finding_decisions || {}).flatMap(id => {
+      const finding = state.rawLinksById.get(id);
+      return [finding?.source_variable_id, finding?.target_variable_id].filter(Boolean);
+    });
     return structuredClone({
       project: state.project, visibleLinks: state.visibleLinks,
       confounderGroupIds: [...(state.confounderGroupIds || [])],
       rawLinksById: state.rawLinksById, cacheCompatibility: state.data.cache_compatibility,
+      variableLabelsById: new Map(excludedVariableIds.map(id => {
+        const variable = state.variableById?.get(id);
+        return [id, variable?.concept_label || variable?.display_label || ""];
+      })),
       rejectedVariables: rejectedVariableEntries(), hiddenVariableIds: [...rejectedVariableIdSet()],
       canonicalByVariableId: [...state.clusterOf.entries()],
     });
@@ -88,7 +98,27 @@ export function createDagExportController({
 
   async function prepareExportInput() {
     await ensureEvidenceLoaded();
-    return captureInput();
+    const input = captureInput();
+    const relevance = getExclusionRelevance();
+    if (relevance) {
+      input.relevantExcludedLinkIds = relevance.linkIds;
+      input.relevantExcludedFindingIds = relevance.findingIds;
+    }
+    const ids = [...new Set((input.relevantExcludedFindingIds
+      || Object.keys(input.project.finding_decisions || {})).flatMap(id => {
+      const finding = input.rawLinksById.get(id);
+      return [finding?.source_variable_id, finding?.target_variable_id].filter(Boolean);
+    }))].filter(id => !input.variableLabelsById.get(id));
+    if (ids.length) {
+      try {
+        for (const [id, label] of await loadFindingVariableLabels(ids)) {
+          if (label) input.variableLabelsById.set(id, label);
+        }
+      } catch {
+        // Group labels remain available when variable metadata cannot be loaded.
+      }
+    }
+    return input;
   }
 
   async function fetchBibliography(input, onProgress = () => {}) {

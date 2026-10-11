@@ -37,6 +37,7 @@ import { createPersistentViewer } from "/persistent_viewer.mjs";
 import { importDraftFile, makeDraftExport } from "/draft_exchange.mjs";
 import { listPreviousSessions } from "/local_schema_store.mjs";
 import { escapeHtml } from "/text_utils.mjs";
+import { relevantExclusions } from "/dag_export_relevance.mjs";
 import { CONFOUNDER_STATUSES, confounderRows } from "/confounder_status.mjs";
 import { h, replaceChildren, safeUrl, setSafeUrl } from "/dom_builder.mjs";
 import { hydrateSearchResult, variableSearchCatalog } from "/variable_search_catalog.mjs";
@@ -514,8 +515,10 @@ function renderConfounderStatuses() {
   replaceChildren(els.confounderStatusList, rows.map(row => {
     const select = h("select", { className: "select-input", attrs: { "aria-label": `Status for ${row.label}` } },
       Object.entries(CONFOUNDER_STATUSES).map(([value, label]) =>
-        h("option", { value, textContent: label })));
+        h("option", { value, textContent: value === "accounted_for_by_design"
+          ? "Accounted for by design" : label })));
     select.value = row.status;
+    select.title = CONFOUNDER_STATUSES[row.status];
     const explanation = h("input", { className: "search-input", type: "text",
       value: row.text, placeholder: "Describe how this confounder is handled",
       attrs: { "aria-label": `Other status for ${row.label}` } });
@@ -533,7 +536,11 @@ function renderConfounderStatuses() {
       void persistentViewer.commitDecision().catch(error =>
         console.error("Could not save confounder status", error));
     };
-    select.addEventListener("change", () => { explanation.hidden = select.value !== "other"; save(); });
+    select.addEventListener("change", () => {
+      select.title = CONFOUNDER_STATUSES[select.value];
+      explanation.hidden = select.value !== "other";
+      save();
+    });
     explanation.addEventListener("change", save);
     return h("div", { className: "confounder-status-row" },
       h("label", { textContent: row.label }, select), explanation);
@@ -1748,8 +1755,25 @@ let publicationController;
 const exportController = createDagExportController({
   state, elements: els, rejectedVariableEntries, rejectedVariableIdSet,
   projectPayload, aggregateGroupLinks, computeVisibleLinks, nowIso,
+  getExclusionRelevance: () => relevantExclusions({
+    project: state.project, groups: dagGroups(), links: state.project.links,
+    rawLinksById: state.rawLinksById,
+    viewOptions: {
+      maxPathLength: state.confounderMaxPathLength,
+      exclusionMaxPathLength: state.exclusionMaxPathLength,
+      excludeBottlenecked: state.excludeBottleneckedConfounders,
+      showConfoundersOnly: state.showConfoundersOnly,
+      showCollidersOnly: state.showCollidersOnly,
+      showExclusionViolations: state.showExclusionViolations,
+      showExogeneity: state.showExogeneity,
+      hideIrrelevantDiagnosticLinks: state.hideIrrelevantConfounderLinks,
+    },
+  }),
   getPublicPermalink: async () => (await publicationController?.publicPermalink())?.permalink || null,
   getDagPngBytes: () => renderDagPng(dagNetworkController.getNetwork(), els.dagNetwork),
+  loadFindingVariableLabels: async ids => new Map(
+    (await dagDataSource.loadVariableProvenance(ids)).map(row =>
+      [row.variable_id, row.concept_label || row.display_label || ""])),
   ensureEvidenceLoaded: async () => {
     while (state.compiledDagUpdatePromise) {
       const pending = state.compiledDagUpdatePromise;
