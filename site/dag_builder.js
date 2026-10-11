@@ -121,6 +121,9 @@ function initElements() {
     "definitionBlock", "definitionTitle", "definitionCancel", "definitionSourcesStep",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue",
     "definitionPartitionStep", "definitionCounts", "definitionTermChips", "definitionTermSummary",
+    "definitionAiDescription", "definitionAiConnect", "definitionAiRecheck", "definitionAiDisconnect", "definitionAiStatus",
+    "definitionAiRun", "definitionAiPreview", "definitionAiSummary", "definitionAiRows",
+    "definitionAiApply", "definitionAiDiscard",
     "definitionTermItems", "definitionTermPrev", "definitionTermPage", "definitionTermNext",
     "definitionTermToNew", "definitionTermToLeftover", "definitionUndoBatch", "definitionVariableSearch",
     "definitionVariableResults", "definitionSelectedVariables", "definitionAddNeighbors", "definitionNeighborResults",
@@ -1853,6 +1856,7 @@ const projectBootstrap = createProjectBootstrap({
   onLocalSchemaLoaded: record => persistentViewer.setLoadedRecord(record),
   onReady: () => {
     persistentViewer.start();
+    void definitionWorkflowController.resumeAfterOAuth();
     void publicationController.refreshPublicationState();
     if (!state.project?.links?.some(link => (link.a_to_b_raw_link_ids?.length || 0)
       + (link.b_to_a_raw_link_ids?.length || 0) > 0)) return;

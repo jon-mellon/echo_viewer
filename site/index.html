@@ -138,6 +138,27 @@
             </div>
             <div id="definitionPartitionStep" hidden>
               <div id="definitionCounts" class="workflow-hint"></div>
+              <section class="definition-ai-assist" aria-labelledby="definitionAiTitle">
+                <div class="section-title compact-title"><h2 id="definitionAiTitle">Suggest a split with Jev</h2></div>
+                <p class="small-note">Describe what belongs in the new variable. Suggesting a split sends your description and the variable labels and text to OpenRouter for Jev to classify. OpenRouter charges your own account. Review suggestions before applying them.</p>
+                <label class="dag-label" for="definitionAiDescription">New variable description</label>
+                <textarea id="definitionAiDescription" class="search-input" rows="3" maxlength="1000" placeholder="For example: school-based measures of academic achievement, excluding learning outside school"></textarea>
+                <div class="mini-toolbar">
+                  <button id="definitionAiConnect" class="toolbar-button" type="button">Connect OpenRouter</button>
+                  <button id="definitionAiRecheck" class="toolbar-button" type="button" hidden>Recheck limit</button>
+                  <button id="definitionAiDisconnect" class="text-button" type="button" hidden>Disconnect</button>
+                </div>
+                <div id="definitionAiStatus" class="small-note" aria-live="polite"></div>
+                <button id="definitionAiRun" class="primary-button" type="button" disabled>Suggest split</button>
+                <div id="definitionAiPreview" class="definition-ai-preview" hidden>
+                  <div id="definitionAiSummary" class="small-note"></div>
+                  <div id="definitionAiRows" class="definition-ai-rows"></div>
+                  <div class="mini-toolbar">
+                    <button id="definitionAiApply" class="primary-button" type="button">Apply reviewed suggestions</button>
+                    <button id="definitionAiDiscard" class="text-button" type="button">Discard</button>
+                  </div>
+                </div>
+              </section>
               <div class="definition-batch-review">
                 <div class="section-title compact-title"><h2>Sort variables</h2></div>
                 <p class="small-note">Review every variable here without searching. Tap a common word for a batch, then correct exceptions with the two side buttons.</p>

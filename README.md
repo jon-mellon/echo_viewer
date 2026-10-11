@@ -11,6 +11,26 @@ To preview the site locally, run:
 python3 -m http.server --directory site
 ```
 
+## Jev-assisted variable splits
+
+In the variable definition partition step, describe the new side of the split
+and choose **Connect OpenRouter**. The browser uses OpenRouter's PKCE flow and
+keeps the returned user-owned key in memory for that tab. No application key or
+server endpoint is involved. The browser checks `GET /api/v1/key` and enables
+Jev only when the key has a non-resetting spending limit of at most $5 with a
+positive balance. If necessary, use the key-settings link, lower the limit in
+OpenRouter, and choose **Recheck limit**. This is a per-key cap; a new key has
+its own limit.
+
+**Suggest split** sends the description and the selected source variables'
+labels and text to OpenRouter's pinned `typesafe/jev-1.13` decision model.
+Suggestions appear as editable new/leftover choices. **Apply reviewed
+suggestions** changes the draft only; the regular review and save controls
+still commit the split. Returning from OpenRouter restores the unsaved
+partition from this browser's session storage. Disconnecting removes the key
+from app memory; the OpenRouter key-settings link remains available for
+revocation. Refreshing the page also clears the key from app memory.
+
 ## Performance profiling
 
 Run `npm run profile` to start a local preview and measure startup, definition
