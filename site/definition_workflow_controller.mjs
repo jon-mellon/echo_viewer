@@ -11,6 +11,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   onCommitFailureRestored = () => {} }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
+  let lastBatch = null;
   const renderDraft = ({ redrawMap = false } = {}) => {
     // Definition steps change selection and map contents, not the project DAG.
     // The DAG is hidden until cancel/save, where a full render is performed.
@@ -25,10 +26,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     void prewarmEvidence().catch(() => {});
     hydrationRevision += 1;
     sourceHydrations.clear();
+    lastBatch = null;
     state.definitionDraft = {
       role, step: "sources", source_group_ids: [], source_snapshot: [],
       eligible_variable_ids: [], new_variable_ids: [], new_label: "",
-      residual_labels: {},
+      residual_labels: {}, reviewed_variable_ids: [],
     };
     state.selectedVariableIds.clear();
     invalidateMapCaches();
@@ -37,6 +39,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   }
 
   async function startEditSplit(groupId = null) {
+    lastBatch = null;
     const context = projectOps.editableSplitContext(state.project, groupId ? groupId : activeGroup());
     if (!context) return;
     const { splitId, newGroup, residuals } = context;
@@ -51,6 +54,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         label: group.label, variable_ids: [...group.variable_ids], updated_at: group.updated_at || null })),
       eligible_variable_ids: eligible,
       new_variable_ids: [...new Set(newGroup.variable_ids.map(clusterRep))],
+      reviewed_variable_ids: eligible,
       new_label: newGroup.label || "",
       residual_labels: Object.fromEntries(residuals.map(group => [group.group_id, group.label || ""])),
     };
@@ -66,6 +70,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   function cancelDefinition() {
     hydrationRevision += 1;
+    lastBatch = null;
     state.definitionDraft = null;
     state.selectedVariableIds.clear();
     state.selectedVariableId = null;
@@ -83,12 +88,14 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     const draft = state.definitionDraft;
     const sources = definitionSources();
     if (!draft || !sources.length) return;
+    lastBatch = null;
     const revision = ++hydrationRevision;
     draft.source_snapshot = sources.map(group => ({ group_id: group.group_id, label: group.label,
       variable_ids: [...group.variable_ids], updated_at: group.updated_at || null }));
     draft.eligible_variable_ids = [...new Set(sources.flatMap(group =>
       group.variable_ids.map(clusterRep)))];
     draft.new_variable_ids = [];
+    draft.reviewed_variable_ids = [];
     draft.residual_labels = Object.fromEntries(sources.map(group =>
       [group.group_id, `Other: ${group.label || group.group_id}`]));
     draft.step = "partition";
@@ -122,12 +129,52 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (!draft || draft.step !== "partition") return;
     const id = clusterRep(variableId);
     if (!draft.eligible_variable_ids.includes(id)) return;
+    lastBatch = null;
     const selected = new Set(draft.new_variable_ids);
     const shouldAdd = add === null ? !selected.has(id) : add;
     if (shouldAdd) selected.add(id); else selected.delete(id);
     draft.new_variable_ids = [...selected];
+    draft.reviewed_variable_ids = [...new Set([...(draft.reviewed_variable_ids || []), id])];
     state.selectedVariableIds = new Set(draft.new_variable_ids);
     state.selectedVariableId = id;
+    invalidateMapCaches();
+    renderDraft({ redrawMap: true });
+  }
+
+  function batchMoveDefinitionVariables(ids, add) {
+    const draft = state.definitionDraft;
+    if (!draft || draft.step !== "partition") return;
+    const eligible = new Set(draft.eligible_variable_ids);
+    const selected = new Set(draft.new_variable_ids);
+    const reviewed = new Set(draft.reviewed_variable_ids || []);
+    const changed = [...new Set(ids)].filter(id => eligible.has(id)
+      && (selected.has(id) !== add || !reviewed.has(id)));
+    if (!changed.length) return;
+    lastBatch = new Map(changed.map(id => [id, { selected: selected.has(id), reviewed: reviewed.has(id) }]));
+    for (const id of changed) {
+      if (add) selected.add(id); else selected.delete(id);
+      reviewed.add(id);
+    }
+    draft.new_variable_ids = [...selected];
+    draft.reviewed_variable_ids = [...reviewed];
+    state.selectedVariableIds = new Set(selected);
+    invalidateMapCaches();
+    renderDraft({ redrawMap: true });
+  }
+
+  function undoDefinitionBatch() {
+    const draft = state.definitionDraft;
+    if (!draft || draft.step !== "partition" || !lastBatch) return;
+    const selected = new Set(draft.new_variable_ids);
+    const reviewed = new Set(draft.reviewed_variable_ids || []);
+    for (const [id, previous] of lastBatch) {
+      if (previous.selected) selected.add(id); else selected.delete(id);
+      if (previous.reviewed) reviewed.add(id); else reviewed.delete(id);
+    }
+    lastBatch = null;
+    draft.new_variable_ids = [...selected];
+    draft.reviewed_variable_ids = [...reviewed];
+    state.selectedVariableIds = new Set(selected);
     invalidateMapCaches();
     renderDraft({ redrawMap: true });
   }
@@ -256,10 +303,19 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     els.definitionSourceSearch.addEventListener("input", renderDefinition);
     els.definitionContinue.addEventListener("click", continueDefinition);
     els.definitionVariableSearch.addEventListener("input", renderDefinition);
+    els.definitionTermToNew.addEventListener("click", () => batchMoveDefinitionVariables(presenter.selectedTermIds(), true));
+    els.definitionTermToLeftover.addEventListener("click", () => batchMoveDefinitionVariables(presenter.selectedTermIds(), false));
+    els.definitionTermPrev.addEventListener("click", () => presenter.changeTermPage(-1));
+    els.definitionTermNext.addEventListener("click", () => presenter.changeTermPage(1));
+    els.definitionUndoBatch.addEventListener("click", undoDefinitionBatch);
     els.definitionAddNeighbors.addEventListener("click", () => {
       const selected = new Set(state.definitionDraft?.new_variable_ids || []);
-      for (const neighbor of definitionNeighbors().slice(0, 8)) selected.add(neighbor.variable_id);
+      const added = definitionNeighbors().slice(0, 8).map(neighbor => neighbor.variable_id);
+      for (const id of added) selected.add(id);
       state.definitionDraft.new_variable_ids = [...selected];
+      state.definitionDraft.reviewed_variable_ids = [...new Set([
+        ...(state.definitionDraft.reviewed_variable_ids || []), ...added,
+      ])];
       state.selectedVariableIds = new Set(selected);
       invalidateMapCaches();
       renderDraft({ redrawMap: true });
@@ -289,6 +345,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     clusterDisplayVariable, definitionNeighbors,
     resizeMap, fitMap, onSourceSelection: setSourceSelection,
     onToggleVariable: toggleDefinitionVariable, onResidualLabel: setResidualLabel,
+    canUndoBatch: () => Boolean(lastBatch),
   });
 
   return { startDefinition, startEditSplit, cancelDefinition, definitionSources, continueDefinition,

@@ -800,6 +800,103 @@ h2 {
   margin-top: 10px;
 }
 
+.definition-batch-review {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f9faf8;
+}
+
+.definition-batch-review .section-title,
+.definition-batch-review p {
+  margin: 0;
+}
+
+.definition-term-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+}
+
+.definition-term-chips button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: white;
+  color: var(--ink);
+}
+
+.definition-term-chips button.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, white);
+}
+
+.definition-term-items {
+  display: grid;
+  gap: 4px;
+  max-height: min(48vh, 500px);
+  overflow-y: auto;
+}
+
+.definition-sort-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: white;
+  color: var(--ink);
+}
+
+.definition-sort-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.definition-side-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.definition-side-buttons button {
+  min-height: 44px;
+  min-width: 70px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: white;
+  color: var(--ink);
+}
+
+.definition-side-buttons button.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, white);
+  font-weight: 700;
+}
+
+.definition-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.definition-term-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 840px) {
+  .definition-sort-row { grid-template-columns: 1fr; }
+  .definition-side-buttons button { flex: 1; }
+}
+
 .definition-selected-variables {
   display: grid;
   gap: 6px;
@@ -945,6 +1042,10 @@ h2 {
 
 #dagMapCanvas.dragging {
   cursor: grabbing;
+}
+
+.mobile-definition-map-hint {
+  display: none;
 }
 
 .dag-map-labels {
@@ -2429,6 +2530,23 @@ h2 {
 }
 
 @media (max-width: 840px) {
+  .dag-body.defining-variable .mobile-definition-map-hint {
+    display: block;
+    position: absolute;
+    z-index: 9;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--ink);
+    font-size: 12px;
+    line-height: 1.35;
+    pointer-events: none;
+  }
+
   .fullscreen-toggle {
     display: none;
   }

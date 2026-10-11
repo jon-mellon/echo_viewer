@@ -1,11 +1,86 @@
 import * as searchModel from "./dag_search.mjs";
+import { reviewTerms } from "./definition_batch_review.mjs";
 import { h, replaceChildren } from "./dom_builder.mjs";
 
 export function createDefinitionWorkflowPresenter({ state, elements: els, normalized, clusterRep, truncate,
   definitionSources, definitionResidualIds, definitionCanReview, searchVariables, visibleVariables,
   clusterDisplayVariable, definitionNeighbors, resizeMap, fitMap,
-  onSourceSelection, onToggleVariable, onResidualLabel }) {
+  onSourceSelection, onToggleVariable, onResidualLabel, canUndoBatch }) {
   let renderedStep = null;
+  let reviewedDraft = null;
+  let activeTerm = null;
+  let termPage = 0;
+  let currentTermIds = [];
+  const PAGE_SIZE = 20;
+
+  function renderTermReview(draft, selectedIds) {
+    if (reviewedDraft !== draft) {
+      reviewedDraft = draft;
+      activeTerm = draft.mode === "edit" ? "all" : "unreviewed";
+      termPage = 0;
+    }
+    const variables = draft.eligible_variable_ids.map(id => {
+      const variable = clusterDisplayVariable(id) || state.variableById.get(id);
+      return { id, label: variable?.display_label || variable?.concept_label || id };
+    });
+    const terms = reviewTerms(variables, selectedIds);
+    const reviewed = new Set(draft.reviewed_variable_ids || []);
+    const unreviewedIds = variables.filter(variable => !reviewed.has(variable.id)).map(variable => variable.id);
+    if (!['all', 'unreviewed'].includes(activeTerm) && !terms.some(term => term.word === activeTerm)) activeTerm = "all";
+    const filters = [
+      { key: "unreviewed", label: `Unreviewed · ${unreviewedIds.length}` },
+      { key: "all", label: `All · ${variables.length}` },
+      ...terms.map(term => ({ key: term.word, label: `${term.word} · ${term.ids.length}` })),
+    ];
+    replaceChildren(els.definitionTermChips, filters.map(filter => h("button", {
+      type: "button", dataset: { term: filter.key }, className: filter.key === activeTerm ? "active" : "",
+      attrs: { "aria-pressed": filter.key === activeTerm ? "true" : "false" },
+      textContent: filter.label,
+    })));
+    els.definitionTermChips.querySelectorAll("button[data-term]").forEach(button =>
+      button.addEventListener("click", () => { activeTerm = button.dataset.term; termPage = 0; render(); }));
+    const term = terms.find(entry => entry.word === activeTerm);
+    const filtered = variables.filter(variable => activeTerm === "all"
+      || (activeTerm === "unreviewed" ? !reviewed.has(variable.id) : term?.ids.includes(variable.id)))
+      .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id));
+    const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    termPage = Math.max(0, Math.min(termPage, pageCount - 1));
+    const shown = filtered.slice(termPage * PAGE_SIZE, (termPage + 1) * PAGE_SIZE);
+    const ids = shown.map(variable => variable.id);
+    currentTermIds = ids;
+    const inNew = ids.filter(id => selectedIds.has(id)).length;
+    els.definitionTermSummary.textContent = activeTerm === "unreviewed"
+      ? `${unreviewedIds.length} still to review · ${shown.length} shown`
+      : `${filtered.length} ${activeTerm === "all" ? "variables" : `contain “${activeTerm}”`} · ${inNew} shown in new variable`;
+    replaceChildren(els.definitionTermItems, shown.map(variable => {
+      const { id, label } = variable;
+      const selected = selectedIds.has(id);
+      return h("div", { className: "definition-sort-row", dataset: { termVariableId: id } },
+        h("span", { className: "definition-sort-label", textContent: label }),
+        h("div", { className: "definition-side-buttons" },
+          h("button", { type: "button", className: selected ? "active" : "", dataset: { side: "new" },
+            attrs: { "aria-pressed": selected ? "true" : "false", "aria-label": `Put ${label} in new variable` }, textContent: "New" }),
+          h("button", { type: "button", className: !selected && reviewed.has(id) ? "active" : "",
+            dataset: { side: "leftover" }, attrs: { "aria-pressed": !selected && reviewed.has(id) ? "true" : "false",
+              "aria-label": `Keep ${label} in leftover` }, textContent: "Leftover" })));
+    }));
+    els.definitionTermItems.querySelectorAll(".definition-sort-row").forEach(row =>
+      row.querySelectorAll("button[data-side]").forEach(button =>
+        button.addEventListener("click", () => onToggleVariable(row.dataset.termVariableId, button.dataset.side === "new"))));
+    els.definitionTermPage.textContent = `${termPage + 1} of ${pageCount}`;
+    els.definitionTermPrev.disabled = termPage === 0;
+    els.definitionTermNext.disabled = termPage >= pageCount - 1;
+    els.definitionTermToNew.textContent = `Move shown ${ids.length} to new`;
+    els.definitionTermToLeftover.textContent = `Move shown ${ids.length} to leftover`;
+    els.definitionTermToNew.disabled = !ids.length || ids.every(id => selectedIds.has(id) && reviewed.has(id));
+    els.definitionTermToLeftover.disabled = !ids.length || ids.every(id => !selectedIds.has(id) && reviewed.has(id));
+    els.definitionUndoBatch.hidden = !canUndoBatch();
+  }
+
+  function changeTermPage(direction) {
+    termPage += direction;
+    render();
+  }
   function render() {
     const draft = state.definitionDraft;
     const stepChanged = draft?.step !== renderedStep;
@@ -57,6 +132,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       els.definitionCounts.textContent = `${draft.new_variable_ids.length} in new variable · ${residualText}`;
       els.definitionReview.disabled = !definitionCanReview();
       const selectedIds = new Set(draft.new_variable_ids);
+      renderTermReview(draft, selectedIds);
       const matches = searchVariables(els.definitionVariableSearch.value, visibleVariables().length)
         .filter(variable => !selectedIds.has(clusterRep(variable.variable_id)))
         .slice(0, 30);
@@ -121,5 +197,6 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionContinue.title = `Could not load variables: ${error?.message || error}`;
   }
 
-  return { render, showValidationError, setContinueLoading, showLoadError };
+  return { render, showValidationError, setContinueLoading, showLoadError,
+    selectedTermIds: () => [...currentTermIds], changeTermPage };
 }

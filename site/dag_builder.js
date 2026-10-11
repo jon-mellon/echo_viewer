@@ -120,7 +120,9 @@ function initElements() {
     "schemaChoice", "loadSchema", "skipSchema",
     "definitionBlock", "definitionTitle", "definitionCancel", "definitionSourcesStep",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue",
-    "definitionPartitionStep", "definitionCounts", "definitionVariableSearch",
+    "definitionPartitionStep", "definitionCounts", "definitionTermChips", "definitionTermSummary",
+    "definitionTermItems", "definitionTermPrev", "definitionTermPage", "definitionTermNext",
+    "definitionTermToNew", "definitionTermToLeftover", "definitionUndoBatch", "definitionVariableSearch",
     "definitionVariableResults", "definitionSelectedVariables", "definitionAddNeighbors", "definitionNeighborResults",
     "definitionBack", "definitionReview",
     "definitionReviewStep", "definitionNewLabel", "definitionReviewVariables", "definitionResidualLabels",
@@ -1885,6 +1887,7 @@ const eventController = createDagEventController({
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean,
   startEditSplit, startDefinition, dismissEvidencePane,
+  toggleDefinitionVariable,
   showExcludedLinks, showExcludedFindings,
 });
 

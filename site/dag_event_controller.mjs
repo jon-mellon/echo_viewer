@@ -19,6 +19,7 @@ export function createDagEventController({
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean, startEditSplit,
   dismissEvidencePane, showExcludedLinks, showExcludedFindings, startDefinition,
+  toggleDefinitionVariable,
 }) {
 function installHandlers() {
   els.closeEvidencePane.addEventListener("click", dismissEvidencePane);
@@ -341,7 +342,7 @@ function installMapHandlers() {
       // Draw is allowed with an active group, or with "Draw +" during seed selection.
       const action = mapInteractions.brushAction({
         mode: state.map.mode,
-        hasActiveGroup: Boolean(activeGroup()),
+        hasActiveGroup: Boolean(activeGroup() || state.definitionDraft?.step === "partition"),
         seedSelectionPhase: isSeedSelectionPhase(),
       });
       state.map.brush = { action, points: [{ x, y }] };
@@ -406,7 +407,7 @@ function installMapHandlers() {
       }
     }
     if (state.map.brush) {
-      if (state.map.brush.action === "select_vars") {
+      if (state.map.brush.action === "select_vars" || state.definitionDraft?.step === "partition") {
         applyBrush();
       } else {
         const before = takeSnapshot();
@@ -422,8 +423,16 @@ function installMapHandlers() {
     }
     const moved = state.map.moved;
     if (!moved) {
-      const point = nearestVariable(event.clientX, event.clientY, 16);
+      const point = nearestVariable(event.clientX, event.clientY,
+        event.pointerType === "touch" ? 28 : 16);
       if (point) {
+        if (state.definitionDraft?.step === "partition") {
+          toggleDefinitionVariable(point.variable_id);
+          state.map.dragging = false;
+          state.map.dragStart = null;
+          canvas.classList.remove("dragging");
+          return;
+        }
         if (state.fullscreenPanel) setFullscreenPanel(null);
         const variableId = clusterRep(point.variable_id);
         const priorId = clusterRep(state.selectedVariableId || "");
@@ -473,6 +482,7 @@ function installMapHandlers() {
   }, { passive: false });
 
   canvas.addEventListener("dblclick", (event) => {
+    if (state.definitionDraft?.step === "partition") return;
     // With a group open, double-clicking a Voronoi cell adds its node to that group.
     const group = activeGroup();
     if (group) {

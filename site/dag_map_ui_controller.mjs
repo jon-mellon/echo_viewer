@@ -174,7 +174,7 @@ function importantMapVariables() {
     width: canvasWidth(),
     height: canvasHeight(),
     transform: state.map.transform,
-    phase: state.phase,
+    phase: state.definitionDraft?.step === "partition" ? "define_iv" : state.phase,
     isRejectedVariable,
     clusterRep,
     clusterMemberIds,
@@ -201,7 +201,7 @@ function renderMapLabels(width, height) {
     for (const item of ordered) {
       const v = item.variable;
       if (!mapRenderModel.shouldShowVariableLabel(item, {
-        isAssigned: assignedVarIds.has(v.variable_id),
+        isAssigned: !state.definitionDraft && assignedVarIds.has(v.variable_id),
         fewVisible,
       })) continue;
       const screen = worldToScreen(v.map_x, v.map_y);
@@ -267,6 +267,27 @@ function applyBrush() {
   const brush = state.map.brush;
   if (!brush?.points || brush.points.length < 3) return;
   const group = activeGroup();
+  if (state.definitionDraft?.step === "partition") {
+    const selected = new Set(state.definitionDraft.new_variable_ids || []);
+    const eligible = new Set(state.definitionDraft.eligible_variable_ids || []);
+    const picked = [];
+    for (const variable of visibleClusterReps()) {
+      if (!brushHitsRepresentative(variable, brush.points)) continue;
+      const id = clusterRep(variable.variable_id);
+      if (!eligible.has(id)) continue;
+      picked.push(id);
+      if (brush.action === "remove") selected.delete(id); else selected.add(id);
+    }
+    state.definitionDraft.new_variable_ids = [...selected];
+    state.definitionDraft.reviewed_variable_ids = [...new Set([
+      ...(state.definitionDraft.reviewed_variable_ids || []), ...picked,
+    ])];
+    state.selectedVariableIds = new Set(selected);
+    state.selectedVariableId = picked[picked.length - 1] || state.selectedVariableId;
+    invalidateMapCaches();
+    renderAll();
+    return;
+  }
   if (brush.action === "select_vars") {
     const picked = [];
     for (const v of visibleClusterReps()) {
@@ -293,23 +314,6 @@ function applyBrush() {
     return;
   }
   if (!group) return;
-  if (group.group_id === "__definition_new__") {
-    const selected = new Set(state.definitionDraft?.new_variable_ids || []);
-    const eligible = new Set(state.definitionDraft?.eligible_variable_ids || []);
-    const picked = [];
-    for (const v of visibleClusterReps()) {
-      if (!brushHitsRepresentative(v, brush.points)) continue;
-      const id = clusterRep(v.variable_id);
-      if (!eligible.has(id)) continue;
-      picked.push(id);
-      if (brush.action === "remove") selected.delete(id); else selected.add(id);
-    }
-    state.definitionDraft.new_variable_ids = [...selected];
-    state.selectedVariableIds = new Set(selected);
-    state.selectedVariableId = picked[picked.length - 1] || state.selectedVariableId;
-    renderAll();
-    return;
-  }
   const before = new Set(group.variable_ids);
   const changed = [];
   const picked = [];

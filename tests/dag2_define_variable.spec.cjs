@@ -196,3 +196,88 @@ test("a new variable can be defined through the mobile controls", async ({ page 
     .some(group => group.label === "Mobile browser variable"))).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+test("mobile spatial editor adds and removes a variable with a tap", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await page.addInitScript(() => {
+      localStorage.clear();
+      sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+    });
+    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+      && window.__dagBuilderState?.publishedSchemaHydrated
+      && !window.__dagBuilderState?.publishedSchemaHydrating);
+    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
+    await page.locator("#definitionContinue").click();
+    await page.locator('.mobile-panel-tab[data-mobile-panel="variables"]').click();
+    await expect(page.locator("#dagMapCanvas")).toBeVisible();
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await expect.poll(() => page.locator("#dagMapLabels .map-label").count()).toBeGreaterThan(0);
+    const target = await page.evaluate(() => {
+      const state = window.__dagBuilderState;
+      const canvas = document.querySelector("#dagMapCanvas");
+      const rect = canvas.getBoundingClientRect();
+      const eligible = new Set(state.definitionDraft.eligible_variable_ids);
+      return (state.map._visibleClusterReps || []).filter(item => eligible.has(item.variable_id)
+        && item.is_cluster_rep && Number.isFinite(item.map_x) && Number.isFinite(item.map_y))
+        .map(variable => ({
+          id: variable.variable_id,
+          x: rect.left + variable.map_x * state.map.transform.scale + state.map.transform.tx,
+          y: rect.top + variable.map_y * state.map.transform.scale + state.map.transform.ty,
+        }))
+        .find(point => point.x > rect.left + 30 && point.x < rect.right - 30
+          && point.y > rect.top + 100 && point.y < rect.bottom - 30
+          && document.elementFromPoint(point.x, point.y) === canvas) || null;
+    });
+    expect(target).toBeTruthy();
+    await page.touchscreen.tap(target.x, target.y);
+    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(1);
+    const tappedId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids[0]);
+    await page.touchscreen.tap(target.x, target.y);
+    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
+    const drawAroundTarget = async () => {
+      await page.mouse.move(target.x - 15, target.y - 15);
+      await page.mouse.down();
+      await page.mouse.move(target.x + 15, target.y - 15);
+      await page.mouse.move(target.x + 15, target.y + 15);
+      await page.mouse.move(target.x - 15, target.y + 15);
+      await page.mouse.move(target.x - 15, target.y - 15);
+      await page.mouse.up();
+    };
+    await page.locator("#dagBrushMode").click();
+    await drawAroundTarget();
+    await expect.poll(() => page.evaluate(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), tappedId)).toBe(true);
+    await page.locator("#dagEraseMode").click();
+    await drawAroundTarget();
+    await expect.poll(() => page.evaluate(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), tappedId)).toBe(false);
+    await page.locator('.mobile-panel-tab[data-mobile-panel="controls"]').click();
+    await expect(page.locator('#definitionTermChips button[data-term="unreviewed"]')).toContainText('Unreviewed ·');
+    await expect(page.locator('#definitionTermItems .definition-sort-row')).toHaveCount(20);
+    const firstRow = page.locator('#definitionTermItems .definition-sort-row').first();
+    const firstId = await firstRow.getAttribute('data-term-variable-id');
+    await firstRow.locator('button[data-side="new"]').tap();
+    await expect.poll(() => page.evaluate(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), firstId)).toBe(true);
+    await page.locator('#definitionTermChips button[data-term="all"]').tap();
+    const allFirstRow = page.locator('#definitionTermItems .definition-sort-row').first();
+    const allFirstId = await allFirstRow.getAttribute('data-term-variable-id');
+    await allFirstRow.locator('button[data-side="leftover"]').tap();
+    await expect.poll(() => page.evaluate(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), allFirstId)).toBe(false);
+    await page.locator('#definitionTermNext').tap();
+    await expect(page.locator('#definitionTermPage')).toHaveText('2 of 16');
+    if (await page.locator('#definitionSelectedVariables .definition-selected-variable').count()) {
+      await page.locator('#definitionSelectedVariables .definition-selected-variable').first().tap();
+    }
+    await page.locator('#definitionTermChips button[data-term="knowledge"]').click();
+    const count = await page.locator('#definitionTermItems .definition-sort-row').count();
+    expect(count).toBe(20);
+    await page.locator('#definitionTermToNew').click();
+    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(count);
+    await page.locator('#definitionUndoBatch').click();
+    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
+  } finally {
+    await context.close();
+  }
+});

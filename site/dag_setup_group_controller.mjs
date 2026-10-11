@@ -293,7 +293,7 @@ export function createDagSetupGroupController({
         elements.dagStatusBadge.className = "status-pill";
         elements.workflowHint.textContent = state.definitionDraft.step === "sources"
           ? "Choose the existing categories whose canonical variables should be available."
-          : "Only canonical variables from the selected categories are available in the spatial view.";
+          : "Use the Variables tab to tap points or draw around them. Return to Setup to search, review, and save.";
         elements.ivSearchBlock.hidden = true;
         elements.dvSearchBlock.hidden = true;
         elements.instrumentSearchBlock.hidden = true;
