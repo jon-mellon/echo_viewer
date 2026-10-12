@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cappedKeyStatus, spotCheckResults } from "../site/definition_jev_assist.mjs";
+import { cappedKeyStatus, randomSampleIds, spotCheckResults } from "../site/definition_jev_assist.mjs";
 
 test("Jev access requires a non-resetting key capped at $5", () => {
   assert.equal(cappedKeyStatus({ limit: 5, limit_reset: null, limit_remaining: 4.5 }), null);
@@ -21,4 +21,13 @@ test("a 30,000-variable run has a bounded spot check from both sides", () => {
   assert.ok(spot.some(item => item.side === "new"));
   assert.ok(spot.some(item => item.side === "leftover"));
   assert.deepEqual(spotCheckResults(results).map(item => item.id), spot.map(item => item.id));
+});
+
+test("a 30,000-variable split can draw its fixed test sample", () => {
+  const source = Array.from({ length: 30_000 }, (_, index) => `variable-${index}`);
+  const sample = randomSampleIds(source);
+  assert.equal(sample.length, 24);
+  assert.equal(new Set(sample).size, 24);
+  assert.equal(source.length, 30_000);
+  assert.ok(sample.every(id => source.includes(id)));
 });

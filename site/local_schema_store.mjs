@@ -1,6 +1,8 @@
 const DATABASE = "echo-local-schemas";
 const SCHEMAS = "schemas";
 const META = "meta";
+const JEV_RUNS = "jev_runs";
+const JEV_BATCHES = "jev_batches";
 const SESSION_PREFIX = "session:";
 
 let databasePromise;
@@ -9,13 +11,24 @@ export function openLocalDatabase(indexedDb = globalThis.indexedDB) {
   if (!indexedDb) return Promise.reject(new Error("IndexedDB is unavailable in this browser."));
   if (indexedDb === globalThis.indexedDB && databasePromise) return databasePromise;
   const opened = new Promise((resolve, reject) => {
-    const request = indexedDb.open(DATABASE, 1);
+    const request = indexedDb.open(DATABASE, 2);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(SCHEMAS)) db.createObjectStore(SCHEMAS, { keyPath: "id" });
       if (!db.objectStoreNames.contains(META)) db.createObjectStore(META, { keyPath: "key" });
+      if (!db.objectStoreNames.contains(JEV_RUNS)) db.createObjectStore(JEV_RUNS, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(JEV_BATCHES)) {
+        const batches = db.createObjectStore(JEV_BATCHES, { keyPath: "key" });
+        batches.createIndex("runId", "runId");
+      }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      request.result.onversionchange = () => {
+        request.result.close();
+        if (indexedDb === globalThis.indexedDB) databasePromise = null;
+      };
+      resolve(request.result);
+    };
     request.onerror = () => reject(request.error);
     request.onblocked = () => reject(new Error("Local schema database is blocked by another tab."));
   });

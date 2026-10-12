@@ -23,6 +23,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv", "instrument", "candidate"].includes(role)) return;
+    jevAssist.clearPreview();
     // Start the query engine while the user chooses a source. The source load
     // still awaits this setup and reports any error through its normal path.
     void prewarmEvidence().catch(() => {});
@@ -44,6 +45,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     lastBatch = null;
     const context = projectOps.editableSplitContext(state.project, groupId ? groupId : activeGroup());
     if (!context) return;
+    jevAssist.clearPreview();
     const { splitId, newGroup, residuals } = context;
     const eligible = [...new Set([...newGroup.variable_ids, ...residuals.flatMap(group => group.variable_ids)]
       .map(clusterRep))];
@@ -345,20 +347,30 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   }
 
   async function resumeAfterOAuth() {
-    const draft = jevAssist.takeResumeDraft();
+    const oauthDraft = jevAssist.takeResumeDraft();
+    const checkpointDraft = !oauthDraft && !state.definitionDraft
+      ? await jevAssist.latestResumeDraft().catch(error => {
+        console.warn("Could not read saved Jev draft.", error);
+        return null;
+      }) : null;
+    const draft = oauthDraft || state.definitionDraft || checkpointDraft;
     if (!draft || draft.step !== "partition" || !Array.isArray(draft.eligible_variable_ids)) return;
     if (!draft.source_snapshot?.every(snap => {
       const current = groupById(snap.group_id);
       return current && JSON.stringify(current.variable_ids) === JSON.stringify(snap.variable_ids);
     })) return;
-    state.definitionDraft = draft;
-    state.selectedVariableIds = new Set(draft.new_variable_ids || []);
+    if (oauthDraft || checkpointDraft) {
+      state.definitionDraft = draft;
+      state.selectedVariableIds = new Set(draft.new_variable_ids || []);
+    }
     try { await hydrateVariableDetails(draft.eligible_variable_ids); }
     catch (error) { console.warn("Could not reload all split variable details.", error); }
     invalidateMapCaches();
     setMapMode("select");
     renderDraft();
     fitMap(draft.eligible_variable_ids);
+    try { await jevAssist.restoreForDraft({ force: true }); }
+    catch (error) { console.warn("Could not restore saved Jev progress.", error); }
   }
 
   const presenter = createDefinitionWorkflowPresenter({

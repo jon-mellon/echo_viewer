@@ -1,4 +1,5 @@
 import { h, replaceChildren } from "./dom_builder.mjs";
+import { jevRunId, loadJevRun, latestJevRun, saveJevRun, saveJevBatch, deleteJevRun } from "./definition_jev_checkpoint.mjs";
 
 const MODEL = "typesafe/jev-1.13";
 const MAX_KEY_LIMIT_USD = 5;
@@ -25,6 +26,20 @@ export function spotCheckResults(results) {
   const leftoverRows = ranked.filter(item => item.side === "leftover").slice(0, SPOT_CHECK_PER_GROUP);
   return [...new Map([...lowest, ...newRows, ...leftoverRows].map(item => [item.id, item])).values()]
     .sort((a, b) => a.confidence - b.confidence);
+}
+
+export function randomSampleIds(sourceIds, count = TEST_SIZE) {
+  const ids = [...sourceIds];
+  const random = new Uint32Array(ids.length);
+  // Browsers cap each getRandomValues call at 65,536 bytes.
+  for (let offset = 0; offset < random.length; offset += 16_384) {
+    crypto.getRandomValues(random.subarray(offset, offset + 16_384));
+  }
+  for (let index = ids.length - 1; index > 0; index -= 1) {
+    const swap = random[index] % (index + 1);
+    [ids[index], ids[swap]] = [ids[swap], ids[index]];
+  }
+  return ids.slice(0, count);
 }
 
 function formatUsd(amount) {
@@ -100,12 +115,25 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   let busy = false;
   let message = "Connect OpenRouter, then set a $5 lifetime cap on the key it creates.";
   let runRevision = 0;
+  let checkpoint = null;
+  let checkpointDraft = null;
+  let checkpointDescription = null;
+  let checkpointSignature = null;
+  let restorePromise = null;
 
   function eligibleSignature(draft) {
     return (draft?.eligible_variable_ids || []).join("\u0000");
   }
 
-  function clearPreview({ keepSample = false } = {}) {
+  function clearPreview({ keepSample = false, keepCheckpoint = false } = {}) {
+    const oldId = checkpoint?.run.id;
+    checkpoint = null;
+    checkpointDraft = null;
+    checkpointDescription = null;
+    checkpointSignature = null;
+    restorePromise = null;
+    if (oldId && !keepCheckpoint) void deleteJevRun(oldId).catch(error =>
+      console.warn("Could not remove Jev checkpoint.", error));
     preview = null;
     previewDraft = null;
     previewMode = null;
@@ -130,16 +158,128 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   function ensureSample(draft) {
     const signature = eligibleSignature(draft);
     if (sampleDraft === draft && sampleSignature === signature && sampleIds) return sampleIds;
-    const ids = [...draft.eligible_variable_ids];
-    const random = crypto.getRandomValues(new Uint32Array(ids.length));
-    for (let index = ids.length - 1; index > 0; index -= 1) {
-      const swap = random[index] % (index + 1);
-      [ids[index], ids[swap]] = [ids[swap], ids[index]];
-    }
     sampleDraft = draft;
     sampleSignature = signature;
-    sampleIds = ids.slice(0, TEST_SIZE);
+    sampleIds = randomSampleIds(draft.eligible_variable_ids);
     return sampleIds;
+  }
+
+  function checkpointSource(draft, description) {
+    return { version: 1, model: MODEL, description,
+      role: draft.role, split_id: draft.split_id || null,
+      source_snapshot: draft.source_snapshot,
+      eligible_variable_ids: draft.eligible_variable_ids,
+      records: recordsFor(draft.eligible_variable_ids) };
+  }
+
+  function phaseBatches(phase) {
+    return checkpoint?.batches.filter(batch => batch.phase === phase) || [];
+  }
+
+  function completedCount(phase) {
+    return phaseBatches(phase).reduce((count, batch) => count + batch.results.length, 0);
+  }
+
+  function savedPhase(ids, phase) {
+    const batches = new Map(phaseBatches(phase).map(batch => [batch.offset, batch]));
+    const results = [];
+    let inputTokens = 0;
+    let usageComplete = true;
+    for (let offset = 0; offset < ids.length; offset += BATCH_SIZE) {
+      const batch = batches.get(offset);
+      const expected = ids.slice(offset, offset + BATCH_SIZE);
+      if (!batch || batch.results.length !== expected.length
+        || batch.results.some((item, index) => item.id !== expected[index])) return null;
+      results.push(...batch.results);
+      if (batch.inputTokens === null) usageComplete = false;
+      else inputTokens += batch.inputTokens;
+    }
+    return { results, inputTokens: usageComplete ? inputTokens : null };
+  }
+
+  function restorePreview(draft, description) {
+    const sample = checkpoint?.run.sampleIds;
+    if (!Array.isArray(sample) || sample.length !== Math.min(TEST_SIZE, draft.eligible_variable_ids.length)
+      || new Set(sample).size !== sample.length
+      || sample.some(id => !draft.eligible_variable_ids.includes(id))) {
+      throw new Error("Saved Jev sample does not match these source variables.");
+    }
+    costCache = null;
+    sampleDraft = draft;
+    sampleSignature = eligibleSignature(draft);
+    sampleIds = sample;
+    const test = savedPhase(sample, "test");
+    if (!test) return;
+    testResults = test.results;
+    testInputTokens = test.inputTokens;
+    testDescription = description;
+    const sampled = new Set(sample);
+    const remaining = draft.eligible_variable_ids.filter(id => !sampled.has(id));
+    const full = savedPhase(remaining, "full");
+    preview = full ? [...test.results, ...full.results] : test.results;
+    fullInputTokens = full?.inputTokens ?? null;
+    previewDraft = draft;
+    previewMode = full ? "full" : "test";
+    spotRows = full ? spotCheckResults(preview) : [];
+    onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), previewMode);
+  }
+
+  async function restoreForDraft({ force = false } = {}) {
+    const draft = getDraft();
+    const description = String(draft?.ai_description || "").trim();
+    if (draft?.step !== "partition" || !description || !draft.eligible_variable_ids?.length) return;
+    const signature = eligibleSignature(draft);
+    if (!force && checkpointDraft === draft && checkpointDescription === description
+      && checkpointSignature === signature) return restorePromise;
+    checkpointDraft = draft;
+    checkpointDescription = description;
+    checkpointSignature = signature;
+    const revision = runRevision;
+    restorePromise = (async () => {
+      const id = await jevRunId(checkpointSource(draft, description));
+      const saved = await loadJevRun(id);
+      if (revision !== runRevision || draft !== getDraft()
+        || description !== String(draft.ai_description || "").trim()
+        || signature !== eligibleSignature(draft)) return;
+      checkpoint = saved;
+      if (saved) {
+        restorePreview(draft, description);
+        const testDone = completedCount("test");
+        const fullDone = completedCount("full");
+        message = previewMode === "full" ? "Full suggestions restored from this browser. Review them before applying."
+          : fullDone ? `${fullDone} full-run variables saved in this browser. Connect a capped key and resume the split.`
+            : testDone && !testResults ? `${testDone} test variables saved in this browser. Connect a capped key and resume the test.`
+              : testResults ? "Test restored from this browser. Run or resume the full split."
+                : message;
+        render();
+      }
+    })().catch(error => {
+      message = `Could not load saved Jev progress: ${error.message}`;
+      render();
+      throw error;
+    });
+    return restorePromise;
+  }
+
+  async function ensureCheckpoint(draft, description) {
+    const revision = runRevision;
+    await restoreForDraft();
+    if (revision !== runRevision || draft !== getDraft()
+      || description !== String(draft.ai_description || "").trim()) return null;
+    if (checkpoint) return checkpoint;
+    const id = await jevRunId(checkpointSource(draft, description));
+    if (revision !== runRevision || draft !== getDraft()
+      || description !== String(draft.ai_description || "").trim()) return null;
+    const sample = ensureSample(draft);
+    const run = { id, sampleIds: sample, draft: structuredClone(draft), createdAt: Date.now() };
+    await saveJevRun(run);
+    if (revision !== runRevision || draft !== getDraft()
+      || description !== String(draft.ai_description || "").trim()) {
+      await deleteJevRun(id);
+      return null;
+    }
+    checkpoint = { run, batches: [] };
+    return checkpoint;
   }
 
   function renderSummary(draft) {
@@ -203,8 +343,12 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       || costCache.description !== description) {
       const sampled = new Set(sample);
       const rest = draft.eligible_variable_ids.filter(id => !sampled.has(id));
+      const restBatchSizes = [];
+      for (let offset = 0; offset < rest.length; offset += BATCH_SIZE) {
+        restBatchSizes.push({ offset, size: requestSizes(rest.slice(offset, offset + BATCH_SIZE), description) });
+      }
       costCache = { draft, signature, description, testSize: requestSizes(sample, description),
-        restSize: requestSizes(rest, description) };
+        restSize: requestSizes(rest, description), restBatchSizes };
     }
     const { testSize, restSize } = costCache;
     const calibrated = testInputTokens !== null && testDescription === description
@@ -212,16 +356,25 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     const testCost = testInputTokens !== null && testDescription === description
       ? estimatedCharge({ ...testSize, inputTokens: testInputTokens }, 1)
       : estimatedCharge(testSize);
+    const completed = new Set(phaseBatches("full").map(batch => batch.offset));
+    const remainingSize = { inputTokens: 0, requests: 0, records: 0 };
+    for (const { offset, size } of costCache.restBatchSizes) {
+      if (completed.has(offset)) continue;
+      remainingSize.inputTokens += size.inputTokens;
+      remainingSize.requests += size.requests;
+      remainingSize.records += size.records;
+    }
     const fullCost = fullInputTokens !== null && previewMode === "full"
       ? estimatedCharge({ ...restSize, inputTokens: fullInputTokens })
-      : estimatedCharge(restSize, calibrated);
+      : estimatedCharge(remainingSize, calibrated);
     const testLabel = testInputTokens !== null && testDescription === description
       ? "Test usage at listed price" : "Estimated test";
     const fullLabel = previewMode === "full"
       ? fullInputTokens !== null ? "full run usage at listed price" : "full run estimate"
       : testInputTokens !== null && testDescription === description
         ? "estimated remaining full run, calibrated from test" : "estimated remaining full run";
-    els.definitionAiCost.textContent = `${testLabel} (${sample.length}): ${formatUsd(testCost)} · ${fullLabel} (${restSize.records}): ${formatUsd(fullCost)}. Estimates use current listed Jev pricing; OpenRouter controls the actual charge.`;
+    const fullCount = previewMode === "full" ? restSize.records : remainingSize.records;
+    els.definitionAiCost.textContent = `${testLabel} (${sample.length}): ${formatUsd(testCost)} · ${fullLabel} (${fullCount}): ${formatUsd(fullCost)}. Estimates use current listed Jev pricing; OpenRouter controls the actual charge.`;
   }
 
   function renderReviewRows(draft) {
@@ -270,11 +423,15 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     els.definitionAiRecheck.hidden = !key;
     els.definitionAiDisconnect.hidden = !key;
     const description = String(draft?.ai_description || "").trim();
+    if (active && description) void restoreForDraft().catch(() => {});
     const canRun = active && key && !cappedKeyStatus(keyInfo) && !busy && description
       && draft.eligible_variable_ids?.length;
     els.definitionAiRun.disabled = !canRun;
+    const testSaved = completedCount("test");
+    const fullSaved = completedCount("full");
     els.definitionAiRun.textContent = busy ? "Classifying variables…"
-      : `${testResults ? "Rerun test on" : "Test split on"} ${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)} variables`;
+      : testSaved && !testResults ? `Resume test (${testSaved}/${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)} saved)`
+        : `${testResults ? "Show saved test for" : "Test split on"} ${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)} variables`;
     replaceChildren(els.definitionAiStatus, h("span", { textContent: message }),
       settingsUrl ? h("a", { href: settingsUrl, target: "_blank", rel: "noopener noreferrer",
         textContent: "Open key settings" }) : null);
@@ -285,6 +442,9 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     els.definitionAiPreview.hidden = !showPreview;
     els.definitionAiFullRun.hidden = !showPreview || previewMode !== "test";
     els.definitionAiFullRun.disabled = !canRun;
+    els.definitionAiFullRun.textContent = fullSaved
+      ? `Resume full split (${fullSaved}/${Math.max(0, (draft?.eligible_variable_ids?.length || 0) - (sampleIds?.length || 0))} saved)`
+      : "Run full split";
     els.definitionAiApply.hidden = !showPreview || previewMode !== "full";
     if (!showPreview) return;
     renderSummary(draft);
@@ -368,21 +528,36 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     for (let offset = 0; offset < records.length; offset += BATCH_SIZE) {
       if (revision !== runRevision || draft !== getDraft()) return null;
       const batch = records.slice(offset, offset + BATCH_SIZE);
-      const body = await openRouterJson("/api/alpha/decisions", key, { method: "POST",
-        body: JSON.stringify(requestFor(batch, description)) });
-      const reportedTokens = Number(body.usage?.input_tokens ?? body.usage?.inputTokens);
-      if (Number.isFinite(reportedTokens) && reportedTokens >= 0) inputTokens += reportedTokens;
-      else usageComplete = false;
-      for (const [index, record] of batch.entries()) {
-        const answer = body.answers?.[`v${index}`];
-        if (answer?.type !== "choice" || !["new", "leftover"].includes(answer.choice)) {
-          throw new Error("Jev returned an incomplete classification. No suggestions were applied.");
-        }
-        const probability = Number(answer.probabilities?.[answer.choice] ?? answer.confidence ?? 0);
-        results.push({ id: record.id, label: record.label, side: answer.choice,
-          confidence: Number.isFinite(probability) ? Math.max(0, Math.min(1, probability)) : 0 });
+      let saved = phaseBatches(phase).find(item => item.offset === offset);
+      if (saved && (saved.results.length !== batch.length
+        || saved.results.some((item, index) => item.id !== batch[index].id))) {
+        throw new Error("Saved Jev progress does not match these source variables.");
       }
-      message = `${phase}: classified ${Math.min(offset + BATCH_SIZE, records.length)} of ${records.length} variables…`;
+      if (!saved) {
+        const body = await openRouterJson("/api/alpha/decisions", key, { method: "POST",
+          body: JSON.stringify(requestFor(batch, description)) });
+        if (revision !== runRevision || draft !== getDraft()) return null;
+        const rows = [];
+        for (const [index, record] of batch.entries()) {
+          const answer = body.answers?.[`v${index}`];
+          if (answer?.type !== "choice" || !["new", "leftover"].includes(answer.choice)) {
+            throw new Error("Jev returned an incomplete classification. Completed batches remain saved.");
+          }
+          const probability = Number(answer.probabilities?.[answer.choice] ?? answer.confidence ?? 0);
+          rows.push({ id: record.id, label: record.label, side: answer.choice,
+            confidence: Number.isFinite(probability) ? Math.max(0, Math.min(1, probability)) : 0 });
+        }
+        const reportedTokens = Number(body.usage?.input_tokens ?? body.usage?.inputTokens);
+        const tokens = Number.isFinite(reportedTokens) && reportedTokens >= 0 ? reportedTokens : null;
+        await saveJevBatch(checkpoint.run.id, phase, offset, rows, tokens);
+        if (revision !== runRevision || draft !== getDraft()) return null;
+        saved = { offset, phase, results: rows, inputTokens: tokens };
+        checkpoint.batches.push(saved);
+      }
+      results.push(...saved.results);
+      if (saved.inputTokens === null) usageComplete = false;
+      else inputTokens += saved.inputTokens;
+      message = `${phase}: ${Math.min(offset + BATCH_SIZE, records.length)} of ${records.length} variables saved in this browser…`;
       const statusText = els.definitionAiStatus.querySelector("span");
       if (statusText) statusText.textContent = message;
     }
@@ -411,7 +586,9 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     render();
     try {
       if (!await checkKey() || revision !== runRevision || draft !== getDraft()) return;
-      const outcome = await classify(ensureSample(draft), description, draft, revision, "Test run");
+      if (!await ensureCheckpoint(draft, description)
+        || revision !== runRevision || draft !== getDraft()) return;
+      const outcome = await classify(ensureSample(draft), description, draft, revision, "test");
       if (!outcome || revision !== runRevision || draft !== getDraft()) return;
       testResults = outcome.results;
       testInputTokens = outcome.inputTokens;
@@ -422,7 +599,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "test");
       message = "Test ready. Review the sample, then revise the description or run the full split.";
     } catch (error) {
-      message = `Could not test the split: ${error.message}`;
+      message = `Test paused: ${error.message} Completed batches are saved in this browser. Resume the test when ready.`;
     } finally {
       busy = false;
       render();
@@ -441,9 +618,11 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     render();
     try {
       if (!await checkKey() || revision !== runRevision || draft !== getDraft()) return;
+      if (!await ensureCheckpoint(draft, description)
+        || revision !== runRevision || draft !== getDraft()) return;
       const sampled = new Set(sampleIds);
       const remaining = draft.eligible_variable_ids.filter(id => !sampled.has(id));
-      const outcome = await classify(remaining, description, draft, revision, "Full run");
+      const outcome = await classify(remaining, description, draft, revision, "full");
       if (!outcome || revision !== runRevision || draft !== getDraft()) return;
       fullInputTokens = outcome.inputTokens;
       preview = [...testResults, ...outcome.results];
@@ -455,7 +634,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "full");
       message = "Full suggestions ready. Review them before applying.";
     } catch (error) {
-      message = `Could not run the full split: ${error.message}`;
+      message = `Full run paused: ${error.message} ${completedCount("full")} completed variables are saved in this browser. Resume when ready.`;
     } finally {
       busy = false;
       render();
@@ -481,7 +660,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     els.definitionAiDisconnect.addEventListener("click", () => {
       key = null; keyInfo = null; pricing = null;
       message = "Disconnected from OpenRouter in this tab. You can revoke the key in OpenRouter.";
-      clearPreview();
+      clearPreview({ keepCheckpoint: true });
     });
     els.definitionAiRun.addEventListener("click", () => void runTest());
     els.definitionAiFullRun.addEventListener("click", () => void runFull());
@@ -514,5 +693,6 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     try { return JSON.parse(saved); } catch { return null; }
   }
 
-  return { install, render, clearPreview, takeResumeDraft };
+  return { install, render, clearPreview, takeResumeDraft, restoreForDraft,
+    latestResumeDraft: async () => (await latestJevRun())?.draft || null };
 }
