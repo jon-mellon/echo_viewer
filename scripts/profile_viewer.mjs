@@ -20,6 +20,7 @@ const results = { started, url, browser: browserName, profileScenario: permalink
   device: mobile ? "mobile" : "desktop", scenarios: [], errors: [] };
 const scenarioBudgets = {
   "open variable definition": 750,
+  "choose definition method": 750,
   "select definition source": 2500,
   "select definition variable": 1000,
   "incident links (40 variables)": 1000,
@@ -258,7 +259,11 @@ try {
   if (!permalink) {
   await measure("open variable definition", async () => {
     await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
-    await page.locator("#definitionSourceList input[data-source-id]").first().waitFor();
+    await page.locator("#definitionChooseManual").waitFor({ state: "visible" });
+  });
+  await measure("choose definition method", async () => {
+    await page.locator("#definitionChooseManual").click();
+    await page.locator("#definitionSourceList input[data-source-id]").first().waitFor({ state: "visible" });
   });
   if (definitionThinkMs) await page.waitForTimeout(definitionThinkMs);
   const sourceGroupId = await page.locator("#definitionSourceList input[data-source-id]").first()
