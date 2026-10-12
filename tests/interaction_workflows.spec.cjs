@@ -50,7 +50,7 @@ test("selecting evidence in full screen returns to the standard layout", async (
   await expect(page.locator("#edgeInspector")).toBeVisible();
 });
 
-test("selecting a variable in full screen returns to the standard layout", async ({ page }) => {
+test("selecting a definition variable in full screen keeps the editor open", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);
   await ready(page);
@@ -64,7 +64,9 @@ test("selecting a variable in full screen returns to the standard layout", async
     const state = window.__dagBuilderState;
     const rect = state.map.canvas.getBoundingClientRect();
     const { scale, tx, ty } = state.map.transform;
+    const eligible = new Set(state.definitionDraft.eligible_variable_ids);
     for (const variable of state.variableById.values()) {
+      if (!eligible.has(variable.variable_id)) continue;
       const x = variable.map_x * scale + tx;
       const y = variable.map_y * scale + ty;
       if (Number.isFinite(x) && Number.isFinite(y)
@@ -76,8 +78,9 @@ test("selecting a variable in full screen returns to the standard layout", async
   });
   expect(point).toBeTruthy();
   await page.mouse.click(point.x, point.y);
-  await expect(page.locator("#fullscreenVariableMap")).toHaveAttribute("aria-pressed", "false");
-  await expect(page.locator(".dag-left-panel")).toBeVisible();
+  await expect.poll(() => page.evaluate(id =>
+    window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), point.id)).toBe(true);
+  await expect(page.locator("#fullscreenVariableMap")).toHaveAttribute("aria-pressed", "true");
 });
 
 test("password gate rejects an incorrect entry and unlocks with the preview password", async ({ page }) => {
