@@ -2,6 +2,20 @@ import { openLocalDatabase } from "./local_schema_store.mjs";
 
 const RUNS = "jev_runs";
 const BATCHES = "jev_batches";
+const STORAGE_TIMEOUT_MS = 15_000;
+
+async function openJevDatabase() {
+  let timer;
+  try {
+    return await Promise.race([
+      openLocalDatabase(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Browser storage did not open within 15 seconds.")),
+          STORAGE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
 
 function requestResult(request) {
   return new Promise((resolve, reject) => {
@@ -15,7 +29,7 @@ function transactionDone(transaction) {
     const timer = setTimeout(() => {
       try { transaction.abort(); } catch { /* The transaction may already have ended. */ }
       reject(new Error("Browser storage did not respond within 15 seconds."));
-    }, 15_000);
+    }, STORAGE_TIMEOUT_MS);
     transaction.oncomplete = () => { clearTimeout(timer); resolve(); };
     transaction.onabort = () => {
       clearTimeout(timer);
@@ -35,7 +49,7 @@ export async function jevRunId(source) {
 }
 
 export async function loadJevRun(id) {
-  const db = await openLocalDatabase();
+  const db = await openJevDatabase();
   const tx = db.transaction([RUNS, BATCHES], "readonly");
   const done = transactionDone(tx);
   const runRequest = tx.objectStore(RUNS).get(id);
@@ -45,7 +59,7 @@ export async function loadJevRun(id) {
 }
 
 export async function latestJevRun() {
-  const db = await openLocalDatabase();
+  const db = await openJevDatabase();
   const tx = db.transaction(RUNS, "readonly");
   const done = transactionDone(tx);
   const [runs] = await Promise.all([requestResult(tx.objectStore(RUNS).getAll()), done]);
@@ -53,14 +67,14 @@ export async function latestJevRun() {
 }
 
 export async function saveJevRun(run) {
-  const db = await openLocalDatabase();
+  const db = await openJevDatabase();
   const tx = db.transaction(RUNS, "readwrite");
   tx.objectStore(RUNS).put(run);
   await transactionDone(tx);
 }
 
 export async function saveJevBatch(runId, phase, offset, results, inputTokens) {
-  const db = await openLocalDatabase();
+  const db = await openJevDatabase();
   const tx = db.transaction(BATCHES, "readwrite");
   tx.objectStore(BATCHES).put({ key: `${runId}:${phase}:${offset}`, runId, phase, offset,
     results, inputTokens });
@@ -69,7 +83,7 @@ export async function saveJevBatch(runId, phase, offset, results, inputTokens) {
 
 export async function deleteJevRun(id) {
   if (!id) return;
-  const db = await openLocalDatabase();
+  const db = await openJevDatabase();
   const tx = db.transaction([RUNS, BATCHES], "readwrite");
   tx.objectStore(RUNS).delete(id);
   const index = tx.objectStore(BATCHES).index("runId");

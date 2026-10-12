@@ -288,15 +288,18 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
 
   async function ensureCheckpoint(draft, description) {
     const revision = runRevision;
+    showProgress("Reading saved progress from this browser…");
     await restoreForDraft();
     if (revision !== runRevision || draft !== getDraft()
       || description !== String(draft.ai_description || "").trim()) return null;
     if (checkpoint) return checkpoint;
+    showProgress("Preparing the split checkpoint…");
     const id = await jevRunId(checkpointSource(draft, description));
     if (revision !== runRevision || draft !== getDraft()
       || description !== String(draft.ai_description || "").trim()) return null;
     const sample = ensureSample(draft);
     const run = { id, sampleIds: sample, draft: structuredClone(draft), createdAt: Date.now() };
+    showProgress("Saving the split checkpoint in this browser…");
     await saveJevRun(run);
     if (revision !== runRevision || draft !== getDraft()
       || description !== String(draft.ai_description || "").trim()) {
