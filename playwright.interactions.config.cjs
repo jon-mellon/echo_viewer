@@ -4,6 +4,7 @@ module.exports = {
     "interaction_workflows.spec.cjs", "static_data_source.spec.cjs",
     "local_schema_persistence.spec.cjs"],
   workers: 1,
+  maxFailures: process.env.CI ? 1 : 0,
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: { browserName: "chromium", acceptDownloads: true },

@@ -10,6 +10,27 @@ import { COMPILED_DAG_PATH, sha256Hex, stableJsonBytes,
 
 export const PUBLISHED_SCHEMA_BUCKET = "published-schemas";
 
+export async function fetchPublishedFile(url, options, fetchImpl, sleep = ms => new Promise(resolve => setTimeout(resolve, ms))) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    let response;
+    try {
+      response = await fetchImpl(url, options);
+    } catch (error) {
+      if (attempt === 4 || error?.name === "AbortError") {
+        throw new Error(`Could not fetch published schema file ${url}: ${error?.message || error}`, { cause: error });
+      }
+      await sleep(250 * (2 ** attempt));
+      continue;
+    }
+    if ((response.status !== 429 && response.status < 500) || attempt === 4) return response;
+    const retryAfter = Number(response.headers.get("retry-after"));
+    const delay = response.status === 429 && Number.isFinite(retryAfter) && retryAfter > 0
+      ? Math.min(retryAfter * 1000, 5000)
+      : 250 * (2 ** attempt);
+    await sleep(delay);
+  }
+}
+
 export function publicationPermalink(publicationId, location = globalThis.location, state = null) {
   const origin = location?.origin || PRODUCTION_APP_ORIGIN;
   const groups = state?.project?.groups || [];
@@ -66,16 +87,7 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
       const cached = browserCache ? await browserCache.match(absolute) : null;
       if (cached) memory.set(absolute, new Uint8Array(await cached.arrayBuffer()));
       else {
-        let response;
-        for (let attempt = 0; attempt < 5; attempt += 1) {
-          response = await fetchImpl(absolute, options);
-          if (response.status !== 429) break;
-          const retryAfter = Number(response.headers.get("retry-after"));
-          const delay = Number.isFinite(retryAfter) && retryAfter > 0
-            ? retryAfter * 1000
-            : 250 * (2 ** attempt);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
+        const response = await fetchPublishedFile(absolute, options, fetchImpl);
         if (!response.ok) return response;
         const bytes = new Uint8Array(await response.arrayBuffer());
         memory.set(absolute, bytes);
