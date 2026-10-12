@@ -515,3 +515,71 @@ test("Jev test and full split resume saved batches after failure and reload", as
     await context.close();
   }
 });
+
+test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  let decisions = 0;
+  await page.route("https://openrouter.ai/auth?**", async route => {
+    const authUrl = new URL(route.request().url());
+    const callback = new URL(authUrl.searchParams.get("callback_url"));
+    callback.searchParams.set("code", "test-code");
+    callback.searchParams.set("state", authUrl.searchParams.get("state"));
+    await route.fulfill({ status: 302, headers: { location: callback.href } });
+  });
+  await page.route("https://openrouter.ai/api/**", async route => {
+    const request = route.request();
+    const headers = { "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-headers": "authorization, content-type" };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (request.url().endsWith("/auth/keys")) {
+      return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify({ key: "sk-or-test" }) });
+    }
+    if (request.url().endsWith("/v1/key")) {
+      return route.fulfill({ headers, contentType: "application/json",
+        body: JSON.stringify({ data: { limit: 5, limit_reset: null, limit_remaining: 5 } }) });
+    }
+    if (request.url().endsWith("/v1/model/typesafe/jev-1.13")) {
+      return route.fulfill({ headers, contentType: "application/json",
+        body: JSON.stringify({ data: { pricing: { prompt: "0.000000042", completion: "0", request: "0" } } }) });
+    }
+    if (request.url().endsWith("/alpha/decisions")) {
+      decisions += 1;
+      if (decisions === 1) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        try { await route.abort("timedout"); } catch { /* The user already stopped the request. */ }
+        return;
+      }
+      const body = request.postDataJSON();
+      const answers = Object.fromEntries(Object.keys(body.questions).map(id => [id,
+        { type: "choice", choice: "new", probabilities: { new: 0.9, leftover: 0.1 } }]));
+      return route.fulfill({ headers, contentType: "application/json",
+        body: JSON.stringify({ answers, usage: { input_tokens: 1000 } }) });
+    }
+    throw new Error(`Unexpected OpenRouter request: ${request.url()}`);
+  });
+  try {
+    await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+      && window.__dagBuilderState?.publishedSchemaHydrated);
+    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
+    await page.locator("#definitionContinue").click();
+    await page.locator("#definitionAiDescription").fill("School and college academic achievement");
+    await page.locator("#definitionAiConnect").click();
+    await expect(page.locator("#definitionAiRun")).toBeEnabled();
+    await page.locator("#definitionAiRun").click();
+    await expect(page.locator("#definitionAiStatus")).toContainText("requesting variables 1–16 of 24");
+    await expect(page.locator("#definitionAiRun")).toHaveText("Stop test (save progress)");
+    await page.locator("#definitionAiRun").click();
+    await expect(page.locator("#definitionAiStatus")).toContainText("Stopped.");
+    await expect(page.locator("#definitionAiRun")).toHaveText("Test split on 24 variables");
+    await page.locator("#definitionAiRun").click();
+    await expect(page.locator("#definitionAiFullRun")).toBeVisible();
+    expect(decisions).toBe(3);
+  } finally {
+    await context.close();
+  }
+});

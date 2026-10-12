@@ -10,6 +10,7 @@ const TEST_SIZE = 24;
 const CHARS_PER_TOKEN = 4;
 const REVIEW_PAGE_SIZE = 40;
 const SPOT_CHECK_PER_GROUP = 12;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 function reviewRank(id) {
   let hash = 2166136261;
@@ -82,14 +83,33 @@ async function keySettingsUrl(key) {
 }
 
 async function openRouterJson(path, key, options = {}) {
-  const response = await fetch(`https://openrouter.ai${path}`, {
-    ...options,
-    headers: { ...(key ? { Authorization: `Bearer ${key}` } : {}),
-      ...(options.body ? { "Content-Type": "application/json" } : {}) },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error?.message || body.message || `OpenRouter returned ${response.status}.`);
-  return body;
+  const { signal, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const stop = () => controller.abort(signal.reason);
+  if (signal?.aborted) stop();
+  else signal?.addEventListener("abort", stop, { once: true });
+  const timer = setTimeout(() => controller.abort("timeout"), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`https://openrouter.ai${path}`, {
+      ...fetchOptions, signal: controller.signal,
+      headers: { ...(key ? { Authorization: `Bearer ${key}` } : {}),
+        ...(options.body ? { "Content-Type": "application/json" } : {}) },
+    });
+    const body = await response.json().catch(error => {
+      if (controller.signal.aborted) throw error;
+      return {};
+    });
+    if (!response.ok) throw new Error(body.error?.message || body.message || `OpenRouter returned ${response.status}.`);
+    return body;
+  } catch (error) {
+    if (controller.signal.reason === "timeout") {
+      throw new Error("OpenRouter did not respond within 60 seconds.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", stop);
+  }
 }
 
 export function createDefinitionJevAssist({ elements: els, getDraft, getVariable, onApply,
@@ -113,6 +133,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   let reviewFilter = "spot";
   let reviewPage = 0;
   let busy = false;
+  let activePhase = null;
+  let activeRequest = null;
   let message = "Connect OpenRouter, then set a $5 lifetime cap on the key it creates.";
   let runRevision = 0;
   let checkpoint = null;
@@ -126,6 +148,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   }
 
   function clearPreview({ keepSample = false, keepCheckpoint = false } = {}) {
+    activeRequest?.abort("stopped");
     const oldId = checkpoint?.run.id;
     checkpoint = null;
     checkpointDraft = null;
@@ -256,6 +279,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     })().catch(error => {
       message = `Could not load saved Jev progress: ${error.message}`;
       render();
+      restorePromise = null;
+      checkpointDraft = null;
       throw error;
     });
     return restorePromise;
@@ -426,10 +451,10 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     if (active && description) void restoreForDraft().catch(() => {});
     const canRun = active && key && !cappedKeyStatus(keyInfo) && !busy && description
       && draft.eligible_variable_ids?.length;
-    els.definitionAiRun.disabled = !canRun;
+    els.definitionAiRun.disabled = activePhase === "test" ? false : !canRun;
     const testSaved = completedCount("test");
     const fullSaved = completedCount("full");
-    els.definitionAiRun.textContent = busy ? "Classifying variables…"
+    els.definitionAiRun.textContent = activePhase === "test" ? "Stop test (save progress)"
       : testSaved && !testResults ? `Resume test (${testSaved}/${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)} saved)`
         : `${testResults ? "Show saved test for" : "Test split on"} ${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)} variables`;
     replaceChildren(els.definitionAiStatus, h("span", { textContent: message }),
@@ -441,8 +466,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     const showPreview = active && currentTest && previewDraft === draft && preview?.length;
     els.definitionAiPreview.hidden = !showPreview;
     els.definitionAiFullRun.hidden = !showPreview || previewMode !== "test";
-    els.definitionAiFullRun.disabled = !canRun;
-    els.definitionAiFullRun.textContent = fullSaved
+    els.definitionAiFullRun.disabled = activePhase === "full" ? false : !canRun;
+    els.definitionAiFullRun.textContent = activePhase === "full" ? "Stop full run (save progress)" : fullSaved
       ? `Resume full split (${fullSaved}/${Math.max(0, (draft?.eligible_variable_ids?.length || 0) - (sampleIds?.length || 0))} saved)`
       : "Run full split";
     els.definitionAiApply.hidden = !showPreview || previewMode !== "full";
@@ -451,20 +476,21 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     renderReviewRows(draft);
   }
 
-  async function checkKey() {
+  async function checkKey(signal) {
     if (!key) return false;
     keyInfo = null;
     render();
-    const body = await openRouterJson("/api/v1/key", key);
+    const body = await openRouterJson("/api/v1/key", key, { signal });
     keyInfo = body.data;
     const problem = cappedKeyStatus(keyInfo);
     pricing = null;
     if (!problem) {
       try {
-        const model = await openRouterJson(`/api/v1/model/${MODEL}`, key);
+        const model = await openRouterJson(`/api/v1/model/${MODEL}`, key, { signal });
         pricing = parsePricing(model.data?.pricing);
       } catch { /* The split can still run if pricing is temporarily unavailable. */ }
     }
+    if (signal?.aborted) return false;
     message = problem || `Connected. This key has a $${keyInfo.limit} non-resetting cap and $${Number(keyInfo.limit_remaining).toFixed(2)} remaining.`;
     render();
     return !problem;
@@ -520,6 +546,19 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     }
   }
 
+  function showProgress(value) {
+    message = value;
+    const statusText = els.definitionAiStatus.querySelector("span");
+    if (statusText) statusText.textContent = value;
+  }
+
+  function stopRun() {
+    if (!busy) return;
+    runRevision += 1;
+    activeRequest?.abort("stopped");
+    showProgress(`Stopped. ${completedCount(activePhase)} completed variables are saved in this browser. You can resume this run.`);
+  }
+
   async function classify(ids, description, draft, revision, phase) {
     const records = recordsFor(ids);
     const results = [];
@@ -534,8 +573,9 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
         throw new Error("Saved Jev progress does not match these source variables.");
       }
       if (!saved) {
+        showProgress(`${phase === "test" ? "Test" : "Full"} run: requesting variables ${offset + 1}–${Math.min(offset + BATCH_SIZE, records.length)} of ${records.length}…`);
         const body = await openRouterJson("/api/alpha/decisions", key, { method: "POST",
-          body: JSON.stringify(requestFor(batch, description)) });
+          body: JSON.stringify(requestFor(batch, description)), signal: activeRequest.signal });
         if (revision !== runRevision || draft !== getDraft()) return null;
         const rows = [];
         for (const [index, record] of batch.entries()) {
@@ -549,17 +589,17 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
         }
         const reportedTokens = Number(body.usage?.input_tokens ?? body.usage?.inputTokens);
         const tokens = Number.isFinite(reportedTokens) && reportedTokens >= 0 ? reportedTokens : null;
-        await saveJevBatch(checkpoint.run.id, phase, offset, rows, tokens);
-        if (revision !== runRevision || draft !== getDraft()) return null;
+        showProgress(`${phase === "test" ? "Test" : "Full"} run: saving variables ${offset + 1}–${Math.min(offset + BATCH_SIZE, records.length)} in this browser…`);
+        const runId = checkpoint.run.id;
+        await saveJevBatch(runId, phase, offset, rows, tokens);
         saved = { offset, phase, results: rows, inputTokens: tokens };
-        checkpoint.batches.push(saved);
+        if (checkpoint?.run.id === runId) checkpoint.batches.push(saved);
+        if (revision !== runRevision || draft !== getDraft()) return null;
       }
       results.push(...saved.results);
       if (saved.inputTokens === null) usageComplete = false;
       else inputTokens += saved.inputTokens;
-      message = `${phase}: ${Math.min(offset + BATCH_SIZE, records.length)} of ${records.length} variables saved in this browser…`;
-      const statusText = els.definitionAiStatus.querySelector("span");
-      if (statusText) statusText.textContent = message;
+      showProgress(`${phase === "test" ? "Test" : "Full"} run: ${Math.min(offset + BATCH_SIZE, records.length)} of ${records.length} variables saved in this browser…`);
     }
     return { results, inputTokens: usageComplete ? inputTokens : null };
   }
@@ -571,6 +611,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     if (!description) return;
     const revision = ++runRevision;
     busy = true;
+    activePhase = "test";
+    activeRequest = new AbortController();
     preview = null;
     previewDraft = null;
     previewMode = null;
@@ -585,7 +627,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     message = "Checking the key limit…";
     render();
     try {
-      if (!await checkKey() || revision !== runRevision || draft !== getDraft()) return;
+      if (!await checkKey(activeRequest.signal) || revision !== runRevision || draft !== getDraft()) return;
+      showProgress("Preparing local checkpoint…");
       if (!await ensureCheckpoint(draft, description)
         || revision !== runRevision || draft !== getDraft()) return;
       const outcome = await classify(ensureSample(draft), description, draft, revision, "test");
@@ -599,9 +642,11 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "test");
       message = "Test ready. Review the sample, then revise the description or run the full split.";
     } catch (error) {
-      message = `Test paused: ${error.message} Completed batches are saved in this browser. Resume the test when ready.`;
+      if (revision === runRevision) message = `Test paused: ${error.message} Completed batches are saved in this browser. Resume the test when ready.`;
     } finally {
       busy = false;
+      activePhase = null;
+      activeRequest = null;
       render();
     }
   }
@@ -614,10 +659,13 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       || testDescription !== description) return;
     const revision = ++runRevision;
     busy = true;
+    activePhase = "full";
+    activeRequest = new AbortController();
     message = "Checking the key limit…";
     render();
     try {
-      if (!await checkKey() || revision !== runRevision || draft !== getDraft()) return;
+      if (!await checkKey(activeRequest.signal) || revision !== runRevision || draft !== getDraft()) return;
+      showProgress("Preparing local checkpoint…");
       if (!await ensureCheckpoint(draft, description)
         || revision !== runRevision || draft !== getDraft()) return;
       const sampled = new Set(sampleIds);
@@ -634,9 +682,11 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "full");
       message = "Full suggestions ready. Review them before applying.";
     } catch (error) {
-      message = `Full run paused: ${error.message} ${completedCount("full")} completed variables are saved in this browser. Resume when ready.`;
+      if (revision === runRevision) message = `Full run paused: ${error.message} ${completedCount("full")} completed variables are saved in this browser. Resume when ready.`;
     } finally {
       busy = false;
+      activePhase = null;
+      activeRequest = null;
       render();
     }
   }
@@ -662,8 +712,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       message = "Disconnected from OpenRouter in this tab. You can revoke the key in OpenRouter.";
       clearPreview({ keepCheckpoint: true });
     });
-    els.definitionAiRun.addEventListener("click", () => void runTest());
-    els.definitionAiFullRun.addEventListener("click", () => void runFull());
+    els.definitionAiRun.addEventListener("click", () => activePhase === "test" ? stopRun() : void runTest());
+    els.definitionAiFullRun.addEventListener("click", () => activePhase === "full" ? stopRun() : void runFull());
     els.definitionAiReviewFilter.addEventListener("change", () => {
       reviewFilter = els.definitionAiReviewFilter.value;
       reviewPage = 0;

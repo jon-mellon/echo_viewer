@@ -12,9 +12,19 @@ function requestResult(request) {
 
 function transactionDone(transaction) {
   return new Promise((resolve, reject) => {
-    transaction.oncomplete = resolve;
-    transaction.onabort = () => reject(transaction.error || new Error("Could not save Jev progress."));
-    transaction.onerror = () => reject(transaction.error || new Error("Could not save Jev progress."));
+    const timer = setTimeout(() => {
+      try { transaction.abort(); } catch { /* The transaction may already have ended. */ }
+      reject(new Error("Browser storage did not respond within 15 seconds."));
+    }, 15_000);
+    transaction.oncomplete = () => { clearTimeout(timer); resolve(); };
+    transaction.onabort = () => {
+      clearTimeout(timer);
+      reject(transaction.error || new Error("Could not save Jev progress."));
+    };
+    transaction.onerror = () => {
+      clearTimeout(timer);
+      reject(transaction.error || new Error("Could not save Jev progress."));
+    };
   });
 }
 
@@ -27,18 +37,18 @@ export async function jevRunId(source) {
 export async function loadJevRun(id) {
   const db = await openLocalDatabase();
   const tx = db.transaction([RUNS, BATCHES], "readonly");
+  const done = transactionDone(tx);
   const runRequest = tx.objectStore(RUNS).get(id);
   const batchRequest = tx.objectStore(BATCHES).index("runId").getAll(id);
-  const [run, batches] = await Promise.all([requestResult(runRequest), requestResult(batchRequest)]);
-  await transactionDone(tx);
+  const [run, batches] = await Promise.all([requestResult(runRequest), requestResult(batchRequest), done]);
   return run ? { run, batches } : null;
 }
 
 export async function latestJevRun() {
   const db = await openLocalDatabase();
   const tx = db.transaction(RUNS, "readonly");
-  const runs = await requestResult(tx.objectStore(RUNS).getAll());
-  await transactionDone(tx);
+  const done = transactionDone(tx);
+  const [runs] = await Promise.all([requestResult(tx.objectStore(RUNS).getAll()), done]);
   return runs.sort((a, b) => b.createdAt - a.createdAt)[0] || null;
 }
 
