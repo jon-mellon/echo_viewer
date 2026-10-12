@@ -141,7 +141,7 @@ function initElements() {
     // Map
     "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts",
     "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
+    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
@@ -1548,8 +1548,8 @@ function globalWorldSpan() {
   return mapViewController.worldSpan();
 }
 
-function fitMap(variableIds = null) {
-  mapViewController.fit(variableIds);
+function fitMap(variableIds = null, options = {}) {
+  mapViewController.fit(variableIds, options);
 }
 
 function fitNeighborhood(variableIds, neighborLimit = 48) {

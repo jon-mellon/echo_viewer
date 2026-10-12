@@ -1,6 +1,31 @@
 import * as mapGeometry from "./map_geometry.mjs";
 import * as mapInteractions from "./map_interactions.mjs";
 
+function extent(variables) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const variable of variables) {
+    minX = Math.min(minX, variable.map_x); maxX = Math.max(maxX, variable.map_x);
+    minY = Math.min(minY, variable.map_y); maxY = Math.max(maxY, variable.map_y);
+  }
+  return { minX, maxX, minY, maxY };
+}
+
+// Select a central 95% for the default viewport. Coordinates themselves remain
+// untouched, so distance, Voronoi regions, hit testing and exports stay exact.
+export function centralVariableExtent(variables, fraction = 0.95) {
+  if (!variables.length) return null;
+  if (variables.length < 20) return extent(variables);
+  const xs = variables.map(v => v.map_x).sort((a, b) => a - b);
+  const ys = variables.map(v => v.map_y).sort((a, b) => a - b);
+  const middle = Math.floor(variables.length / 2);
+  const cx = xs[middle], cy = ys[middle];
+  const count = Math.max(1, Math.ceil(variables.length * fraction));
+  const central = variables.map((variable, index) => ({
+    variable, index, distance: Math.hypot(variable.map_x - cx, variable.map_y - cy),
+  })).sort((a, b) => a.distance - b.distance || a.index - b.index).slice(0, count);
+  return extent(central.map(entry => entry.variable));
+}
+
 // Owns map mode and viewport lifecycle. Drawing primitives remain independently
 // testable; the caller supplies the final frame renderer.
 export function createDagMapViewController({
@@ -77,15 +102,16 @@ export function createDagMapViewController({
     return state.map._worldSpan;
   }
 
-  function fit(variableIds = null) {
+  function fit(variableIds = null, { all = false } = {}) {
     const variables = variableIds?.length
       ? variableIds.map(id => state.variableById.get(id)).filter(v => v && !isRejectedVariable(v.variable_id))
       : visibleVariables();
     if (!variables.length || !state.map.canvas) return;
-    const xs = variables.map(v => v.map_x), ys = variables.map(v => v.map_y);
-    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const { minX, maxX, minY, maxY } = variableIds?.length || all
+      ? extent(variables) : centralVariableExtent(variables);
     const width = Math.max(1, canvasWidth()), height = Math.max(1, canvasHeight());
-    const minSpan = worldSpan() * 0.03;
+    const fittedSpan = Math.max(maxX - minX, maxY - minY);
+    const minSpan = (fittedSpan > 0 ? fittedSpan : worldSpan()) * 0.03;
     const padding = variableIds?.length ? 150 : 54;
     const scale = Math.min(Math.max(1, width - padding * 2) / Math.max(maxX - minX, minSpan),
       Math.max(1, height - padding * 2) / Math.max(maxY - minY, minSpan));

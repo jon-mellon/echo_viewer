@@ -123,6 +123,7 @@ function installHandlers() {
   els.dagZoomIn.addEventListener("click", () => zoomMap(canvasWidth() / 2, canvasHeight() / 2, 1.12));
   els.dagZoomOut.addEventListener("click", () => zoomMap(canvasWidth() / 2, canvasHeight() / 2, 1 / 1.12));
   els.dagFitView.addEventListener("click", () => fitMap());
+  els.dagFitAll.addEventListener("click", () => fitMap(null, { all: true }));
   els.fullscreenVariableMap.addEventListener("click", () => toggleFullscreenPanel("variable-map"));
   els.toggleVariableLabels.addEventListener("click", () => {
     state.showVariableLabels = !state.showVariableLabels;

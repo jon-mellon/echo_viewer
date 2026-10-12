@@ -11,6 +11,7 @@ import {
   selectionAfterClick,
   zoomTransform,
 } from "../site/map_interactions.mjs";
+import { centralVariableExtent, createDagMapViewController } from "../site/dag_map_view_controller.mjs";
 
 const identity = (x, y) => ({ x, y });
 
@@ -77,4 +78,23 @@ test("selection and context-menu placement remain deterministic", () => {
     clientX: 190, clientY: 90, rect: { left: 10, top: 10, width: 200, height: 100 },
     menuWidth: 120, menuHeight: 80,
   }), { left: 72, top: 12 });
+});
+
+test("default variable fit gives the dense 95% room without changing coordinates", () => {
+  const variables = Array.from({ length: 100 }, (_, i) => ({
+    map_x: i % 10, map_y: Math.floor(i / 10), variable_id: String(i),
+  }));
+  variables[99] = { map_x: 1000, map_y: 1000, variable_id: "99" };
+  const original = variables.map(v => ({ ...v }));
+  const central = centralVariableExtent(variables);
+  assert.ok(central.maxX < 20 && central.maxY < 20);
+  const state = { map: { transform: { scale: 1, tx: 0, ty: 0 }, fitScale: 1,
+    canvas: { width: 800, height: 600 }, dpr: 1 }, variableById: new Map() };
+  const controller = createDagMapViewController({ state, elements: {}, activeGroup: () => null,
+    visibleVariables: () => variables, isRejectedVariable: () => false, drawMap: () => {} });
+  controller.fit();
+  const focusScale = state.map.transform.scale;
+  controller.fit(null, { all: true });
+  assert.ok(focusScale > state.map.transform.scale * 20);
+  assert.deepEqual(variables, original);
 });
