@@ -130,17 +130,32 @@
               <strong id="definitionTitle">Define new variable</strong>
               <button id="definitionCancel" class="text-button" type="button">Cancel</button>
             </div>
-            <div id="definitionSourcesStep">
+            <div id="definitionMethodStep" class="definition-method-step">
+              <h2>How do you want to split the variables?</h2>
+              <div class="definition-method-choices">
+                <button id="definitionChooseManual" class="definition-method-choice" type="button">
+                  <strong>Sort manually</strong><span>Inspect the source variables and move them yourself.</span>
+                </button>
+                <button id="definitionChooseJev" class="definition-method-choice" type="button">
+                  <strong>Classify with AI</strong><span>Describe the new variable, test 24 examples, then review suggestions. Uses your capped OpenRouter key.</span>
+                </button>
+              </div>
+            </div>
+            <div id="definitionSourcesStep" hidden>
+              <div class="definition-chosen-method"><span id="definitionChosenMethod"></span><button id="definitionChangeMethod" class="text-button" type="button">Change method</button></div>
               <label class="dag-label" for="definitionSourceSearch">Choose one or more categories to chop from</label>
               <input id="definitionSourceSearch" class="search-input" type="search" placeholder="Search categories or constituent variables">
               <div id="definitionSourceList" class="setup-group-picker-list"></div>
               <button id="definitionContinue" class="primary-button" type="button" disabled>Continue</button>
             </div>
             <div id="definitionPartitionStep" hidden>
-              <div id="definitionCounts" class="workflow-hint"></div>
-              <section class="definition-ai-assist" aria-labelledby="definitionAiTitle">
-                <div class="section-title compact-title"><h2 id="definitionAiTitle">Suggest a split with Jev</h2></div>
-                <p class="small-note">Describe what belongs in the new variable. Leftover means everything in the selected sources that does not clearly match that description, including uncertain cases. Test Jev on 24 randomly chosen variables, revise your description if needed, then run the full split. Each run sends the description and variable labels and text to OpenRouter, which charges your own account.</p>
+              <div class="definition-method-switch" role="group" aria-label="How to split these variables">
+                <button id="definitionMethodJev" class="toolbar-button" type="button" aria-pressed="true">AI suggestions</button>
+                <button id="definitionMethodManual" class="toolbar-button" type="button" aria-pressed="false">Sort manually</button>
+              </div>
+              <section id="definitionJevPanel" class="definition-ai-assist" aria-labelledby="definitionAiTitle">
+                <div class="section-title compact-title"><h2 id="definitionAiTitle">Classify with AI</h2></div>
+                <p class="small-note">Describe the new variable, test 24 examples, then review the suggestions before running the full split. Leftover includes anything that does not clearly fit, including uncertain cases. Your description and variable labels and text go to OpenRouter; your account is charged for each run.</p>
                 <label class="dag-label" for="definitionAiDescription">New variable description</label>
                 <textarea id="definitionAiDescription" class="search-input" rows="3" maxlength="1000" placeholder="For example: academic grades, tests, and skills assessed in school or college; exclude informal learning outside those settings"></textarea>
                 <div class="mini-toolbar">
@@ -155,8 +170,8 @@
                   <div id="definitionAiSummary" class="small-note"></div>
                   <div class="mini-toolbar">
                     <button id="definitionAiFullRun" class="primary-button" type="button" hidden>Run full split</button>
-                    <button id="definitionAiApply" class="primary-button" type="button" hidden>Apply full suggestions</button>
-                    <button id="definitionAiDiscard" class="text-button" type="button">Discard</button>
+                    <button id="definitionAiApply" class="primary-button" type="button" hidden>Use choices in draft</button>
+                    <button id="definitionAiDiscard" class="text-button" type="button">Discard suggestions</button>
                   </div>
                   <div id="definitionAiReviewTools" class="mini-toolbar" hidden>
                     <label for="definitionAiReviewFilter">Inspect</label>
@@ -174,6 +189,8 @@
                   <div id="definitionAiRows" class="definition-ai-rows"></div>
                 </div>
               </section>
+              <div id="definitionManualPanel" hidden>
+              <div id="definitionCounts" class="workflow-hint"></div>
               <div class="definition-batch-review">
                 <div class="section-title compact-title"><h2>Sort variables</h2></div>
                 <p class="small-note">Inspect variables here without searching. Tap a common word for a batch, then correct exceptions with the two side buttons.</p>
@@ -202,6 +219,7 @@
               <div class="mini-toolbar">
                 <button id="definitionBack" class="toolbar-button" type="button">Back</button>
                 <button id="definitionReview" class="primary-button" type="button" disabled>Name and review</button>
+              </div>
               </div>
             </div>
             <div id="definitionReviewStep" hidden>

@@ -48,14 +48,15 @@ function drawVoronoiBackground(ctx, width, height) {
 function displayGroups() {
   const draft = state.definitionDraft;
   if (!draft || !["partition", "review"].includes(draft.step)) return state.project?.groups || [];
-  const carved = new Set(state.definitionAiPreviewIds ?? draft.new_variable_ids ?? []);
+  const jevMode = draft.step === "partition" && state.definitionMethod !== "manual";
+  const carved = new Set(jevMode ? state.definitionAiPreviewIds || [] : draft.new_variable_ids || []);
   const sources = new Set(draft.source_group_ids || []);
   const residuals = (state.project?.groups || []).map(group => sources.has(group.group_id)
     ? { ...group, variable_ids: (group.variable_ids || []).filter(id => !carved.has(clusterRep(id))) }
     : group);
   return [...residuals, {
     group_id: "__definition_new__",
-    label: state.definitionAiPreviewIds ? "Jev preview" : "New group",
+    label: jevMode ? "AI preview" : "New group",
     type: "custom",
     variable_ids: [...carved],
   }];
@@ -137,7 +138,9 @@ function drawGroupRegion(ctx, group, region, active) {
 
 function drawMapPoints(ctx, width, height) {
   const groups = displayGroups();
-  const definitionActiveId = (state.definitionAiPreviewIds?.size || state.definitionDraft?.new_variable_ids?.length)
+  const previewSize = state.definitionMethod !== "manual" ? state.definitionAiPreviewIds?.size
+    : state.definitionDraft?.new_variable_ids?.length;
+  const definitionActiveId = previewSize
     ? "__definition_new__" : state.activeGroupId;
   const points = mapRenderModel.buildMapPointModels({
     variables: visibleClusterReps(),
@@ -267,6 +270,7 @@ function drawBrush(ctx) {
 function applyBrush() {
   const brush = state.map.brush;
   if (!brush?.points || brush.points.length < 3) return;
+  if (state.definitionDraft?.step === "partition" && state.definitionMethod !== "manual") return;
   const group = activeGroup();
   if (state.definitionDraft?.step === "partition") {
     const selected = new Set(state.definitionDraft.new_variable_ids || []);
@@ -614,6 +618,10 @@ function flagContextAction(action, title, description) {
 
 function renderMapContextMenu() {
   if (!els.dagMapContextMenu) return;
+  if (state.definitionDraft?.step === "partition" && state.definitionMethod !== "manual") {
+    hideMapContextMenu();
+    return;
+  }
   const selectedIds = [...new Set((state.mapContextMenu.variableIds || []).map((id) => clusterRep(id)).filter(Boolean))];
   const isBatchSelection = selectedIds.length > 0;
   const variable = state.variableById.get(state.mapContextMenu.variableId || "");

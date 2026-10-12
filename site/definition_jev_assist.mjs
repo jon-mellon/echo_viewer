@@ -225,7 +225,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     if (!Array.isArray(sample) || sample.length !== Math.min(TEST_SIZE, draft.eligible_variable_ids.length)
       || new Set(sample).size !== sample.length
       || sample.some(id => !draft.eligible_variable_ids.includes(id))) {
-      throw new Error("Saved Jev sample does not match these source variables.");
+      throw new Error("Saved AI sample does not match these source variables.");
     }
     costCache = null;
     sampleDraft = draft;
@@ -277,7 +277,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
         render();
       }
     })().catch(error => {
-      message = `Could not load saved Jev progress: ${error.message}`;
+      message = `Could not load saved classification progress: ${error.message}`;
       render();
       restorePromise = null;
       checkpointDraft = null;
@@ -315,8 +315,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     const uncertain = preview.filter(item => item.confidence < 0.65).length;
     const counts = `${newCount} suggested for new · ${preview.length - newCount} leftover · ${uncertain} lower-score choices.`;
     els.definitionAiSummary.textContent = previewMode === "test"
-      ? `Tested ${preview.length} of ${draft.eligible_variable_ids.length} variables. ${counts} Review the choices, then revise the description and retest this sample or run the full split.`
-      : `${counts} Spot check suggestions and inspect lower-score choices. You can page through all results; applying uses every suggestion, including those not shown here.`;
+      ? `Tested ${preview.length} of ${draft.eligible_variable_ids.length} variables. ${counts} This is a preview; your draft has not changed. Review the choices, then revise the description or run the full split.`
+      : `${counts} This is a preview; your draft has not changed. Spot check the choices, then use them in your draft. Every choice is included, even those not shown here.`;
   }
 
   function recordsFor(ids) {
@@ -362,7 +362,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       return;
     }
     if (!pricing) {
-      els.definitionAiCost.textContent = "Cost estimate unavailable. Check Jev pricing on OpenRouter before running.";
+      els.definitionAiCost.textContent = "Cost estimate unavailable. Check model pricing on OpenRouter before running.";
       return;
     }
     const sample = ensureSample(draft);
@@ -402,7 +402,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       : testInputTokens !== null && testDescription === description
         ? "estimated remaining full run, calibrated from test" : "estimated remaining full run";
     const fullCount = previewMode === "full" ? restSize.records : remainingSize.records;
-    els.definitionAiCost.textContent = `${testLabel} (${sample.length}): ${formatUsd(testCost)} · ${fullLabel} (${fullCount}): ${formatUsd(fullCost)}. Estimates use current listed Jev pricing; OpenRouter controls the actual charge.`;
+    els.definitionAiCost.textContent = `${testLabel} (${sample.length}): ${formatUsd(testCost)} · ${fullLabel} (${fullCount}): ${formatUsd(fullCost)}. Estimates use current listed model pricing; OpenRouter controls the actual charge.`;
   }
 
   function renderReviewRows(draft) {
@@ -450,6 +450,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     els.definitionAiConnect.hidden = Boolean(key);
     els.definitionAiRecheck.hidden = !key;
     els.definitionAiDisconnect.hidden = !key;
+    els.definitionMethodJev.disabled = busy;
+    els.definitionMethodManual.disabled = busy;
     const description = String(draft?.ai_description || "").trim();
     if (active && description) void restoreForDraft().catch(() => {});
     const canRun = active && key && !cappedKeyStatus(keyInfo) && !busy && description
@@ -459,7 +461,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     const fullSaved = completedCount("full");
     els.definitionAiRun.textContent = activePhase === "test" ? "Stop test (save progress)"
       : testSaved && !testResults ? `Resume test (${testSaved}/${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)} saved)`
-        : `${testResults ? "Show saved test for" : "Test split on"} ${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)} variables`;
+        : testResults ? `Review saved ${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)}-variable test`
+          : `Test split on ${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)} variables`;
     replaceChildren(els.definitionAiStatus, h("span", { textContent: message }),
       settingsUrl ? h("a", { href: settingsUrl, target: "_blank", rel: "noopener noreferrer",
         textContent: "Open key settings" }) : null);
@@ -573,7 +576,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       let saved = phaseBatches(phase).find(item => item.offset === offset);
       if (saved && (saved.results.length !== batch.length
         || saved.results.some((item, index) => item.id !== batch[index].id))) {
-        throw new Error("Saved Jev progress does not match these source variables.");
+        throw new Error("Saved classification progress does not match these source variables.");
       }
       if (!saved) {
         showProgress(`${phase === "test" ? "Test" : "Full"} run: requesting variables ${offset + 1}–${Math.min(offset + BATCH_SIZE, records.length)} of ${records.length}…`);
@@ -584,7 +587,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
         for (const [index, record] of batch.entries()) {
           const answer = body.answers?.[`v${index}`];
           if (answer?.type !== "choice" || !["new", "leftover"].includes(answer.choice)) {
-            throw new Error("Jev returned an incomplete classification. Completed batches remain saved.");
+            throw new Error("The model returned an incomplete classification. Completed batches remain saved.");
           }
           const probability = Number(answer.probabilities?.[answer.choice] ?? answer.confidence ?? 0);
           rows.push({ id: record.id, label: record.label, side: answer.choice,

@@ -24,6 +24,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv", "instrument", "candidate"].includes(role)) return;
     jevAssist.clearPreview();
+    state.definitionMethod = null;
     // Start the query engine while the user chooses a source. The source load
     // still awaits this setup and reports any error through its normal path.
     void prewarmEvidence().catch(() => {});
@@ -38,7 +39,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.selectedVariableIds.clear();
     invalidateMapCaches();
     renderDraft();
-    els.definitionSourceSearch.focus();
+    els.definitionChooseManual.focus();
   }
 
   async function startEditSplit(groupId = null) {
@@ -46,6 +47,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     const context = projectOps.editableSplitContext(state.project, groupId ? groupId : activeGroup());
     if (!context) return;
     jevAssist.clearPreview();
+    state.definitionMethod = "manual";
     const { splitId, newGroup, residuals } = context;
     const eligible = [...new Set([...newGroup.variable_ids, ...residuals.flatMap(group => group.variable_ids)]
       .map(clusterRep))];
@@ -77,6 +79,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     lastBatch = null;
     jevAssist.clearPreview();
     state.definitionDraft = null;
+    state.definitionMethod = null;
     state.selectedVariableIds.clear();
     state.selectedVariableId = null;
     invalidateMapCaches();
@@ -92,7 +95,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   async function continueDefinition() {
     const draft = state.definitionDraft;
     const sources = definitionSources();
-    if (!draft || !sources.length) return;
+    if (!draft || !state.definitionMethod || !sources.length) return;
     lastBatch = null;
     const revision = ++hydrationRevision;
     draft.source_snapshot = sources.map(group => ({ group_id: group.group_id, label: group.label,
@@ -131,7 +134,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   function toggleDefinitionVariable(variableId, add = null) {
     const draft = state.definitionDraft;
-    if (!draft || draft.step !== "partition") return;
+    if (!draft || draft.step !== "partition" || state.definitionMethod !== "manual") return;
     const id = clusterRep(variableId);
     if (!draft.eligible_variable_ids.includes(id)) return;
     lastBatch = null;
@@ -306,6 +309,23 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   function installDefinitionHandlers() {
     jevAssist.install();
+    const chooseInitialMethod = method => {
+      if (state.definitionDraft?.step !== "sources") return;
+      state.definitionMethod = method;
+      renderDraft();
+      (method ? els.definitionSourceSearch : els.definitionChooseManual).focus();
+    };
+    els.definitionChooseJev.addEventListener("click", () => chooseInitialMethod("jev"));
+    els.definitionChooseManual.addEventListener("click", () => chooseInitialMethod("manual"));
+    els.definitionChangeMethod.addEventListener("click", () => chooseInitialMethod(null));
+    const chooseMethod = method => {
+      if (state.definitionDraft?.step !== "partition" || state.definitionMethod === method) return;
+      state.definitionMethod = method;
+      if (state.map) state.map._groupRegions = null;
+      renderDraft({ redrawMap: true });
+    };
+    els.definitionMethodJev.addEventListener("click", () => chooseMethod("jev"));
+    els.definitionMethodManual.addEventListener("click", () => chooseMethod("manual"));
     els.definitionCancel.addEventListener("click", cancelDefinition);
     els.definitionSourceSearch.addEventListener("input", renderDefinition);
     els.definitionContinue.addEventListener("click", continueDefinition);
@@ -355,6 +375,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       }) : null;
     const draft = oauthDraft || state.definitionDraft || checkpointDraft;
     if (!draft || draft.step !== "partition" || !Array.isArray(draft.eligible_variable_ids)) return;
+    state.definitionMethod = "jev";
     if (!draft.source_snapshot?.every(snap => {
       const current = groupById(snap.group_id);
       return current && JSON.stringify(current.variable_ids) === JSON.stringify(snap.variable_ids);
@@ -397,6 +418,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     onApply: ids => {
       const draft = state.definitionDraft;
       if (!draft || draft.step !== "partition") return;
+      state.definitionMethod = "manual";
       lastBatch = null;
       draft.new_variable_ids = ids;
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];

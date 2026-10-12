@@ -4,18 +4,7 @@ const RUNS = "jev_runs";
 const BATCHES = "jev_batches";
 const STORAGE_TIMEOUT_MS = 15_000;
 
-async function openJevDatabase() {
-  let timer;
-  try {
-    return await Promise.race([
-      openLocalDatabase(),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Browser storage did not open within 15 seconds.")),
-          STORAGE_TIMEOUT_MS);
-      }),
-    ]);
-  } finally { clearTimeout(timer); }
-}
+const openJevDatabase = openLocalDatabase;
 
 function requestResult(request) {
   return new Promise((resolve, reject) => {
@@ -33,11 +22,11 @@ function transactionDone(transaction) {
     transaction.oncomplete = () => { clearTimeout(timer); resolve(); };
     transaction.onabort = () => {
       clearTimeout(timer);
-      reject(transaction.error || new Error("Could not save Jev progress."));
+      reject(transaction.error || new Error("Could not save classification progress."));
     };
     transaction.onerror = () => {
       clearTimeout(timer);
-      reject(transaction.error || new Error("Could not save Jev progress."));
+      reject(transaction.error || new Error("Could not save classification progress."));
     };
   });
 }

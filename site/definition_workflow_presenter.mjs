@@ -105,10 +105,18 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     }
     els.definitionTitle.textContent = draft.mode === "edit" ? "Edit split"
       : draft.role === "candidate" ? "Define new variable" : `Define new ${draft.role.toUpperCase()}`;
-    els.definitionSourcesStep.hidden = draft.step !== "sources";
+    els.definitionMethodStep.hidden = draft.step !== "sources" || Boolean(state.definitionMethod);
+    els.definitionSourcesStep.hidden = draft.step !== "sources" || !state.definitionMethod;
+    els.definitionChosenMethod.textContent = state.definitionMethod === "manual" ? "Sort manually" : "Classify with AI";
     els.definitionPartitionStep.hidden = draft.step !== "partition";
     els.definitionReviewStep.hidden = draft.step !== "review";
     els.definitionBack.hidden = draft.mode === "edit";
+    const jevMode = state.definitionMethod !== "manual";
+    els.definitionJevPanel.hidden = !jevMode;
+    els.definitionManualPanel.hidden = jevMode;
+    els.definitionMethodJev.setAttribute("aria-pressed", String(jevMode));
+    els.definitionMethodManual.setAttribute("aria-pressed", String(!jevMode));
+    els.definitionMapPreviewStatus.hidden = !jevMode || !state.definitionAiPreviewIds;
     if (draft.step === "sources") {
       const query = normalized(els.definitionSourceSearch.value);
       const selected = new Set(draft.source_group_ids);
@@ -203,9 +211,9 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
   }
 
   function setJevPreviewStatus(ids, mode) {
-    els.definitionMapPreviewStatus.hidden = !ids;
+    els.definitionMapPreviewStatus.hidden = !ids || state.definitionMethod === "manual";
     els.definitionMapPreviewStatus.textContent = ids
-      ? `Jev ${mode === "test" ? "sample" : "full"} preview · ${ids.length} suggested for new` : "";
+      ? `AI ${mode === "test" ? "sample" : "full"} preview only · ${ids.length} suggested for new` : "";
   }
 
   return { render, showValidationError, setContinueLoading, showLoadError,

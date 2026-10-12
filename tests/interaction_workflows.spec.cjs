@@ -55,8 +55,10 @@ test("selecting a definition variable in full screen keeps the editor open", asy
   await page.goto(viewer);
   await ready(page);
   await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await page.locator("#definitionChooseManual").click();
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
+  await page.locator("#definitionMethodManual").click();
   await expect(page.locator("#dagMapCanvas")).toBeVisible();
   await page.locator("#fullscreenVariableMap").click();
   await expect(page.locator("#fullscreenVariableMap")).toHaveAttribute("aria-pressed", "true");
@@ -110,12 +112,14 @@ test("definition navigation returns through both Back steps and Cancel", async (
     };
   });
   await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await page.locator("#definitionChooseManual").click();
   await page.locator("#definitionSourceSearch").fill("education");
   await expect(page.locator("#definitionSourceList input[data-source-id]").first()).toBeVisible();
   await page.locator("#definitionSourceSearch").fill("");
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
+  await page.locator("#definitionMethodManual").click();
   // Opening a source only needs map records; neighbor suggestions are fetched
   // for selected variables when the person starts defining the new group.
   expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:neighbors").length)).toBe(0);
@@ -171,9 +175,11 @@ test("map context menu changes a definition selection and closes with Escape", a
   await page.goto(viewer);
   await ready(page);
   await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await page.locator("#definitionChooseManual").click();
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
+  await page.locator("#definitionMethodManual").click();
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
   await page.locator("#definitionVariableSearch").fill(variableId);
   await page.locator("#definitionVariableResults .result-button").first().click();
@@ -321,6 +327,7 @@ test("pinching the mobile variable map zooms the map without selecting a variabl
   await page.goto(viewer);
   await ready(page);
   await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await page.locator("#definitionChooseManual").click();
   await expect(page.locator('#definitionSourceList input[data-source-id]').first()).toBeVisible();
   await page.locator('#definitionSourceList input[data-source-id]').first().check();
   await page.locator('#definitionContinue').click();

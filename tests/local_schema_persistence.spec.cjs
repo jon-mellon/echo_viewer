@@ -41,6 +41,33 @@ test("the local schema database upgrade preserves saved schemas and sessions", a
   expect(result.session).toEqual({ key: "session:prior", title: "Kept session" });
 });
 
+test("a blocked database upgrade recovers after the old tab closes its connection", async ({ page }) => {
+  await page.route("http://127.0.0.1:8767/", route =>
+    route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Storage recovery</title>" }));
+  await page.goto("http://127.0.0.1:8767/");
+  const result = await page.evaluate(async () => {
+    const old = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("echo-local-schemas", 1);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore("schemas", { keyPath: "id" });
+        request.result.createObjectStore("meta", { keyPath: "key" });
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const { openLocalDatabase } = await import("/local_schema_store.mjs");
+    let blocked = false;
+    try { await openLocalDatabase(); }
+    catch (error) { blocked = /blocked by another Echo tab/.test(error.message); }
+    old.close();
+    const upgraded = await openLocalDatabase();
+    return { blocked, version: upgraded.version, stores: [...upgraded.objectStoreNames] };
+  });
+  expect(result.blocked).toBe(true);
+  expect(result.version).toBe(2);
+  expect(result.stores).toContain("jev_runs");
+});
+
 test("the root starts fresh and Previous Sessions restores a committed local schema", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto("http://127.0.0.1:8767/?new=1", { waitUntil: "domcontentloaded" });

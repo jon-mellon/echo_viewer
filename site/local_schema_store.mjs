@@ -4,15 +4,31 @@ const META = "meta";
 const JEV_RUNS = "jev_runs";
 const JEV_BATCHES = "jev_batches";
 const SESSION_PREFIX = "session:";
+const OPEN_TIMEOUT_MS = 15_000;
 
 let databasePromise;
 
-export function openLocalDatabase(indexedDb = globalThis.indexedDB) {
+export function openLocalDatabase(indexedDb = globalThis.indexedDB, timeoutMs = OPEN_TIMEOUT_MS) {
   if (!indexedDb) return Promise.reject(new Error("IndexedDB is unavailable in this browser."));
   if (indexedDb === globalThis.indexedDB && databasePromise) return databasePromise;
   const opened = new Promise((resolve, reject) => {
     const request = indexedDb.open(DATABASE, 2);
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return false;
+      settled = true;
+      clearTimeout(timer);
+      callback(value);
+      return true;
+    };
+    const timer = setTimeout(() => finish(reject, new Error(
+      "Browser storage did not open within 15 seconds. Close other Echo tabs and reload this page, then try again.",
+    )), timeoutMs);
     request.onupgradeneeded = () => {
+      if (settled) {
+        try { request.transaction?.abort(); } catch { /* The upgrade may already have ended. */ }
+        return;
+      }
       const db = request.result;
       if (!db.objectStoreNames.contains(SCHEMAS)) db.createObjectStore(SCHEMAS, { keyPath: "id" });
       if (!db.objectStoreNames.contains(META)) db.createObjectStore(META, { keyPath: "key" });
@@ -23,19 +39,28 @@ export function openLocalDatabase(indexedDb = globalThis.indexedDB) {
       }
     };
     request.onsuccess = () => {
+      if (settled) {
+        request.result.close();
+        return;
+      }
       request.result.onversionchange = () => {
         request.result.close();
         if (indexedDb === globalThis.indexedDB) databasePromise = null;
       };
-      resolve(request.result);
+      finish(resolve, request.result);
     };
-    request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error("Local schema database is blocked by another tab."));
+    request.onerror = () => finish(reject, request.error);
+    request.onblocked = () => finish(reject, new Error(
+      "Local schema database is blocked by another Echo tab. Close other Echo tabs and reload this page.",
+    ));
   });
-  if (indexedDb === globalThis.indexedDB) databasePromise = opened.catch(error => {
-    databasePromise = null;
-    throw error;
-  });
+  if (indexedDb === globalThis.indexedDB) {
+    databasePromise = opened.catch(error => {
+      databasePromise = null;
+      throw error;
+    });
+    return databasePromise;
+  }
   return opened;
 }
 

@@ -15,6 +15,9 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
 
   await expect(page.locator("#ivGroupPicker [data-define-side=iv]")).toBeVisible();
   await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+  await expect(page.locator("#definitionMethodStep")).toBeVisible();
+  await expect(page.locator("#definitionSourcesStep")).toBeHidden();
+  await page.locator("#definitionChooseManual").click();
   await expect(page.locator("body")).not.toHaveClass(/defining-variable/);
   await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
 
@@ -29,6 +32,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   }), sourceIds);
   await page.locator("#definitionContinue").click();
   await expect(page.locator("body"), browserErrors.errors.join("\n")).toHaveClass(/defining-variable/);
+  await page.locator("#definitionMethodManual").click();
   await expect(page.locator("#dagMapCanvas")).toBeVisible();
   await expect(page.locator("#dagWorkspaceSection")).toBeHidden();
   await expect.poll(() => page.locator("#dagMapCanvas").evaluate(canvas => canvas.width)).toBeGreaterThan(100);
@@ -125,9 +129,11 @@ test("Variables list definition and split editing are reachable on desktop and m
   await page.locator("#variableDefineNew").click();
   await expect(page.locator("#definitionTitle")).toHaveText("Define new variable");
   expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.role)).toBe("candidate");
+  await page.locator("#definitionChooseManual").click();
   const source = page.locator("#definitionSourceList input[data-source-id]").nth(2);
   await source.check();
   await page.locator("#definitionContinue").click();
+  await page.locator("#definitionMethodManual").click();
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
   await page.locator("#definitionVariableSearch").fill(variableId);
   await page.locator("#definitionVariableResults .result-button").first().click();
@@ -174,12 +180,15 @@ test("a new variable can be defined through the mobile controls", async ({ page 
   await expect(page.locator("#definitionTitle")).toBeInViewport();
   await expect(page.locator("#groupingPanel")).toBeHidden();
 
+  await page.locator("#definitionChooseManual").click();
+
   const sourceRow = page.locator("#definitionSourceList .definition-source-row").nth(2);
   await sourceRow.click({ position: { x: 30, y: 20 } });
   await expect(sourceRow.locator("input")).toBeChecked();
   await expect(page.locator("#definitionContinue")).toBeInViewport();
   await page.locator("#definitionContinue").click();
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+  await page.locator("#definitionMethodManual").click();
   await expect(page.locator("#definitionTitle")).toBeInViewport();
 
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
@@ -210,8 +219,10 @@ test("mobile spatial editor adds and removes a variable with a tap", async ({ br
       && window.__dagBuilderState?.publishedSchemaHydrated
       && !window.__dagBuilderState?.publishedSchemaHydrating);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionChooseManual").click();
     await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
     await page.locator("#definitionContinue").click();
+    await page.locator("#definitionMethodManual").click();
     await page.locator('.mobile-panel-tab[data-mobile-panel="variables"]').click();
     await expect(page.locator("#dagMapCanvas")).toBeVisible();
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -338,9 +349,12 @@ for (const device of [
       await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
         && window.__dagBuilderState?.publishedSchemaHydrated);
       await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+      await page.locator("#definitionChooseJev").click();
       await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
       await page.locator("#definitionContinue").click();
       await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+      await expect(page.locator("#definitionJevPanel")).toBeVisible();
+      await expect(page.locator("#definitionManualPanel")).toBeHidden();
       await page.locator("#definitionAiDescription").fill("School based measures of academic achievement");
       await page.locator("#definitionAiConnect").click();
       await expect(page.locator("#definitionPartitionStep")).toBeVisible();
@@ -367,9 +381,16 @@ for (const device of [
       await expect(page.locator("#definitionAiCost")).toContainText("Test usage at listed price (24): $0.000084");
       await expect(page.locator("#definitionAiCost")).toContainText("calibrated from test");
       expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(24);
-      await expect(page.locator("#definitionMapPreviewStatus")).toContainText("Jev sample preview · 24 suggested for new");
+      await expect(page.locator("#definitionMapPreviewStatus")).toContainText("AI sample preview only · 24 suggested for new");
       expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
       expect(await mapImage()).not.toEqual(mapBeforeTest);
+      await page.locator("#definitionMethodManual").click();
+      await expect(page.locator("#definitionJevPanel")).toBeHidden();
+      await expect(page.locator("#definitionManualPanel")).toBeVisible();
+      await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
+      await page.locator("#definitionMethodJev").click();
+      await expect(page.locator("#definitionAiPreview")).toBeVisible();
+      await expect(page.locator("#definitionMapPreviewStatus")).toBeVisible();
       await expect(page.locator("#definitionAiApply")).toBeHidden();
       expect(decisions).toBe(2);
       const firstSample = batches.flatMap(batch => batch.records);
@@ -388,7 +409,7 @@ for (const device of [
       await expect(page.locator("#definitionAiApply")).toBeVisible();
       await expect(page.locator("#definitionAiCost")).toContainText("full run usage at listed price");
       expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(eligibleCount);
-      await expect(page.locator("#definitionMapPreviewStatus")).toContainText(`Jev full preview · ${eligibleCount} suggested for new`);
+      await expect(page.locator("#definitionMapPreviewStatus")).toContainText(`AI full preview only · ${eligibleCount} suggested for new`);
       await page.locator("#definitionAiReviewFilter").selectOption("all");
       await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(40);
       await page.locator("#definitionAiReviewNext").click();
@@ -464,6 +485,7 @@ test("Jev test and full split resume saved batches after failure and reload", as
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionChooseJev").click();
     await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
     await page.locator("#definitionContinue").click();
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
@@ -565,6 +587,7 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionChooseJev").click();
     await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
     await page.locator("#definitionContinue").click();
     await page.locator("#definitionAiDescription").fill("School and college academic achievement");
