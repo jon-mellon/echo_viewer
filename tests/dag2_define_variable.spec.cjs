@@ -286,11 +286,12 @@ for (const device of [
   { name: "mobile", context: { viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true } },
   { name: "desktop", context: { viewport: { width: 1280, height: 900 } } },
 ]) {
-  test(`${device.name} Jev split resumes after OAuth and rejects a key above the $5 lifetime cap`, async ({ browser }) => {
+  test(`${device.name} Jev split tests a fixed sample before the full run`, async ({ browser }) => {
     const context = await browser.newContext(device.context);
     const page = await context.newPage();
     let limit = 6;
     let decisions = 0;
+    const batches = [];
     await page.route("https://openrouter.ai/auth?**", async route => {
       const authUrl = new URL(route.request().url());
       const callback = new URL(authUrl.searchParams.get("callback_url"));
@@ -311,15 +312,21 @@ for (const device of [
         return route.fulfill({ headers, contentType: "application/json",
           body: JSON.stringify({ data: { limit, limit_reset: null, limit_remaining: limit } }) });
       }
+      if (request.url().endsWith("/v1/model/typesafe/jev-1.13")) {
+        return route.fulfill({ headers, contentType: "application/json",
+          body: JSON.stringify({ data: { pricing: { prompt: "0.000000042", completion: "0", request: "0" } } }) });
+      }
       if (request.url().endsWith("/alpha/decisions")) {
         decisions += 1;
         const body = request.postDataJSON();
+        batches.push({ description: body.state.target_definition, records: body.state.records });
         expect(body.model).toBe("typesafe/jev-1.13");
         expect(Object.values(body.questions)[0].instructions).toContain("not a separately defined opposite concept");
         expect(Object.values(body.questions)[0].criteria.leftover).toContain("uncertain matches");
         const answers = Object.fromEntries(Object.keys(body.questions).map(id => [id,
           { type: "choice", choice: "new", probabilities: { new: 0.9, leftover: 0.1 } }]));
-        return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify({ answers }) });
+        return route.fulfill({ headers, contentType: "application/json",
+          body: JSON.stringify({ answers, usage: { input_tokens: 1000, output_tokens: 0 } }) });
       }
       throw new Error(`Unexpected OpenRouter request: ${request.url()}`);
     });
@@ -343,12 +350,60 @@ for (const device of [
       limit = 5;
       await page.locator("#definitionAiRecheck").click();
       await expect(page.locator("#definitionAiRun")).toBeEnabled();
+      await expect(page.locator("#definitionAiCost")).toContainText("Estimated test (24): $");
+      await expect(page.locator("#definitionAiCost")).toContainText("estimated remaining full run");
+      async function mapImage() {
+        if (device.name === "mobile") await page.locator('.mobile-panel-tab[data-mobile-panel="variables"]').click();
+        await expect(page.locator("#dagMapCanvas")).toBeVisible();
+        const image = await page.locator("#dagMapCanvas").screenshot();
+        if (device.name === "mobile") await page.locator('.mobile-panel-tab[data-mobile-panel="controls"]').click();
+        return image;
+      }
+      const mapBeforeTest = await mapImage();
       await page.locator("#definitionAiRun").click();
       await expect(page.locator("#definitionAiPreview")).toBeVisible();
-      expect(decisions).toBeGreaterThan(0);
+      await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(24);
+      await expect(page.locator("#definitionAiFullRun")).toBeVisible();
+      await expect(page.locator("#definitionAiCost")).toContainText("Test usage at listed price (24): $0.000084");
+      await expect(page.locator("#definitionAiCost")).toContainText("calibrated from test");
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(24);
+      await expect(page.locator("#definitionMapPreviewStatus")).toContainText("Jev sample preview · 24 suggested for new");
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
+      expect(await mapImage()).not.toEqual(mapBeforeTest);
+      await expect(page.locator("#definitionAiApply")).toBeHidden();
+      expect(decisions).toBe(2);
+      const firstSample = batches.flatMap(batch => batch.records);
+      await page.locator("#definitionAiDescription").fill("School and college academic achievement");
+      await expect(page.locator("#definitionAiPreview")).toBeHidden();
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds)).toBeNull();
+      await page.locator("#definitionAiRun").click();
+      await expect(page.locator("#definitionAiFullRun")).toBeVisible();
+      expect(batches.slice(2).flatMap(batch => batch.records)).toEqual(firstSample);
+      expect(batches.slice(2, 4).every(batch => batch.description === "School and college academic achievement")).toBe(true);
+      const eligibleCount = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids.length);
+      await page.locator("#definitionAiFullRun").click();
+      await expect(page.locator("#definitionAiReviewTools")).toBeVisible();
+      await expect(page.locator("#definitionAiReviewFilter")).toHaveValue("spot");
+      expect(await page.locator("#definitionAiRows .definition-ai-row").count()).toBeLessThanOrEqual(40);
+      await expect(page.locator("#definitionAiApply")).toBeVisible();
+      await expect(page.locator("#definitionAiCost")).toContainText("full run usage at listed price");
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(eligibleCount);
+      await expect(page.locator("#definitionMapPreviewStatus")).toContainText(`Jev full preview · ${eligibleCount} suggested for new`);
+      await page.locator("#definitionAiReviewFilter").selectOption("all");
+      await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(40);
+      await page.locator("#definitionAiReviewNext").click();
+      await expect(page.locator("#definitionAiReviewPage")).toContainText("41–80");
+      await page.locator("#definitionAiRows select").first().selectOption("leftover");
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(eligibleCount - 1);
+      await page.locator("#definitionAiRows select").first().selectOption("new");
+      expect(batches.slice(4).flatMap(batch => batch.records)).toHaveLength(eligibleCount - 24);
       expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
       await page.locator("#definitionAiApply").click();
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds)).toBeNull();
+      await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
       expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBeGreaterThan(0);
+      await expect(page.locator("#definitionSelectedVariables .definition-selected-variable")).toHaveCount(40);
+      await expect(page.locator('#definitionTermChips button[data-term="all"]')).toHaveAttribute("aria-pressed", "true");
     } finally {
       await context.close();
     }

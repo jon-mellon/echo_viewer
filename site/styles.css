@@ -831,6 +831,23 @@ h2 {
 
 #definitionAiStatus a { margin-left: 6px; }
 
+.definition-map-preview-status {
+  position: absolute;
+  z-index: 8;
+  top: 114px;
+  left: 12px;
+  max-width: calc(100% - 24px);
+  padding: 6px 10px;
+  border: 1px solid #bd38b2;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #9a1694;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.definition-map-preview-status[hidden] { display: none; }
+
 .definition-ai-rows {
   display: grid;
   gap: 4px;
@@ -851,6 +868,7 @@ h2 {
 
 .definition-ai-row span { overflow-wrap: anywhere; }
 .definition-ai-row select { min-height: 44px; }
+.definition-ai-side { font-weight: 600; }
 
 @media (max-width: 840px) {
   .definition-ai-row { grid-template-columns: 1fr; }

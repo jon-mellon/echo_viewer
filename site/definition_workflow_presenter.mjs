@@ -12,6 +12,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
   let termPage = 0;
   let currentTermIds = [];
   const PAGE_SIZE = 20;
+  const SELECTED_LIST_LIMIT = 40;
 
   function renderTermReview(draft, selectedIds) {
     if (reviewedDraft !== draft) {
@@ -26,6 +27,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     const terms = reviewTerms(variables, selectedIds);
     const reviewed = new Set(draft.reviewed_variable_ids || []);
     const unreviewedIds = variables.filter(variable => !reviewed.has(variable.id)).map(variable => variable.id);
+    if (activeTerm === "unreviewed" && !unreviewedIds.length) activeTerm = "all";
     if (!['all', 'unreviewed'].includes(activeTerm) && !terms.some(term => term.word === activeTerm)) activeTerm = "all";
     const filters = [
       { key: "unreviewed", label: `Unreviewed · ${unreviewedIds.length}` },
@@ -146,11 +148,12 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       els.definitionVariableResults.querySelectorAll("button[data-variable-id]").forEach(button =>
         button.addEventListener("click", () => onToggleVariable(button.dataset.variableId)));
       replaceChildren(els.definitionSelectedVariables, draft.new_variable_ids.length
-        ? draft.new_variable_ids.map(id => {
+        ? [h("div", { className: "small-note", textContent: `${draft.new_variable_ids.length} variables in the new group${draft.new_variable_ids.length > SELECTED_LIST_LIMIT ? ` · showing the first ${SELECTED_LIST_LIMIT}` : ""}. Use the sorter above to inspect more.` }),
+          ...draft.new_variable_ids.slice(0, SELECTED_LIST_LIMIT).map(id => {
           const variable = clusterDisplayVariable(id) || state.variableById.get(id);
           return h("button", { className: "definition-selected-variable", type: "button", dataset: { selectedVariableId: id }, title: "Remove from new group" },
             h("span", { textContent: variable?.display_label || variable?.concept_label || id }), h("b", { textContent: "×" }));
-        })
+        })]
         : h("div", { className: "small-note", textContent: "No variables picked yet. Click a point, search result, or draw around variables." }));
       els.definitionSelectedVariables.querySelectorAll("button[data-selected-variable-id]").forEach(button =>
         button.addEventListener("click", () => onToggleVariable(button.dataset.selectedVariableId, false)));
@@ -167,7 +170,9 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
         button.addEventListener("click", () => onToggleVariable(button.dataset.neighborId, true)));
     } else {
       els.definitionNewLabel.value = draft.new_label || "";
-      replaceChildren(els.definitionReviewVariables, draft.new_variable_ids.map(id => {
+      replaceChildren(els.definitionReviewVariables,
+        h("div", { className: "small-note", textContent: `${draft.new_variable_ids.length} variables in the new group${draft.new_variable_ids.length > SELECTED_LIST_LIMIT ? ` · showing the first ${SELECTED_LIST_LIMIT}` : ""}. Go back to inspect or change them.` }),
+        draft.new_variable_ids.slice(0, SELECTED_LIST_LIMIT).map(id => {
         const variable = clusterDisplayVariable(id) || state.variableById.get(id);
         return h("div", { className: "definition-review-variable", textContent: variable?.display_label || variable?.concept_label || id });
       }));
@@ -197,6 +202,12 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionContinue.title = `Could not load variables: ${error?.message || error}`;
   }
 
+  function setJevPreviewStatus(ids, mode) {
+    els.definitionMapPreviewStatus.hidden = !ids;
+    els.definitionMapPreviewStatus.textContent = ids
+      ? `Jev ${mode === "test" ? "sample" : "full"} preview · ${ids.length} suggested for new` : "";
+  }
+
   return { render, showValidationError, setContinueLoading, showLoadError,
-    selectedTermIds: () => [...currentTermIds], changeTermPage };
+    setJevPreviewStatus, selectedTermIds: () => [...currentTermIds], changeTermPage };
 }

@@ -22,14 +22,24 @@ positive balance. If necessary, use the key-settings link, lower the limit in
 OpenRouter, and choose **Recheck limit**. This is a per-key cap; a new key has
 its own limit.
 
-**Suggest split** sends the description and the selected source variables'
-labels and text to OpenRouter's pinned `typesafe/jev-1.13` decision model.
-Suggestions appear as editable new/leftover choices. **Apply reviewed
-suggestions** changes the draft only; the regular review and save controls
-still commit the split. Returning from OpenRouter restores the unsaved
-partition from this browser's session storage. Disconnecting removes the key
-from app memory; the OpenRouter key-settings link remains available for
-revocation. Refreshing the page also clears the key from app memory.
+**Test split** sends 24 randomly sampled source variables and the description
+to OpenRouter's pinned `typesafe/jev-1.13` decision model. The sample stays
+fixed while the user revises the description and reruns the test, so they can
+inspect the effect of the wording. The app fetches Jev's current OpenRouter
+pricing and estimates both runs before the test. After the test, its reported
+input-token usage refines the estimate for the remaining variables. These are
+estimates, not spending guarantees; OpenRouter determines the charge.
+The map previews Jev's suggested new side after both runs and updates when a
+full-run choice is corrected; the draft changes only when suggestions are applied.
+**Run full split** classifies the remaining variables and reuses the test results.
+The full preview opens on a bounded spot
+check with lower-score, suggested-new, leftover, and paged all-results views.
+Only the full preview offers editable new/leftover choices. **Apply full suggestions**
+changes the draft only; the regular review and save controls still commit the split. Returning from
+OpenRouter restores the unsaved partition from this browser's session storage.
+Disconnecting removes the key from app memory; the OpenRouter key-settings link
+remains available for revocation. Refreshing the page also clears the key from
+app memory.
 
 ## Performance profiling
 

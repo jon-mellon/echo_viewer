@@ -48,17 +48,17 @@ function drawVoronoiBackground(ctx, width, height) {
 function displayGroups() {
   const draft = state.definitionDraft;
   if (!draft || !["partition", "review"].includes(draft.step)) return state.project?.groups || [];
-  const carved = new Set(draft.new_variable_ids || []);
+  const carved = new Set(state.definitionAiPreviewIds ?? draft.new_variable_ids ?? []);
   const sources = new Set(draft.source_group_ids || []);
   const residuals = (state.project?.groups || []).map(group => sources.has(group.group_id)
     ? { ...group, variable_ids: (group.variable_ids || []).filter(id => !carved.has(clusterRep(id))) }
     : group);
-  return [{
+  return [...residuals, {
     group_id: "__definition_new__",
-    label: "New group",
+    label: state.definitionAiPreviewIds ? "Jev preview" : "New group",
     type: "custom",
     variable_ids: [...carved],
-  }, ...residuals];
+  }];
 }
 
 function drawMapGroups(ctx) {
@@ -137,7 +137,8 @@ function drawGroupRegion(ctx, group, region, active) {
 
 function drawMapPoints(ctx, width, height) {
   const groups = displayGroups();
-  const definitionActiveId = state.definitionDraft?.new_variable_ids?.length ? "__definition_new__" : state.activeGroupId;
+  const definitionActiveId = (state.definitionAiPreviewIds?.size || state.definitionDraft?.new_variable_ids?.length)
+    ? "__definition_new__" : state.activeGroupId;
   const points = mapRenderModel.buildMapPointModels({
     variables: visibleClusterReps(),
     groups,

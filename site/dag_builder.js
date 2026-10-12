@@ -121,8 +121,9 @@ function initElements() {
     "definitionBlock", "definitionTitle", "definitionCancel", "definitionSourcesStep",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue",
     "definitionPartitionStep", "definitionCounts", "definitionTermChips", "definitionTermSummary",
-    "definitionAiDescription", "definitionAiConnect", "definitionAiRecheck", "definitionAiDisconnect", "definitionAiStatus",
-    "definitionAiRun", "definitionAiPreview", "definitionAiSummary", "definitionAiRows",
+    "definitionAiDescription", "definitionAiConnect", "definitionAiRecheck", "definitionAiDisconnect", "definitionAiStatus", "definitionAiCost",
+    "definitionAiRun", "definitionAiPreview", "definitionAiSummary", "definitionAiRows", "definitionAiFullRun",
+    "definitionAiReviewTools", "definitionAiReviewFilter", "definitionAiReviewPage", "definitionAiReviewPrev", "definitionAiReviewNext",
     "definitionAiApply", "definitionAiDiscard",
     "definitionTermItems", "definitionTermPrev", "definitionTermPage", "definitionTermNext",
     "definitionTermToNew", "definitionTermToLeftover", "definitionUndoBatch", "definitionVariableSearch",
@@ -142,7 +143,7 @@ function initElements() {
     // Rejected variables
     "rejectedVariablesPanel", "rejectedVariableSearch", "rejectedVariablesList",
     // Map
-    "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts",
+    "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts", "definitionMapPreviewStatus",
     "dagMapContextMenu",
     "dagZoomIn", "dagZoomOut", "dagFitView", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",

@@ -375,6 +375,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     getVariable: id => clusterDisplayVariable(id) || state.variableById.get(id),
     persistDraft: persistProjectLocally,
     renderDraft,
+    onPreviewChange: (ids, mode) => {
+      state.definitionAiPreviewIds = ids ? new Set(ids) : null;
+      presenter.setJevPreviewStatus(ids, mode);
+      // The positions and visible variables are unchanged; only group regions move.
+      if (state.map) state.map._groupRegions = null;
+      drawMap();
+    },
     onApply: ids => {
       const draft = state.definitionDraft;
       if (!draft || draft.step !== "partition") return;
