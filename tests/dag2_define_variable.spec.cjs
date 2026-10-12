@@ -281,3 +281,237 @@ test("mobile spatial editor adds and removes a variable with a tap", async ({ br
     await context.close();
   }
 });
+
+for (const device of [
+  { name: "mobile", context: { viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true } },
+  { name: "desktop", context: { viewport: { width: 1280, height: 900 } } },
+]) {
+  test(`${device.name} Jev split tests a fixed sample before the full run`, async ({ browser }) => {
+    const context = await browser.newContext(device.context);
+    const page = await context.newPage();
+    let limit = 6;
+    let decisions = 0;
+    const batches = [];
+    await page.route("https://openrouter.ai/auth?**", async route => {
+      const authUrl = new URL(route.request().url());
+      const callback = new URL(authUrl.searchParams.get("callback_url"));
+      callback.searchParams.set("code", "test-code");
+      callback.searchParams.set("state", authUrl.searchParams.get("state"));
+      await route.fulfill({ status: 302, headers: { location: callback.href } });
+    });
+    await page.route("https://openrouter.ai/api/**", async route => {
+      const request = route.request();
+      const headers = { "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS",
+        "access-control-allow-headers": "authorization, content-type" };
+      if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+      if (request.url().endsWith("/auth/keys")) {
+        return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify({ key: "sk-or-test" }) });
+      }
+      if (request.url().endsWith("/v1/key")) {
+        return route.fulfill({ headers, contentType: "application/json",
+          body: JSON.stringify({ data: { limit, limit_reset: null, limit_remaining: limit } }) });
+      }
+      if (request.url().endsWith("/v1/model/typesafe/jev-1.13")) {
+        return route.fulfill({ headers, contentType: "application/json",
+          body: JSON.stringify({ data: { pricing: { prompt: "0.000000042", completion: "0", request: "0" } } }) });
+      }
+      if (request.url().endsWith("/alpha/decisions")) {
+        decisions += 1;
+        const body = request.postDataJSON();
+        batches.push({ description: body.state.target_definition, records: body.state.records });
+        expect(body.model).toBe("typesafe/jev-1.13");
+        expect(Object.values(body.questions)[0].instructions).toContain("not a separately defined opposite concept");
+        expect(Object.values(body.questions)[0].criteria.leftover).toContain("uncertain matches");
+        const answers = Object.fromEntries(Object.keys(body.questions).map(id => [id,
+          { type: "choice", choice: "new", probabilities: { new: 0.9, leftover: 0.1 } }]));
+        return route.fulfill({ headers, contentType: "application/json",
+          body: JSON.stringify({ answers, usage: { input_tokens: 1000, output_tokens: 0 } }) });
+      }
+      throw new Error(`Unexpected OpenRouter request: ${request.url()}`);
+    });
+    try {
+      await page.addInitScript(() => {
+        sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+      });
+      await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+        && window.__dagBuilderState?.publishedSchemaHydrated);
+      await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+      await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
+      await page.locator("#definitionContinue").click();
+      await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+      await page.locator("#definitionAiDescription").fill("School based measures of academic achievement");
+      await page.locator("#definitionAiConnect").click();
+      await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+      await expect(page.locator("#definitionAiDescription")).toHaveValue("School based measures of academic achievement");
+      await expect(page.locator("#definitionAiStatus")).toContainText("Lower its limit to $5");
+      await expect(page.locator("#definitionAiRun")).toBeDisabled();
+      limit = 5;
+      await page.locator("#definitionAiRecheck").click();
+      await expect(page.locator("#definitionAiRun")).toBeEnabled();
+      await expect(page.locator("#definitionAiCost")).toContainText("Estimated test (24): $");
+      await expect(page.locator("#definitionAiCost")).toContainText("estimated remaining full run");
+      async function mapImage() {
+        if (device.name === "mobile") await page.locator('.mobile-panel-tab[data-mobile-panel="variables"]').click();
+        await expect(page.locator("#dagMapCanvas")).toBeVisible();
+        const image = await page.locator("#dagMapCanvas").screenshot();
+        if (device.name === "mobile") await page.locator('.mobile-panel-tab[data-mobile-panel="controls"]').click();
+        return image;
+      }
+      const mapBeforeTest = await mapImage();
+      await page.locator("#definitionAiRun").click();
+      await expect(page.locator("#definitionAiPreview")).toBeVisible();
+      await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(24);
+      await expect(page.locator("#definitionAiFullRun")).toBeVisible();
+      await expect(page.locator("#definitionAiCost")).toContainText("Test usage at listed price (24): $0.000084");
+      await expect(page.locator("#definitionAiCost")).toContainText("calibrated from test");
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(24);
+      await expect(page.locator("#definitionMapPreviewStatus")).toContainText("Jev sample preview · 24 suggested for new");
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
+      expect(await mapImage()).not.toEqual(mapBeforeTest);
+      await expect(page.locator("#definitionAiApply")).toBeHidden();
+      expect(decisions).toBe(2);
+      const firstSample = batches.flatMap(batch => batch.records);
+      await page.locator("#definitionAiDescription").fill("School and college academic achievement");
+      await expect(page.locator("#definitionAiPreview")).toBeHidden();
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds)).toBeNull();
+      await page.locator("#definitionAiRun").click();
+      await expect(page.locator("#definitionAiFullRun")).toBeVisible();
+      expect(batches.slice(2).flatMap(batch => batch.records)).toEqual(firstSample);
+      expect(batches.slice(2, 4).every(batch => batch.description === "School and college academic achievement")).toBe(true);
+      const eligibleCount = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids.length);
+      await page.locator("#definitionAiFullRun").click();
+      await expect(page.locator("#definitionAiReviewTools")).toBeVisible();
+      await expect(page.locator("#definitionAiReviewFilter")).toHaveValue("spot");
+      expect(await page.locator("#definitionAiRows .definition-ai-row").count()).toBeLessThanOrEqual(40);
+      await expect(page.locator("#definitionAiApply")).toBeVisible();
+      await expect(page.locator("#definitionAiCost")).toContainText("full run usage at listed price");
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(eligibleCount);
+      await expect(page.locator("#definitionMapPreviewStatus")).toContainText(`Jev full preview · ${eligibleCount} suggested for new`);
+      await page.locator("#definitionAiReviewFilter").selectOption("all");
+      await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(40);
+      await page.locator("#definitionAiReviewNext").click();
+      await expect(page.locator("#definitionAiReviewPage")).toContainText("41–80");
+      await page.locator("#definitionAiRows select").first().selectOption("leftover");
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(eligibleCount - 1);
+      await page.locator("#definitionAiRows select").first().selectOption("new");
+      expect(batches.slice(4).flatMap(batch => batch.records)).toHaveLength(eligibleCount - 24);
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
+      await page.locator("#definitionAiApply").click();
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds)).toBeNull();
+      await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBeGreaterThan(0);
+      await expect(page.locator("#definitionSelectedVariables .definition-selected-variable")).toHaveCount(40);
+      await expect(page.locator('#definitionTermChips button[data-term="all"]')).toHaveAttribute("aria-pressed", "true");
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test("Jev test and full split resume saved batches after failure and reload", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  let decisions = 0;
+  let failTestOnce = true;
+  let failFullOnce = true;
+  const requestedBatches = [];
+  await page.route("https://openrouter.ai/auth?**", async route => {
+    const authUrl = new URL(route.request().url());
+    const callback = new URL(authUrl.searchParams.get("callback_url"));
+    callback.searchParams.set("code", "test-code");
+    callback.searchParams.set("state", authUrl.searchParams.get("state"));
+    await route.fulfill({ status: 302, headers: { location: callback.href } });
+  });
+  await page.route("https://openrouter.ai/api/**", async route => {
+    const request = route.request();
+    const headers = { "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-headers": "authorization, content-type" };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (request.url().endsWith("/auth/keys")) {
+      return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify({ key: "sk-or-test" }) });
+    }
+    if (request.url().endsWith("/v1/key")) {
+      return route.fulfill({ headers, contentType: "application/json",
+        body: JSON.stringify({ data: { limit: 5, limit_reset: null, limit_remaining: 5 } }) });
+    }
+    if (request.url().endsWith("/v1/model/typesafe/jev-1.13")) {
+      return route.fulfill({ headers, contentType: "application/json",
+        body: JSON.stringify({ data: { pricing: { prompt: "0.000000042", completion: "0", request: "0" } } }) });
+    }
+    if (request.url().endsWith("/alpha/decisions")) {
+      decisions += 1;
+      const body = request.postDataJSON();
+      requestedBatches.push(body.state.records);
+      if (decisions === 2 && failTestOnce || decisions === 5 && failFullOnce) {
+        if (decisions === 2) failTestOnce = false;
+        else failFullOnce = false;
+        return route.fulfill({ status: 503, headers, contentType: "application/json",
+          body: JSON.stringify({ error: { message: "Temporary failure" } }) });
+      }
+      const answers = Object.fromEntries(Object.keys(body.questions).map(id => [id,
+        { type: "choice", choice: "new", probabilities: { new: 0.9, leftover: 0.1 } }]));
+      return route.fulfill({ headers, contentType: "application/json",
+        body: JSON.stringify({ answers, usage: { input_tokens: 1000 } }) });
+    }
+    throw new Error(`Unexpected OpenRouter request: ${request.url()}`);
+  });
+  try {
+    await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+      && window.__dagBuilderState?.publishedSchemaHydrated);
+    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
+    await page.locator("#definitionContinue").click();
+    await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+    await page.locator("#definitionAiDescription").fill("School and college academic achievement");
+    await page.locator("#definitionAiConnect").click();
+    await expect(page.locator("#definitionAiRun")).toBeEnabled();
+    await page.locator("#definitionAiRun").click();
+    await expect(page.locator("#definitionAiStatus")).toContainText("Test paused");
+    await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/24 saved)");
+    const failedTestBatch = requestedBatches[1];
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+    await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/24 saved)");
+    await page.locator("#definitionAiConnect").click();
+    await expect(page.locator("#definitionAiRun")).toBeEnabled();
+    await page.locator("#definitionAiRun").click();
+    await expect(page.locator("#definitionAiFullRun")).toBeVisible();
+    expect(requestedBatches[2]).toEqual(failedTestBatch);
+    expect(decisions).toBe(3);
+    await page.locator("#definitionAiFullRun").click();
+    await expect(page.locator("#definitionAiStatus")).toContainText("Full run paused");
+    await expect(page.locator("#definitionAiFullRun")).toContainText("16/");
+    const storage = await page.evaluate(async () => {
+      const { openLocalDatabase } = await import("/local_schema_store.mjs");
+      const db = await openLocalDatabase();
+      return { name: db.name, stores: [...db.objectStoreNames] };
+    });
+    expect(storage.name).toBe("echo-local-schemas");
+    expect(storage.stores).toContain("jev_runs");
+    expect(storage.stores).toContain("jev_batches");
+    const eligibleCount = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids.length);
+    await expect(page.locator("#definitionAiCost")).toContainText(`estimated remaining full run, calibrated from test (${eligibleCount - 40})`);
+    const failedBatch = requestedBatches[4];
+    expect(decisions).toBe(5);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+    await expect(page.locator("#definitionAiFullRun")).toContainText("Resume full split (16/");
+    await expect(page.locator("#definitionAiRun")).toBeDisabled();
+    await page.locator("#definitionAiConnect").click();
+    await expect(page.locator("#definitionAiFullRun")).toBeEnabled();
+    await page.locator("#definitionAiFullRun").click();
+    await expect(page.locator("#definitionAiApply")).toBeVisible();
+    expect(requestedBatches[5]).toEqual(failedBatch);
+    expect(requestedBatches.slice(5).flat()).not.toContainEqual(requestedBatches[3][0]);
+    await page.locator("#definitionAiDescription").fill("School measures only");
+    await expect(page.locator("#definitionAiPreview")).toBeHidden();
+    await expect(page.locator("#definitionAiRun")).toContainText("Test split on");
+  } finally {
+    await context.close();
+  }
+});

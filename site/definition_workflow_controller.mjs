@@ -1,6 +1,7 @@
 import * as projectOps from "./dag_project.mjs";
 import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
 import { nearbyMapNeighbors } from "./definition_neighbors.mjs";
+import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
   invalidateMapCaches, renderAll, drawMap = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
@@ -16,11 +17,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     // Definition steps change selection and map contents, not the project DAG.
     // The DAG is hidden until cancel/save, where a full render is performed.
     renderAll({ rebuild: false });
+    jevAssist.render();
     if (redrawMap) drawMap();
   };
 
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv", "instrument", "candidate"].includes(role)) return;
+    jevAssist.clearPreview();
     // Start the query engine while the user chooses a source. The source load
     // still awaits this setup and reports any error through its normal path.
     void prewarmEvidence().catch(() => {});
@@ -42,6 +45,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     lastBatch = null;
     const context = projectOps.editableSplitContext(state.project, groupId ? groupId : activeGroup());
     if (!context) return;
+    jevAssist.clearPreview();
     const { splitId, newGroup, residuals } = context;
     const eligible = [...new Set([...newGroup.variable_ids, ...residuals.flatMap(group => group.variable_ids)]
       .map(clusterRep))];
@@ -71,6 +75,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   function cancelDefinition() {
     hydrationRevision += 1;
     lastBatch = null;
+    jevAssist.clearPreview();
     state.definitionDraft = null;
     state.selectedVariableIds.clear();
     state.selectedVariableId = null;
@@ -237,7 +242,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       void hydrateNeighbors(state.definitionDraft.new_variable_ids)
         .catch(error => console.warn("Could not load variable neighbor suggestions.", error));
     }
-    return presenter.render();
+    presenter.render();
+    jevAssist.render();
   }
 
   async function saveDefinition() {
@@ -299,6 +305,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   }
 
   function installDefinitionHandlers() {
+    jevAssist.install();
     els.definitionCancel.addEventListener("click", cancelDefinition);
     els.definitionSourceSearch.addEventListener("input", renderDefinition);
     els.definitionContinue.addEventListener("click", continueDefinition);
@@ -339,6 +346,33 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     els.definitionSave.addEventListener("click", saveDefinition);
   }
 
+  async function resumeAfterOAuth() {
+    const oauthDraft = jevAssist.takeResumeDraft();
+    const checkpointDraft = !oauthDraft && !state.definitionDraft
+      ? await jevAssist.latestResumeDraft().catch(error => {
+        console.warn("Could not read saved Jev draft.", error);
+        return null;
+      }) : null;
+    const draft = oauthDraft || state.definitionDraft || checkpointDraft;
+    if (!draft || draft.step !== "partition" || !Array.isArray(draft.eligible_variable_ids)) return;
+    if (!draft.source_snapshot?.every(snap => {
+      const current = groupById(snap.group_id);
+      return current && JSON.stringify(current.variable_ids) === JSON.stringify(snap.variable_ids);
+    })) return;
+    if (oauthDraft || checkpointDraft) {
+      state.definitionDraft = draft;
+      state.selectedVariableIds = new Set(draft.new_variable_ids || []);
+    }
+    try { await hydrateVariableDetails(draft.eligible_variable_ids); }
+    catch (error) { console.warn("Could not reload all split variable details.", error); }
+    invalidateMapCaches();
+    setMapMode("select");
+    renderDraft();
+    fitMap(draft.eligible_variable_ids);
+    try { await jevAssist.restoreForDraft({ force: true }); }
+    catch (error) { console.warn("Could not restore saved Jev progress.", error); }
+  }
+
   const presenter = createDefinitionWorkflowPresenter({
     state, elements: els, normalized, clusterRep, truncate, definitionSources,
     definitionResidualIds, definitionCanReview, searchVariables, visibleVariables,
@@ -348,7 +382,33 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     canUndoBatch: () => Boolean(lastBatch),
   });
 
+  const jevAssist = createDefinitionJevAssist({ elements: els,
+    getDraft: () => state.definitionDraft,
+    getVariable: id => clusterDisplayVariable(id) || state.variableById.get(id),
+    persistDraft: persistProjectLocally,
+    renderDraft,
+    onPreviewChange: (ids, mode) => {
+      state.definitionAiPreviewIds = ids ? new Set(ids) : null;
+      presenter.setJevPreviewStatus(ids, mode);
+      // The positions and visible variables are unchanged; only group regions move.
+      if (state.map) state.map._groupRegions = null;
+      drawMap();
+    },
+    onApply: ids => {
+      const draft = state.definitionDraft;
+      if (!draft || draft.step !== "partition") return;
+      lastBatch = null;
+      draft.new_variable_ids = ids;
+      draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
+      state.selectedVariableIds = new Set(ids);
+      invalidateMapCaches();
+      persistProjectLocally();
+      renderDraft({ redrawMap: true });
+    },
+  });
+
   return { startDefinition, startEditSplit, cancelDefinition, definitionSources, continueDefinition,
     definitionResidualIds, toggleDefinitionVariable,
-    definitionCanReview, definitionNeighbors, renderDefinition, saveDefinition, installDefinitionHandlers };
+    definitionCanReview, definitionNeighbors, renderDefinition, saveDefinition, installDefinitionHandlers,
+    resumeAfterOAuth };
 }

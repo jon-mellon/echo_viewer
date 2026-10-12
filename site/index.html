@@ -138,9 +138,45 @@
             </div>
             <div id="definitionPartitionStep" hidden>
               <div id="definitionCounts" class="workflow-hint"></div>
+              <section class="definition-ai-assist" aria-labelledby="definitionAiTitle">
+                <div class="section-title compact-title"><h2 id="definitionAiTitle">Suggest a split with Jev</h2></div>
+                <p class="small-note">Describe what belongs in the new variable. Leftover means everything in the selected sources that does not clearly match that description, including uncertain cases. Test Jev on 24 randomly chosen variables, revise your description if needed, then run the full split. Each run sends the description and variable labels and text to OpenRouter, which charges your own account.</p>
+                <label class="dag-label" for="definitionAiDescription">New variable description</label>
+                <textarea id="definitionAiDescription" class="search-input" rows="3" maxlength="1000" placeholder="For example: academic grades, tests, and skills assessed in school or college; exclude informal learning outside those settings"></textarea>
+                <div class="mini-toolbar">
+                  <button id="definitionAiConnect" class="toolbar-button" type="button">Connect OpenRouter</button>
+                  <button id="definitionAiRecheck" class="toolbar-button" type="button" hidden>Recheck limit</button>
+                  <button id="definitionAiDisconnect" class="text-button" type="button" hidden>Disconnect</button>
+                </div>
+                <div id="definitionAiStatus" class="small-note" aria-live="polite"></div>
+                <div id="definitionAiCost" class="small-note" aria-live="polite"></div>
+                <button id="definitionAiRun" class="primary-button" type="button" disabled>Test split on 24 variables</button>
+                <div id="definitionAiPreview" class="definition-ai-preview" hidden>
+                  <div id="definitionAiSummary" class="small-note"></div>
+                  <div class="mini-toolbar">
+                    <button id="definitionAiFullRun" class="primary-button" type="button" hidden>Run full split</button>
+                    <button id="definitionAiApply" class="primary-button" type="button" hidden>Apply full suggestions</button>
+                    <button id="definitionAiDiscard" class="text-button" type="button">Discard</button>
+                  </div>
+                  <div id="definitionAiReviewTools" class="mini-toolbar" hidden>
+                    <label for="definitionAiReviewFilter">Inspect</label>
+                    <select id="definitionAiReviewFilter" class="select-input-sm">
+                      <option value="spot">Spot check</option>
+                      <option value="uncertain">Lower-score choices</option>
+                      <option value="new">Suggested new</option>
+                      <option value="leftover">Leftover</option>
+                      <option value="all">All results</option>
+                    </select>
+                    <span id="definitionAiReviewPage" class="small-note"></span>
+                    <button id="definitionAiReviewPrev" class="toolbar-button" type="button">Previous</button>
+                    <button id="definitionAiReviewNext" class="toolbar-button" type="button">Next</button>
+                  </div>
+                  <div id="definitionAiRows" class="definition-ai-rows"></div>
+                </div>
+              </section>
               <div class="definition-batch-review">
                 <div class="section-title compact-title"><h2>Sort variables</h2></div>
-                <p class="small-note">Review every variable here without searching. Tap a common word for a batch, then correct exceptions with the two side buttons.</p>
+                <p class="small-note">Inspect variables here without searching. Tap a common word for a batch, then correct exceptions with the two side buttons.</p>
                 <div id="definitionTermChips" class="definition-term-chips"></div>
                 <div id="definitionTermSummary" class="small-note" aria-live="polite"></div>
                 <div id="definitionTermItems" class="definition-term-items"></div>
@@ -287,6 +323,7 @@
           <select id="variableLayoutSelect" class="select-input-sm" aria-label="Variable map layout" title="Change the variable embedding layout"></select>
           <span id="variableAssignmentCounts" class="assignment-coverage" aria-live="polite"></span>
         </div>
+        <div id="definitionMapPreviewStatus" class="definition-map-preview-status" hidden></div>
         <canvas id="dagMapCanvas"></canvas>
         <div class="mobile-definition-map-hint">Tap a point to add or remove it. Use Draw + or Draw − to circle several. Drag in Inspect to move; pinch to zoom.</div>
         <div id="dagMapLabels" class="dag-map-labels"></div>

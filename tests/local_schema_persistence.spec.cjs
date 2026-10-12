@@ -1,5 +1,46 @@
 const { test, expect } = require("playwright/test");
 
+test("the local schema database upgrade preserves saved schemas and sessions", async ({ page }) => {
+  await page.route("http://127.0.0.1:8767/", route =>
+    route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Storage upgrade</title>" }));
+  await page.goto("http://127.0.0.1:8767/");
+  const result = await page.evaluate(async () => {
+    const old = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("echo-local-schemas", 1);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore("schemas", { keyPath: "id" });
+        request.result.createObjectStore("meta", { keyPath: "key" });
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = old.transaction(["schemas", "meta"], "readwrite");
+      tx.objectStore("schemas").put({ id: "prior-schema", label: "Kept schema" });
+      tx.objectStore("meta").put({ key: "session:prior", title: "Kept session" });
+      tx.oncomplete = resolve;
+      tx.onabort = () => reject(tx.error);
+    });
+    old.close();
+    const { openLocalDatabase } = await import("/local_schema_store.mjs");
+    const db = await openLocalDatabase();
+    const tx = db.transaction(["schemas", "meta"], "readonly");
+    const read = request => new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const [schema, session] = await Promise.all([
+      read(tx.objectStore("schemas").get("prior-schema")),
+      read(tx.objectStore("meta").get("session:prior")),
+    ]);
+    return { version: db.version, stores: [...db.objectStoreNames], schema, session };
+  });
+  expect(result.version).toBe(2);
+  expect(result.stores).toEqual(["jev_batches", "jev_runs", "meta", "schemas"]);
+  expect(result.schema).toEqual({ id: "prior-schema", label: "Kept schema" });
+  expect(result.session).toEqual({ key: "session:prior", title: "Kept session" });
+});
+
 test("the root starts fresh and Previous Sessions restores a committed local schema", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto("http://127.0.0.1:8767/?new=1", { waitUntil: "domcontentloaded" });
