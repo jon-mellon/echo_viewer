@@ -41,7 +41,11 @@ export function createGroupingSetController({ state, elements, publicationContro
         // Preserve metadata from the published schema so a freshly hydrated
         // working copy hashes identically until the user actually edits it.
         ...(sourceGroups.get(group.group_id) || {}),
+        // Split provenance is needed to reopen a private draft after reload.
+        ...(group.provenance?.operation === "split_categories"
+          ? projectOps.withoutGroupReviewStatus(group) : {}),
         group_id: group.group_id, label: group.label || "", notes: group.notes || "",
+        ...(group.description !== undefined ? { description: group.description } : {}),
         source: group.source || "project_export",
         ...(Number.isFinite(group.similarity_coherence) ? { similarity_coherence: group.similarity_coherence } : {}),
         variable_ids,

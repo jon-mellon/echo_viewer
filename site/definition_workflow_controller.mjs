@@ -33,7 +33,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     lastBatch = null;
     state.definitionDraft = {
       role, step: "sources", source_group_ids: [], source_snapshot: [],
-      eligible_variable_ids: [], new_variable_ids: [], new_label: "",
+      eligible_variable_ids: [], new_variable_ids: [], new_label: "", new_description: "",
       residual_labels: {}, reviewed_variable_ids: [],
     };
     state.selectedVariableIds.clear();
@@ -62,15 +62,27 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       new_variable_ids: [...new Set(newGroup.variable_ids.map(clusterRep))],
       reviewed_variable_ids: eligible,
       new_label: newGroup.label || "",
+      new_description: newGroup.description || "",
       residual_labels: Object.fromEntries(residuals.map(group => [group.group_id, group.label || ""])),
+      details_loading: true,
     };
     state.activeGroupId = null;
     state.selectedVariableIds = new Set(state.definitionDraft.new_variable_ids);
-    await hydrateVariableDetails(eligible);
-    if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     invalidateMapCaches();
     setMapMode("select");
     renderDraft();
+    fitMap(eligible);
+    try {
+      await hydrateVariableDetails(eligible, { skipNeighbors: true });
+    } catch (error) {
+      if (revision === hydrationRevision && state.definitionDraft === draft) {
+        draft.details_error = error?.message || String(error);
+      }
+    }
+    if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
+    draft.details_loading = false;
+    invalidateMapCaches();
+    renderDraft({ redrawMap: true });
     fitMap(eligible);
   }
 
@@ -241,8 +253,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   }
 
   function renderDefinition() {
-    if (state.definitionDraft?.step === "partition" && state.definitionDraft.new_variable_ids?.length) {
-      void hydrateNeighbors(state.definitionDraft.new_variable_ids)
+    const draft = state.definitionDraft;
+    if (draft?.step === "partition" && !draft.details_loading && draft.new_variable_ids?.length
+      && !(draft.mode === "edit" && draft.new_variable_ids.length > 40)) {
+      void hydrateNeighbors(draft.new_variable_ids)
         .catch(error => console.warn("Could not load variable neighbor suggestions.", error));
     }
     presenter.render();
@@ -253,6 +267,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     const draft = state.definitionDraft;
     if (!draft) return;
     draft.new_label = clean(draft.new_label);
+    draft.new_description = clean(draft.new_description || "");
     draft.residual_labels = Object.fromEntries(Object.entries(draft.residual_labels)
       .map(([groupId, label]) => [groupId, clean(label)]));
     const previousProject = structuredClone(state.project);
@@ -269,6 +284,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       const operation = draft.mode === "edit" ? projectOps.updateSplitCategories : projectOps.splitCategories;
       const next = operation(state.project, {
         sourceGroupIds: draft.source_group_ids, newGroupId, newLabel: draft.new_label,
+        newDescription: draft.new_description,
         residualLabels: draft.residual_labels,
         newVariableIds: expandToClusterMembers(draft.new_variable_ids), timestamp: nowIso(),
         role: draft.role,
@@ -357,10 +373,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     });
     els.definitionReviewBack.addEventListener("click", () => {
       state.definitionDraft.new_label = clean(els.definitionNewLabel.value);
+      state.definitionDraft.new_description = clean(els.definitionNewDescription.value);
       state.definitionDraft.step = "partition"; renderDraft({ redrawMap: true });
     });
     els.definitionNewLabel.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_label = els.definitionNewLabel.value;
+      persistProjectLocally();
+    });
+    els.definitionNewDescription.addEventListener("input", () => {
+      if (state.definitionDraft) state.definitionDraft.new_description = els.definitionNewDescription.value;
       persistProjectLocally();
     });
     els.definitionSave.addEventListener("click", saveDefinition);
@@ -415,12 +436,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       if (state.map) state.map._groupRegions = null;
       drawMap();
     },
-    onApply: ids => {
+    onApply: (ids, description) => {
       const draft = state.definitionDraft;
       if (!draft || draft.step !== "partition") return;
       state.definitionMethod = "manual";
       lastBatch = null;
       draft.new_variable_ids = ids;
+      draft.new_description = description;
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
       state.selectedVariableIds = new Set(ids);
       invalidateMapCaches();

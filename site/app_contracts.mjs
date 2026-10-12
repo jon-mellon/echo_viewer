@@ -6,6 +6,7 @@
  * @typedef {Object} Group
  * @property {string} group_id
  * @property {string} [label]
+ * @property {string} [description]
  * @property {string[]} variable_ids
  * @property {string[]} [seed_variable_ids]
  * @property {string[]} [excluded_nearby_variable_ids]

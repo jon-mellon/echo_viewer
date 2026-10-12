@@ -425,6 +425,39 @@ for (const device of [
       expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBeGreaterThan(0);
       await expect(page.locator("#definitionSelectedVariables .definition-selected-variable")).toHaveCount(40);
       await expect(page.locator('#definitionTermChips button[data-term="all"]')).toHaveAttribute("aria-pressed", "true");
+      await page.locator('#definitionTermItems button[data-side="leftover"]').first().click();
+      await page.locator("#definitionReview").click();
+      await expect(page.locator("#definitionNewDescription")).toHaveValue("School and college academic achievement");
+      await page.locator("#definitionNewLabel").fill("School and college achievement");
+      await page.locator("#definitionSave").click();
+      await expect(page.locator("#definitionReviewStep")).toBeHidden();
+      const savedDescription = await page.evaluate(() => {
+        const state = window.__dagBuilderState;
+        return state.project.groups.find(group => group.group_id === state.project.iv_group_id)?.description;
+      });
+      expect(savedDescription).toBe("School and college academic achievement");
+      await page.locator('#dvGroupPicker button[data-group-id="category-income"]').click();
+      await expect.poll(() => new URL(page.url()).searchParams.get("dv")).toBe("category-income");
+      const localSchemaId = new URL(page.url()).searchParams.get("local_schema");
+      expect(localSchemaId).toBeTruthy();
+      expect(new URL(page.url()).searchParams.get("iv")).toBe(await page.evaluate(() => window.__dagBuilderState.project.iv_group_id));
+      const storedSplit = await page.evaluate(async id => {
+        const { loadLocalSchema } = await import("/local_schema_store.mjs");
+        const record = await loadLocalSchema(id);
+        return record?.schema?.groups.find(group => group.label === "School and college achievement");
+      }, localSchemaId);
+      expect(storedSplit?.description).toBe(savedDescription);
+      expect(storedSplit?.provenance?.operation).toBe("split_categories");
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await expect.poll(() => page.evaluate(() => window.__dagBuilderState?.project?.iv_group_id))
+        .toBe(storedSplit.group_id);
+      await expect(page.locator("#editSplitIv")).toBeVisible();
+      await page.locator("#editSplitIv").click();
+      await expect(page.locator("#definitionTitle")).toHaveText("Edit split");
+      await expect(page.locator("#definitionManualPanel")).toBeVisible();
+      await expect(page.locator("#definitionSelectedVariables .definition-selected-variable")).toHaveCount(40);
+      await page.locator("#definitionReview").click();
+      await expect(page.locator("#definitionNewDescription")).toHaveValue(savedDescription);
     } finally {
       await context.close();
     }

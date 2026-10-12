@@ -109,6 +109,10 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionSourcesStep.hidden = draft.step !== "sources" || !state.definitionMethod;
     els.definitionChosenMethod.textContent = state.definitionMethod === "manual" ? "Sort manually" : "Classify with AI";
     els.definitionPartitionStep.hidden = draft.step !== "partition";
+    els.definitionLoadStatus.hidden = !draft.details_loading && !draft.details_error;
+    els.definitionLoadStatus.textContent = draft.details_error
+      ? `Some variable details could not load: ${draft.details_error}. You can still edit this split.`
+      : draft.details_loading ? "Loading variable details…" : "";
     els.definitionReviewStep.hidden = draft.step !== "review";
     els.definitionBack.hidden = draft.mode === "edit";
     const jevMode = state.definitionMethod !== "manual";
@@ -178,6 +182,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
         button.addEventListener("click", () => onToggleVariable(button.dataset.neighborId, true)));
     } else {
       els.definitionNewLabel.value = draft.new_label || "";
+      els.definitionNewDescription.value = draft.new_description || "";
       replaceChildren(els.definitionReviewVariables,
         h("div", { className: "small-note", textContent: `${draft.new_variable_ids.length} variables in the new group${draft.new_variable_ids.length > SELECTED_LIST_LIMIT ? ` · showing the first ${SELECTED_LIST_LIMIT}` : ""}. Go back to inspect or change them.` }),
         draft.new_variable_ids.slice(0, SELECTED_LIST_LIMIT).map(id => {

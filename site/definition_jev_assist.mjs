@@ -55,13 +55,13 @@ function parsePricing(data) {
 
 export function cappedKeyStatus(data) {
   if (!data || !Number.isFinite(data.limit) || data.limit < 0) {
-    return "Set a spending limit of $5 or less on this OpenRouter key.";
+    return "This key was rejected: Set a spending limit of $5 or less that never resets in OpenRouter key settings, then recheck the limit.";
   }
   if (data.limit > MAX_KEY_LIMIT_USD) {
-    return `This key allows $${data.limit} of spending. Lower its limit to $5 or less.`;
+    return `This key was rejected: It allows $${data.limit} of spending. Lower its limit to $5 or less in OpenRouter key settings, then recheck the limit.`;
   }
   if (data.limit_reset !== null) {
-    return "Choose a limit that never resets, rather than a daily, weekly, or monthly limit.";
+    return "This key was rejected: Choose a limit that never resets, rather than a daily, weekly, or monthly limit, then recheck the limit.";
   }
   if (!Number.isFinite(data.limit_remaining) || data.limit_remaining <= 0) {
     return "This key has no spending allowance left. Connect a new capped key.";
@@ -135,7 +135,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   let busy = false;
   let activePhase = null;
   let activeRequest = null;
-  let message = "Connect OpenRouter, then set a $5 lifetime cap on the key it creates.";
+  let message = "After connecting, set a non-resetting $5 or lower maximum spend in OpenRouter key settings. This key cannot run classification until it passes the limit check.";
   let runRevision = 0;
   let checkpoint = null;
   let checkpointDraft = null;
@@ -735,7 +735,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     });
     els.definitionAiApply.addEventListener("click", () => {
       if (!preview || previewMode !== "full" || previewDraft !== getDraft()) return;
-      onApply(preview.filter(item => item.side === "new").map(item => item.id));
+      onApply(preview.filter(item => item.side === "new").map(item => item.id), testDescription);
       clearPreview();
     });
     els.definitionAiDiscard.addEventListener("click", clearPreview);

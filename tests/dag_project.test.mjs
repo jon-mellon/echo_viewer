@@ -17,14 +17,17 @@ test('an editable split preserves IDs and returns deselected variables to their 
   ];
   const split = ops.splitCategories(project, {
     sourceGroupIds: ['a', 'b'], newGroupId: 'new', newLabel: 'New',
+    newDescription: 'Academic work in formal education',
     residualLabels: { a: 'Other A', b: 'Other B' }, newVariableIds: ['a1', 'b1'],
     timestamp, role: 'iv', splitId: 'split-1',
   });
   const context = ops.editableSplitContext(split, 'a');
   assert.equal(context?.newGroup.group_id, 'new');
+  assert.equal(context?.newGroup.description, 'Academic work in formal education');
   assert.deepEqual(context?.residuals.map(group => group.group_id), ['a', 'b']);
   const edited = ops.updateSplitCategories(split, {
     sourceGroupIds: ['a', 'b'], newGroupId: 'new', newLabel: 'Updated',
+    newDescription: 'School and college outcomes',
     residualLabels: { a: 'Rest A', b: 'Rest B' }, newVariableIds: ['a2', 'b1'],
     timestamp: '2026-09-09T13:00:00.000Z', role: 'iv', splitId: 'split-1',
   });
@@ -32,6 +35,7 @@ test('an editable split preserves IDs and returns deselected variables to their 
   assert.deepEqual(edited.groups.find(group => group.group_id === 'a').variable_ids, ['a1']);
   assert.deepEqual(edited.groups.find(group => group.group_id === 'b').variable_ids, ['b2']);
   assert.equal(edited.groups.find(group => group.group_id === 'new').label, 'Updated');
+  assert.equal(edited.groups.find(group => group.group_id === 'new').description, 'School and college outcomes');
   assert.equal(edited.decisions.at(-1).type, 'split_categories_updated');
 });
 

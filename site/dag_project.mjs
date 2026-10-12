@@ -254,7 +254,7 @@ export function setFindingDecision(project, rawId, decision) {
 }
 
 export function splitCategories(project, {
-  sourceGroupIds, newGroupId, newLabel, residualLabels = {}, newVariableIds,
+  sourceGroupIds, newGroupId, newLabel, newDescription, residualLabels = {}, newVariableIds,
   timestamp, role, splitId = null,
 }) {
   splitId ||= `split_${newGroupId}`;
@@ -294,6 +294,7 @@ export function splitCategories(project, {
   if (labels.has(normalizedNewLabel)) throw new Error("Category names must be unique.");
   const newGroup = {
     group_id: newGroupId, label: String(newLabel).trim(), variable_ids: [...carved],
+    ...(String(newDescription || "").trim() ? { description: String(newDescription).trim() } : {}),
     seed_variable_ids: [...carved], excluded_nearby_variable_ids: [], boundary_geometry: {},
     notes: "", type: role || "candidate", source: "user_split",
     created_at: timestamp, updated_at: timestamp,
@@ -340,7 +341,7 @@ export function editableSplitContext(project, groupOrId) {
 }
 
 export function updateSplitCategories(project, {
-  sourceGroupIds, newGroupId, newLabel, residualLabels = {}, newVariableIds,
+  sourceGroupIds, newGroupId, newLabel, newDescription, residualLabels = {}, newVariableIds,
   timestamp, role, splitId,
 }) {
   const sourceIds = [...new Set(sourceGroupIds || [])];
@@ -368,6 +369,7 @@ export function updateSplitCategories(project, {
     if (!resultIds.has(group.group_id)) return group;
     if (group.group_id === newGroupId) return { ...group,
       label: String(newLabel || "").trim(), variable_ids: [...carved],
+      ...(newDescription === undefined ? {} : { description: String(newDescription || "").trim() }),
       seed_variable_ids: [...carved], type: role || group.type, updated_at: timestamp };
     const variable_ids = [...eligible].filter(id => !carved.has(id) && ownerByVariable.get(id) === group.group_id);
     if (!variable_ids.length) throw new Error(`The leftover for ${group.label || group.group_id} cannot be empty.`);

@@ -137,7 +137,7 @@
                   <strong>Sort manually</strong><span>Inspect the source variables and move them yourself.</span>
                 </button>
                 <button id="definitionChooseJev" class="definition-method-choice" type="button">
-                  <strong>Classify with AI</strong><span>Describe the new variable, test 24 examples, then review suggestions. Uses your capped OpenRouter key.</span>
+                  <strong>Classify with AI</strong><span>Requires an OpenRouter key with a non-resetting $5 or lower maximum spend. Keys without that limit are rejected.</span>
                 </button>
               </div>
             </div>
@@ -153,11 +153,13 @@
                 <button id="definitionMethodJev" class="toolbar-button" type="button" aria-pressed="true">AI suggestions</button>
                 <button id="definitionMethodManual" class="toolbar-button" type="button" aria-pressed="false">Sort manually</button>
               </div>
+              <div id="definitionLoadStatus" class="small-note" role="status" hidden></div>
               <section id="definitionJevPanel" class="definition-ai-assist" aria-labelledby="definitionAiTitle">
                 <div class="section-title compact-title"><h2 id="definitionAiTitle">Classify with AI</h2></div>
                 <p class="small-note">Describe the new variable, test 24 examples, then review the suggestions before running the full split. Leftover includes anything that does not clearly fit, including uncertain cases. Your description and variable labels and text go to OpenRouter; your account is charged for each run.</p>
                 <label class="dag-label" for="definitionAiDescription">New variable description</label>
                 <textarea id="definitionAiDescription" class="search-input" rows="3" maxlength="1000" placeholder="For example: academic grades, tests, and skills assessed in school or college; exclude informal learning outside those settings"></textarea>
+                <p class="small-note"><strong>Required before AI classification:</strong> Set this OpenRouter key's maximum spend to $5 or less and choose a limit that never resets. The app rejects keys with no limit, a higher limit, or a resetting limit. After changing the key settings, select Recheck limit.</p>
                 <div class="mini-toolbar">
                   <button id="definitionAiConnect" class="toolbar-button" type="button">Connect OpenRouter</button>
                   <button id="definitionAiRecheck" class="toolbar-button" type="button" hidden>Recheck limit</button>
@@ -225,6 +227,8 @@
             <div id="definitionReviewStep" hidden>
               <label class="dag-label" for="definitionNewLabel">New variable name</label>
               <input id="definitionNewLabel" class="search-input" type="text" placeholder="New variable">
+              <label class="dag-label" for="definitionNewDescription">New group definition</label>
+              <textarea id="definitionNewDescription" class="search-input" rows="3" maxlength="1000" placeholder="Describe what belongs in this group"></textarea>
               <div class="section-title compact-title"><h2>New group variables</h2></div>
               <div id="definitionReviewVariables" class="definition-review-variables"></div>
               <div id="definitionResidualLabels"></div>
