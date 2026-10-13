@@ -84,7 +84,9 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
     colliderGroupIds: new Set(), colliderPathGroupIds: new Set(),
     confounderGroupIds: new Set(), confounderPathGroupIds: new Set(), visibleLinks: [],
   };
+  const visibilityChanges = [];
   const dagNetwork = { clientWidth: 630, clientHeight: 700,
+    style: { set visibility(value) { visibilityChanges.push(value); } },
     addEventListener() {}, removeEventListener() {} };
   class DataSet {
     constructor(items) { this.items = new Map(items.map(item => [item.id, item])); this.updateCalls = []; }
@@ -142,6 +144,11 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   assert.equal(networks[0].options.nodes.widthConstraint.maximum, 185);
   assert.equal(networks[0].data.nodes.updateCalls.length, 1);
   assert.ok(controller.minimumDagScale() > firstScale);
+  state.componentGroupIds.delete("b");
+  controller.renderDag();
+  await controller.whenRendered();
+  assert.deepEqual(visibilityChanges.slice(-2), ["hidden", ""]);
+  assert.ok(!networks[0].data.nodes.getIds().includes("b"));
 });
 
 test("edge selection updates only the old and new routed links", () => {
@@ -266,6 +273,12 @@ test("render coordination preserves rebuild order, comparison precedence and fin
   assert.deepEqual(calls.slice(0, 3).map(c => c[0]), ["buildCandidateQueue", "aggregateGroupLinks", "computeVisibleLinks"]);
   assert.equal(calls.at(-1)[0], "saveProjectLocally");
   assert.ok(calls.some(c => c[0] === "renderSelectedEdge"));
+  calls.length = 0;
+  coordinator.rebuildLinkDecision();
+  assert.ok(calls.findIndex(c => c[0] === "computeVisibleLinks")
+    < calls.findIndex(c => c[0] === "renderMapToolbarToggles"));
+  assert.ok(calls.findIndex(c => c[0] === "renderMapToolbarToggles")
+    < calls.findIndex(c => c[0] === "renderDag"));
   calls.length = 0; comparing = true;
   coordinator.renderAll();
   assert.deepEqual(calls.filter(c => c[0] === "renderSearch"), [["renderSearch", "iv"], ["renderSearch", "dv"]]);

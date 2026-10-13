@@ -23,6 +23,7 @@ export function createRenderCoordinator(view) {
     view.aggregateGroupLinks();
     view.computeVisibleLinks();
     view.renderConfounderStatuses?.();
+    view.renderMapToolbarToggles();
     view.renderDag({ reuseGeometry: true });
     view.renderSelectedEdge();
     view.renderExportStatus();

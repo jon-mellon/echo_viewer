@@ -45,6 +45,25 @@ test("diagnostic modes retain only witness links when requested", () => {
   assert.deepEqual(colliders.visibleLinks.map(item => item.edge_id), ["iv_x", "dv_x"]);
 });
 
+test("a node linked only to the IV is absent from the confounder map", () => {
+  const screenshotGroups = ["personality", "vote", "academic", "education", "exposure", "ideology"]
+    .map(group_id => ({ group_id }));
+  const screenshotLinks = [
+    link("academic_iv", "academic", "personality", "BIDIRECTIONAL"),
+    ...["education", "exposure", "ideology"].flatMap(id => [
+      link(`${id}_iv`, id, "personality", "A_TO_B"),
+      link(`${id}_dv`, id, "vote", "A_TO_B"),
+    ]),
+    link("target", "personality", "vote", "A_TO_B", { is_target_relation: true }),
+  ];
+  const view = deriveDagView({ groups: screenshotGroups, links: screenshotLinks,
+    ivId: "personality", dvId: "vote", maxPathLength: 1,
+    showConfoundersOnly: true, hideIrrelevantDiagnosticLinks: true });
+  assert.deepEqual([...view.confounders.confounderIds].sort(), ["education", "exposure", "ideology"]);
+  assert.equal(view.componentGroupIds.has("academic"), false);
+  assert.equal(view.visibleLinks.some(edge => edge.edge_id === "academic_iv"), false);
+});
+
 test("confounder default leaves the map visible while anchors are missing", () => {
   const view = deriveDagView({
     groups, links, showConfoundersOnly: true, hideIrrelevantDiagnosticLinks: true,

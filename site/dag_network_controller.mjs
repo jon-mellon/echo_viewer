@@ -353,6 +353,16 @@ function renderDag({ reuseGeometry = false } = {}) {
   clearConfounderPathHover();
   const groups = dagVisibleGroups();
 
+  // A worker render can take long enough for the previous diagnostic graph to
+  // remain on screen after its nodes cease to qualify. Hide that stale graph
+  // until the new node set has been applied.
+  const nextGroupIds = new Set(groups.map(group => group.group_id));
+  const displayedGroupIds = _visNodes?.getIds().filter(id => !String(id).startsWith("__route__")) || [];
+  if (_visNetwork && (displayedGroupIds.length !== nextGroupIds.size
+    || displayedGroupIds.some(id => !nextGroupIds.has(id)))) {
+    els.dagNetwork.style.visibility = "hidden";
+  }
+
   const links = state.visibleLinks.filter((link) => !link.is_target_relation);
   if (reuseGeometry && !_dagRenderWorker && _visNetwork) {
     const reused = reuseDagGeometry(_dagGeometry, groups, links);
@@ -483,6 +493,7 @@ function applyDagRender(groups, layout, routes) {
       setTimeout(() => _visNetwork?.fit(DAG_FIT_OPTIONS), 120);
     }
   }
+  els.dagNetwork.style.visibility = "";
 }
 
 function applyReusedDagRender(groups, layout, routes) {
