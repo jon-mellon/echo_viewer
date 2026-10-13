@@ -147,7 +147,7 @@ function initElements() {
     // Map
     "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts", "definitionMapPreviewStatus",
     "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
+    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
@@ -1223,6 +1223,7 @@ function computeVisibleLinks() {
     showExclusionViolations: state.showExclusionViolations,
     showExogeneity: state.showExogeneity,
     hideIrrelevantDiagnosticLinks: state.hideIrrelevantConfounderLinks,
+    showAllExclusionLinks: state.showAllExclusionLinks,
   });
   state.componentGroupIds = view.componentGroupIds;
   state.visibleLinks = view.visibleLinks;
@@ -1775,6 +1776,7 @@ const exportController = createDagExportController({
       showExclusionViolations: state.showExclusionViolations,
       showExogeneity: state.showExogeneity,
       hideIrrelevantDiagnosticLinks: state.hideIrrelevantConfounderLinks,
+      showAllExclusionLinks: state.showAllExclusionLinks,
     },
   }),
   getPublicPermalink: async () => (await publicationController?.publicPermalink())?.permalink || null,

@@ -4,6 +4,7 @@ const booleanFields = {
   conf: "showConfoundersOnly", coll: "showCollidersOnly", excl: "showExclusionViolations", exog: "showExogeneity",
   bottle: "excludeBottleneckedConfounders",
   paths: "hideIrrelevantConfounderLinks", vl: "showVariableLabels", gl: "showGroupLabels",
+  excl_links: "showAllExclusionLinks",
 };
 
 export function permalinkInput(location = globalThis.location) {
@@ -87,6 +88,7 @@ export function applyPermalink(params, state) {
   state.exclusionMaxPathLength = Math.max(2, Math.min(99,
     Number(params.get("exclusion_path")) || (state.project.instrument_group_id ? Number(params.get("path")) : 0) || 2));
   for (const [parameter, field] of Object.entries(booleanFields)) if (params.has(parameter)) state[field] = params.get(parameter) === "1";
+  if (!params.has("excl_links")) state.showAllExclusionLinks = false;
   if (!params.has("conf")) state.showConfoundersOnly = !params.has("coll");
   if (!params.has("coll")) state.showCollidersOnly = false;
   state.showExogeneity = Boolean(state.project.instrument_group_id && params.get("exog") === "1");

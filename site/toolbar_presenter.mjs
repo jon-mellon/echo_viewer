@@ -105,6 +105,9 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     elements.toggleIrrelevantConfounderLinks.title = anchorsReady
       ? `Keep only the ${linkCount} logical link${linkCount === 1 ? "" : "s"} used by at least one currently displayed ${state.showCollidersOnly ? "collider's anchor-to-collider" : state.showExogeneity ? "common cause's paths to the instrument and DV" : "confounder's candidate-to-anchor"} witness path.`
       : "Select an IV and DV before filtering diagnostic-path links.";
+    elements.toggleAllExclusionLinks.hidden = !state.showExclusionViolations || !instrumentReady;
+    elements.toggleAllExclusionLinks.classList.toggle("active", state.showAllExclusionLinks);
+    elements.toggleAllExclusionLinks.setAttribute("aria-pressed", state.showAllExclusionLinks ? "true" : "false");
     const selectedCount = state.selectedVariableIds?.size || 0;
     if (elements.selectionCount) {
       elements.selectionCount.hidden = selectedCount === 0;

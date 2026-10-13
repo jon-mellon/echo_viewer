@@ -37,6 +37,7 @@ export function createDagAppState(interfaceMode = "classic") {
     exclusionPathsByGroup: new Map(), exclusionLinkPairKeys: new Set(),
     confounderMaxPathLength: 1, exclusionMaxPathLength: 2, excludeBottleneckedConfounders: true,
     hideIrrelevantConfounderLinks: true,
+    showAllExclusionLinks: false,
     confounderGroupIds: new Set(), confounderPathGroupIds: new Set(),
     confounderPathsByGroup: new Map(), confounderLinkPairKeys: new Set(),
     bottleneckedConfounderIds: new Set(),

@@ -196,6 +196,10 @@ function installHandlers() {
     if (!state.showCollidersOnly && !state.showExogeneity) state.showConfoundersOnly = true;
     rebuildProject();
   });
+  els.toggleAllExclusionLinks.addEventListener("click", () => {
+    state.showAllExclusionLinks = !state.showAllExclusionLinks;
+    rebuildProject();
+  });
   els.dagSelectMode.addEventListener("click", () => setMapMode("select"));
   els.dagBrushMode.addEventListener("click", () => setMapMode("draw_add"));
   els.dagEraseMode.addEventListener("click", () => setMapMode("draw_remove"));
