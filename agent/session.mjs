@@ -376,6 +376,7 @@ export class EchoAgentSession {
     if (typeof showConfoundersOnly !== "boolean") throw new Error("Invalid permalink confounder view option.");
     const current = await canonicalizeWorkingSchema(this.schema);
     if (current.contentHash !== this.record.readyHash) throw new Error("Schema changed after review.");
+    const variableLayoutSource = await this.evidence.layoutSource();
     const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       auth: { persistSession: false, detectSessionInUrl: false },
     });
@@ -393,7 +394,8 @@ export class EchoAgentSession {
         compileInput: { project: projectFromSchema(this.schema, this.record.anchors), rawLinks } });
       this.record.status = "published";
       const state = { project: this.project, data: { snapshot: { snapshot_id: this.record.snapshotId } },
-        workflowMode: "dag", confounderMaxPathLength: maxPathLength, showConfoundersOnly };
+        workflowMode: "dag", variableLayoutSource,
+        confounderMaxPathLength: maxPathLength, showConfoundersOnly };
       this.record.published = { publicationId: result.publicationId, contentHash: result.contentHash,
         permalink: publicationPermalink(result.publicationId, undefined, state), reused: result.reused };
       await this.save();

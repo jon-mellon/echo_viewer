@@ -16,6 +16,7 @@ import { validateGroupingSchema } from "../site/data_validation.mjs";
 import { searchVariables as echoSearchVariables } from "../site/dag_search.mjs";
 import { pairKey } from "../site/dag_link_aggregation.mjs";
 import { lookupPublishedSchema, publicSchemaBaseUrl } from "../site/publication_access.mjs";
+import { fetchPublishedFile } from "../site/published_schema_loader.mjs";
 
 const execFileAsync = promisify(execFile);
 const HASH = /^[0-9a-f]{64}$/i;
@@ -95,13 +96,13 @@ export async function clonePublication({ publicationId = DEFAULT_SCHEMA_PUBLICAT
   const publicationDir = join(home, "publications", publicationId);
   const baseUrl = publicSchemaBaseUrl(client, publication.storage_prefix);
   const publicUrl = path => new URL(path, baseUrl).href;
-  const schemaManifestResponse = await fetch(publicUrl("manifest.json"));
+  const schemaManifestResponse = await fetchPublishedFile(publicUrl("manifest.json"), undefined, fetch);
   if (!schemaManifestResponse.ok) throw new Error("Could not download publication manifest.");
   const schemaManifest = JSON.parse(await schemaManifestResponse.text());
   const paths = ["manifest.json", schemaManifest.schema_file, schemaManifest.groups_file,
     ...Object.values(schemaManifest.group_membership_files || {}), schemaManifest.rejected_file,
     publication.compiled_manifest_path].filter(Boolean);
-  const compiledManifestResponse = await fetch(publicUrl(publication.compiled_manifest_path));
+  const compiledManifestResponse = await fetchPublishedFile(publicUrl(publication.compiled_manifest_path), undefined, fetch);
   if (!compiledManifestResponse.ok) throw new Error("Could not download compiled manifest.");
   const compiledManifestBytes = Buffer.from(await compiledManifestResponse.arrayBuffer());
   if (publication.compiled_manifest_hash && sha256(compiledManifestBytes) !== publication.compiled_manifest_hash) {
@@ -110,8 +111,8 @@ export async function clonePublication({ publicationId = DEFAULT_SCHEMA_PUBLICAT
   const compiledManifest = JSON.parse(compiledManifestBytes.toString("utf8"));
   paths.push(compiledManifest.artifacts?.dag?.path);
   const schemaFiles = new Map();
-  await eachLimited([...new Set(paths.filter(Boolean))], 8, async relative => {
-    const response = await fetch(publicUrl(relative));
+  await eachLimited([...new Set(paths.filter(Boolean))], 4, async relative => {
+    const response = await fetchPublishedFile(publicUrl(relative), undefined, fetch);
     if (!response.ok) throw new Error(`Could not download publication file ${relative}.`);
     const bytes = Buffer.from(await response.arrayBuffer());
     const path = safePath(publicationDir, relative);
@@ -173,6 +174,12 @@ export function localEvidence(snapshotDir) {
   const relation = name => sqlString(join(snapshotDir, `canonical/${name}.parquet`));
   const list = values => values.map(sqlString).join(",");
   return {
+    async layoutSource() {
+      const metadata = await duckRows(`SELECT metadata_json FROM read_parquet(${relation("build_metadata")})`);
+      const layout = JSON.parse(metadata[0]?.metadata_json || "{}").layout?.default_source;
+      if (!layout) throw new Error("Snapshot has no default variable layout.");
+      return layout;
+    },
     async variables(ids) {
       if (!ids.length) return [];
       return duckRows(`SELECT * FROM read_parquet(${relation("variable_occurrences")}) WHERE variable_id IN (${list(ids)}) ORDER BY index`);
@@ -195,9 +202,7 @@ export function localEvidence(snapshotDir) {
       return duckRows(`SELECT * FROM read_parquet(${relation("causal_link_occurrences")}) WHERE source_variable_id IN (${list(ids)}) OR target_variable_id IN (${list(ids)})`);
     },
     async candidateInputs() {
-      const metadata = await duckRows(`SELECT metadata_json FROM read_parquet(${relation("build_metadata")})`);
-      const layout = JSON.parse(metadata[0]?.metadata_json || "{}").layout?.default_source;
-      if (!layout) throw new Error("Snapshot has no default variable layout.");
+      const layout = await this.layoutSource();
       const variables = await duckRows(`SELECT v.variable_id,l.map_x,l.map_y FROM read_parquet(${relation("variable_occurrences")}) v JOIN read_parquet(${relation("variable_layouts")}) l USING (variable_id) WHERE l.layout_source=${sqlString(layout)}`);
       const similarity = await duckRows(`SELECT source,target,weight FROM read_parquet(${relation("similarity_edges")}) WHERE layout_source=${sqlString(layout)}`);
       const rawLinks = await this.rawLinks();
