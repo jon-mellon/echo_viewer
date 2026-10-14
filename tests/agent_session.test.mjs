@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { EchoAgentSession } from "../agent/session.mjs";
 import { createEchoTools } from "../agent/tools.mjs";
 import { jevRequest, jevResults } from "../site/definition_jev_core.mjs";
+import { publicationPermalink } from "../site/published_schema_loader.mjs";
 
 const baseSchema = {
   schema_version: "groupings-v3", grouping_set_id: "fixture", label: "Fixture", description: "Test",
@@ -50,6 +51,7 @@ test("local split, finding decision, graph, review, and single publication gate 
   const review = await session.ready();
   assert.equal(review.status, "ready");
   await assert.rejects(() => session.upsertGroup({ groupId: "x", label: "X" }), /start a new session/);
+  await assert.rejects(() => session.publish({ maxPathLength: 0 }), /path length/);
   session.record.status = "published";
   await assert.rejects(() => session.publish(), /Review and mark/);
 });
@@ -59,6 +61,32 @@ test("Jev's local and browser paths share request and answer semantics", () => {
   assert.equal(jevRequest(records, "alpha").model, "typesafe/jev-1.13");
   assert.deepEqual(jevResults({ answers: { v0: { type: "choice", choice: "new", confidence: 0.7 } } }, records),
     [{ id: "a", label: "A", side: "new", confidence: 0.7 }]);
+});
+
+test("retained finding reviews and every confounder status keep local open reasons", async () => {
+  const session = await fixture();
+  await session.setAnchors({ ivId: "iv", dvId: "dv" });
+  await session.setFindingDecision({ rawLinkId: "r1", excluded: false,
+    reasonText: "Same construct and target population." });
+  assert.equal(session.schema.finding_reviews.r1.reason_text, "Same construct and target population.");
+  await session.setConfounderStatus({ groupId: "source", status: "explicitly_controlled",
+    text: "The stated specification includes this covariate." });
+  assert.equal(Object.values(session.schema.confounder_statuses)[0].text,
+    "The stated specification includes this covariate.");
+  await session.setFindingDecision({ rawLinkId: "r1", excluded: true, reasonCode: "concept_miscategorized",
+    reasonText: "The measured entity is the teacher." });
+  assert.equal(session.schema.finding_reviews.r1, undefined);
+});
+
+test("publication permalink selects the reviewed X-Y graph", () => {
+  const state = { project: { ...baseSchema, iv_group_id: "iv", dv_group_id: "dv" },
+    data: { snapshot: { snapshot_id: "fixture" } }, workflowMode: "dag",
+    confounderMaxPathLength: 1, showConfoundersOnly: true };
+  const url = new URL(publicationPermalink("publication-1", undefined, state));
+  assert.equal(url.searchParams.get("schema"), "publication-1");
+  assert.equal(url.searchParams.get("iv"), "iv");
+  assert.equal(url.searchParams.get("dv"), "dv");
+  assert.equal(url.searchParams.get("path"), "1");
 });
 
 test("MCP exposes the local workflow and a single final publication tool", () => {

@@ -13,6 +13,7 @@ import { validateGroupingSchema } from "../site/data_validation.mjs";
 import { canonicalizeWorkingSchema, publishWorkingSchema } from "../site/dag_publication_core.mjs";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "../site/supabase_config.mjs";
 import { DEFAULT_SCHEMA_PUBLICATION_ID } from "../site/dag_data_config.mjs";
+import { publicationPermalink } from "../site/published_schema_loader.mjs";
 import { JEV_BATCH_SIZE, JEV_TEST_SIZE, cappedKeyStatus, randomSampleIds,
   jevRecords, jevRequest, jevResults, openRouterJson, parseJevPricing,
   jevRequestSizes, estimatedJevCharge } from "../site/definition_jev_core.mjs";
@@ -194,11 +195,15 @@ export class EchoAgentSession {
   }
   async setFindingDecision({ rawLinkId, excluded, reasonCode = "", reasonText = "" }) {
     if (!(await this.evidence.rawLinks([rawLinkId])).length) throw new Error("Unknown finding ID.");
+    if (!excluded && reasonCode) throw new Error("Reason codes apply only to excluded findings.");
     return this.mutate("set_finding_decision", { rawLinkId, excluded, reasonCode, reasonText }, schema => {
       const project = projectFromSchema(schema);
       schema.finding_decisions = projectOps.setFindingDecision(project, rawLinkId,
         excluded ? { display_status: "excluded", ...(reasonCode ? { reason_code: reasonCode } : {}),
           ...(reasonText ? { reason_text: reasonText } : {}) } : null).finding_decisions;
+      schema.finding_reviews ||= {};
+      if (excluded || !reasonText.trim()) delete schema.finding_reviews[rawLinkId];
+      else schema.finding_reviews[rawLinkId] = { status: "retained", reason_text: reasonText };
     });
   }
   async setConfounderStatus({ groupId, status, text = "" }) {
@@ -363,8 +368,12 @@ export class EchoAgentSession {
     await this.save();
     return { ...diff, status: "ready" };
   }
-  async publish() {
+  async publish({ maxPathLength = 1, showConfoundersOnly = true } = {}) {
     if (this.status !== "ready") throw new Error("Review and mark this session ready before publishing.");
+    if (!Number.isInteger(maxPathLength) || maxPathLength < 1 || maxPathLength > 99) {
+      throw new Error("Permalink path length must be an integer from 1 to 99.");
+    }
+    if (typeof showConfoundersOnly !== "boolean") throw new Error("Invalid permalink confounder view option.");
     const current = await canonicalizeWorkingSchema(this.schema);
     if (current.contentHash !== this.record.readyHash) throw new Error("Schema changed after review.");
     const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
@@ -383,8 +392,10 @@ export class EchoAgentSession {
         previousPublication: { publication_id: this.record.sourcePublication.id },
         compileInput: { project: projectFromSchema(this.schema, this.record.anchors), rawLinks } });
       this.record.status = "published";
+      const state = { project: this.project, data: { snapshot: { snapshot_id: this.record.snapshotId } },
+        workflowMode: "dag", confounderMaxPathLength: maxPathLength, showConfoundersOnly };
       this.record.published = { publicationId: result.publicationId, contentHash: result.contentHash,
-        permalink: `https://echo.epistemicinfra.org/?schema=${result.publicationId}`, reused: result.reused };
+        permalink: publicationPermalink(result.publicationId, undefined, state), reused: result.reused };
       await this.save();
       return this.record.published;
     } catch (error) {

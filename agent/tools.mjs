@@ -78,10 +78,10 @@ export function createEchoTools({ getSession, setSession }) {
       obj({ ivId: str, dvId: str, instrumentId: str }, ["ivId", "dvId"]), a => session().setAnchors(a)),
     define("echo_set_edge_decision", "Exclude or restore a graph edge.",
       obj({ edgeId: str, excluded: bool, reason: str }, ["edgeId", "excluded"]), a => session().setEdgeDecision(a)),
-    define("echo_set_finding_decision", "Exclude or restore one finding, matching Echo's finding-level behavior.",
+    define("echo_set_finding_decision", "Exclude a finding with a reason, or retain it with a private open review reason.",
       obj({ rawLinkId: str, excluded: bool, reasonCode: str, reasonText: str }, ["rawLinkId", "excluded"]),
       a => session().setFindingDecision(a)),
-    define("echo_set_confounder_status", "Set Echo's status for a potential confounder under the selected IV and DV.",
+    define("echo_set_confounder_status", "Set Echo's status for a potential confounder and a private open reason under the selected IV and DV.",
       obj({ groupId: str, status: str, text: str }, ["groupId", "status"]), a => session().setConfounderStatus(a)),
     define("echo_graph", "Compile the working DAG and calculate Echo's confounder, collider, and exclusion diagnostics.",
       obj({ showConfoundersOnly: bool, showCollidersOnly: bool, showExclusionViolations: bool,
@@ -112,7 +112,7 @@ export function createEchoTools({ getSession, setSession }) {
       a => session().jevApplySplit(a)),
     define("echo_diff", "Show the working schema's changes and canonical public content hash.", obj({}), () => session().diff()),
     define("echo_ready", "Validate the complete schema and freeze it for a single final publication action.", obj({}), () => session().ready()),
-    define("echo_publish", "Publish once through Echo's normal Supabase Storage and registry path. This is public and immutable.",
-      obj({}), () => session().publish()),
+    define("echo_publish", "Publish once through Echo's normal Supabase Storage and registry path and return a view permalink. This is public and immutable.",
+      obj({ maxPathLength: num, showConfoundersOnly: bool }), a => session().publish(a)),
   ];
 }
