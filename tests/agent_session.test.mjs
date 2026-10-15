@@ -8,6 +8,8 @@ import { EchoAgentSession } from "../agent/session.mjs";
 import { createEchoTools } from "../agent/tools.mjs";
 import { jevRequest, jevResults } from "../site/definition_jev_core.mjs";
 import { publicationPermalink } from "../site/published_schema_loader.mjs";
+import { writeGroupingSchemaFolder } from "../site/grouping_schema_writer.mjs";
+import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "../site/app_contracts.mjs";
 
 const baseSchema = {
   schema_version: "groupings-v3", grouping_set_id: "fixture", label: "Fixture", description: "Test",
@@ -39,6 +41,7 @@ test("local split, finding decision, graph, review, and single publication gate 
   const session = await fixture();
   await session.setAnchors({ ivId: "iv", dvId: "dv" });
   await session.split({ sourceGroupIds: ["source"], newGroupId: "new", newLabel: "New",
+    newDescription: "Source member selected for this test split.",
     residualLabels: { source: "Other source" }, newVariableIds: ["s1"] });
   assert.deepEqual(session.schema.groups.find(group => group.group_id === "new").variable_ids, ["s1"]);
   assert.deepEqual(session.schema.groups.find(group => group.group_id === "source").variable_ids, ["s2", "s3"]);
@@ -61,6 +64,45 @@ test("Jev's local and browser paths share request and answer semantics", () => {
   assert.equal(jevRequest(records, "alpha").model, "typesafe/jev-1.13");
   assert.deepEqual(jevResults({ answers: { v0: { type: "choice", choice: "new", confidence: 0.7 } } }, records),
     [{ id: "a", label: "A", side: "new", confidence: 0.7 }]);
+});
+
+test("agent checks approved published splits before Jev and can apply a selected split", async () => {
+  const session = await fixture();
+  const published = { group_id: "published", label: "School outcomes",
+    description: "Outcomes measured in formal education.", source: "user_split",
+    provenance: { operation: "split_categories", source_group_ids: ["source"] },
+    variable_ids: ["s1"] };
+  const files = await writeGroupingSchemaFolder({ schema_version: GROUPING_FORMAT_VERSION,
+    membership_unit: GROUPING_MEMBERSHIP_UNIT, grouping_set_id: "fixture", label: "Fixture",
+    groups: [published] });
+  const row = { publication_id: "publication", group_id: "published", split_id: "split-published",
+    source_group_ids: ["source"], name: published.label, description: published.description,
+    storage_prefix: "owner/publication", membership_path: "memberships/published.tsv",
+    owner_id: "other", published_at: "2026-10-15T00:00:00Z" };
+  session.browseSplits = async () => [row];
+  session.publishedSplitClient = () => ({ storage: { from: () => ({ getPublicUrl: path => ({
+    data: { publicUrl: `https://example.test/published/${path}` },
+  }) }) } });
+  session.publishedSplitFetch = async url => {
+    const path = new URL(url).pathname.split("/published/owner/publication/")[1];
+    return new Response(files.get(path), { status: files.has(path) ? 200 : 404 });
+  };
+  const tools = createEchoTools({ getSession: () => session, setSession: () => {} });
+  const browse = tools.find(tool => tool.name === "echo_browse_published_splits");
+  assert.deepEqual(await browse.run({ sourceGroupIds: ["source"] }), [row]);
+  const testTool = tools.find(tool => tool.name === "echo_jev_test");
+  const gate = await testTool.run({ sourceGroupIds: ["source"], description: "Educational outcomes" });
+  assert.equal(gate.phase, "published_lookup");
+  assert.deepEqual(gate.candidates, [row]);
+  const estimate = tools.find(tool => tool.name === "echo_jev_estimate");
+  assert.equal((await estimate.run({ sourceGroupIds: ["source"],
+    description: "Educational outcomes" })).phase, "published_lookup");
+  const apply = tools.find(tool => tool.name === "echo_apply_published_split");
+  await apply.run({ sourceGroupIds: ["source"], publicationId: "publication", groupId: "published",
+    newGroupId: "school", residualLabels: { source: "Other source" } });
+  assert.deepEqual(session.schema.groups.find(group => group.group_id === "school").variable_ids, ["s1"]);
+  assert.equal(session.schema.groups.find(group => group.group_id === "school").description, published.description);
+  assert.deepEqual(session.schema.groups.find(group => group.group_id === "source").variable_ids, ["s2", "s3"]);
 });
 
 test("retained finding reviews and every confounder status keep local open reasons", async () => {
