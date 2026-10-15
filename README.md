@@ -5,6 +5,20 @@ The static viewer is deployed to [echo.epistemicinfra.org](https://echo.epistemi
 The deployable website is contained in `site/`. GitHub Pages uploads only that
 directory, so repository-level files such as tests are not served publicly.
 
+## Push secret scan
+
+Run `npm run prepare` once in each clone to enable the versioned pre-push hook.
+`npm install` also runs this setup. The hook checks the Git objects that a push
+would send, including earlier commits in the outgoing history, and blocks
+recognized credentials and suspicious hard-coded values. It reports locations
+without printing the values. A normal push from the command line, a local agent,
+or GitHub Desktop runs the hook in that checkout. Run `npm run check:secrets` to
+scan the full current branch manually.
+
+This is a local safeguard. A different clone needs its own hook setup, and Git
+allows callers to bypass local hooks. Enable GitHub secret scanning push
+protection for server-side coverage where available.
+
 ## Local agent operations
 
 Run `npm run agent:mcp` to expose Echo operations to a local MCP client over
