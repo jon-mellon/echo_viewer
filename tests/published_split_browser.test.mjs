@@ -4,7 +4,7 @@ import { browsePublishedSplits, loadPublishedSplitMembership } from "../site/pub
 import { writeGroupingSchemaFolder } from "../site/grouping_schema_writer.mjs";
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "../site/app_contracts.mjs";
 
-test("browse keeps only approved splits matching the exact selected sources", async () => {
+test("browse keeps approved splits, including the viewer's own, matching the exact selected sources", async () => {
   const rows = [
     { publication_id: "one", group_id: "g1", split_id: "split-1", owner_id: "other",
       source_group_ids: ["a"], published_at: "2026-10-01" },
@@ -19,8 +19,8 @@ test("browse keeps only approved splits matching the exact selected sources", as
     select() { return this; }, eq() { return this; }, contains(_column, [id]) { this.id = id; return this; },
     order() { return this; }, async limit() { return { data: rows.filter(row => row.source_group_ids.includes(this.id)), error: null }; },
   }) };
-  assert.deepEqual((await browsePublishedSplits(["a"], client)).map(row => row.group_id), ["g1"]);
-  assert.deepEqual((await browsePublishedSplits(["a"], client)).map(row => row.publication_id), ["later"]);
+  assert.deepEqual((await browsePublishedSplits(["a"], client)).map(row => row.group_id), ["own", "g1"]);
+  assert.deepEqual((await browsePublishedSplits(["a"], client)).map(row => row.publication_id), ["mine", "later"]);
   assert.deepEqual((await browsePublishedSplits(["a", "b"], client)).map(row => row.group_id), ["g2"]);
 });
 

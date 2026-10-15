@@ -6,8 +6,6 @@ export async function browsePublishedSplits(sourceGroupIds, client = supabase) {
   if (!client) throw new Error("Supabase is not configured.");
   const ids = [...new Set(sourceGroupIds)].filter(Boolean);
   if (!ids.length) return [];
-  const { data: authData } = await client.auth?.getSession?.() || {};
-  const ownId = authData?.session?.user?.id;
   const pages = await Promise.all(ids.map(async id => {
     const { data, error } = await client.from("published_split_index")
       .select("publication_id,group_id,split_id,source_group_ids,name,description,storage_prefix,membership_path,owner_id,published_at")
@@ -18,7 +16,6 @@ export async function browsePublishedSplits(sourceGroupIds, client = supabase) {
   }));
   const unique = new Map();
   for (const row of pages.flat()) {
-    if (row.owner_id === ownId && ownId) continue;
     if (row.source_group_ids?.length !== ids.length
       || !row.source_group_ids.every(id => ids.includes(id))) continue;
     const key = `${row.owner_id}:${row.split_id || row.group_id}`;
