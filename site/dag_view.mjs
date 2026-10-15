@@ -28,6 +28,7 @@ export function deriveDagView({
   showExclusionViolations = false,
   showExogeneity = false,
   hideIrrelevantDiagnosticLinks = false,
+  showAllExclusionLinks = false,
 } = {}) {
   const fullGraph = createGraph(groups.map((group) => group.group_id), links);
   const connectivityGraph = filterGraphLinks(fullGraph, (link) => !excludedForConnectivity(link));
@@ -69,7 +70,7 @@ export function deriveDagView({
   });
   if (showExogeneity && instrumentId && hideIrrelevantDiagnosticLinks) {
     visibleGraph = filterGraphByLinkPairs(visibleGraph, exogeneityGraph.metadata.linkPairKeys);
-  } else if (showExclusionViolations && instrumentId) {
+  } else if (showExclusionViolations && instrumentId && !showAllExclusionLinks) {
     visibleGraph = filterGraphByLinkPairs(visibleGraph, exclusionGraph.metadata.linkPairKeys);
   } else if (anchorsReady && (showConfoundersOnly || showCollidersOnly) && hideIrrelevantDiagnosticLinks) {
     const retainedPairs = showCollidersOnly

@@ -89,6 +89,7 @@ test("instrument view finds bounded directed exclusion paths without the IV", ()
     link("k2_dv", "k2", "dv", "A_TO_B"),
     link("z_iv", "z", "iv", "A_TO_B"),
     link("iv_dv", "iv", "dv", "A_TO_B"),
+    link("excluded_visible", "iv", "k1", "A_TO_B", { display_status: "excluded" }),
     link("z_other", "z", "other", "A_TO_B", { display_status: "excluded" }),
     link("other_dv", "other", "dv", "A_TO_B"),
   ];
@@ -99,6 +100,12 @@ test("instrument view finds bounded directed exclusion paths without the IV", ()
   assert.deepEqual([...view(2).exclusionViolations.violationIds], ["k1"]);
   assert.deepEqual([...view(2).componentGroupIds].sort(), ["dv", "iv", "k1", "z"]);
   assert.deepEqual(view(2).visibleLinks.map(item => item.edge_id), ["z_k1", "k1_dv"]);
+  const allVisibleLinks = deriveDagView({ groups: instrumentGroups, links: instrumentLinks,
+    ivId: "iv", dvId: "dv", instrumentId: "z", exclusionMaxPathLength: 2,
+    showExclusionViolations: true, showAllExclusionLinks: true });
+  assert.deepEqual([...allVisibleLinks.componentGroupIds].sort(), ["dv", "iv", "k1", "z"]);
+  assert.deepEqual(allVisibleLinks.visibleLinks.map(item => item.edge_id),
+    ["z_k1", "k1_dv", "z_iv", "iv_dv"]);
   assert.deepEqual([...view(3).exclusionViolations.violationIds].sort(), ["k1", "k2"]);
   const separateLengths = deriveDagView({ groups: instrumentGroups, links: instrumentLinks,
     ivId: "iv", dvId: "dv", instrumentId: "z", maxPathLength: 1,

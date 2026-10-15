@@ -18,6 +18,7 @@ export function publicFindingDecisions(decisions = {}) {
 
 export function publicSchemaProjection(schema) {
   const { link_decisions: _localDecisions, finding_decisions: _localFindings,
+    finding_reviews: _localReviews,
     confounder_statuses: _localConfounders, ...rest } = schema;
   const linkDecisions = publicLinkDecisions(schema.link_decisions);
   const findingDecisions = publicFindingDecisions(schema.finding_decisions);

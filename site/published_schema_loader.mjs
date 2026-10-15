@@ -8,7 +8,9 @@ import { deriveDagView } from "./dag_view.mjs";
 import { COMPILED_DAG_PATH, sha256Hex, stableJsonBytes,
   validateCompiledArtifact } from "./compiled_dag.mjs";
 
-export const PUBLISHED_SCHEMA_BUCKET = "published-schemas";
+export { PUBLISHED_SCHEMA_BUCKET } from "./publication_constants.mjs";
+import { publicSchemaBaseUrl as sharedPublicSchemaBaseUrl,
+  lookupPublishedSchema as sharedLookupPublishedSchema } from "./publication_access.mjs";
 
 export async function fetchPublishedFile(url, options, fetchImpl, sleep = ms => new Promise(resolve => setTimeout(resolve, ms))) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -55,20 +57,11 @@ export function publicationId(location = globalThis.location) {
 }
 
 export function publicSchemaBaseUrl(client, storagePrefix) {
-  const { data } = client.storage.from(PUBLISHED_SCHEMA_BUCKET).getPublicUrl(`${storagePrefix}/manifest.json`);
-  if (!data?.publicUrl) throw new Error("Supabase did not return a public schema URL.");
-  return data.publicUrl.replace(/manifest\.json$/, "");
+  return sharedPublicSchemaBaseUrl(client, storagePrefix);
 }
 
 export async function lookupPublishedSchema(publicationId, client = supabase) {
-  if (!client) throw new Error("Supabase is not configured.");
-  if (!/^[0-9a-f-]{36}$/i.test(publicationId)) throw new Error("Invalid schema publication ID.");
-  const { data, error } = await client.from("published_schemas")
-    .select("id, owner_id, content_hash, storage_prefix, parent_schema_id, title, description, evidence_snapshot, compiled_manifest_path, compiled_manifest_hash, compiler_version")
-    .eq("id", publicationId)
-    .single();
-  if (error) throw error;
-  return data;
+  return sharedLookupPublishedSchema(publicationId, client);
 }
 
 export async function loadPublishedSchema(publicationId, client = supabase, fetchImpl = globalThis.fetch) {

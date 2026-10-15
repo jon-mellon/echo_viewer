@@ -1,16 +1,12 @@
 import { h, replaceChildren } from "./dom_builder.mjs";
 import { jevRunId, loadJevRun, latestJevRun, saveJevRun, saveJevBatch, deleteJevRun } from "./definition_jev_checkpoint.mjs";
+import { JEV_MODEL as MODEL, JEV_BATCH_SIZE as BATCH_SIZE, JEV_TEST_SIZE as TEST_SIZE, cappedKeyStatus, randomSampleIds, jevRecords, jevRequest, jevResults, openRouterJson, parseJevPricing, jevRequestSizes, estimatedJevCharge } from "./definition_jev_core.mjs";
+export { cappedKeyStatus, randomSampleIds } from "./definition_jev_core.mjs";
 
-const MODEL = "typesafe/jev-1.13";
-const MAX_KEY_LIMIT_USD = 5;
 const OAUTH_PENDING_KEY = "echo-openrouter-pkce-v1";
 const OAUTH_DRAFT_KEY = "echo-openrouter-definition-draft-v1";
-const BATCH_SIZE = 16;
-const TEST_SIZE = 24;
-const CHARS_PER_TOKEN = 4;
 const REVIEW_PAGE_SIZE = 40;
 const SPOT_CHECK_PER_GROUP = 12;
-const REQUEST_TIMEOUT_MS = 60_000;
 
 function reviewRank(id) {
   let hash = 2166136261;
@@ -29,44 +25,8 @@ export function spotCheckResults(results) {
     .sort((a, b) => a.confidence - b.confidence);
 }
 
-export function randomSampleIds(sourceIds, count = TEST_SIZE) {
-  const ids = [...sourceIds];
-  const random = new Uint32Array(ids.length);
-  // Browsers cap each getRandomValues call at 65,536 bytes.
-  for (let offset = 0; offset < random.length; offset += 16_384) {
-    crypto.getRandomValues(random.subarray(offset, offset + 16_384));
-  }
-  for (let index = ids.length - 1; index > 0; index -= 1) {
-    const swap = random[index] % (index + 1);
-    [ids[index], ids[swap]] = [ids[swap], ids[index]];
-  }
-  return ids.slice(0, count);
-}
-
 function formatUsd(amount) {
   return amount > 0 && amount < 0.000001 ? "<$0.000001" : `$${amount.toFixed(6)}`;
-}
-
-function parsePricing(data) {
-  const values = [data?.prompt, data?.completion, data?.request ?? 0].map(Number);
-  if (values.some(value => !Number.isFinite(value) || value < 0)) return null;
-  return { input: values[0], output: values[1], request: values[2] };
-}
-
-export function cappedKeyStatus(data) {
-  if (!data || !Number.isFinite(data.limit) || data.limit < 0) {
-    return "This key was rejected: Set a spending limit of $5 or less that never resets in OpenRouter key settings, then recheck the limit.";
-  }
-  if (data.limit > MAX_KEY_LIMIT_USD) {
-    return `This key was rejected: It allows $${data.limit} of spending. Lower its limit to $5 or less in OpenRouter key settings, then recheck the limit.`;
-  }
-  if (data.limit_reset !== null) {
-    return "This key was rejected: Choose a limit that never resets, rather than a daily, weekly, or monthly limit, then recheck the limit.";
-  }
-  if (!Number.isFinite(data.limit_remaining) || data.limit_remaining <= 0) {
-    return "This key has no spending allowance left. Connect a new capped key.";
-  }
-  return null;
 }
 
 function base64Url(bytes) {
@@ -80,36 +40,6 @@ async function sha256Base64Url(value) {
 async function keySettingsUrl(key) {
   const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)));
   return `https://openrouter.ai/keys/${[...hash].map(byte => byte.toString(16).padStart(2, "0")).join("")}`;
-}
-
-async function openRouterJson(path, key, options = {}) {
-  const { signal, ...fetchOptions } = options;
-  const controller = new AbortController();
-  const stop = () => controller.abort(signal.reason);
-  if (signal?.aborted) stop();
-  else signal?.addEventListener("abort", stop, { once: true });
-  const timer = setTimeout(() => controller.abort("timeout"), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetch(`https://openrouter.ai${path}`, {
-      ...fetchOptions, signal: controller.signal,
-      headers: { ...(key ? { Authorization: `Bearer ${key}` } : {}),
-        ...(options.body ? { "Content-Type": "application/json" } : {}) },
-    });
-    const body = await response.json().catch(error => {
-      if (controller.signal.aborted) throw error;
-      return {};
-    });
-    if (!response.ok) throw new Error(body.error?.message || body.message || `OpenRouter returned ${response.status}.`);
-    return body;
-  } catch (error) {
-    if (controller.signal.reason === "timeout") {
-      throw new Error("OpenRouter did not respond within 60 seconds.");
-    }
-    throw error;
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener("abort", stop);
-  }
 }
 
 export function createDefinitionJevAssist({ elements: els, getDraft, getVariable, onApply,
@@ -319,42 +249,11 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       : `${counts} This is a preview; your draft has not changed. Spot check the choices, then use them in your draft. Every choice is included, even those not shown here.`;
   }
 
-  function recordsFor(ids) {
-    return ids.map(id => {
-      const variable = getVariable(id) || {};
-      return { id, label: String(variable.display_label || variable.concept_label || id).slice(0, 300),
-        text: String(variable.raw_variable_text || variable.concept_label || "").slice(0, 600) };
-    });
-  }
+  function recordsFor(ids) { return jevRecords(ids, getVariable); }
+  function requestFor(batch, description) { return jevRequest(batch, description); }
 
-  function requestFor(batch, description) {
-    const questions = Object.fromEntries(batch.map((record, index) => [`v${index}`, {
-      type: "choice", instructions: `Classify the source variable at records[${index}] using its label and text. Choose new only when it clearly fits target_definition. Leftover is the remainder of the selected source variables, not a separately defined opposite concept. Put uncertain or ambiguous matches in leftover for human review.`,
-      criteria: { new: "Clearly belongs in the new variable described by target_definition",
-        leftover: "Does not clearly belong in the new variable described by target_definition, including uncertain matches" },
-    }]));
-    return { model: MODEL,
-      state: { target_definition: description, records: batch.map(({ label, text }) => ({ label, text })) },
-      questions };
-  }
-
-  function requestSizes(ids, description) {
-    const records = recordsFor(ids);
-    let inputTokens = 0;
-    let requests = 0;
-    for (let offset = 0; offset < records.length; offset += BATCH_SIZE) {
-      inputTokens += Math.ceil(JSON.stringify(requestFor(records.slice(offset, offset + BATCH_SIZE), description)).length / CHARS_PER_TOKEN);
-      requests += 1;
-    }
-    return { inputTokens, requests, records: records.length };
-  }
-
-  function estimatedCharge(size, calibration = 1) {
-    // Jev currently charges for input tokens; include a small output allowance if that pricing changes.
-    const outputTokens = size.records * 8;
-    return (size.inputTokens * calibration * pricing.input) + (outputTokens * pricing.output)
-      + (size.requests * pricing.request);
-  }
+  function requestSizes(ids, description) { return jevRequestSizes(recordsFor(ids), description); }
+  function estimatedCharge(size, calibration = 1) { return estimatedJevCharge(size, pricing, calibration); }
 
   function renderCost(draft, description) {
     if (!draft || draft.step !== "partition" || !draft.eligible_variable_ids?.length || !description || !key) {
@@ -493,7 +392,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     if (!problem) {
       try {
         const model = await openRouterJson(`/api/v1/model/${MODEL}`, key, { signal });
-        pricing = parsePricing(model.data?.pricing);
+        pricing = parseJevPricing(model.data?.pricing);
       } catch { /* The split can still run if pricing is temporarily unavailable. */ }
     }
     if (signal?.aborted) return false;
@@ -583,16 +482,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
         const body = await openRouterJson("/api/alpha/decisions", key, { method: "POST",
           body: JSON.stringify(requestFor(batch, description)), signal: activeRequest.signal });
         if (revision !== runRevision || draft !== getDraft()) return null;
-        const rows = [];
-        for (const [index, record] of batch.entries()) {
-          const answer = body.answers?.[`v${index}`];
-          if (answer?.type !== "choice" || !["new", "leftover"].includes(answer.choice)) {
-            throw new Error("The model returned an incomplete classification. Completed batches remain saved.");
-          }
-          const probability = Number(answer.probabilities?.[answer.choice] ?? answer.confidence ?? 0);
-          rows.push({ id: record.id, label: record.label, side: answer.choice,
-            confidence: Number.isFinite(probability) ? Math.max(0, Math.min(1, probability)) : 0 });
-        }
+        const rows = jevResults(body, batch);
         const reportedTokens = Number(body.usage?.input_tokens ?? body.usage?.inputTokens);
         const tokens = Number.isFinite(reportedTokens) && reportedTokens >= 0 ? reportedTokens : null;
         showProgress(`${phase === "test" ? "Test" : "Full"} run: saving variables ${offset + 1}–${Math.min(offset + BATCH_SIZE, records.length)} in this browser…`);

@@ -139,6 +139,9 @@
                 <button id="definitionChooseJev" class="definition-method-choice" type="button">
                   <strong>Classify with AI</strong><span>Requires an OpenRouter key with a non-resetting $5 or lower maximum spend. Keys without that limit are rejected.</span>
                 </button>
+                <button id="definitionChooseBrowse" class="definition-method-choice" type="button">
+                  <strong>Browse user splits</strong><span>Find published splits for these variables, inspect their names and descriptions, and adapt one.</span>
+                </button>
               </div>
             </div>
             <div id="definitionSourcesStep" hidden>
@@ -146,6 +149,10 @@
               <label class="dag-label" for="definitionSourceSearch">Choose one or more categories to chop from</label>
               <input id="definitionSourceSearch" class="search-input" type="search" placeholder="Search categories or constituent variables">
               <div id="definitionSourceList" class="setup-group-picker-list"></div>
+              <div id="definitionBrowsePanel" hidden>
+                <p id="definitionBrowseStatus" class="small-note" role="status">Choose a source category to see published splits.</p>
+                <div id="definitionBrowseResults" class="definition-browse-results"></div>
+              </div>
               <button id="definitionContinue" class="primary-button" type="button" disabled>Continue</button>
             </div>
             <div id="definitionPartitionStep" hidden>
@@ -228,7 +235,7 @@
               <label class="dag-label" for="definitionNewLabel">New variable name</label>
               <input id="definitionNewLabel" class="search-input" type="text" placeholder="New variable">
               <label class="dag-label" for="definitionNewDescription">New group definition</label>
-              <textarea id="definitionNewDescription" class="search-input" rows="3" maxlength="1000" placeholder="Describe what belongs in this group"></textarea>
+              <textarea id="definitionNewDescription" class="search-input" rows="3" minlength="20" maxlength="1000" placeholder="Describe what belongs in this group (at least 20 characters)"></textarea>
               <div class="section-title compact-title"><h2>New group variables</h2></div>
               <div id="definitionReviewVariables" class="definition-review-variables"></div>
               <div id="definitionResidualLabels"></div>
@@ -414,6 +421,7 @@
               </label>
               <button id="toggleBottleneckedConfounders" class="toolbar-button" type="button" aria-pressed="false" title="Keep only candidates with bounded paths to the IV and DV that share no intermediate group; mouseover shows that same qualifying pair">Exclude bottlenecked</button>
               <button id="toggleIrrelevantConfounderLinks" class="toolbar-button" type="button" aria-pressed="false" title="Hide links that are not used by any currently displayed confounder's IV or DV witness path">Path links only</button>
+              <button id="toggleAllExclusionLinks" class="toolbar-button" type="button" aria-pressed="false" title="Show every link between groups visible in the exclusion restriction view" hidden>All visible links</button>
               <button id="showExcludedLinks" class="toolbar-button" type="button" hidden>Excluded links</button>
               <button id="showExcludedFindings" class="toolbar-button" type="button" hidden>Excluded findings</button>
               <button id="dagSvgZoomIn" class="icon-button" type="button" title="Zoom in">+</button>

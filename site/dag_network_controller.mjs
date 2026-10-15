@@ -390,7 +390,7 @@ function renderDag({ reuseGeometry = false } = {}) {
       : state.showExogeneity
         ? `exogeneity:${state.project?.instrument_group_id}:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
       : state.showExclusionViolations
-        ? `exclusion:${state.project?.instrument_group_id}:${state.exclusionMaxPathLength}`
+        ? `exclusion:${state.project?.instrument_group_id}:${state.exclusionMaxPathLength}:all-links:${state.showAllExclusionLinks}`
       : state.showCollidersOnly
         ? `colliders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
         : "all",

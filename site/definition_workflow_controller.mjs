@@ -2,6 +2,7 @@ import * as projectOps from "./dag_project.mjs";
 import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
 import { nearbyMapNeighbors } from "./definition_neighbors.mjs";
 import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
+import { browsePublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
   invalidateMapCaches, renderAll, drawMap = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
@@ -13,6 +14,64 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
   let lastBatch = null;
+  let browseRevision = 0;
+  const browseState = { rows: [], loading: false, error: "" };
+  async function refreshBrowse() {
+    const revision = ++browseRevision;
+    browseState.rows = [];
+    browseState.error = "";
+    browseState.loading = Boolean(state.definitionDraft?.source_group_ids?.length);
+    renderDefinition();
+    if (!browseState.loading) return;
+    try {
+      const rows = await browsePublishedSplits(state.definitionDraft.source_group_ids);
+      if (revision !== browseRevision || state.definitionMethod !== "browse") return;
+      browseState.rows = rows;
+    } catch (error) {
+      if (revision !== browseRevision || state.definitionMethod !== "browse") return;
+      browseState.error = `Could not browse splits: ${error.message || error}`;
+    }
+    browseState.loading = false;
+    renderDefinition();
+  }
+  async function choosePublishedSplit(row) {
+    if (!row || browseState.loading || state.definitionDraft?.step !== "sources") return;
+    const draft = state.definitionDraft;
+    browseState.loading = true;
+    browseState.error = "Loading the published assignments…";
+    renderDefinition();
+    try {
+      const ids = await loadPublishedSplitMembership(row);
+      if (state.definitionDraft !== draft) return;
+      const sources = definitionSources();
+      const eligible = new Set(sources.flatMap(group => group.variable_ids));
+      if (!ids.length || ids.some(id => !eligible.has(id))
+        || sources.some(group => group.variable_ids.every(id => ids.includes(id)))) {
+        throw new Error("This split does not fit the current source category assignments.");
+      }
+      state.definitionMethod = "manual";
+      await continueDefinition();
+      if (state.definitionDraft !== draft) return;
+      if (draft.step !== "partition") {
+        state.definitionMethod = "browse";
+        throw new Error("Could not load the current source variables.");
+      }
+      draft.new_variable_ids = [...new Set(ids.map(clusterRep))];
+      draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
+      draft.new_label = row.name;
+      draft.new_description = row.description;
+      state.selectedVariableIds = new Set(draft.new_variable_ids);
+      persistProjectLocally();
+      invalidateMapCaches();
+      renderDraft({ redrawMap: true });
+    } catch (error) {
+      if (state.definitionDraft === draft) {
+        browseState.error = `Could not use this split: ${error.message || error}`;
+        browseState.loading = false;
+        renderDefinition();
+      }
+    }
+  }
   const renderDraft = ({ redrawMap = false } = {}) => {
     // Definition steps change selection and map contents, not the project DAG.
     // The DAG is hidden until cancel/save, where a full render is performed.
@@ -25,6 +84,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (state.interfaceMode !== "dag2" || !["iv", "dv", "instrument", "candidate"].includes(role)) return;
     jevAssist.clearPreview();
     state.definitionMethod = null;
+    browseRevision += 1;
+    browseState.rows = [];
+    browseState.error = "";
+    browseState.loading = false;
     // Start the query engine while the user chooses a source. The source load
     // still awaits this setup and reports any error through its normal path.
     void prewarmEvidence().catch(() => {});
@@ -87,6 +150,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   }
 
   function cancelDefinition() {
+    browseRevision += 1;
     hydrationRevision += 1;
     lastBatch = null;
     jevAssist.clearPreview();
@@ -235,6 +299,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.definitionDraft.source_group_ids = [...ids];
     persistProjectLocally();
     renderDefinition();
+    if (state.definitionMethod === "browse") void refreshBrowse();
     if (selected && !sourceHydrations.has(sourceId)) {
       const source = groupById(sourceId);
       if (source?.variable_ids?.length) {
@@ -268,6 +333,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (!draft) return;
     draft.new_label = clean(draft.new_label);
     draft.new_description = clean(draft.new_description || "");
+    if ([...draft.new_description].length < 20) {
+      presenter.showValidationError(new Error("Write a description of at least 20 characters."));
+      return;
+    }
     draft.residual_labels = Object.fromEntries(Object.entries(draft.residual_labels)
       .map(([groupId, label]) => [groupId, clean(label)]));
     const previousProject = structuredClone(state.project);
@@ -327,12 +396,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     jevAssist.install();
     const chooseInitialMethod = method => {
       if (state.definitionDraft?.step !== "sources") return;
+      browseRevision += 1;
       state.definitionMethod = method;
       renderDraft();
+      if (method === "browse") void refreshBrowse();
       (method ? els.definitionSourceSearch : els.definitionChooseManual).focus();
     };
     els.definitionChooseJev.addEventListener("click", () => chooseInitialMethod("jev"));
     els.definitionChooseManual.addEventListener("click", () => chooseInitialMethod("manual"));
+    els.definitionChooseBrowse.addEventListener("click", () => chooseInitialMethod("browse"));
     els.definitionChangeMethod.addEventListener("click", () => chooseInitialMethod(null));
     const chooseMethod = method => {
       if (state.definitionDraft?.step !== "partition" || state.definitionMethod === method) return;
@@ -422,6 +494,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     resizeMap, fitMap, onSourceSelection: setSourceSelection,
     onToggleVariable: toggleDefinitionVariable, onResidualLabel: setResidualLabel,
     canUndoBatch: () => Boolean(lastBatch),
+    browseState, onChoosePublishedSplit: choosePublishedSplit,
   });
 
   const jevAssist = createDefinitionJevAssist({ elements: els,
