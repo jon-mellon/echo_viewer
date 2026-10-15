@@ -5,7 +5,8 @@ import { h, replaceChildren } from "./dom_builder.mjs";
 export function createDefinitionWorkflowPresenter({ state, elements: els, normalized, clusterRep, truncate,
   definitionSources, definitionResidualIds, definitionCanReview, searchVariables, visibleVariables,
   clusterDisplayVariable, definitionNeighbors, resizeMap, fitMap,
-  onSourceSelection, onToggleVariable, onResidualLabel, canUndoBatch }) {
+  onSourceSelection, onToggleVariable, onResidualLabel, canUndoBatch,
+  browseState, onChoosePublishedSplit }) {
   let renderedStep = null;
   let reviewedDraft = null;
   let activeTerm = null;
@@ -107,7 +108,8 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       : draft.role === "candidate" ? "Define new variable" : `Define new ${draft.role.toUpperCase()}`;
     els.definitionMethodStep.hidden = draft.step !== "sources" || Boolean(state.definitionMethod);
     els.definitionSourcesStep.hidden = draft.step !== "sources" || !state.definitionMethod;
-    els.definitionChosenMethod.textContent = state.definitionMethod === "manual" ? "Sort manually" : "Classify with AI";
+    els.definitionChosenMethod.textContent = state.definitionMethod === "manual" ? "Sort manually"
+      : state.definitionMethod === "browse" ? "Browse user splits" : "Classify with AI";
     els.definitionPartitionStep.hidden = draft.step !== "partition";
     els.definitionLoadStatus.hidden = !draft.details_loading && !draft.details_error;
     els.definitionLoadStatus.textContent = draft.details_error
@@ -140,6 +142,22 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       els.definitionContinue.disabled = !selected.size;
       els.definitionContinue.textContent = selected.size
         ? `Continue with ${selected.size} categories (${count} variables)` : "Choose categories to continue";
+      els.definitionBrowsePanel.hidden = state.definitionMethod !== "browse";
+      els.definitionContinue.hidden = state.definitionMethod === "browse";
+      if (state.definitionMethod === "browse") {
+        els.definitionBrowseStatus.textContent = browseState.error || (browseState.loading
+          ? "Finding published splits…" : !selected.size
+            ? "Choose a source category to see published splits."
+            : browseState.rows.length ? `${browseState.rows.length} published splits for these categories.`
+              : "No approved splits found for these categories yet.");
+        replaceChildren(els.definitionBrowseResults, browseState.rows.map((row, index) =>
+          h("article", { className: "definition-browse-card" },
+            h("strong", { textContent: row.name }), h("p", { textContent: row.description }),
+            h("button", { type: "button", className: "toolbar-button", dataset: { splitIndex: String(index) },
+              textContent: "Use this split", disabled: browseState.loading }))));
+        els.definitionBrowseResults.querySelectorAll("button[data-split-index]").forEach(button =>
+          button.addEventListener("click", () => onChoosePublishedSplit(browseState.rows[Number(button.dataset.splitIndex)])));
+      }
     } else if (draft.step === "partition") {
       const residualText = definitionSources().map(source =>
         `${source.label}: ${definitionResidualIds(source).length} leftover`).join(" · ");

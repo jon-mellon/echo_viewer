@@ -85,3 +85,18 @@ test("publication keeps the finding reason category but omits free text", async 
     assert.ok(!body.includes("reason_text"));
   }
 });
+
+test("retained finding notes and reasons for ordinary confounder statuses remain local", async () => {
+  const reason = "PRIVATE REVIEW EXPLANATION 205";
+  const key = confounderKey("iv", "dv", "c");
+  const schema = { schema_version: "groupings-v3", grouping_set_id: "test",
+    membership_unit: "canonical_variable", groups: [],
+    finding_reviews: { finding1: { status: "retained", reason_text: reason } },
+    confounder_statuses: { [key]: { status: "accounted_for_by_design", text: reason } } };
+  assert.doesNotThrow(() => validateGroupingSchema(schema));
+  const safe = publicSchemaProjection(schema);
+  assert.equal(safe.finding_reviews, undefined);
+  assert.deepEqual(safe.confounder_statuses[key], { status: "accounted_for_by_design" });
+  const files = await writeGroupingSchemaFolder(safe);
+  for (const bytes of files.values()) assert.ok(!new TextDecoder().decode(bytes).includes(reason));
+});

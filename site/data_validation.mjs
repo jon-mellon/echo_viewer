@@ -129,6 +129,16 @@ export function validateGroupingSchema(schema) {
       }
     }
   }
+  if (Object.hasOwn(schema, "finding_reviews")) {
+    if (!isRecord(schema.finding_reviews)) throw new Error("Grouping schema.finding_reviews must be an object.");
+    for (const [rawId, review] of Object.entries(schema.finding_reviews)) {
+      if (!rawId || !isRecord(review) || review.status !== "retained"
+        || typeof review.reason_text !== "string" || !review.reason_text.trim()
+        || schema.finding_decisions?.[rawId]?.display_status === "excluded") {
+        throw new Error(`Invalid retained finding review for ${rawId}.`);
+      }
+    }
+  }
   if (Object.hasOwn(schema, "confounder_statuses")) {
     if (!isRecord(schema.confounder_statuses)) throw new Error("Grouping schema.confounder_statuses must be an object.");
     for (const [key, decision] of Object.entries(schema.confounder_statuses)) {
@@ -136,8 +146,7 @@ export function validateGroupingSchema(schema) {
         "accounted_for_by_design", "other"].includes(decision.status)) {
         throw new Error(`Invalid confounder status for ${key}.`);
       }
-      if (Object.hasOwn(decision, "text") && (decision.status !== "other"
-        || typeof decision.text !== "string" || !decision.text.trim())) {
+      if (Object.hasOwn(decision, "text") && (typeof decision.text !== "string" || !decision.text.trim())) {
         throw new Error(`Invalid confounder status text for ${key}.`);
       }
     }

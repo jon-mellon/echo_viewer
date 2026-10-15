@@ -826,6 +826,10 @@ h2 {
 .definition-method-choice:hover,
 .definition-method-choice:focus-visible { border-color: #78b5a4; background: #f2faf7; }
 .definition-method-choice span { color: var(--muted); }
+.definition-browse-results { display: grid; gap: 10px; margin: 12px 0; }
+.definition-browse-card { border: 1px solid var(--line, #d7ddd9); border-radius: 12px; padding: 14px; background: #fff; }
+.definition-browse-card strong { display: block; margin-bottom: 5px; }
+.definition-browse-card p { margin: 0 0 10px; color: var(--muted); overflow-wrap: anywhere; }
 
 .definition-chosen-method { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 

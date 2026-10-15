@@ -16,7 +16,12 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await expect(page.locator("#ivGroupPicker [data-define-side=iv]")).toBeVisible();
   await page.locator("#ivGroupPicker [data-define-side=iv]").click();
   await expect(page.locator("#definitionMethodStep")).toBeVisible();
+  await expect(page.locator("#definitionChooseBrowse")).toBeVisible();
   await expect(page.locator("#definitionSourcesStep")).toBeHidden();
+  await page.locator("#definitionChooseBrowse").click();
+  await expect(page.locator("#definitionBrowsePanel")).toBeVisible();
+  await expect(page.locator("#definitionBrowseStatus")).toContainText("Choose a source category");
+  await page.locator("#definitionChangeMethod").click();
   await page.locator("#definitionChooseManual").click();
   await expect(page.locator("body")).not.toHaveClass(/defining-variable/);
   await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
@@ -54,6 +59,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await expect(page.locator("#definitionReviewVariables .definition-review-variable")).toHaveCount(1);
 
   await page.locator("#definitionNewLabel").fill("Browser test construct");
+  await page.locator("#definitionNewDescription").fill("A browser test construct with defined source members.");
   const residualInputs = page.locator("#definitionResidualLabels input[data-residual-id]");
   await expect(residualInputs).toHaveCount(2);
   await residualInputs.nth(0).fill("Browser residual one");
@@ -139,6 +145,7 @@ test("Variables list definition and split editing are reachable on desktop and m
   await page.locator("#definitionVariableResults .result-button").first().click();
   await page.locator("#definitionReview").click();
   await page.locator("#definitionNewLabel").fill("Browser list variable");
+  await page.locator("#definitionNewDescription").fill("A browser list variable with selected source members.");
   await page.locator("#definitionResidualLabels input").fill("Browser list residual");
   await page.locator("#definitionSave").click();
   await expect(page.locator("#variableDefineNew")).toBeVisible();
@@ -198,6 +205,7 @@ test("a new variable can be defined through the mobile controls", async ({ page 
   await expect(page.locator("#definitionReviewStep")).toBeVisible();
   await expect(page.locator("#definitionTitle")).toBeInViewport();
   await page.locator("#definitionNewLabel").fill("Mobile browser variable");
+  await page.locator("#definitionNewDescription").fill("A mobile browser variable with selected source members.");
   await page.locator("#definitionResidualLabels input").fill("Mobile browser residual");
   await page.locator("#definitionSave").click();
   await expect(page.locator("#definitionBlock")).toBeHidden();

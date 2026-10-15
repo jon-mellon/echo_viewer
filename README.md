@@ -19,6 +19,49 @@ This is a local safeguard. A different clone needs its own hook setup, and Git
 allows callers to bypass local hooks. Enable GitHub secret scanning push
 protection for server-side coverage where available.
 
+## Local agent operations
+
+Run `npm run agent:mcp` to expose Echo operations to a local MCP client over
+standard input/output. Node.js 22 and the `duckdb` command line program are
+required. Configure the MCP client to launch that command from this repository.
+The `echo_start` tool clones the current published schema and its pinned public
+evidence snapshot by default. Pass `publicationId` and, when needed, a compatible
+physical `snapshotId` to select a different starting point. `echo_clone` preloads
+the data without starting a session; `echo_start` with `sync: false` starts from
+an already cloned publication. Downloads are checked against the manifest's
+SHA-256 hashes and the publication's canonical schema hash.
+
+Agent sessions, public data clones, and Jev checkpoints live in `.echo-agent/`,
+which is ignored by Git. Set `ECHO_AGENT_HOME` to move them elsewhere. All
+evidence queries and graph calculations use the local clone. The Jev tools make
+OpenRouter requests with an `OPENROUTER_API_KEY` supplied through the process
+environment; they use the same model, prompts, result parsing, and spending-cap
+check as the browser. No credential is written to a session file.
+
+Before Jev pricing or classification, `echo_jev_estimate` and `echo_jev_test`
+check the approved published split index for the selected source groups. If
+matches exist, they return their names and descriptions without making an AI
+request. The agent can apply one with
+`echo_apply_published_split`, which verifies the published membership file and
+current source assignments. If none fits, repeat the Jev estimate or test with
+`useAIWhenPublishedAvailable: true`. `echo_browse_published_splits` also exposes
+the lookup directly. An unavailable index is reported when Jev runs.
+
+Use `echo_diff` to review the complete local revision and `echo_ready` to
+validate and freeze it. `echo_publish` is the only publication tool. It invokes
+the same immutable Supabase Storage uploads and registry insert as the site's
+Publish action and cannot be called a second time in that session. This is one
+final publication action, though Echo's publication format consists of multiple
+Storage writes followed by one registry write. An agent session never publishes
+automatically. By default, Supabase creates a private anonymous session, as
+the browser does. To reuse an existing Supabase identity, supply both
+`ECHO_SUPABASE_ACCESS_TOKEN` and `ECHO_SUPABASE_REFRESH_TOKEN` through the
+process environment. Do not put credentials in this repository.
+
+The agent's finding decisions operate on individual raw causal links, matching
+Echo's finding-level Exclude/Restore controls. There is no article-wide
+exclusion operation.
+
 To preview the site locally, run:
 
 ```sh
@@ -26,6 +69,27 @@ python3 -m http.server --directory site
 ```
 
 ## Jev-assisted variable splits
+
+### Browse published user splits
+
+The **Browse user splits** choice lists approved splits for the selected source
+category or categories. The index stores a name, description, source IDs, and
+an immutable Storage pointer; it does not copy variable assignments. Choosing
+a split loads its one membership file and opens an editable draft. Source
+assignments must still match the current schema. New and edited split
+descriptions must contain at least 20 characters.
+
+To enable browsing in Supabase, apply
+`supabase/migrations/202610150001_public_split_index.sql`. The scan and Jev
+quality checker live in `harvest_abstracts/analysis/10k/echo_viewer_bundle/`
+on the `junk_causal` branch. Run its `index_published_splits.py` with
+`SUPABASE_SERVICE_ROLE_KEY` and `OPENROUTER_API_KEY` set outside the repository.
+It scans public schema metadata and upserts approved or rejected metadata;
+unchanged rows are skipped. `--scan` uses Echo's public publishable key and does
+not write or call Jev. The harvest_abstracts GitHub workflow runs only when
+manually dispatched; local runs can load credentials from its encrypted
+`keys.yaml` with `sops exec-env`.
+
 
 In the variable definition partition step, describe the new side of the split
 and choose **Connect OpenRouter**. The browser uses OpenRouter's PKCE flow and

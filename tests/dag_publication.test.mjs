@@ -3,21 +3,22 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../site/dag_publication.mjs", import.meta.url), "utf8");
+const core = await readFile(new URL("../site/dag_publication_core.mjs", import.meta.url), "utf8");
 
 test("working publication deduplicates before allocating or uploading", () => {
-  const lookup = source.indexOf("findOwnedPublication(client, user.id, canonical.contentHash)");
-  const allocation = source.indexOf("cryptoApi.randomUUID()", lookup);
-  const upload = source.indexOf(".upload(", lookup);
+  const lookup = core.indexOf("findOwnedPublication(client, user.id, canonical.contentHash)");
+  const allocation = core.indexOf("cryptoApi.randomUUID()", lookup);
+  const upload = core.indexOf(".upload(", lookup);
   assert.ok(lookup > 0 && allocation > lookup && upload > allocation);
-  assert.match(source, /if \(existing\) return .*reused: true/);
+  assert.match(core, /if \(existing\) return .*reused: true/);
 });
 
 test("registry insert follows every upload and preserves baseline lineage", () => {
-  const upload = source.indexOf(".upload(");
-  const insert = source.indexOf('.from("published_schemas").insert', upload);
+  const upload = core.indexOf(".upload(");
+  const insert = core.indexOf('.from("published_schemas").insert', upload);
   assert.ok(insert > upload);
-  assert.match(source, /CANONICAL_BASELINE_ID = "a0118906-2366-4cc8-8809-bafdf3860c23"/);
-  assert.match(source, /parent_schema_id: parentSchemaId/);
+  assert.match(core, /CANONICAL_BASELINE_ID = "a0118906-2366-4cc8-8809-bafdf3860c23"/);
+  assert.match(core, /parent_schema_id: parentSchemaId/);
 });
 
 test("share refuses to create a permalink while schema changes are unpublished", () => {
@@ -54,7 +55,7 @@ test("publication explicitly confirms public immutable access", () => {
 test("publication requests authentication only after immutable-public confirmation", () => {
   const publish = source.slice(source.indexOf("async function publish()"), source.indexOf("async function share()"));
   assert.ok(publish.indexOf("confirmPublicPublication()") < publish.indexOf("publishWorkingSchema({"));
-  assert.match(source, /ensureAnonymousPublicationUser\(client\)/);
+  assert.match(core, /ensureAnonymousPublicationUser\(client\)/);
 });
 
 test("published state distinguishes private working-copy changes", () => {
