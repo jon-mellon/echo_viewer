@@ -132,7 +132,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       replaceChildren(els.definitionSourceList, groups.map(({ group, variableMatch }) =>
         h("label", { className: "definition-source-row" }, h("span", { className: "definition-source-copy" },
           h("span", { className: "definition-source-main" }, h("strong", { textContent: group.label || group.group_id }),
-            h("span", { textContent: `${new Set(group.variable_ids.map(clusterRep)).size} canonical` })),
+            h("span", { textContent: `${new Set(group.variable_ids.map(clusterRep)).size} variables` })),
           variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched: ${truncate(variableMatch, 72)}` }) : null),
         h("input", { type: "checkbox", dataset: { sourceId: group.group_id }, checked: selected.has(group.group_id) }))));
       els.definitionSourceList.querySelectorAll("input[data-source-id]").forEach(input =>
