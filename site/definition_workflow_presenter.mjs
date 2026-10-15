@@ -128,7 +128,9 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       const selected = new Set(draft.source_group_ids);
       const groups = (state.project.groups || []).map((group, index) =>
         searchModel.anchorGroupSearchMatch(group, query, index, state.variableById))
-        .filter(item => item.group.variable_ids?.length && item.matches).slice(0, 60);
+        .filter(item => item.group.variable_ids?.length && item.matches
+          && (state.definitionMethod !== "browse" || browseState.sourceIds?.has(item.group.group_id)))
+        .slice(0, 60);
       replaceChildren(els.definitionSourceList, groups.map(({ group, variableMatch }) =>
         h("label", { className: "definition-source-row" }, h("span", { className: "definition-source-copy" },
           h("span", { className: "definition-source-main" }, h("strong", { textContent: group.label || group.group_id }),
@@ -145,11 +147,13 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       els.definitionBrowsePanel.hidden = state.definitionMethod !== "browse";
       els.definitionContinue.hidden = state.definitionMethod === "browse";
       if (state.definitionMethod === "browse") {
-        els.definitionBrowseStatus.textContent = browseState.error || (browseState.loading
+        els.definitionBrowseStatus.textContent = browseState.sourceError || (browseState.sourceLoading
+          ? "Finding categories with published user splits…" : browseState.error || (browseState.loading
           ? "Finding published splits…" : !selected.size
-            ? "Choose a source category to see published splits."
+            ? browseState.sourceIds?.size ? "Choose a source category to see published splits."
+              : "No published user splits are available for these categories yet."
             : browseState.rows.length ? `${browseState.rows.length} published splits for these categories.`
-              : "No approved splits found for these categories yet.");
+              : "No approved splits for this selection. Some splits require more source categories."));
         replaceChildren(els.definitionBrowseResults, browseState.rows.map((row, index) =>
           h("article", { className: "definition-browse-card" },
             h("strong", { textContent: row.name }), h("p", { textContent: row.description }),

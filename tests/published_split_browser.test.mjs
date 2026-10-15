@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { browsePublishedSplits, loadPublishedSplitMembership } from "../site/published_split_browser.mjs";
+import { browsePublishedSplits, loadPublishedSplitMembership,
+  publishedSplitSourceIds } from "../site/published_split_browser.mjs";
 import { writeGroupingSchemaFolder } from "../site/grouping_schema_writer.mjs";
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "../site/app_contracts.mjs";
 
@@ -22,6 +23,17 @@ test("browse keeps only approved splits matching the exact selected sources", as
   assert.deepEqual((await browsePublishedSplits(["a"], client)).map(row => row.group_id), ["g1"]);
   assert.deepEqual((await browsePublishedSplits(["a"], client)).map(row => row.publication_id), ["later"]);
   assert.deepEqual((await browsePublishedSplits(["a", "b"], client)).map(row => row.group_id), ["g2"]);
+});
+
+test("source picker includes only categories in approved splits from other users", async () => {
+  const rows = [
+    { publication_id: "one", group_id: "split-a", source_group_ids: ["a", "b"], owner_id: "other" },
+    { publication_id: "two", group_id: "split-c", source_group_ids: ["c"], owner_id: "me" },
+  ];
+  const client = { auth: { getSession: async () => ({ data: { session: { user: { id: "me" } } } }) },
+    from: () => ({ select() { return this; }, eq() { return this; }, order() { return this; },
+      async range() { return { data: rows, error: null }; } }) };
+  assert.deepEqual([...await publishedSplitSourceIds(client)].sort(), ["a", "b"]);
 });
 
 test("loading a split fetches its membership file and rejects a changed pointer", async () => {

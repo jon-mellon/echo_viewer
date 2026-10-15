@@ -10,6 +10,11 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
     }
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
+  await page.route("**/rest/v1/published_split_index*", route => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify([{ publication_id: "test-publication", group_id: "test-split",
+      source_group_ids: ["category-age"], owner_id: "another-user" }]),
+  }));
   await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
 
@@ -21,6 +26,8 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await page.locator("#definitionChooseBrowse").click();
   await expect(page.locator("#definitionBrowsePanel")).toBeVisible();
   await expect(page.locator("#definitionBrowseStatus")).toContainText("Choose a source category");
+  await expect(page.locator("#definitionSourceList input[data-source-id]")).toHaveCount(1);
+  await expect(page.locator("#definitionSourceList input[data-source-id=category-age]")).toBeVisible();
   await page.locator("#definitionChangeMethod").click();
   await page.locator("#definitionChooseManual").click();
   await expect(page.locator("body")).not.toHaveClass(/defining-variable/);

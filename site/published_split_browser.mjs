@@ -2,6 +2,28 @@ import { supabase } from "./supabase_client.mjs";
 import { publicSchemaBaseUrl } from "./publication_access.mjs";
 import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
 
+export async function publishedSplitSourceIds(client = supabase) {
+  if (!client) throw new Error("Supabase is not configured.");
+  const { data: authData } = await client.auth?.getSession?.() || {};
+  const ownId = authData?.session?.user?.id;
+  const ids = new Set();
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await client.from("published_split_index")
+      .select("publication_id,group_id,source_group_ids,owner_id")
+      .eq("quality_status", "approved")
+      .order("publication_id").order("group_id")
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    for (const row of data || []) {
+      if (ownId && row.owner_id === ownId) continue;
+      for (const id of row.source_group_ids || []) ids.add(id);
+    }
+    if ((data || []).length < pageSize) break;
+  }
+  return ids;
+}
+
 export async function browsePublishedSplits(sourceGroupIds, client = supabase) {
   if (!client) throw new Error("Supabase is not configured.");
   const ids = [...new Set(sourceGroupIds)].filter(Boolean);

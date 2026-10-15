@@ -2,7 +2,7 @@ import * as projectOps from "./dag_project.mjs";
 import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
 import { nearbyMapNeighbors } from "./definition_neighbors.mjs";
 import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
-import { browsePublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
+import { browsePublishedSplits, loadPublishedSplitMembership, publishedSplitSourceIds } from "./published_split_browser.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
   invalidateMapCaches, renderAll, drawMap = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
@@ -15,7 +15,35 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   const sourceHydrations = new Map();
   let lastBatch = null;
   let browseRevision = 0;
-  const browseState = { rows: [], loading: false, error: "" };
+  let browseSourceRevision = 0;
+  const browseState = { rows: [], loading: false, error: "", sourceIds: null,
+    sourceLoading: false, sourceError: "" };
+  async function loadBrowseSources() {
+    const revision = ++browseSourceRevision;
+    browseState.sourceIds = null;
+    browseState.sourceError = "";
+    browseState.sourceLoading = true;
+    renderDefinition();
+    try {
+      const ids = await publishedSplitSourceIds();
+      if (revision !== browseSourceRevision || state.definitionMethod !== "browse") return;
+      browseState.sourceIds = ids;
+      const draft = state.definitionDraft;
+      if (draft) {
+        const selected = draft.source_group_ids.filter(id => ids.has(id));
+        if (selected.length !== draft.source_group_ids.length) {
+          draft.source_group_ids = selected;
+          persistProjectLocally();
+        }
+      }
+    } catch (error) {
+      if (revision !== browseSourceRevision || state.definitionMethod !== "browse") return;
+      browseState.sourceError = `Could not load published split sources: ${error.message || error}`;
+    }
+    browseState.sourceLoading = false;
+    renderDefinition();
+    if (state.definitionDraft?.source_group_ids.length) void refreshBrowse();
+  }
   async function refreshBrowse() {
     const revision = ++browseRevision;
     browseState.rows = [];
@@ -85,9 +113,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     jevAssist.clearPreview();
     state.definitionMethod = null;
     browseRevision += 1;
+    browseSourceRevision += 1;
     browseState.rows = [];
     browseState.error = "";
     browseState.loading = false;
+    browseState.sourceIds = null;
+    browseState.sourceLoading = false;
+    browseState.sourceError = "";
     // Start the query engine while the user chooses a source. The source load
     // still awaits this setup and reports any error through its normal path.
     void prewarmEvidence().catch(() => {});
@@ -151,6 +183,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   function cancelDefinition() {
     browseRevision += 1;
+    browseSourceRevision += 1;
     hydrationRevision += 1;
     lastBatch = null;
     jevAssist.clearPreview();
@@ -397,9 +430,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     const chooseInitialMethod = method => {
       if (state.definitionDraft?.step !== "sources") return;
       browseRevision += 1;
+      browseSourceRevision += 1;
       state.definitionMethod = method;
       renderDraft();
-      if (method === "browse") void refreshBrowse();
+      if (method === "browse") void loadBrowseSources();
       (method ? els.definitionSourceSearch : els.definitionChooseManual).focus();
     };
     els.definitionChooseJev.addEventListener("click", () => chooseInitialMethod("jev"));
