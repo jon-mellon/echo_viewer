@@ -163,6 +163,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
         `${source.label}: ${definitionResidualIds(source).length} leftover`).join(" · ");
       els.definitionCounts.textContent = `${draft.new_variable_ids.length} in new variable · ${residualText}`;
       els.definitionReview.disabled = !definitionCanReview();
+      els.definitionReview.textContent = draft.published_split ? "Use split" : "Name and review";
       const selectedIds = new Set(draft.new_variable_ids);
       renderTermReview(draft, selectedIds);
       const matches = searchVariables(els.definitionVariableSearch.value, visibleVariables().length)

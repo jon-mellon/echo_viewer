@@ -647,3 +647,66 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
     await context.close();
   }
 });
+
+test("a published split is reviewed on the map and used without a naming step", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page, { warnings: true });
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem("dag2-test-initialized")) {
+      localStorage.clear();
+      sessionStorage.setItem("dag2-test-initialized", "1");
+    }
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+  });
+  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+
+  await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+  await page.locator("#definitionChooseBrowse").click();
+  const sourceId = await page.locator("#definitionSourceList input[data-source-id]").first().getAttribute("data-source-id");
+
+  // Publish a fixture split carved from that source category.
+  const fixture = await page.evaluate(async sourceId => {
+    const { writeGroupingSchemaFolder } = await import("./grouping_schema_writer.mjs");
+    const { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } = await import("./app_contracts.mjs");
+    const source = window.__dagBuilderState.project.groups.find(group => group.group_id === sourceId);
+    const group = { group_id: "published_new", label: "Published fixture split",
+      description: "A published fixture split taken from one source category.", source: "user_split",
+      provenance: { operation: "split_categories", source_group_ids: [source.group_id] },
+      variable_ids: source.variable_ids.slice(0, 1) };
+    const files = await writeGroupingSchemaFolder({ schema_version: GROUPING_FORMAT_VERSION,
+      membership_unit: GROUPING_MEMBERSHIP_UNIT, grouping_set_id: "fixture", label: "Fixture", groups: [group] });
+    const text = Object.fromEntries([...files].map(([path, bytes]) => [path, new TextDecoder().decode(bytes)]));
+    return { sourceId, sourceLabel: source.label,
+      membershipPath: JSON.parse(text["manifest.json"]).group_membership_files.published_new, files: text };
+  }, sourceId);
+  await page.route("**/rest/v1/published_split_index**", route => route.fulfill({ contentType: "application/json",
+    body: JSON.stringify([{ publication_id: "00000000-0000-0000-0000-000000000001", group_id: "published_new",
+      split_id: "published_new", source_group_ids: [fixture.sourceId], name: "Published fixture split",
+      description: "A published fixture split taken from one source category.", storage_prefix: "fixture-owner/fixture-pub",
+      membership_path: fixture.membershipPath, owner_id: "someone", published_at: "2026-10-15T00:00:00Z" }]) }));
+  await page.route("**/storage/v1/object/public/published-schemas/fixture-owner/fixture-pub/**", route => {
+    const path = new URL(route.request().url()).pathname.split("/fixture-pub/")[1];
+    return fixture.files[path] === undefined ? route.fulfill({ status: 404, body: "" })
+      : route.fulfill({ body: fixture.files[path] });
+  });
+  await page.locator(`#definitionSourceList input[data-source-id="${sourceId}"]`).check();
+  await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
+  await page.locator("#definitionBrowseResults button[data-split-index]").click();
+
+  await expect(page.locator("#definitionPartitionStep")
+    .or(page.locator("#definitionBrowseStatus", { hasText: "Could not" }))).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator("#definitionBrowseStatus")).not.toContainText("Could not");
+  await expect(page.locator("body"), browserErrors.errors.join("\n")).toHaveClass(/defining-variable/);
+  await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+  await expect(page.locator("#definitionReview")).toHaveText("Use split");
+  await expect(page.locator("#definitionReview")).toBeEnabled();
+  await page.locator("#definitionReview").click();
+
+  await expect(page.locator("#definitionBlock")).toBeHidden();
+  const groups = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .map(group => ({ group_id: group.group_id, label: group.label, description: group.description })));
+  expect(groups.find(group => group.label === "Published fixture split")?.description)
+    .toBe("A published fixture split taken from one source category.");
+  expect(groups.find(group => group.group_id === fixture.sourceId)?.label).toBe(fixture.sourceLabel);
+  browserErrors.check();
+});

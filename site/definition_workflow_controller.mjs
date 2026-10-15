@@ -60,6 +60,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
       draft.new_label = row.name;
       draft.new_description = row.description;
+      // A published split keeps its name and description; each leftover keeps
+      // its source category's name, so the split is used without a naming step.
+      draft.published_split = { publication_id: row.publication_id, group_id: row.group_id };
+      draft.residual_labels = Object.fromEntries(sources.map(group => [group.group_id, group.label || group.group_id]));
       state.selectedVariableIds = new Set(draft.new_variable_ids);
       persistProjectLocally();
       invalidateMapCaches();
@@ -334,7 +338,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.new_label = clean(draft.new_label);
     draft.new_description = clean(draft.new_description || "");
     if ([...draft.new_description].length < 20) {
-      presenter.showValidationError(new Error("Write a description of at least 20 characters."));
+      showSaveError(new Error("Write a description of at least 20 characters."));
       return;
     }
     draft.residual_labels = Object.fromEntries(Object.entries(draft.residual_labels)
@@ -388,8 +392,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       onCommitFailureRestored();
       invalidateMapCaches();
       renderDraft({ redrawMap: true });
-      presenter.showValidationError(error);
+      showSaveError(error);
     }
+  }
+
+  // Validation messages live on the review step, which a published split skips.
+  function showSaveError(error) {
+    const draft = state.definitionDraft;
+    if (draft && draft.step !== "review") { draft.step = "review"; renderDraft(); }
+    presenter.showValidationError(error);
   }
 
   function installDefinitionHandlers() {
@@ -409,6 +420,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     const chooseMethod = method => {
       if (state.definitionDraft?.step !== "partition" || state.definitionMethod === method) return;
       state.definitionMethod = method;
+      delete state.definitionDraft.published_split;
       if (state.map) state.map._groupRegions = null;
       renderDraft({ redrawMap: true });
     };
@@ -437,10 +449,12 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     });
     els.definitionBack.addEventListener("click", () => {
       state.definitionDraft.step = "sources"; state.selectedVariableIds.clear();
+      delete state.definitionDraft.published_split;
       invalidateMapCaches(); renderDraft();
     });
     els.definitionReview.addEventListener("click", () => {
       if (!definitionCanReview()) return;
+      if (state.definitionDraft.published_split) { void saveDefinition(); return; }
       state.definitionDraft.step = "review"; renderDraft();
     });
     els.definitionReviewBack.addEventListener("click", () => {
