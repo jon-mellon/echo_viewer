@@ -5,6 +5,13 @@ import { pairKey } from "./edge_keys.mjs";
 /** @typedef {import("./app_contracts.mjs").Project} Project */
 /** @typedef {import("./app_contracts.mjs").AggregatedLink} AggregatedLink */
 
+// A record supports an edge only when its claim is "present". Records without a
+// claim (legacy data) count as present; "absent" and "uncertain" are evidence only.
+export function isPresentLink(link) {
+  const claim = String(link?.causal_link_existence ?? "").trim().toLowerCase();
+  return !claim || claim === "present";
+}
+
 export const linkKey = (sourceId, targetId) => `${sourceId}->${targetId}`;
 export const edgeKey = (a, b) => `${a}__${b}`;
 
@@ -31,8 +38,10 @@ export function aggregateGroupLinks({ project, linkLookup, rawLinksById }) {
   const iv = project.groups.find(g => g.group_id === project.iv_group_id);
   const dv = project.groups.find(g => g.group_id === project.dv_group_id);
   const evidenceByEdge = indexGroupLinkEvidence(groups, iv, dv, linkLookup, project.finding_decisions || {});
+  const presentOnly = ids => ids.filter(id => isPresentLink(rawLinksById.get(id)));
   return [...evidenceByEdge.values()].filter(({ targetPair, aToB, bToA }) =>
-    targetPair || aToB.length || bToA.length).map(({ groupA, groupB, targetPair, aToB, bToA }) => {
+    targetPair || presentOnly(aToB).length || presentOnly(bToA).length).map(({ groupA, groupB, targetPair, aToB, bToA }) => {
+    const aPresent = presentOnly(aToB), bPresent = presentOnly(bToA);
     const edgeId = edgeKey(groupA.group_id, groupB.group_id);
     const decision = normalizeLinkDecision(project.link_decisions[edgeId]) || null;
     return {
@@ -42,11 +51,13 @@ export function aggregateGroupLinks({ project, linkLookup, rawLinksById }) {
       is_target_relation: Boolean(targetPair),
       target_direction: targetPair ? "group_a_to_group_b" : "",
       edge_source: "mapping_derived",
-      mapping_a_to_b_exists: aToB.length > 0,
-      mapping_b_to_a_exists: bToA.length > 0,
-      direction_type: directionType(aToB.length > 0, bToA.length > 0, targetPair),
+      mapping_a_to_b_exists: aPresent.length > 0,
+      mapping_b_to_a_exists: bPresent.length > 0,
+      direction_type: directionType(aPresent.length > 0, bPresent.length > 0, targetPair),
       a_to_b_raw_link_ids: aToB,
       b_to_a_raw_link_ids: bToA,
+      a_to_b_present_raw_link_ids: aPresent,
+      b_to_a_present_raw_link_ids: bPresent,
       a_to_b_paper_table_keys: paperTableKeys(aToB, rawLinksById),
       b_to_a_paper_table_keys: paperTableKeys(bToA, rawLinksById),
       display_status: decision?.display_status || "active_by_default",

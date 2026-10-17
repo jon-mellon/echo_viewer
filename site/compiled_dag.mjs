@@ -66,9 +66,9 @@ export function fullCompileDag({ schema, project = {}, rawLinks = [], linkLookup
   const compileProject = projectForSchema(schema, project);
   const edges = aggregateGroupLinks({ project: compileProject, ...indexed }).map(edge => ({
     ...edge,
-    a_to_b_occurrence_count: edge.a_to_b_raw_link_ids.length,
-    b_to_a_occurrence_count: edge.b_to_a_raw_link_ids.length,
-    causal_link_occurrence_count: edge.a_to_b_raw_link_ids.length + edge.b_to_a_raw_link_ids.length,
+    a_to_b_occurrence_count: edge.a_to_b_present_raw_link_ids.length,
+    b_to_a_occurrence_count: edge.b_to_a_present_raw_link_ids.length,
+    causal_link_occurrence_count: edge.a_to_b_present_raw_link_ids.length + edge.b_to_a_present_raw_link_ids.length,
   }));
   const nodes = compileProject.groups.map(group => ({
     group_id: group.group_id,
@@ -158,6 +158,8 @@ export function incrementCompiledDag({ compiledDag, oldSchema, newSchema, incide
       ...evidenceEdge,
       a_to_b_raw_link_ids: (edge.a_to_b_raw_link_ids || []).filter(id => !incidentIds.has(id)),
       b_to_a_raw_link_ids: (edge.b_to_a_raw_link_ids || []).filter(id => !incidentIds.has(id)),
+      a_to_b_present_raw_link_ids: (edge.a_to_b_present_raw_link_ids || edge.a_to_b_raw_link_ids || []).filter(id => !incidentIds.has(id)),
+      b_to_a_present_raw_link_ids: (edge.b_to_a_present_raw_link_ids || edge.b_to_a_raw_link_ids || []).filter(id => !incidentIds.has(id)),
     }];
   }));
   const additions = fullCompileDag({ schema: newSchema, project, rawLinks: incident }).edges;
@@ -167,13 +169,17 @@ export function incrementCompiledDag({ compiledDag, oldSchema, newSchema, incide
     else {
       current.a_to_b_raw_link_ids.push(...addition.a_to_b_raw_link_ids);
       current.b_to_a_raw_link_ids.push(...addition.b_to_a_raw_link_ids);
+      current.a_to_b_present_raw_link_ids.push(...addition.a_to_b_present_raw_link_ids);
+      current.b_to_a_present_raw_link_ids.push(...addition.b_to_a_present_raw_link_ids);
     }
   }
   const edges = [...edgesById.values()].flatMap(edge => {
     edge.a_to_b_raw_link_ids = [...new Set(edge.a_to_b_raw_link_ids)];
     edge.b_to_a_raw_link_ids = [...new Set(edge.b_to_a_raw_link_ids)];
-    edge.a_to_b_occurrence_count = edge.a_to_b_raw_link_ids.length;
-    edge.b_to_a_occurrence_count = edge.b_to_a_raw_link_ids.length;
+    edge.a_to_b_present_raw_link_ids = [...new Set(edge.a_to_b_present_raw_link_ids)];
+    edge.b_to_a_present_raw_link_ids = [...new Set(edge.b_to_a_present_raw_link_ids)];
+    edge.a_to_b_occurrence_count = edge.a_to_b_present_raw_link_ids.length;
+    edge.b_to_a_occurrence_count = edge.b_to_a_present_raw_link_ids.length;
     edge.causal_link_occurrence_count = edge.a_to_b_occurrence_count + edge.b_to_a_occurrence_count;
     edge.mapping_a_to_b_exists = edge.a_to_b_occurrence_count > 0;
     edge.mapping_b_to_a_exists = edge.b_to_a_occurrence_count > 0;

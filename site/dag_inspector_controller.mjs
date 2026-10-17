@@ -362,7 +362,7 @@ export function createDagInspectorController({
       });
       const row = h("tr", { className: excluded ? "finding-excluded" : "" }, h("td", {}, paper), conceptCell(source.concept, raw.source_variable_id),
         conceptCell(target.concept, raw.target_variable_id),
-        cell(raw.causal_link_existence || ""), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(truncate(raw.target_population || "", 60)),
+        cell(raw.causal_link_existence || "present"), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(truncate(raw.target_population || "", 60)),
         h("td", {}, excluded ? h("span", { className: "finding-excluded-label",
           textContent: `Excluded${reasonLabel ? `: ${reasonLabel}` : ""} ` }) : null, action));
       if (pendingFindingId !== id || !canDecide) return row;
@@ -393,7 +393,7 @@ export function createDagInspectorController({
       return [row, h("tr", {}, h("td", { colSpan: 7, className: "finding-reason-row" },
         reason, detail, confirm, cancel))];
     };
-    const headings = ["Paper", "Source concept", "Target concept", "Existence", "Strategy", "Population", "Decision"];
+    const headings = ["Paper", "Source concept", "Target concept", "Claim", "Strategy", "Population", "Decision"];
     replaceChildren(elements.provenancePanel,
       model.sections.map(section => h("section", { className: "provenance-direction" },
         h("h3", { textContent: `Evidence for ${section.sourceLabel} → ${section.targetLabel}` }),

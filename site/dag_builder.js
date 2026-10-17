@@ -1173,16 +1173,16 @@ function renderVariableComparison() {
 
   replaceChildren(els.edgeInspector, h("strong", { textContent: "Evidence between variables" }),
     h("div", { textContent: `${sourceLabel} ↔ ${targetLabel}` }),
-    h("div", { className: "small-note", textContent: `${rows.length} extracted evidence record${rows.length === 1 ? "" : "s"}; “present” supports a link and “absent” records evidence against one.` }));
+    h("div", { className: "small-note", textContent: `${rows.length} extracted evidence record${rows.length === 1 ? "" : "s"}; only “present” claims create DAG edges; “absent” and “uncertain” are shown for reference.` }));
   const evidenceRows = rows.map((link) => {
     const doi = isDoi(link.paper_id) ? link.paper_id.trim() : null;
     const paper = truncate(link.paper_title || link.paper_id, 44);
     const paperCell = doi ? h("a", { href: safeUrl(`https://doi.org/${encodeURIComponent(doi)}`), target: "_blank", rel: "noopener", title: link.paper_title || doi, textContent: paper }) : document.createTextNode(paper);
     return h("tr", {}, h("td", { textContent: link.direction }), h("td", {}, paperCell),
-      h("td", { textContent: link.causal_link_existence || "" }), h("td", { textContent: (link.identification_strategy || "").replaceAll("_", " ") }),
+      h("td", { textContent: link.causal_link_existence || "present" }), h("td", { textContent: (link.identification_strategy || "").replaceAll("_", " ") }),
       h("td", { textContent: truncate(link.target_population || "", 60) }));
   });
-  const headings = ["Direction", "Paper", "Evidence", "Strategy", "Population"];
+  const headings = ["Direction", "Paper", "Claim", "Strategy", "Population"];
   replaceChildren(els.provenancePanel, h("table", { className: "provenance-table" },
     h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))), h("tbody", {}, evidenceRows)));
   return true;

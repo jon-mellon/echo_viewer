@@ -128,7 +128,7 @@ test('aggregation preserves evidence direction, provenance and decision semantic
     const links = aggregateGroupLinks(input);
     const expected = legacyAggregate({ ...input, project: { ...input.project, manual_edges: [] } })
       .map(({ is_manual, manual_edge_ids, manual_a_to_b_exists, manual_b_to_a_exists, ...link }) => link);
-    assert.deepEqual(links, expected, scenario);
+    assert.deepEqual(links.map(({ a_to_b_present_raw_link_ids, b_to_a_present_raw_link_ids, ...link }) => link), expected, scenario);
     assert.deepEqual(input, before);
     assert.deepEqual(aggregateGroupLinks({ ...input, project: { ...input.project, groups: [...input.project.groups].reverse() } }), links);
     assert.ok(links.every(link => link.group_a !== 'empty' && link.group_b !== 'empty'));
@@ -138,6 +138,19 @@ test('aggregation preserves evidence direction, provenance and decision semantic
       assert.equal(links[0].direction_type, 'A_TO_B');
     }
   }
+});
+
+test('absent and uncertain claims stay as evidence but do not create edges', () => {
+  const project = { groups: [{ group_id: 'a', variable_ids: ['va'] }, { group_id: 'b', variable_ids: ['vb'] },
+    { group_id: 'c', variable_ids: ['vc'] }], iv_group_id: '', dv_group_id: '', link_decisions: {} };
+  const linkLookup = new Map([[linkKey('va', 'vb'), ['r1', 'r2']], [linkKey('vb', 'vc'), ['r3', 'r4']]]);
+  const rawLinksById = new Map([
+    ['r1', { causal_link_existence: 'present' }], ['r2', { causal_link_existence: 'absent' }],
+    ['r3', { causal_link_existence: 'absent' }], ['r4', { causal_link_existence: 'uncertain' }]]);
+  const links = aggregateGroupLinks({ project, linkLookup, rawLinksById });
+  assert.deepEqual(links.map(link => link.edge_id), ['a__b']);
+  assert.deepEqual(links[0].a_to_b_raw_link_ids, ['r1', 'r2']);
+  assert.deepEqual(links[0].a_to_b_present_raw_link_ids, ['r1']);
 });
 
 test('published links discard obsolete manual-only edges and annotations', () => {
