@@ -6,6 +6,7 @@ import { browserV2ManifestLayout, browserV2ShardPath,
 import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
 import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication-v2";
 import { variableSearchCatalog, SNAPSHOT_SEARCH_CATALOGS } from "./variable_search_catalog.mjs";
+import { evidencePanelCatalog } from "./evidence_panel_catalog.mjs";
 
 // Reading many small remote Parquet shards incurs a separate metadata/range
 // round trip for each shard. The canonical snapshot is cheaper for wide groups.
@@ -242,6 +243,15 @@ export class ParquetManifestDagDataSource {
         WHERE raw_causal_link_id IN (${placeholders})`, batch));
     }
     return rows;
+  }
+
+  async loadPanelEvidence(rawLinkIds) {
+    try {
+      return await evidencePanelCatalog.load(evidenceSnapshotIdFromManifestUrl(this.manifestUrl), rawLinkIds);
+    } catch (error) {
+      console.warn("Evidence bundle unavailable; using snapshot retrieval.", error);
+      return null;
+    }
   }
 
   async loadRawLinkSupportByIds(rawLinkIds) {

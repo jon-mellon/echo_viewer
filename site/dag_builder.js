@@ -1447,7 +1447,16 @@ function renderSelectedEdge() {
   if ((missing.length || missingVariables.length) && !pendingEdgeEvidencePromise) {
     const loadingEdgeId = state.selectedEdgeId;
     state.pendingEdgeEvidence = true;
-    const load = (missing.length ? dagDataSource.loadRawLinksByIds(missing) : Promise.resolve([])).then(async links => {
+    const loadSources = async () => {
+      if (!missing.length) return [];
+      const panel = await dagDataSource.loadPanelEvidence(rawIds);
+      if (!panel) return dagDataSource.loadRawLinksByIds(missing);
+      for (const variable of panel.variables) {
+        if (!state.variableById.has(variable.variable_id)) state.variableById.set(variable.variable_id, variable);
+      }
+      return panel.links;
+    };
+    const load = loadSources().then(async links => {
       for (const link of links) state.rawLinksById.set(link.raw_causal_link_id, link);
       // Show paper and study rows immediately; labels can arrive separately.
       renderSelectedEdgePanels();

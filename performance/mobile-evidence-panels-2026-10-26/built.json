@@ -1,0 +1,84 @@
+{
+  "scenario": "load-evidence",
+  "option": "baseline",
+  "dataTransport": "Playwright proxy (localhost CORS)",
+  "sourceOverride": null,
+  "cpuThrottle": 1,
+  "url": "http://127.0.0.1:8779/",
+  "runs": [
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "cold edge selection to visible findings",
+          "ms": 142.7999997138977,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "remaining evidence metadata",
+          "ms": 32.10000038146973,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "warm edge selection to visible findings",
+          "ms": 90.10000038146973,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "next page to visible findings",
+          "ms": 64.5,
+          "longestTaskMs": 0,
+          "rows": 8
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-cognitive-ability",
+      "rawLinksBefore": 0,
+      "evidence": {
+        "rawLinks": 93,
+        "variables": 126,
+        "findings": 10,
+        "measures": [
+          {
+            "name": "echo:evidence:publication",
+            "ms": 935.1000003814697
+          }
+        ]
+      },
+      "paginationVerified": true,
+      "requests": [
+        {
+          "url": "http://127.0.0.1:8779/evidence-panels/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/index.json.gz",
+          "ms": 44.89545799999996,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 215842
+        },
+        {
+          "url": "http://127.0.0.1:8779/evidence-panels/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/09e81300fbba1d4be645bbf0e66c98bffddac9b3642b4372bbc43a964d47a117.json.gz",
+          "ms": 1.4502919999995356,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 11265
+        }
+      ],
+      "optionStats": {
+        "option": "baseline",
+        "catalogStatusBefore": "idle",
+        "labelCalls": [],
+        "downloadedBytes": 0,
+        "labelsVerified": 0
+      }
+    }
+  ]
+}

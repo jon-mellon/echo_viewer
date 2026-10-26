@@ -1,0 +1,211 @@
+{
+  "scenario": "load-evidence",
+  "option": "baseline",
+  "dataTransport": "Playwright proxy (localhost CORS)",
+  "sourceOverride": null,
+  "cpuThrottle": 4,
+  "url": "http://127.0.0.1:8779/",
+  "runs": [
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "cold edge selection to visible findings",
+          "ms": 389.19999980926514,
+          "longestTaskMs": 116,
+          "rows": 3
+        },
+        {
+          "name": "remaining evidence metadata",
+          "ms": 32.299999713897705,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "warm edge selection to visible findings",
+          "ms": 294.69999980926514,
+          "longestTaskMs": 154,
+          "rows": 3
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-macroeconomic-context",
+      "rawLinksBefore": 0,
+      "evidence": {
+        "rawLinks": 2,
+        "variables": 4,
+        "findings": 2,
+        "measures": [
+          {
+            "name": "echo:evidence:publication",
+            "ms": 600.5
+          }
+        ]
+      },
+      "requests": [
+        {
+          "url": "http://127.0.0.1:8779/evidence-panels/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/index.json.gz",
+          "ms": 124.94587500000034,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 215842
+        },
+        {
+          "url": "http://127.0.0.1:8779/evidence-panels/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/a553f0772684838b897e0ed0dc7cd86b85d4a0775ff94cecde672b09f3a9422c.json.gz",
+          "ms": 1.5945409999994808,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 713
+        }
+      ],
+      "optionStats": {
+        "option": "baseline",
+        "catalogStatusBefore": "idle",
+        "labelCalls": [],
+        "downloadedBytes": 0,
+        "labelsVerified": 0
+      }
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "cold edge selection to visible findings",
+          "ms": 360,
+          "longestTaskMs": 113,
+          "rows": 3
+        },
+        {
+          "name": "remaining evidence metadata",
+          "ms": 32.09999990463257,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "warm edge selection to visible findings",
+          "ms": 262.80000019073486,
+          "longestTaskMs": 132,
+          "rows": 3
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-macroeconomic-context",
+      "rawLinksBefore": 0,
+      "evidence": {
+        "rawLinks": 2,
+        "variables": 4,
+        "findings": 2,
+        "measures": [
+          {
+            "name": "echo:evidence:publication",
+            "ms": 591.5
+          }
+        ]
+      },
+      "requests": [
+        {
+          "url": "http://127.0.0.1:8779/evidence-panels/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/index.json.gz",
+          "ms": 117.12766600000032,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 215842
+        },
+        {
+          "url": "http://127.0.0.1:8779/evidence-panels/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/a553f0772684838b897e0ed0dc7cd86b85d4a0775ff94cecde672b09f3a9422c.json.gz",
+          "ms": 1.9889579999999114,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 713
+        }
+      ],
+      "optionStats": {
+        "option": "baseline",
+        "catalogStatusBefore": "idle",
+        "labelCalls": [],
+        "downloadedBytes": 0,
+        "labelsVerified": 0
+      }
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "cold edge selection to visible findings",
+          "ms": 361.6000003814697,
+          "longestTaskMs": 112,
+          "rows": 3
+        },
+        {
+          "name": "remaining evidence metadata",
+          "ms": 32.80000019073486,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "warm edge selection to visible findings",
+          "ms": 249.90000009536743,
+          "longestTaskMs": 127,
+          "rows": 3
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-macroeconomic-context",
+      "rawLinksBefore": 0,
+      "evidence": {
+        "rawLinks": 2,
+        "variables": 4,
+        "findings": 2,
+        "measures": [
+          {
+            "name": "echo:evidence:publication",
+            "ms": 424.90000009536743
+          }
+        ]
+      },
+      "requests": [
+        {
+          "url": "http://127.0.0.1:8779/evidence-panels/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/index.json.gz",
+          "ms": 114.51066599999831,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 215842
+        },
+        {
+          "url": "http://127.0.0.1:8779/evidence-panels/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/a553f0772684838b897e0ed0dc7cd86b85d4a0775ff94cecde672b09f3a9422c.json.gz",
+          "ms": 2.535209000001487,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 713
+        }
+      ],
+      "optionStats": {
+        "option": "baseline",
+        "catalogStatusBefore": "idle",
+        "labelCalls": [],
+        "downloadedBytes": 0,
+        "labelsVerified": 0
+      }
+    }
+  ]
+}
