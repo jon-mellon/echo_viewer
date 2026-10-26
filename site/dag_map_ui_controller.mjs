@@ -369,16 +369,33 @@ function variableColor(status) {
 }
 
 let _paletteAssignmentSig = null;
+let _paletteAssignmentShape = null;
 let _paletteAssignment = new Map(); // group_id -> palette index
 
 function invalidateCaches() {
   _globalVoronoiCells = null;
   _paletteAssignmentSig = null;
+  _paletteAssignmentShape = null;
   _paletteAssignment = new Map();
+}
+
+// groupColor() runs once per DAG node and map region, so the full membership
+// signature is too costly to rebuild on every call. When no group or
+// membership array has been replaced, resized or renamed, the assignment
+// still holds; otherwise fall back to comparing the full signature.
+function paletteAssignmentShape(groups) {
+  return groups.map(g => [g, g.group_id, g.variable_ids, g.variable_ids.length]);
+}
+
+function samePaletteAssignmentShape(shape, groups) {
+  return shape?.length === groups.length && shape.every(([group, id, ids, length], index) =>
+    group === groups[index] && id === group.group_id && ids === group.variable_ids && length === ids.length);
 }
 
 function computePaletteAssignment() {
   const groups = state.project?.groups || [];
+  if (samePaletteAssignmentShape(_paletteAssignmentShape, groups)) return;
+  _paletteAssignmentShape = paletteAssignmentShape(groups);
   const sig = groups.map(g => g.group_id + ":" + g.variable_ids.join(",")).join("|");
   if (sig === _paletteAssignmentSig) return;
   _paletteAssignmentSig = sig;

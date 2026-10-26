@@ -35,6 +35,17 @@ test("inspectors deduplicate evidence and preserve direction", () => {
   assert.equal(inspector.studyInspector({ links: [] }, rawById), null);
 });
 
+test("provenance classifications follow schema order across overlapping groups", () => {
+  const labels = inspector.groupLabelsByVariable([
+    { group_id: "b", label: "B", variable_ids: ["x", "x"] },
+    { group_id: "a", variable_ids: ["x", "y"] },
+    { group_id: "c", label: "B", variable_ids: ["x"] },
+  ]);
+  assert.deepEqual(inspector.provenanceVariable("x", new Map(), labels).classifications, ["B", "a"]);
+  assert.deepEqual(inspector.provenanceVariable("y", new Map(), labels).classifications, ["a"]);
+  assert.deepEqual(inspector.provenanceVariable("z", new Map(), labels), { concept: "z", classifications: [] });
+});
+
 test("absent evidence preserves empty provenance and comparison directions", () => {
   const project = { groups: [], link_decisions: {} };
   const link = { edge_id: "e", group_a: "a", group_b: "b", direction_type: "BIDIRECTIONAL",

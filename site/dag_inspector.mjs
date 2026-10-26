@@ -72,12 +72,23 @@ export function studyInspector(project, rawLinksById) {
   };
 }
 
-export function provenanceVariable(variableId, variables, groups) {
+/** Group labels per variable, in schema order, so each evidence row avoids scanning every membership. */
+export function groupLabelsByVariable(groups) {
+  const labels = new Map();
+  for (const group of groups || []) {
+    for (const id of group.variable_ids || []) {
+      if (!labels.has(id)) labels.set(id, []);
+      labels.get(id).push(group.label || group.group_id);
+    }
+  }
+  return labels;
+}
+
+export function provenanceVariable(variableId, variables, labelsByVariable) {
   const variable = variables.get(variableId);
   return {
     concept: variable?.concept_label || variable?.display_label || variableId || "",
-    classifications: [...new Set(groups.filter(g => (g.variable_ids || []).includes(variableId))
-      .map(g => g.label || g.group_id))],
+    classifications: [...new Set(labelsByVariable.get(variableId) || [])],
   };
 }
 
@@ -98,6 +109,7 @@ export function provenanceModel(link, project, rawLinksById, variables, diagnost
   ];
   if (diagnosticEvidenceDirection(link, diagnosticView) === "B_TO_A") sections.reverse();
   const seen = new Set();
+  const labelsByVariable = groupLabelsByVariable(project.groups);
   const populatedSections = sections.map(section => ({
     ...section,
     rows: section.rawIds.filter(id => {
@@ -106,8 +118,8 @@ export function provenanceModel(link, project, rawLinksById, variables, diagnost
       return true;
     }).map(id => rawLinksById.get(id)).filter(Boolean).map(raw => ({
       raw,
-      source: provenanceVariable(raw.source_variable_id, variables, project.groups),
-      target: provenanceVariable(raw.target_variable_id, variables, project.groups),
+      source: provenanceVariable(raw.source_variable_id, variables, labelsByVariable),
+      target: provenanceVariable(raw.target_variable_id, variables, labelsByVariable),
     })),
   }));
   return { ...edge, rawIds: [...seen], sections: populatedSections,
