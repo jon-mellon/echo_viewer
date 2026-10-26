@@ -1,0 +1,136 @@
+name: Deploy Echo Staging
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: echo-staging-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out staging source
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Echo
+        run: npm run build:site
+
+      - name: Prepare staging website
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("dist/site")
+          prefix = "/echo_viewer_staging"
+
+          # Remove production custom domain
+          (root / "CNAME").unlink(missing_ok=True)
+
+          # Collect local files and directories
+          assets = {
+              p.relative_to(root).as_posix()
+              for p in root.rglob("*")
+              if p.is_file()
+          }
+          directories = {
+              p.name for p in root.iterdir()
+              if p.is_dir()
+          }
+
+          # Rewrite root-relative local asset references
+          pattern = re.compile(
+              r"""(["'`])/(?!/)([^"'`\r\n]+?)\1"""
+          )
+
+          def rewrite(match):
+              quote, value = match.groups()
+              asset = value.split("?")[0].split("#")[0]
+              local = (
+                  asset in assets
+                  or any(
+                      asset.startswith(d + "/")
+                      for d in directories
+                  )
+              )
+              if local:
+                  return f"{quote}{prefix}/{value}{quote}"
+              return match.group(0)
+
+          changed = 0
+          for path in root.rglob("*"):
+              if not path.is_file():
+                  continue
+              if path.suffix not in (".html", ".js", ".mjs", ".css"):
+                  continue
+              if "vendor" in path.relative_to(root).parts:
+                  continue
+
+              original = path.read_text()
+              updated = pattern.sub(rewrite, original)
+
+              if updated != original:
+                  path.write_text(updated)
+                  changed += 1
+
+          # Confirm critical paths were rewritten
+          html = (root / "index.html").read_text()
+          builder = (root / "dag_builder.js").read_text()
+
+          assert f'{prefix}/styles.css' in html
+          assert f'{prefix}/dag_builder.js' in html
+          assert f'{prefix}/dag_project.mjs' in builder
+          assert not (root / "CNAME").exists()
+
+          print(f"Prepared staging site: {changed} files updated")
+          PY
+
+      - name: Check out staging publishing repository
+        uses: actions/checkout@v4
+        with:
+          repository: jon-mellon/echo_viewer_staging
+          ref: main
+          token: ${{ secrets.STAGING_REPO_TOKEN }}
+          path: staging-pages
+
+      - name: Copy built site
+        run: |
+          rsync -a --delete \
+            --exclude='.git/' \
+            dist/site/ staging-pages/
+
+      - name: Publish staging
+        working-directory: staging-pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to publish"
+            exit 0
+          fi
+
+          git commit -m "Deploy Echo staging from $GITHUB_SHA"
+          git push origin HEAD:main
