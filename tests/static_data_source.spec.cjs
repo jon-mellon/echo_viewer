@@ -88,3 +88,28 @@ for (const route of ["/"]) {
     expect(apiStatus).toBe(404);
   });
 }
+
+test("content-ID layouts resolve shards through the variable_id lookup", async ({ page }) => {
+  test.setTimeout(78000);
+  const publication = "c221423a-9470-4c82-8a3d-8bcf4a01ef7c";
+  const contentSnapshot = "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b";
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  const errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await page.goto(`${base}/?schema=${publication}&data_version=${contentSnapshot}`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
+    && document.getElementById("startupLoading")?.hidden, null, { timeout: 78000 });
+  const state = await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    await dagDataSource.ensureEvidenceConnection();
+    return {
+      shards: ["v00008ca8c17b2a4b", "v00a8a27ccc9fd830", "vffffe44b8b970692", "v1"]
+        .map(id => dagDataSource.browserShardIds([id])),
+      provenance: await dagDataSource.loadVariableProvenance(["v00a8a27ccc9fd830"]),
+    };
+  });
+  expect(state.shards).toEqual([[0], [1], [382], []]);
+  expect(state.provenance).toEqual([expect.objectContaining({
+    variable_id: "v00a8a27ccc9fd830", concept_label: "uoa's emergency department use" })]);
+  expect(errors).toEqual([]);
+});

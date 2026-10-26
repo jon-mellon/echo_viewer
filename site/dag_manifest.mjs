@@ -40,10 +40,12 @@ export function browserV2ManifestLayout(manifest) {
   if (!Number.isInteger(manifest.shards?.count) || manifest.shards.count < 1) {
     throw new Error("Browser-v2 manifest has an invalid shard count.");
   }
-  if (manifest.lookup?.key !== "variable_index" || manifest.lookup?.value !== "shard_id") {
+  // Layouts whose variable IDs carry their stable index map index -> shard;
+  // layouts with content-derived IDs map the ID itself.
+  if (!["variable_index", "variable_id"].includes(manifest.lookup?.key) || manifest.lookup?.value !== "shard_id") {
     throw new Error("Browser-v2 manifest has an unsupported lookup mapping.");
   }
-  const paths = { lookup: manifest.lookup.path, ...manifest.shards };
+  const paths = { lookup: manifest.lookup.path, lookup_key: manifest.lookup.key, ...manifest.shards };
   for (const key of ["lookup", "variables", "causal_links_by_source", "causal_links_by_target", "neighbors"]) {
     if (typeof paths[key] !== "string" || !paths[key].trim()) throw new Error(`Browser-v2 manifest is missing ${key}.`);
   }

@@ -23,6 +23,11 @@ test("browser-v2 manifests expose validated retrieval patterns", () => {
       causal_links_by_target: "causal-links/by-target/shard-{shard_id:05d}.parquet",
       neighbors: "neighbors/shard-{shard_id:05d}.parquet" } };
   assert.equal(browserV2ManifestLayout(manifest).lookup, "lookup/variable-shards.parquet");
+  assert.equal(browserV2ManifestLayout(manifest).lookup_key, "variable_index");
+  const byId = { ...manifest, lookup: { ...manifest.lookup, key: "variable_id" } };
+  assert.equal(browserV2ManifestLayout(byId).lookup_key, "variable_id");
+  assert.throws(() => browserV2ManifestLayout({ ...manifest, lookup: { ...manifest.lookup, key: "paper_id" } }),
+    /unsupported lookup/);
   assert.equal(browserV2ShardPath(manifest.shards.variables, 7), "variables/shard-00007.parquet");
   assert.throws(() => browserV2ManifestLayout({ ...manifest, layout_version: "browser-v3" }), /Unsupported/);
   assert.throws(() => browserV2ShardPath("shard.parquet", 1), /pattern/);

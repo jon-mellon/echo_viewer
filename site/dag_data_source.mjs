@@ -262,6 +262,11 @@ export class ParquetManifestDagDataSource {
       return;
     }
     const url = new URL(this.browserLayout.lookup, this.manifestBaseUrl).href.replaceAll("'", "''");
+    if (this.browserLayout.lookup_key === "variable_id") {
+      const rows = await queryRows(this.connection, `SELECT variable_id, shard_id FROM read_parquet('${url}')`);
+      this.shardByVariableId = new Map(rows.map(row => [String(row.variable_id), Number(row.shard_id)]));
+      return;
+    }
     const rows = await queryRows(this.connection, `SELECT variable_index, shard_id FROM read_parquet('${url}')`);
     this.shardByVariableIndex = new Map(rows.map(row => [Number(row.variable_index), Number(row.shard_id)]));
   }
@@ -321,6 +326,11 @@ export class ParquetManifestDagDataSource {
   browserShardIds(variableIds) {
     const shards = new Set();
     for (const variableId of variableIds || []) {
+      if (this.shardByVariableId) {
+        const shard = this.shardByVariableId.get(String(variableId));
+        if (shard != null) shards.add(shard);
+        continue;
+      }
       const match = String(variableId).match(/^v(\d+)$/);
       const index = match ? Number(match[1]) : NaN;
       const shard = this.contiguousShardMaxIndex
