@@ -1,0 +1,52 @@
+[
+  {
+    "option": "baseline",
+    "coldMs": 3954,
+    "labelMs": 2147.199999809265,
+    "nextMs": 730.6999998092651,
+    "firstPageLabelRequests": 51,
+    "firstPageLabelBytes": 1107960,
+    "requestCountIncludingPagination": 80,
+    "verified": true
+  },
+  {
+    "option": "locality",
+    "coldMs": 2922.4000000953674,
+    "labelMs": 1021.4000000953674,
+    "nextMs": 583,
+    "firstPageLabelRequests": 42,
+    "firstPageLabelBytes": 908849,
+    "requestCountIncludingPagination": 71,
+    "verified": true
+  },
+  {
+    "option": "full-shards",
+    "coldMs": 1950.5999999046326,
+    "labelMs": 214.69999980926514,
+    "nextMs": 199.2999997138977,
+    "firstPageLabelRequests": 17,
+    "firstPageLabelBytes": 1107960,
+    "requestCountIncludingPagination": 34,
+    "verified": true
+  },
+  {
+    "option": "catalog",
+    "coldMs": 2405.4000000953674,
+    "labelMs": 257.09999990463257,
+    "nextMs": 148.40000009536743,
+    "firstPageLabelRequests": 1,
+    "firstPageLabelBytes": 7564095,
+    "requestCountIncludingPagination": 14,
+    "verified": true
+  },
+  {
+    "option": "canonical",
+    "coldMs": 2489.0999999046326,
+    "labelMs": 674.1999998092651,
+    "nextMs": 209,
+    "firstPageLabelRequests": 3,
+    "firstPageLabelBytes": 18508056,
+    "requestCountIncludingPagination": 16,
+    "verified": true
+  }
+]

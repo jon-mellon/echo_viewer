@@ -1,0 +1,1965 @@
+{
+  "scenario": "load-evidence",
+  "option": "locality",
+  "dataTransport": "Playwright proxy (localhost CORS)",
+  "cpuThrottle": 1,
+  "url": "http://127.0.0.1:8782/",
+  "runs": [
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "cold edge selection to visible findings",
+          "ms": 4440.299999713898,
+          "longestTaskMs": 70,
+          "rows": 10
+        },
+        {
+          "name": "remaining evidence metadata",
+          "ms": 31.90000009536743,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "warm edge selection to visible findings",
+          "ms": 93.2000002861023,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "next page to visible findings",
+          "ms": 894,
+          "longestTaskMs": 62,
+          "rows": 8
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-cognitive-ability",
+      "rawLinksBefore": 0,
+      "evidence": {
+        "rawLinks": 93,
+        "variables": 15,
+        "findings": 10,
+        "measures": [
+          {
+            "name": "echo:evidence:publication",
+            "ms": 466.90000009536743
+          },
+          {
+            "name": "echo:evidence:manifest",
+            "ms": 146.2999997138977
+          },
+          {
+            "name": "echo:evidence:engine",
+            "ms": 272.2999997138977
+          },
+          {
+            "name": "echo:evidence:lookup",
+            "ms": 783.7000002861023
+          },
+          {
+            "name": "echo:evidence:validation",
+            "ms": 67.09999990463257
+          }
+        ]
+      },
+      "paginationVerified": true,
+      "requests": [
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/manifest.json",
+          "ms": 145.82345799999985,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 356078
+        },
+        {
+          "url": "http://127.0.0.1:8782/vendor/duckdb/duckdb-browser-eh.worker.js",
+          "ms": 19.59900000000016,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 772759
+        },
+        {
+          "url": "http://127.0.0.1:8782/vendor/duckdb/duckdb-eh.wasm",
+          "ms": 196.7657080000008,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://extensions.duckdb.org/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm",
+          "ms": 354.9787499999993,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 3045039
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/lookup/variable-shards.parquet",
+          "ms": 70.4818750000004,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/lookup/variable-shards.parquet",
+          "ms": 234.00145799999973,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 920193
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 45.0761250000005,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 20.93604199999936,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 1989
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 63.39875000000029,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 192.46895900000072,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7087503
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 82.14649999999983,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00002.parquet",
+          "ms": 22.262249999999767,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00004.parquet",
+          "ms": 26.43895800000064,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00002.parquet",
+          "ms": 29.655375000000276,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64054
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00069.parquet",
+          "ms": 25.525125000000116,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00077.parquet",
+          "ms": 20.392500000000837,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00084.parquet",
+          "ms": 94.21595799999977,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00110.parquet",
+          "ms": 66.38066700000036,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00138.parquet",
+          "ms": 62.00891700000011,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00171.parquet",
+          "ms": 34.672875000000204,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00187.parquet",
+          "ms": 24.510290999999597,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00212.parquet",
+          "ms": 82.84045900000001,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00296.parquet",
+          "ms": 33.96170799999982,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00341.parquet",
+          "ms": 30.333917000000838,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00351.parquet",
+          "ms": 29.19616700000006,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00375.parquet",
+          "ms": 70.56591600000047,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00002.parquet",
+          "ms": 25.073707999999897,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00004.parquet",
+          "ms": 32.929417000000285,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00069.parquet",
+          "ms": 33.51208300000053,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00077.parquet",
+          "ms": 27.11479099999997,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00084.parquet",
+          "ms": 34.39074999999957,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00110.parquet",
+          "ms": 27.930915999999343,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00138.parquet",
+          "ms": 40.88641699999971,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00171.parquet",
+          "ms": 34.58745900000031,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00187.parquet",
+          "ms": 24.972625000000335,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00212.parquet",
+          "ms": 21.097875000000386,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00296.parquet",
+          "ms": 30.697250000000167,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00341.parquet",
+          "ms": 16.902540999999474,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00351.parquet",
+          "ms": 26.216457999999875,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00375.parquet",
+          "ms": 75.11958400000003,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00004.parquet",
+          "ms": 30.34216699999979,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64856
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00069.parquet",
+          "ms": 65.8563750000003,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63784
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00077.parquet",
+          "ms": 620.0422090000002,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63710
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00084.parquet",
+          "ms": 26.161833000000115,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64240
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00110.parquet",
+          "ms": 30.590750000001208,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64307
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00138.parquet",
+          "ms": 30.907416000000012,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63261
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00171.parquet",
+          "ms": 24.678291000000172,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 65078
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00187.parquet",
+          "ms": 31.79583300000013,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 68305
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00212.parquet",
+          "ms": 33.73212499999863,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 66262
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00296.parquet",
+          "ms": 86.47612499999923,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63730
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00341.parquet",
+          "ms": 26.189833999998882,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64750
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00351.parquet",
+          "ms": 27.961750000000393,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 62974
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00375.parquet",
+          "ms": 25.52033300000039,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 69538
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00106.parquet",
+          "ms": 23.769500000000335,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00245.parquet",
+          "ms": 18.420916999999463,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00106.parquet",
+          "ms": 25.906042000000525,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63611
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00259.parquet",
+          "ms": 29.019916999999623,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00265.parquet",
+          "ms": 20.573207999999795,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00269.parquet",
+          "ms": 23.505208000000493,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00339.parquet",
+          "ms": 23.533540999998877,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00106.parquet",
+          "ms": 25.552582999998776,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00245.parquet",
+          "ms": 18.486291999999594,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00259.parquet",
+          "ms": 32.62595800000054,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00265.parquet",
+          "ms": 33.91750000000138,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00269.parquet",
+          "ms": 36.61320800000067,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00339.parquet",
+          "ms": 23.36225000000013,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00245.parquet",
+          "ms": 31.267499999999927,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64448
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00259.parquet",
+          "ms": 39.60908399999971,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63725
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00265.parquet",
+          "ms": 279.1773750000011,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64101
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00269.parquet",
+          "ms": 23.672582999999577,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64013
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00339.parquet",
+          "ms": 27.87054199999875,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64868
+        }
+      ],
+      "optionStats": {
+        "option": "locality",
+        "catalogStatusBefore": "idle",
+        "labelCalls": [
+          {
+            "ids": 15,
+            "ms": 2188
+          },
+          {
+            "ids": 6,
+            "ms": 747.2999997138977
+          }
+        ],
+        "downloadedBytes": 0,
+        "firstPageShards": 14,
+        "labelsVerified": 21
+      }
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "cold edge selection to visible findings",
+          "ms": 2909.5999999046326,
+          "longestTaskMs": 75,
+          "rows": 10
+        },
+        {
+          "name": "remaining evidence metadata",
+          "ms": 32.19999980926514,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "warm edge selection to visible findings",
+          "ms": 92.90000009536743,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "next page to visible findings",
+          "ms": 583,
+          "longestTaskMs": 67,
+          "rows": 8
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-cognitive-ability",
+      "rawLinksBefore": 0,
+      "evidence": {
+        "rawLinks": 93,
+        "variables": 15,
+        "findings": 10,
+        "measures": [
+          {
+            "name": "echo:evidence:publication",
+            "ms": 433.90000009536743
+          },
+          {
+            "name": "echo:evidence:manifest",
+            "ms": 97.19999980926514
+          },
+          {
+            "name": "echo:evidence:engine",
+            "ms": 288.1000003814697
+          },
+          {
+            "name": "echo:evidence:lookup",
+            "ms": 614.1999998092651
+          },
+          {
+            "name": "echo:evidence:validation",
+            "ms": 56.09999990463257
+          }
+        ]
+      },
+      "paginationVerified": true,
+      "requests": [
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/manifest.json",
+          "ms": 96.34375,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 356078
+        },
+        {
+          "url": "http://127.0.0.1:8782/vendor/duckdb/duckdb-browser-eh.worker.js",
+          "ms": 17.174542000000656,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 772759
+        },
+        {
+          "url": "http://127.0.0.1:8782/vendor/duckdb/duckdb-eh.wasm",
+          "ms": 216.23675000000003,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://extensions.duckdb.org/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm",
+          "ms": 321.8722080000007,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 3045039
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/lookup/variable-shards.parquet",
+          "ms": 57.77649999999994,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/lookup/variable-shards.parquet",
+          "ms": 104.59441599999991,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 920193
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 18.774249999998574,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 35.27574999999706,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 1989
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 40.07395899999756,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 211.02974999999788,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7087503
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 74.17645900000207,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00002.parquet",
+          "ms": 19.35095899999942,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00004.parquet",
+          "ms": 35.21729200000118,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00002.parquet",
+          "ms": 20.146083000003273,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64054
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00069.parquet",
+          "ms": 22.427749999998923,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00077.parquet",
+          "ms": 32.63904199999888,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00084.parquet",
+          "ms": 29.126541999998153,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00110.parquet",
+          "ms": 40.29337499999747,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00138.parquet",
+          "ms": 20.635290999998688,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00171.parquet",
+          "ms": 38.01483400000143,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00187.parquet",
+          "ms": 35.702250000002095,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00212.parquet",
+          "ms": 25.12537499999962,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00296.parquet",
+          "ms": 16.431749999999738,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00341.parquet",
+          "ms": 18.14166600000317,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00351.parquet",
+          "ms": 18.940957999999227,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00375.parquet",
+          "ms": 15.807916000001569,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00002.parquet",
+          "ms": 18.512957999999344,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00004.parquet",
+          "ms": 21.535166999998182,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00069.parquet",
+          "ms": 17.882832999999664,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00077.parquet",
+          "ms": 40.03216699999757,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00084.parquet",
+          "ms": 19.533833000001323,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00110.parquet",
+          "ms": 19.910875000001397,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00138.parquet",
+          "ms": 22.9665419999983,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00171.parquet",
+          "ms": 19.223541999999725,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00187.parquet",
+          "ms": 40.57879200000025,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00212.parquet",
+          "ms": 17.94987499999843,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00296.parquet",
+          "ms": 31.439833000000363,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00341.parquet",
+          "ms": 22.66729199999827,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00351.parquet",
+          "ms": 18.009416999997484,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00375.parquet",
+          "ms": 18.6440419999999,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00004.parquet",
+          "ms": 21.624416000002384,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64856
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00069.parquet",
+          "ms": 21.3592499999977,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63784
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00077.parquet",
+          "ms": 23.152290999998513,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63710
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00084.parquet",
+          "ms": 37.96700000000055,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64240
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00110.parquet",
+          "ms": 23.151708000001236,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64307
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00138.parquet",
+          "ms": 20.523709000000963,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63261
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00171.parquet",
+          "ms": 18.880958000001556,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 65078
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00187.parquet",
+          "ms": 19.73949999999968,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 68305
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00212.parquet",
+          "ms": 21.227790999997524,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 66262
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00296.parquet",
+          "ms": 22.253292000001238,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63730
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00341.parquet",
+          "ms": 22.449584000001778,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64750
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00351.parquet",
+          "ms": 16.74054199999955,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 62974
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00375.parquet",
+          "ms": 18.896083999999973,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 69538
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00106.parquet",
+          "ms": 18.32341699999961,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00245.parquet",
+          "ms": 23.615750000000844,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00106.parquet",
+          "ms": 21.367416000000958,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63611
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00259.parquet",
+          "ms": 27.059000000001106,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00265.parquet",
+          "ms": 19.05345899999884,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00269.parquet",
+          "ms": 19.240125000000262,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00339.parquet",
+          "ms": 20.986791999999696,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00106.parquet",
+          "ms": 20.096417000000656,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00245.parquet",
+          "ms": 15.997917000000598,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00259.parquet",
+          "ms": 19.532458999998198,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00265.parquet",
+          "ms": 19.52191600000151,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00269.parquet",
+          "ms": 20.283290999999736,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00339.parquet",
+          "ms": 73.60245799999757,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00245.parquet",
+          "ms": 28.58112500000061,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64448
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00259.parquet",
+          "ms": 20.348667000002024,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63725
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00265.parquet",
+          "ms": 24.872458000001643,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64101
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00269.parquet",
+          "ms": 19.956790999996883,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64013
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00339.parquet",
+          "ms": 21.793249999998807,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64868
+        }
+      ],
+      "optionStats": {
+        "option": "locality",
+        "catalogStatusBefore": "idle",
+        "labelCalls": [
+          {
+            "ids": 15,
+            "ms": 1021.4000000953674
+          },
+          {
+            "ids": 6,
+            "ms": 441.40000009536743
+          }
+        ],
+        "downloadedBytes": 0,
+        "firstPageShards": 14,
+        "labelsVerified": 21
+      }
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "cold edge selection to visible findings",
+          "ms": 2922.4000000953674,
+          "longestTaskMs": 75,
+          "rows": 10
+        },
+        {
+          "name": "remaining evidence metadata",
+          "ms": 32.90000009536743,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "warm edge selection to visible findings",
+          "ms": 96.30000019073486,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "next page to visible findings",
+          "ms": 513.5,
+          "longestTaskMs": 65,
+          "rows": 8
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-cognitive-ability",
+      "rawLinksBefore": 0,
+      "evidence": {
+        "rawLinks": 93,
+        "variables": 15,
+        "findings": 10,
+        "measures": [
+          {
+            "name": "echo:evidence:publication",
+            "ms": 394.5
+          },
+          {
+            "name": "echo:evidence:manifest",
+            "ms": 99
+          },
+          {
+            "name": "echo:evidence:engine",
+            "ms": 275.09999990463257
+          },
+          {
+            "name": "echo:evidence:lookup",
+            "ms": 638.0999999046326
+          },
+          {
+            "name": "echo:evidence:validation",
+            "ms": 60
+          }
+        ]
+      },
+      "paginationVerified": true,
+      "requests": [
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/manifest.json",
+          "ms": 98.39050000000134,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 356078
+        },
+        {
+          "url": "http://127.0.0.1:8782/vendor/duckdb/duckdb-browser-eh.worker.js",
+          "ms": 16.892125000002125,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 772759
+        },
+        {
+          "url": "http://127.0.0.1:8782/vendor/duckdb/duckdb-eh.wasm",
+          "ms": 203.35158299999966,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://extensions.duckdb.org/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm",
+          "ms": 358.7593340000021,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 3045039
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/lookup/variable-shards.parquet",
+          "ms": 38.96466700000019,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/lookup/variable-shards.parquet",
+          "ms": 112.47683299999699,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 920193
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 23.969375000000582,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 33.98291600000084,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 1989
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 34.07862500000192,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 206.94445800000176,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7087503
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 94.90562499999942,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00002.parquet",
+          "ms": 22.547875000000204,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00004.parquet",
+          "ms": 31.42895800000042,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00002.parquet",
+          "ms": 21.81275000000096,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64054
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00069.parquet",
+          "ms": 36.35041699999783,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00077.parquet",
+          "ms": 18.908166999997775,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00084.parquet",
+          "ms": 44.96020800000042,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00110.parquet",
+          "ms": 28.112333000000945,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00138.parquet",
+          "ms": 22.937541999999667,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00171.parquet",
+          "ms": 37.27762499999881,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00187.parquet",
+          "ms": 20.807583000001614,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00212.parquet",
+          "ms": 19.12554199999795,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00296.parquet",
+          "ms": 41.28545799999847,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00341.parquet",
+          "ms": 19.401832999999897,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00351.parquet",
+          "ms": 18.078917000002548,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00375.parquet",
+          "ms": 19.236790999999357,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00002.parquet",
+          "ms": 18.307041000000027,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00004.parquet",
+          "ms": 19.637125000001106,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00069.parquet",
+          "ms": 18.37341700000252,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00077.parquet",
+          "ms": 17.4821669999983,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00084.parquet",
+          "ms": 19.05933300000106,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00110.parquet",
+          "ms": 45.738625000001775,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00138.parquet",
+          "ms": 20.518040999999357,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00171.parquet",
+          "ms": 20.08379100000093,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00187.parquet",
+          "ms": 19.335332999999082,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00212.parquet",
+          "ms": 33.08904099999927,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00296.parquet",
+          "ms": 18.15504200000214,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00341.parquet",
+          "ms": 20.219375000000582,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00351.parquet",
+          "ms": 16.755291999998008,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00375.parquet",
+          "ms": 19.646042000000307,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00004.parquet",
+          "ms": 22.589332999999897,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64856
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00069.parquet",
+          "ms": 19.80487500000163,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63784
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00077.parquet",
+          "ms": 23.403667000002315,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63710
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00084.parquet",
+          "ms": 26.79820800000016,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64240
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00110.parquet",
+          "ms": 19.89862500000163,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64307
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00138.parquet",
+          "ms": 22.589250000000902,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63261
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00171.parquet",
+          "ms": 25.00737499999741,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 65078
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00187.parquet",
+          "ms": 20.519374999999854,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 68305
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00212.parquet",
+          "ms": 22.196250000000873,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 66262
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00296.parquet",
+          "ms": 18.70537499999773,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63730
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00341.parquet",
+          "ms": 24.26066599999831,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64750
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00351.parquet",
+          "ms": 21.36420899999939,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 62974
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00375.parquet",
+          "ms": 24.74279199999728,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 69538
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00106.parquet",
+          "ms": 27.737042000000656,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00245.parquet",
+          "ms": 17.53258300000016,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00106.parquet",
+          "ms": 24.141082999998616,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63611
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00259.parquet",
+          "ms": 17.14287499999773,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00265.parquet",
+          "ms": 17.830415999997058,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00269.parquet",
+          "ms": 19.335583000000042,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00339.parquet",
+          "ms": 20.046708000001672,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00106.parquet",
+          "ms": 17.90191599999889,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00245.parquet",
+          "ms": 19.328125,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00259.parquet",
+          "ms": 18.898042000000714,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00265.parquet",
+          "ms": 16.205958999998984,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00269.parquet",
+          "ms": 20.94995899999776,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00339.parquet",
+          "ms": 15.210792000001675,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00245.parquet",
+          "ms": 20.582875000000058,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64448
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00259.parquet",
+          "ms": 34.57337499999994,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 63725
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00265.parquet",
+          "ms": 25.01862500000061,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64101
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00269.parquet",
+          "ms": 18.485916999998153,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64013
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variables/shard-00339.parquet",
+          "ms": 20.303834000002098,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 64868
+        }
+      ],
+      "optionStats": {
+        "option": "locality",
+        "catalogStatusBefore": "idle",
+        "labelCalls": [
+          {
+            "ids": 15,
+            "ms": 1015.9000000953674
+          },
+          {
+            "ids": 6,
+            "ms": 377.7000002861023
+          }
+        ],
+        "downloadedBytes": 0,
+        "firstPageShards": 14,
+        "labelsVerified": 21
+      }
+    }
+  ]
+}

@@ -34,6 +34,9 @@ jobs:
 
       - name: Build Echo
         run: npm run build:site
+        env:
+          DEFAULT_DATA_PUBLICATION: c221423a-9470-4c82-8a3d-8bcf4a01ef7c
+          DEFAULT_DATA_SNAPSHOT: f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b
 
       - name: Prepare staging website
         run: |

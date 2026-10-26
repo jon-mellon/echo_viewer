@@ -13,17 +13,49 @@ async function filesIn(directory) {
   return files.sort();
 }
 
+function stagingDataConfig(source) {
+  const publication = process.env.DEFAULT_DATA_PUBLICATION || "";
+  const snapshot = process.env.DEFAULT_DATA_SNAPSHOT || "";
+  if (!publication && !snapshot) return null;
+  if (!publication || !snapshot) {
+    throw new Error("Set DEFAULT_DATA_PUBLICATION and DEFAULT_DATA_SNAPSHOT together.");
+  }
+  if (!/^[0-9a-f]{64}$/.test(snapshot)) {
+    throw new Error("DEFAULT_DATA_SNAPSHOT must be a 64-character snapshot ID.");
+  }
+  let config = source;
+  const replaceConstant = (name, value) => {
+    const pattern = new RegExp(`(export const ${name} =\\s*)"[^"]*"`);
+    if (!pattern.test(config)) throw new Error(`dag_data_config.mjs no longer defines ${name}.`);
+    config = config.replace(pattern, `$1${JSON.stringify(value)}`);
+  };
+  replaceConstant("DEFAULT_SCHEMA_PUBLICATION_ID", publication);
+  replaceConstant(
+    "PRODUCTION_EVIDENCE_MANIFEST",
+    `https://data.epistemicinfra.org/evidence/layouts/browser-v2/${snapshot}/manifest.json`,
+  );
+  return config;
+}
+
 export async function buildSite(source, destination) {
   const files = await filesIn(source);
   const hash = createHash("sha256");
+  const hasDataOverride = process.env.DEFAULT_DATA_PUBLICATION || process.env.DEFAULT_DATA_SNAPSHOT;
+  const configuredConfig = hasDataOverride
+    ? stagingDataConfig(await readFile(join(source, "dag_data_config.mjs"), "utf8"))
+    : null;
   for (const file of files) {
     hash.update(relative(source, file));
-    hash.update(await readFile(file));
+    const content = relative(source, file) === "dag_data_config.mjs" && configuredConfig
+      ? configuredConfig
+      : await readFile(file);
+    hash.update(content);
   }
   const version = hash.digest("hex").slice(0, 16);
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
   await cp(source, destination, { recursive: true });
+  if (configuredConfig) await writeFile(join(destination, "dag_data_config.mjs"), configuredConfig);
 
   for (const file of files) {
     const target = join(destination, relative(source, file));

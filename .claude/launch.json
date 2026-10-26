@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "viewer-new-data",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8767", "--directory", "dist/new-data-site"],
+      "port": 8767
+    }
+  ]
+}
