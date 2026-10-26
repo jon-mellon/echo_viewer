@@ -18,6 +18,7 @@
     "test:exports": "node tests/dag_exports_smoke.mjs",
     "test:static-data": "playwright test tests/static_data_source.spec.cjs --workers=1",
     "test:browser": "playwright test --config=playwright.interactions.config.cjs",
+    "test:browser:new-data": "playwright test --config=playwright.new-data.config.cjs",
     "build:search-catalog": "node scripts/generate_variable_search_catalog.mjs",
     "build:site": "node scripts/build_site.mjs",
     "profile": "node scripts/profile_viewer.mjs",
