@@ -137,3 +137,22 @@ test("exogeneity view finds common ancestors of the instrument and outcome", () 
     toIv: ["common", "via", "z"], toDv: ["common", "dv"],
   });
 });
+
+test("sparse edge filtering counts distinct present papers before finding paths", () => {
+  const evidence = new Map([
+    ["a", { paper_id: "p1" }], ["b", { paper_id: "p1" }],
+    ["c", { paper_id: "p2", causal_link_existence: "absent" }],
+    ["d", { paper_id: "p2", causal_link_existence: "present" }],
+  ]);
+  const supportedLinks = [
+    link("c_iv", "c", "iv", "A_TO_B", { a_to_b_raw_link_ids: ["a", "b", "c"] }),
+    link("c_dv", "c", "dv", "A_TO_B", { a_to_b_raw_link_ids: ["a"], b_to_a_raw_link_ids: ["d"] }),
+  ];
+  const options = { groups, links: supportedLinks, ivId: "iv", dvId: "dv", rawLinksById: evidence };
+  assert.equal(deriveDagView(options).visibleLinks.length, 2);
+  const filtered = deriveDagView({ ...options, excludeSparseEdges: true });
+  assert.deepEqual(filtered.visibleLinks.map(item => item.edge_id), ["c_dv"]);
+  assert.equal(filtered.confounders.confounderIds.size, 0);
+  assert.equal(deriveDagView({ ...options, excludeSparseEdges: true, minimumEdgePapers: 1 }).visibleLinks.length, 2);
+  assert.equal(deriveDagView({ ...options, excludeSparseEdges: true, minimumEdgePapers: 3 }).visibleLinks.length, 0);
+});

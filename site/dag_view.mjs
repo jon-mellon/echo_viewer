@@ -1,3 +1,5 @@
+import { isPresentLink } from "./dag_link_aggregation.mjs";
+
 import {
   connectedComponentGraph,
   createGraph,
@@ -22,6 +24,9 @@ export function deriveDagView({
   maxPathLength = 1,
   exclusionMaxPathLength = maxPathLength,
   excludeBottlenecked = false,
+  excludeSparseEdges = false,
+  minimumEdgePapers = 2,
+  rawLinksById = new Map(),
   filterByCausalRelevance = false,
   showConfoundersOnly = false,
   showCollidersOnly = false,
@@ -30,7 +35,15 @@ export function deriveDagView({
   hideIrrelevantDiagnosticLinks = false,
   showAllExclusionLinks = false,
 } = {}) {
-  const fullGraph = createGraph(groups.map((group) => group.group_id), links);
+  const retainedLinks = excludeSparseEdges ? links.filter(link => {
+    const ids = [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])];
+    const papers = new Set(ids.flatMap(id => {
+      const evidence = rawLinksById.get(id);
+      return evidence?.paper_id && isPresentLink(evidence) ? [evidence.paper_id] : [];
+    }));
+    return papers.size >= minimumEdgePapers;
+  }) : links;
+  const fullGraph = createGraph(groups.map((group) => group.group_id), retainedLinks);
   const connectivityGraph = filterGraphLinks(fullGraph, (link) => !excludedForConnectivity(link));
   const traversableLink = (link) => !excludedForConnectivity(link);
   const diagnosticOptions = {

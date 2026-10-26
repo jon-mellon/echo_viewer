@@ -186,6 +186,19 @@ function installHandlers() {
       els.confounderPathLength.value = String(state[field]);
     }
   });
+  els.toggleSparseEdges.addEventListener("click", () => {
+    state.excludeSparseEdges = !state.excludeSparseEdges;
+    rebuildProject();
+  });
+  els.minimumEdgePapers.addEventListener("input", () => {
+    const requested = Math.trunc(Number(els.minimumEdgePapers.value));
+    if (!Number.isSafeInteger(requested) || requested < 1) return;
+    state.minimumEdgePapers = requested;
+    rebuildProject();
+  });
+  els.minimumEdgePapers.addEventListener("change", () => {
+    els.minimumEdgePapers.value = String(state.minimumEdgePapers);
+  });
   els.toggleBottleneckedConfounders.addEventListener("click", () => {
     state.excludeBottleneckedConfounders = !state.excludeBottleneckedConfounders;
     if (!state.showCollidersOnly && !state.showExogeneity) state.showConfoundersOnly = true;

@@ -27,6 +27,11 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
   }
 
   function render(anchorsReady) {
+    if (elements.toggleSparseEdges) {
+      elements.toggleSparseEdges.classList.toggle("active", state.excludeSparseEdges);
+      elements.toggleSparseEdges.setAttribute("aria-pressed", state.excludeSparseEdges ? "true" : "false");
+      elements.minimumEdgePapers.value = String(state.minimumEdgePapers ?? 2);
+    }
     const layoutSources = state.data?.layout?.sources || [];
     replaceChildren(elements.variableLayoutSelect, layoutSources.map(source =>
       h("option", { value: source.source, textContent: source.label || source.source })));

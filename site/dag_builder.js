@@ -147,7 +147,7 @@ function initElements() {
     // Map
     "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts", "definitionMapPreviewStatus",
     "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
+    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleSparseEdges", "minimumEdgePapers", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
@@ -1192,7 +1192,22 @@ function hasAnyMapping(sourceIds, targetIds) {
   return rawLinksBetween(sourceIds, targetIds).length > 0;
 }
 
+let sparseEdgeEvidencePromise = null;
 function computeVisibleLinks() {
+  if (state.excludeSparseEdges && !sparseEdgeEvidencePromise) {
+    const missing = [...new Set((state.project?.links || []).flatMap(link =>
+      [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))]
+      .filter(id => !state.rawLinksById.has(id));
+    if (missing.length) {
+      sparseEdgeEvidencePromise = dagDataSource.loadRawLinksByIds(missing).then(rows => {
+        for (const row of rows) state.rawLinksById.set(row.raw_causal_link_id, row);
+        computeVisibleLinks();
+        renderAll();
+      }).catch(error => {
+        console.error("Could not load sparse edge evidence", error);
+      }).finally(() => { sparseEdgeEvidencePromise = null; });
+    }
+  }
   const instrumentId = state.project.instrument_group_id;
   if (instrumentId && (instrumentId === state.project.iv_group_id
     || instrumentId === state.project.dv_group_id
@@ -1217,6 +1232,9 @@ function computeVisibleLinks() {
     maxPathLength: state.confounderMaxPathLength,
     exclusionMaxPathLength: state.exclusionMaxPathLength,
     excludeBottlenecked: state.excludeBottleneckedConfounders,
+    excludeSparseEdges: state.excludeSparseEdges,
+    minimumEdgePapers: state.minimumEdgePapers,
+    rawLinksById: state.rawLinksById,
     filterByCausalRelevance: false,
     showConfoundersOnly: state.showConfoundersOnly,
     showCollidersOnly: state.showCollidersOnly,
@@ -1771,6 +1789,9 @@ const exportController = createDagExportController({
       maxPathLength: state.confounderMaxPathLength,
       exclusionMaxPathLength: state.exclusionMaxPathLength,
       excludeBottlenecked: state.excludeBottleneckedConfounders,
+      excludeSparseEdges: state.excludeSparseEdges,
+      minimumEdgePapers: state.minimumEdgePapers,
+      rawLinksById: state.rawLinksById,
       showConfoundersOnly: state.showConfoundersOnly,
       showCollidersOnly: state.showCollidersOnly,
       showExclusionViolations: state.showExclusionViolations,

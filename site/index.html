@@ -419,6 +419,11 @@
                 <span>Max path</span>
                 <input id="confounderPathLength" class="path-length-input" type="number" min="1" max="99" step="1" value="1" inputmode="numeric" aria-label="Maximum confounder path length">
               </label>
+              <button id="toggleSparseEdges" class="toolbar-button" type="button" aria-pressed="false" title="Hide edges supported by fewer than the minimum number of distinct papers">Exclude sparse edges</button>
+              <label class="path-length-control" for="minimumEdgePapers" title="Minimum number of distinct supporting papers required when sparse edges are excluded">
+                <span>Min papers</span>
+                <input id="minimumEdgePapers" class="path-length-input" type="number" min="1" step="1" value="2" inputmode="numeric" aria-label="Minimum supporting papers per edge">
+              </label>
               <button id="toggleBottleneckedConfounders" class="toolbar-button" type="button" aria-pressed="false" title="Keep only candidates with bounded paths to the IV and DV that share no intermediate group; mouseover shows that same qualifying pair">Exclude bottlenecked</button>
               <button id="toggleIrrelevantConfounderLinks" class="toolbar-button" type="button" aria-pressed="false" title="Hide links that are not used by any currently displayed confounder's IV or DV witness path">Path links only</button>
               <button id="toggleAllExclusionLinks" class="toolbar-button" type="button" aria-pressed="false" title="Show every link between groups visible in the exclusion restriction view" hidden>All visible links</button>
