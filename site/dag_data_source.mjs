@@ -80,7 +80,7 @@ export class ParquetManifestDagDataSource {
     performance.measure("echo:evidence:manifest", { start: manifestStart, end: performance.now() });
     this.manifestBaseUrl = manifestUrl;
     this.browserLayout = browserV2ManifestLayout(this.manifest);
-    const mapDownloads = this.prewarmMapFiles ? this.downloadMapFiles() : null;
+    const evidenceDownloads = this.downloadEvidenceFiles();
     this.onStatus("Loading grouping schema…");
     if (!publicationId) {
       this.groupingSet = await loadGroupingSchema(this.schemaUrl);
@@ -103,8 +103,8 @@ export class ParquetManifestDagDataSource {
     this.connection = await database.connect();
     this.neighborConnection = await database.connect();
     performance.measure("echo:evidence:engine", { start: engineStart, end: performance.now() });
-    if (mapDownloads) {
-      for (const file of await mapDownloads) {
+    if (evidenceDownloads) {
+      for (const file of await evidenceDownloads) {
         if (!file) continue;
         await database.registerFileBuffer(file.name, file.bytes);
         this.localParquetFiles ||= new Map();
@@ -216,12 +216,19 @@ export class ParquetManifestDagDataSource {
   }
 
   async loadRawLinksByIds(rawLinkIds) {
-    await this.ensureEvidenceConnection({ variableIds: [] });
     if (!rawLinkIds?.length) return [];
+    // Evidence rows need endpoint labels. Begin the shared catalog download
+    // alongside the query engine instead of waiting for the findings query.
+    const snapshotId = evidenceSnapshotIdFromManifestUrl(this.manifestUrl);
+    if (SNAPSHOT_SEARCH_CATALOGS[snapshotId]) {
+      void variableSearchCatalog.loadSnapshot(snapshotId).catch(() => {});
+    }
+    this.prewarmRawLinks = true;
+    await this.ensureEvidenceConnection({ variableIds: [] });
     const canonicalUrl = this.canonicalEvidenceRelationUrl("causal_link_occurrences");
     if (!canonicalUrl) await this.ensureBrowserRelation("causal_link_occurrences");
     const relation = canonicalUrl
-      ? `read_parquet('${canonicalUrl.replaceAll("'", "''")}')`
+      ? `read_parquet('${this.parquetFile(canonicalUrl).replaceAll("'", "''")}')`
       : "causal_link_occurrences";
     // Bound both the WASM parameter buffer and result batches. A map can
     // reference tens of thousands of findings; one giant query can exhaust
@@ -413,21 +420,26 @@ export class ParquetManifestDagDataSource {
     return this.localParquetFiles?.get(url) || url;
   }
 
-  async downloadMapFiles() {
-    // These immutable map prerequisites are small enough to fetch together
-    // during WASM startup. Verified buffers avoid serial remote Parquet footer
-    // and range requests. An unavailable prefetch retains the remote SQL path.
+  async downloadEvidenceFiles() {
+    // Fetch immutable prerequisites during WASM startup. Verified buffers avoid
+    // serial remote Parquet probes. Oversized or failed downloads retain the
+    // remote SQL path; only map views request layouts and the variable lookup.
     const lookupPath = this.browserLayout.lookup;
     const plans = [
-      { kind: "lookup", url: new URL(lookupPath, this.manifestBaseUrl).href,
-        integrity: this.manifest.files?.[lookupPath] },
-      ...["build_metadata", "variable_layouts"].map(kind => ({ kind,
+      ...(this.prewarmMapFiles ? [
+        { kind: "lookup", url: new URL(lookupPath, this.manifestBaseUrl).href,
+          integrity: this.manifest.files?.[lookupPath] },
+      ] : []),
+      ...[...(!this.isContiguousShardSnapshot() || this.prewarmMapFiles ? ["build_metadata"] : []),
+        ...(this.prewarmMapFiles ? ["variable_layouts"] : []),
+        ...(this.prewarmRawLinks ? ["causal_link_occurrences"] : [])].map(kind => ({ kind,
         url: this.canonicalEvidenceRelationUrl(kind),
         integrity: this.manifest.identity?.legacy_relation_integrity?.[kind] })),
     ];
     return Promise.all(plans.map(async ({ kind, url, integrity }) => {
       if (!url || !Number.isInteger(integrity?.bytes) || integrity.bytes < 1
-        || integrity.bytes > 4 * 1024 * 1024 || !/^[0-9a-f]{64}$/i.test(integrity.sha256 || "")) return null;
+        || integrity.bytes > (kind === "causal_link_occurrences" ? 8 : 4) * 1024 * 1024
+        || !/^[0-9a-f]{64}$/i.test(integrity.sha256 || "")) return null;
       try {
         const response = await fetch(url, { cache: "force-cache" });
         if (!response.ok) return null;

@@ -3,6 +3,40 @@ const { test, expect } = require("playwright/test");
 const base = process.env.DAG_VIEWER_URL || "http://127.0.0.1:8767";
 const snapshotId = "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0";
 
+for (const rejectBuffer of [false, true]) {
+  test(`cold findings prefetch preserves evidence with rejected buffer=${rejectBuffer}`, async ({ page }) => {
+    test.setTimeout(90000);
+    await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+    await page.goto(`${base}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b`);
+    await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
+      && document.getElementById("startupLoading")?.hidden);
+    const result = await page.evaluate(async rejectBuffer => {
+      const { dagDataSource: source } = await import("/dag_data_source.mjs?v=browser-v2");
+      const download = source.downloadEvidenceFiles.bind(source);
+      source.downloadEvidenceFiles = () => {
+        if (rejectBuffer) source.manifest.identity.legacy_relation_integrity.causal_link_occurrences.sha256 = "0".repeat(64);
+        return download();
+      };
+      const edge = window.__dagBuilderState.project.links.find(e => e.a_to_b_raw_link_ids?.length);
+      const ids = edge.a_to_b_raw_link_ids.slice(0, 5);
+      const rows = await source.loadRawLinksByIds(ids);
+      const url = source.canonicalEvidenceRelationUrl("causal_link_occurrences");
+      const registered = source.parquetFile(url) !== url;
+      const expected = await source.connection.query(`SELECT * FROM read_parquet('${url}')
+        WHERE raw_causal_link_id IN (${ids.map(id => `'${id.replaceAll("'", "''")}'`).join(",")})`);
+      const normalize = values => JSON.stringify(values.sort((a, b) => a.raw_causal_link_id.localeCompare(b.raw_causal_link_id)),
+        (_, value) => typeof value === "bigint" ? Number(value) : value);
+      const labels = await source.loadVariableProvenance(rows.flatMap(r => [r.source_variable_id, r.target_variable_id]));
+      return { registered, count: rows.length, matches: normalize(rows) === normalize(expected.toArray().map(r => r.toJSON())),
+        hasLabels: labels.length > 0 && labels.every(r => r.concept_label || r.display_label) };
+    }, rejectBuffer);
+    expect(result.registered).toBe(!rejectBuffer);
+    expect(result.count).toBeGreaterThan(0);
+    expect(result.matches).toBe(true);
+    expect(result.hasLabels).toBe(true);
+  });
+}
+
 for (const route of ["/"]) {
   test(`${route} loads compiled startup and retrieves browser-v2 evidence shards`, async ({ page }) => {
     // Original baseline was 60000 ms; this is a runner timeout, not a performance gate.

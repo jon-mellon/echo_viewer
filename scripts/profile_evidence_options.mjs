@@ -1,8 +1,14 @@
 // Benchmark-only overrides: no production data or application modules are changed.
 export async function installEvidenceOption(page, option) {
   await page.evaluate(async option => {
-    const { dagDataSource: source } = await import('/dag_data_source.mjs?v=browser-v2');
-    const { variableSearchCatalog: catalog } = await import('/variable_search_catalog.mjs');
+    const moduleUrl = document.querySelector('script[type="module"][src*="dag_builder.js"]').src;
+    const builderCode = await (await fetch(moduleUrl)).text();
+    const sourcePath = builderCode.match(/from\s+["']([^"']*dag_data_source\.mjs[^"']*)["']/)[1];
+    const sourceUrl = new URL(sourcePath, moduleUrl).href;
+    const sourceCode = await (await fetch(sourceUrl)).text();
+    const catalogPath = sourceCode.match(/from\s+["']([^"']*variable_search_catalog\.mjs[^"']*)["']/)[1];
+    const { dagDataSource: source } = await import(sourceUrl);
+    const { variableSearchCatalog: catalog } = await import(new URL(catalogPath, sourceUrl).href);
     const originalLabels = source.loadVariableProvenance.bind(source);
     const originalLinks = source.loadRawLinksByIds.bind(source);
     const stats = window.__evidenceOption = { option, catalogStatusBefore: catalog.status, labelCalls: [], downloadedBytes: 0 };

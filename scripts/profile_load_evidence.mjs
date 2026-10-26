@@ -1,7 +1,7 @@
 // Focused real-data benchmark: run against a local server with PROFILE_URL.
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { installEvidenceOption } from './profile_evidence_options.mjs';
 const option = process.env.PROFILE_EVIDENCE_OPTION || 'baseline';
 if (!['baseline', 'locality', 'full-shards', 'catalog', 'canonical'].includes(option)) throw new Error(`Unknown evidence option: ${option}`);
@@ -24,13 +24,22 @@ if (server) await new Promise((resolve, reject) => {
 });
 let activeCdp;
 const browser = await chromium.launch({ headless: true });
-const report = { scenario: 'load-evidence', option, dataTransport: 'Playwright proxy (localhost CORS)', cpuThrottle: process.env.PROFILE_DEVICE === 'mobile' ? 4 : 1, url: process.env.PROFILE_URL || localUrl, runs: [] };
+const report = { scenario: 'load-evidence', option, dataTransport: process.env.PROFILE_URL ? 'Direct browser requests' : 'Playwright proxy (localhost CORS)', sourceOverride: process.env.PROFILE_SOURCE_OVERRIDE || null, cpuThrottle: process.env.PROFILE_DEVICE === 'mobile' ? 4 : 1, url: process.env.PROFILE_URL || localUrl, runs: [] };
 try {
   for (let run = 0; run < Number(process.env.PROFILE_RUNS || 3); run++) {
     const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
+    if (process.env.PROFILE_SOURCE_OVERRIDE) {
+      const source = await readFile(process.env.PROFILE_SOURCE_OVERRIDE, 'utf8');
+      await context.route('**/dag_data_source.mjs*', async route => {
+        const version = new URL(route.request().url()).searchParams.get('v');
+        const body = version ? source.replace(/(["'])((?:\.{1,2}\/)[^"'\n]*?\.m?js)(?:\?[^"'\n]*)?\1/g,
+          (_, quote, path) => `${quote}${path}?v=${version}${quote}`) : source;
+        await route.fulfill({ status: 200, contentType: 'text/javascript', body });
+      });
+    }
     // Proxy immutable data requests through Playwright to avoid localhost CORS.
     // Transfers still use the real remote data; timings include proxy overhead.
-    await context.route('https://data.epistemicinfra.org/**', async route => {
+    if (!process.env.PROFILE_URL) await context.route('https://data.epistemicinfra.org/**', async route => {
       const headers = { ...route.request().headers() };
       delete headers.origin;
       delete headers.referer;
@@ -74,14 +83,15 @@ try {
     await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
     await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
     await page.locator('#showUnfiltered').click();
-    const edgeId = await page.evaluate(async () => {
+    const edgeId = await page.evaluate(async preferredEdge => {
       const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
       await api.whenDagRendered();
       const rendered = new Set(api.renderedDagEdgeIds());
-      const edge = [...rendered].find(id => id !== '__study_design_iv_to_dv__');
+      const edge = preferredEdge || [...rendered].find(id => id !== '__study_design_iv_to_dv__');
+      if (!rendered.has(edge)) throw new Error(`Requested edge is not rendered: ${edge}`);
       if (!edge) throw new Error('No evidence edge rendered');
       return edge;
-    });
+    }, process.env.PROFILE_EDGE_ID || null);
     result.edgeId = edgeId;
     result.rawLinksBefore = await page.evaluate(() => window.__dagBuilderState.rawLinksById.size);
     await installEvidenceOption(page, option);
