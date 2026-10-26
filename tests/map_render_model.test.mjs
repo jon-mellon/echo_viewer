@@ -5,6 +5,7 @@ import {
   buildMapPointModels,
   computePaletteAssignment,
   estimateLabelSize,
+  firstGroupByVariable,
   importantMapVariables,
   labelPriority,
   mapLabelClasses,
@@ -55,6 +56,32 @@ test("visual status preserves group precedence and palette assignment is determi
     [["assigned", 0]],
   );
   assert.deepEqual([...computePaletteAssignment(groups, [], palette).entries()], []);
+});
+
+test("point statuses use the first group listing each variable", () => {
+  const groups = [
+    { group_id: "first", type: "custom", variable_ids: ["a", "b"] },
+    { group_id: "dv", type: "dv", variable_ids: ["b", "c"] },
+  ];
+  assert.deepEqual([...firstGroupByVariable(groups)].map(([id, group]) => [id, group.group_id]),
+    [["a", "first"], ["b", "first"], ["c", "dv"]]);
+  const points = buildMapPointModels({
+    variables: ["a", "b", "c", "d"].map(variable_id => ({ variable_id, map_x: 0, map_y: 0, cluster_size: 1 })),
+    groups, activeGroupId: "first", selectedVariableIds: new Set(), clusterRep: id => id,
+    worldToScreen: () => ({ x: 0, y: 0 }), width: 10, height: 10, variableColorForStatus: status => status,
+    uoaMatches: () => true,
+  });
+  assert.deepEqual(points.map(point => point.status), ["active", "active", "dv", "unassigned"]);
+});
+
+test("palette assignment only separates groups whose members are near", () => {
+  const variables = [[0, 0], [1, 0], [2, 0], [500, 500]].map(([map_x, map_y], index) =>
+    ({ variable_id: `v${index}`, map_x, map_y }));
+  const groups = [["near-a", ["v0"]], ["near-b", ["v1", "v2"]], ["far", ["v3"]]]
+    .map(([group_id, variable_ids]) => ({ group_id, type: "custom", variable_ids }));
+  const assignment = computePaletteAssignment(groups, variables, palette);
+  assert.notEqual(assignment.get("near-a"), assignment.get("near-b"));
+  assert.deepEqual(computePaletteAssignment([groups[2]], variables, palette), new Map([["far", assignment.get("far")]]));
 });
 
 test("palette assignment distributes groups whose coordinates are not hydrated", () => {

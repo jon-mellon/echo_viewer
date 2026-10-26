@@ -392,12 +392,32 @@ function samePaletteAssignmentShape(shape, groups) {
     group === groups[index] && id === group.group_id && ids === group.variable_ids && length === ids.length);
 }
 
+// Replaced groups usually keep most membership arrays, or copy them unchanged.
+// Key each array once so the fallback signature is cheap to rebuild and compare.
+const _membershipKeys = new WeakMap();
+
+function membershipKey(ids) {
+  const cached = _membershipKeys.get(ids);
+  if (cached?.length === ids.length) return cached.key;
+  const key = ids.join(",");
+  _membershipKeys.set(ids, { length: ids.length, key });
+  return key;
+}
+
+function paletteAssignmentSig(groups) {
+  return groups.map(g => [g.group_id, membershipKey(g.variable_ids)]);
+}
+
+function samePaletteAssignmentSig(a, b) {
+  return a?.length === b.length && a.every(([id, key], index) => id === b[index][0] && key === b[index][1]);
+}
+
 function computePaletteAssignment() {
   const groups = state.project?.groups || [];
   if (samePaletteAssignmentShape(_paletteAssignmentShape, groups)) return;
   _paletteAssignmentShape = paletteAssignmentShape(groups);
-  const sig = groups.map(g => g.group_id + ":" + g.variable_ids.join(",")).join("|");
-  if (sig === _paletteAssignmentSig) return;
+  const sig = paletteAssignmentSig(groups);
+  if (samePaletteAssignmentSig(_paletteAssignmentSig, sig)) return;
   _paletteAssignmentSig = sig;
   _paletteAssignment = mapRenderModel.computePaletteAssignment(groups, state.variables, GROUP_PALETTE);
 }

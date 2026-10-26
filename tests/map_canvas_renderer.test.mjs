@@ -66,6 +66,44 @@ test("canvas commands match legacy for regions, halos, cells, badges and brushes
   }
 });
 
+test("browser group regions compile world geometry once and keep screen-pixel strokes", () => {
+  const priorPath2D = globalThis.Path2D;
+  const paths = [];
+  globalThis.Path2D = class {
+    constructor() { this.commands = []; paths.push(this); }
+    moveTo(...args) { this.commands.push(["moveTo", ...args]); }
+    lineTo(...args) { this.commands.push(["lineTo", ...args]); }
+    closePath(...args) { this.commands.push(["closePath", ...args]); }
+    rect(...args) { this.commands.push(["rect", ...args]); }
+    addPath(path) { this.commands.push(["addPath", path]); }
+  };
+  try {
+    const region = { territories: [[{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 1 }]] };
+    const draw = (transform, active) => {
+      const out = recorder();
+      renderer.drawGroupRegion(out.ctx, region, active, { color: "#1f7a67", width: 200, height: 100, transform });
+      return out.commands;
+    };
+    const first = draw({ scale: 2, tx: 10, ty: 20 }, false);
+    const second = draw({ scale: 4, tx: 30, ty: 40 }, true);
+    const compiled = paths.filter(path => path.commands[0]?.[0] === "moveTo");
+    assert.equal(compiled.length, 1);
+    assert.deepEqual(compiled[0].commands, [["moveTo", 0, 0], ["lineTo", 2, 0], ["lineTo", 2, 1], ["closePath"]]);
+    assert.deepEqual(first.find(command => command[0] === "transform"), ["transform", 2, 0, 0, 2, 10, 20]);
+    assert.equal(first.find(command => command[0] === "lineWidth")[1], 1.5);
+    assert.equal(second.find(command => command[0] === "lineWidth")[1], 1.1);
+    assert.deepEqual(second.find(command => command[0] === "setLineDash")[1], [1.5, 0.75]);
+    const clip = first.find(command => command[0] === "clip");
+    assert.deepEqual(clip[1].commands, [["rect", -5, -10, 100, 50], ["addPath", compiled[0]]]);
+    assert.equal(clip[2], "evenodd");
+    assert.equal(first.find(command => command[0] === "fill")[1], compiled[0]);
+    assert.equal(first.find(command => command[0] === "stroke")[1], compiled[0]);
+  } finally {
+    if (priorPath2D === undefined) delete globalThis.Path2D;
+    else globalThis.Path2D = priorPath2D;
+  }
+});
+
 test("browser Voronoi rendering compiles immutable world geometry once", () => {
   const priorPath2D = globalThis.Path2D;
   const paths = [];

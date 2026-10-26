@@ -98,10 +98,49 @@ export function drawPolygonPath(ctx, points) {
   ctx.closePath();
 }
 
+const regionPathCache = new WeakMap();
+
+function compiledRegionPath(territories) {
+  let path = regionPathCache.get(territories);
+  if (path) return path;
+  path = new Path2D();
+  for (const poly of territories) {
+    path.moveTo(poly[0].x, poly[0].y);
+    for (let i = 1; i < poly.length; i++) path.lineTo(poly[i].x, poly[i].y);
+    path.closePath();
+  }
+  regionPathCache.set(territories, path);
+  return path;
+}
+
 export function drawGroupRegion(ctx, region, active, { color, width: W, height: H, transform }) {
   const worldToScreen = (x, y) => projectPoint(x, y, transform);
   if (!region.territories?.length) return;
   const lw = active ? 2.2 : 1.5;
+
+  // Regions are cached in world space until membership changes, so compile each
+  // one once and draw it under the viewport transform, as the Voronoi
+  // background does. Widths and dashes are divided by the scale to stay in
+  // screen pixels, and the clip's canvas rectangle is mapped into world space.
+  if (typeof Path2D !== "undefined") {
+    const path = compiledRegionPath(region.territories);
+    const scale = Math.max(Math.abs(transform.scale), Number.EPSILON);
+    const origin = { x: -transform.tx / transform.scale, y: -transform.ty / transform.scale };
+    ctx.save();
+    ctx.transform(transform.scale, 0, 0, transform.scale, transform.tx, transform.ty);
+    ctx.fillStyle = hexToRgba(color, active ? 0.16 : 0.09);
+    ctx.fill(path);
+    const outside = new Path2D();
+    outside.rect(origin.x, origin.y, W / transform.scale, H / transform.scale);
+    outside.addPath(path);
+    ctx.clip(outside, "evenodd");
+    ctx.strokeStyle = color;
+    ctx.lineWidth = (lw * 2) / scale;
+    ctx.setLineDash(active ? [6 / scale, 3 / scale] : []);
+    ctx.stroke(path);
+    ctx.restore();
+    return;
+  }
 
   // Append all territory subpaths to whatever path is currently open.
   const addPaths = () => {
