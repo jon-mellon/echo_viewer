@@ -120,7 +120,7 @@ test("a finding's exclude control waits for both concept labels", () => {
     const controller = createDagInspectorController({ state, elements, truncate: text => text,
       takeSnapshot: () => "before", nowIso: () => "2026-10-10T00:00:00Z",
       applyProjectOperation: next => { state.project = next; },
-      addDecision() {}, addToUndoHistory() {}, renderAll() {} });
+      addDecision() {}, addToUndoHistory() {}, rebuildLinkDecision() {}, renderAll() {} });
     controller.renderProvenance();
     assert.equal(elements.provenancePanel.findAll("button").length, 0);
     state.variableById.set("v1", { concept_label: "Source" });
