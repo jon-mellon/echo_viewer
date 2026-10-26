@@ -861,11 +861,14 @@ function applyProjectOperation(next) {
       const batchedIds = [...state.compiledUpdateChangedIds];
       const batchedRawIds = [...state.compiledUpdateChangedRawIds];
       const batchBaseSchema = state.compiledUpdateBaseSchema;
+      const cachedRawLinks = batchedRawIds.map(id => state.rawLinksById.get(id)).filter(Boolean);
+      const missingRawIds = batchedRawIds.filter(id => !state.rawLinksById.has(id));
       const updatePromise = Promise.all([
         batchedIds.length ? dagDataSource.loadIncidentRawLinks(batchedIds) : [],
-        batchedRawIds.length ? dagDataSource.loadRawLinksByIds(batchedRawIds) : [],
+        missingRawIds.length ? dagDataSource.loadRawLinksByIds(missingRawIds) : [],
       ]).then(parts => {
-        const incidentRawLinks = [...new Map(parts.flat().map(link => [link.raw_causal_link_id, link])).values()];
+        const incidentRawLinks = [...new Map([...cachedRawLinks, ...parts.flat()]
+          .map(link => [link.raw_causal_link_id, link])).values()];
         if (state.compiledDagRevision !== revision) return;
         for (const link of incidentRawLinks) {
           if (!state.rawLinksById.has(link.raw_causal_link_id)) state.rawLinks.push(link);
@@ -881,7 +884,8 @@ function applyProjectOperation(next) {
         state.compiledUpdateChangedIds = null;
         state.compiledUpdateChangedRawIds = null;
         state.compiledDagUpdating = false;
-        renderAll();
+        if (batchedIds.length) renderAll();
+        else rebuildLinkDecision();
       }).catch(error => {
         if (state.compiledDagRevision !== revision) return;
         state.compiledDagUpdating = false;
@@ -1336,7 +1340,7 @@ async function showExcludedFindings() {
         if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
         addDecision("finding_restored", { raw_causal_link_id: id });
         addToUndoHistory("Restored finding", before, "finding-decision");
-        renderAll();
+        rebuildLinkDecision();
         persistFindingDecision();
         if (Object.keys(state.project.finding_decisions || {}).length) void showExcludedFindings();
         else { els.edgeInspector.hidden = true; els.closeEvidencePane.hidden = true; }

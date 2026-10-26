@@ -357,7 +357,7 @@ export function createDagInspectorController({
           if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
           addDecision("finding_restored", { raw_causal_link_id: id });
           addToUndoHistory("Restored finding", before, "finding-decision");
-          renderAll();
+          rebuildLinkDecision();
           persistFindingDecision();
         } else {
           pendingFindingId = pendingFindingId === id ? null : id;
@@ -389,7 +389,7 @@ export function createDagInspectorController({
         pendingFindingId = null;
         addDecision("finding_excluded", { raw_causal_link_id: id });
         addToUndoHistory("Excluded finding", before, "finding-decision");
-        renderAll();
+        rebuildLinkDecision();
         persistFindingDecision();
       });
       const cancel = h("button", { className: "text-button", type: "button", textContent: "Cancel" });

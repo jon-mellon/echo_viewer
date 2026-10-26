@@ -1,0 +1,100 @@
+{
+  "dataTransport": "Playwright proxy (localhost CORS)",
+  "cpuThrottle": 1,
+  "url": "http://127.0.0.1:8768/",
+  "runs": [
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "open finding exclusion",
+          "ms": 52.299999713897705,
+          "longestTaskMs": 0,
+          "rows": 11
+        },
+        {
+          "name": "exclude finding to visible feedback",
+          "ms": 174.69999980926514,
+          "longestTaskMs": 109,
+          "rows": 10
+        },
+        {
+          "name": "restore finding to visible feedback",
+          "ms": 150.90000009536743,
+          "longestTaskMs": 110,
+          "rows": 10
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-cognitive-ability",
+      "findingId": "r058e320e5b8c80e42392a0ca"
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "open finding exclusion",
+          "ms": 40.5,
+          "longestTaskMs": 0,
+          "rows": 11
+        },
+        {
+          "name": "exclude finding to visible feedback",
+          "ms": 174.69999980926514,
+          "longestTaskMs": 107,
+          "rows": 10
+        },
+        {
+          "name": "restore finding to visible feedback",
+          "ms": 149.7999997138977,
+          "longestTaskMs": 108,
+          "rows": 10
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-cognitive-ability",
+      "findingId": "r058e320e5b8c80e42392a0ca"
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "open finding exclusion",
+          "ms": 51.200000286102295,
+          "longestTaskMs": 0,
+          "rows": 11
+        },
+        {
+          "name": "exclude finding to visible feedback",
+          "ms": 176,
+          "longestTaskMs": 107,
+          "rows": 10
+        },
+        {
+          "name": "restore finding to visible feedback",
+          "ms": 148.5,
+          "longestTaskMs": 109,
+          "rows": 10
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-cognitive-ability",
+      "findingId": "r058e320e5b8c80e42392a0ca"
+    }
+  ]
+}
