@@ -1,3 +1,4 @@
+import { routeProfileSite } from "./profile_site_route.mjs";
 import { chromium, firefox } from "playwright";
 import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -166,6 +167,7 @@ try {
   context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 }
     : { width: 1365, height: 900 }, deviceScaleFactor: 1,
   isMobile: mobile, hasTouch: mobile });
+  await routeProfileSite(context, url, process.env.PROFILE_ROUTE_SITE_DIR);
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   page = await context.newPage();
   page.on("pageerror", error => results.errors.push(error.message));

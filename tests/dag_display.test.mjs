@@ -106,3 +106,14 @@ test("exogeneity colors common causes while keeping the three study anchors", ()
   assert.equal(iv.color.background, "#123456");
   assert.equal(instrument.shape, "ellipse");
 });
+
+test("group centroid skips cold membership scans and retains duplicate-representative weighting", async () => {
+  const { groupMapCentroid } = await import("../site/dag_display.mjs");
+  const group = { variable_ids: ["copy", "v1", "v2", "missing"] };
+  const empty = new Map();
+  let representativesVisited = 0;
+  assert.deepEqual(groupMapCentroid(group, empty, id => { representativesVisited++; return id; }), { x: 0, y: 0 });
+  assert.equal(representativesVisited, 0);
+  const variables = new Map([["v1", { map_x: 3, map_y: 6 }], ["v2", { map_x: 9 }]]);
+  assert.deepEqual(groupMapCentroid(group, variables, id => id === "copy" ? "v1" : id), { x: 5, y: 4 });
+});

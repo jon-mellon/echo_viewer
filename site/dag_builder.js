@@ -359,8 +359,8 @@ function restoreProjectLocally() {
 
 // ─── Undo / Redo ──────────────────────────────────────────────────────────────
 
-function takeSnapshot() {
-  return projectController.snapshot();
+function takeSnapshot(kind) {
+  return projectController.snapshot(kind);
 }
 
 function applySnapshot(serialized) {
@@ -452,9 +452,6 @@ const renderCoordinator = createRenderCoordinator({
 function renderAll(options) {
   renderCoordinator.renderAll(options);
   persistentViewer.viewerChanged();
-  // Enrich references opportunistically while the user works. Export actions
-  // await the same de-duplicated, rate-limited requests before downloading.
-  exportController.warmBibliography();
 }
 
 function rebuildProject(options) {
@@ -619,7 +616,7 @@ function installDefinitionHandlers() { return definitionWorkflowController.insta
 
 // ─── Search ───────────────────────────────────────────────────────────────────
 
-function renderSearch(side) {
+function renderSearch(side, { renderPicker = true } = {}) {
   const input = side === "iv" ? els.ivInput : els.dvInput;
   const container = side === "iv" ? els.ivResults : els.dvResults;
   const query = input.value.trim();
@@ -628,7 +625,7 @@ function renderSearch(side) {
   if (state.anchorSearchMode[side] !== "new") {
     state.searchMatches[side] = [];
     container.replaceChildren();
-    renderSetupGroupPicker(side);
+    if (renderPicker) renderSetupGroupPicker(side);
     return;
   }
   if (query && state.variableSearchStatus !== "ready") {
@@ -688,12 +685,9 @@ function searchVisibleVariables(query, limit = 20) {
   }, limit);
 }
 
+const anchorGroupSearchIndex = new searchModel.AnchorGroupSearchIndex();
 function searchAnchorGroups(project, side, query, variableById, limit = 12) {
-  const catalogMatches = query && state.variableSearchStatus === "ready"
-    ? variableSearchCatalog.searchVariables(query, variableSearchCatalog.records.length)
-    : [];
-  const searchRecordById = new Map(catalogMatches.map(record => [record.variable_id, record]));
-  return searchModel.searchAnchorGroups(project, side, query, variableById, limit, searchRecordById);
+  return anchorGroupSearchIndex.search(project, side, query, variableById, state.variableSearchStatus === "ready" ? variableSearchCatalog : null, limit);
 }
 
 async function loadVariableSearchCatalog() {
@@ -701,7 +695,10 @@ async function loadVariableSearchCatalog() {
   state.variableSearchStatus = "loading";
   state.variableSearchError = null;
   try {
-    await variableSearchCatalog.load();
+    await variableSearchCatalog.loadSnapshot(state.data.snapshot.snapshot_id, {
+      loadRecords: () => dagDataSource.loadVariableSearchRecords(),
+    });
+    await anchorGroupSearchIndex.prepare(state.project.groups, variableSearchCatalog);
     state.variableSearchStatus = "ready";
   } catch (error) {
     state.variableSearchStatus = "error";
@@ -710,6 +707,7 @@ async function loadVariableSearchCatalog() {
   }
   renderSearch("iv");
   renderSearch("dv");
+  renderSetupGroupPicker("instrument");
 }
 
 function groupedVariableIds(excludeGroupId = null) {
@@ -803,6 +801,12 @@ function applyProjectOperation(next) {
     return false;
   }
   const oldProject = state.project;
+  if (projectOps.isAnchorOnlyChange(oldProject, next)) {
+    // Compiled evidence nodes/edges do not contain anchor roles. Candidates and
+    // anchor-dependent visibility are refreshed by the following render pass.
+    projectController.applyOperation(next, { preserveMembership: true });
+    return true;
+  }
   const anchorChanged = oldProject && ["iv_group_id", "dv_group_id", "instrument_group_id"]
     .some(key => oldProject[key] !== next[key]);
   const structural = project => JSON.stringify({
@@ -1884,11 +1888,10 @@ const projectBootstrap = createProjectBootstrap({
     persistentViewer.start();
     void definitionWorkflowController.resumeAfterOAuth();
     void publicationController.refreshPublicationState();
-    if (!state.project?.links?.some(link => (link.a_to_b_raw_link_ids?.length || 0)
-      + (link.b_to_a_raw_link_ids?.length || 0) > 0)) return;
-    const prewarm = () => { void dagDataSource.ensureEvidenceConnection().catch(() => {}); };
-    if ("requestIdleCallback" in window) requestIdleCallback(prewarm, { timeout: 3000 });
-    else setTimeout(prewarm, 0);
+    // Compiled-DAG browsing and catalog search need no raw evidence engine.
+    // Definitions, evidence details, and exports start it on explicit intent;
+    // speculative startup used to deliver a large lookup conversion during
+    // the user's first search/anchor selection.
   },
 });
 

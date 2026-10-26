@@ -1,0 +1,208 @@
+{
+  "cpuThrottle": 1,
+  "url": "http://127.0.0.1:8767/",
+  "routedSite": "dist/new-data-site",
+  "runs": [
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "first search: education",
+          "ms": 363.2999997138977,
+          "longestTaskMs": 0,
+          "rows": 44
+        },
+        {
+          "name": "warm search: income",
+          "ms": 49.200000286102295,
+          "longestTaskMs": 0,
+          "rows": 24
+        },
+        {
+          "name": "warm search: education",
+          "ms": 32.69999980926514,
+          "longestTaskMs": 0,
+          "rows": 44
+        },
+        {
+          "name": "warm search: health",
+          "ms": 32.90000009536743,
+          "longestTaskMs": 0,
+          "rows": 58
+        },
+        {
+          "name": "warm search: e",
+          "ms": 31.800000190734863,
+          "longestTaskMs": 0,
+          "rows": 111
+        },
+        {
+          "name": "warm search: zzzznomatch",
+          "ms": 32.5,
+          "longestTaskMs": 0,
+          "rows": 0
+        },
+        {
+          "name": "warm search: (clear)",
+          "ms": 31.800000190734863,
+          "longestTaskMs": 0,
+          "rows": 111
+        },
+        {
+          "name": "select IV",
+          "ms": 125.59999990463257,
+          "longestTaskMs": 0,
+          "rows": 110
+        }
+      ],
+      "catalog": {
+        "records": 97818,
+        "membersInCatalog": 97818,
+        "constituent": {
+          "groupId": "category-academic-achievement",
+          "query": "verbal number skills"
+        }
+      },
+      "constituentSearchPassed": true,
+      "compiledDagReused": true,
+      "historyPassed": true
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "first search: education",
+          "ms": 344.59999990463257,
+          "longestTaskMs": 0,
+          "rows": 44
+        },
+        {
+          "name": "warm search: income",
+          "ms": 50.5,
+          "longestTaskMs": 0,
+          "rows": 24
+        },
+        {
+          "name": "warm search: education",
+          "ms": 32.90000009536743,
+          "longestTaskMs": 0,
+          "rows": 44
+        },
+        {
+          "name": "warm search: health",
+          "ms": 32.5,
+          "longestTaskMs": 0,
+          "rows": 58
+        },
+        {
+          "name": "warm search: e",
+          "ms": 34,
+          "longestTaskMs": 0,
+          "rows": 111
+        },
+        {
+          "name": "warm search: zzzznomatch",
+          "ms": 32.19999980926514,
+          "longestTaskMs": 0,
+          "rows": 0
+        },
+        {
+          "name": "warm search: (clear)",
+          "ms": 33.700000286102295,
+          "longestTaskMs": 0,
+          "rows": 111
+        },
+        {
+          "name": "select IV",
+          "ms": 123.69999980926514,
+          "longestTaskMs": 0,
+          "rows": 110
+        }
+      ],
+      "catalog": {
+        "records": 97818,
+        "membersInCatalog": 97818,
+        "constituent": {
+          "groupId": "category-academic-achievement",
+          "query": "verbal number skills"
+        }
+      },
+      "constituentSearchPassed": true,
+      "compiledDagReused": true,
+      "historyPassed": true
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "first search: education",
+          "ms": 393.40000009536743,
+          "longestTaskMs": 0,
+          "rows": 44
+        },
+        {
+          "name": "warm search: income",
+          "ms": 49,
+          "longestTaskMs": 0,
+          "rows": 24
+        },
+        {
+          "name": "warm search: education",
+          "ms": 32.90000009536743,
+          "longestTaskMs": 0,
+          "rows": 44
+        },
+        {
+          "name": "warm search: health",
+          "ms": 35,
+          "longestTaskMs": 0,
+          "rows": 58
+        },
+        {
+          "name": "warm search: e",
+          "ms": 31.40000009536743,
+          "longestTaskMs": 0,
+          "rows": 111
+        },
+        {
+          "name": "warm search: zzzznomatch",
+          "ms": 33,
+          "longestTaskMs": 0,
+          "rows": 0
+        },
+        {
+          "name": "warm search: (clear)",
+          "ms": 33.80000019073486,
+          "longestTaskMs": 0,
+          "rows": 111
+        },
+        {
+          "name": "select IV",
+          "ms": 108.89999961853027,
+          "longestTaskMs": 0,
+          "rows": 110
+        }
+      ],
+      "catalog": {
+        "records": 97818,
+        "membersInCatalog": 97818,
+        "constituent": {
+          "groupId": "category-academic-achievement",
+          "query": "verbal number skills"
+        }
+      },
+      "constituentSearchPassed": true,
+      "compiledDagReused": true,
+      "historyPassed": true
+    }
+  ]
+}

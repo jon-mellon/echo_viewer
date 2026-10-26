@@ -37,8 +37,8 @@ export function createRenderCoordinator(view) {
     view.renderVariablePanel?.();
     view.renderUoaStep();
     view.renderUoaFilterBar();
-    view.renderSearch("iv");
-    view.renderSearch("dv");
+    view.renderSearch("iv", { renderPicker: false });
+    view.renderSearch("dv", { renderPicker: false });
     view.renderSetupGroupPickers();
     view.renderSeedRows();
     view.renderGroupingSetControls();

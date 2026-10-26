@@ -24,7 +24,7 @@ export function createDagProjectController({
       .find(candidate => candidate.grouping_set_id === state.data.default_grouping_set_id);
   }
 
-  function applyOperation(next) {
+  function applyOperation(next, { preserveMembership = false } = {}) {
     const existing = new Map(state.project.groups.map(group => [group.group_id, group]));
     const groups = next.groups.map(group => {
       const current = existing.get(group.group_id);
@@ -34,7 +34,7 @@ export function createDagProjectController({
       return current;
     });
     Object.assign(state.project, next, { groups });
-    if (state.map) state.map._groupRegions = null;
+    if (state.map && !preserveMembership) state.map._groupRegions = null;
   }
 
   function initialize() {
@@ -127,7 +127,9 @@ export function createDagProjectController({
     }
   }
 
-  const snapshot = () => projectOps.snapshotProject(state.project, state.phase);
+  const snapshot = (kind = "full") => kind === "anchors"
+    ? projectOps.snapshotAnchors(state.project, state.phase)
+    : projectOps.snapshotProject(state.project, state.phase);
 
   function applySnapshot(serialized, { invalidate = true } = {}) {
     const restored = projectOps.restoreSnapshot(state.project, serialized);
@@ -137,7 +139,7 @@ export function createDagProjectController({
   }
 
   function record(description, before, renderKind = "full") {
-    const after = snapshot();
+    const after = snapshot(renderKind === "anchors" ? "anchors" : "full");
     if (before === after) return;
     Object.assign(state, history.recordHistory(state, description, before, after, nowIso(), renderKind));
     renderUndoRedo();
@@ -149,7 +151,7 @@ export function createDagProjectController({
     if (!next) return;
     state.undoPointer = next.undoPointer;
     const linkDecisionOnly = next.renderKind === "link-decision";
-    applySnapshot(next.snapshot, { invalidate: !linkDecisionOnly });
+    applySnapshot(next.snapshot, { invalidate: !linkDecisionOnly && next.renderKind !== "anchors" });
     if (linkDecisionOnly) rebuildLinkDecision();
     else renderAll();
   }

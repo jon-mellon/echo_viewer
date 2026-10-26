@@ -98,3 +98,99 @@ export function searchAnchorGroups(project, side, query, variableById, limit = 1
     .sort((a, b) => Number(b.labelMatches) - Number(a.labelMatches) || a.index - b.index)
     .slice(0, limit);
 }
+
+// Group-first search can stop at the first matching member, instead of
+// collecting every matching variable in the evidence catalog. Role/label
+// changes retain these caches; membership replacement or append invalidates.
+export class AnchorGroupSearchIndex {
+  constructor() { this.groups = []; this.queries = new Map(); this.catalog = null; }
+  entry(group, catalog, old) {
+    const ids = group.variable_ids || [];
+    if (old?.ids === group.variable_ids && old.length === ids.length) return old;
+    return { id: group.group_id, ids: group.variable_ids, length: ids.length,
+      fields: ids.map(id => catalog?.fieldsById.get(id)),
+      // This coarse native check may include paper/UOA or cross-field hits;
+      // every positive candidate is verified against the original fields.
+      haystack: ids.map(id => catalog?.recordById.get(id)?.[6] || "").join("\0") };
+  }
+  unchanged(groups, catalog) {
+    return this.catalog === catalog && groups.length === this.groups.length && groups.every((g, i) => {
+      const prior = this.groups[i];
+      return g.group_id === prior.id && g.variable_ids === prior.ids
+        && (g.variable_ids?.length || 0) === prior.length;
+    });
+  }
+  commit(groups, catalog) {
+    this.catalog = catalog;
+    this.groups = groups;
+    this.groupById = new Map(groups.map(group => [group.id, group]));
+    this.queries.clear();
+  }
+  update(groups, catalog) {
+    if (this.unchanged(groups, catalog)) return;
+    const previous = this.catalog === catalog ? this.groupById : null;
+    this.commit(groups.map(group => this.entry(group, catalog, previous?.get(group.group_id))), catalog);
+  }
+  async prepare(groups, catalog) {
+    if (this.unchanged(groups, catalog)) return;
+    const previous = this.catalog === catalog ? this.groupById : null;
+    const prepared = [];
+    let sliceStart = performance.now();
+    for (const group of groups) {
+      catalog.assertCoverage(group.variable_ids || []);
+      prepared.push(this.entry(group, catalog, previous?.get(group.group_id)));
+      if (performance.now() - sliceStart >= 8) {
+        if (globalThis.scheduler?.yield) await globalThis.scheduler.yield();
+        else await new Promise(resolve => setTimeout(resolve, 0));
+        sliceStart = performance.now();
+      }
+    }
+    this.commit(prepared, catalog);
+  }
+  search(project, side, query, variableById, catalog, limit = 12) {
+    query = normalized(query);
+    const available = availableSetupAnchorGroups(project, side);
+    if (!query) return available.slice(0, limit).map((group, index) => ({ group, index, labelMatches: true, variableMatch: "", matches: true }));
+    this.update(project.groups, catalog?.status === "ready" ? catalog : null);
+    // Hydrated records may be edited in place. Always inspect those live;
+    // catalog-only searches can safely reuse per-group positive/negative hits.
+    const cacheable = !variableById.size;
+    let cached = cacheable ? this.queries.get(query) : null;
+    if (cacheable && !cached) {
+      if (this.queries.size >= 16) this.queries.delete(this.queries.keys().next().value);
+      this.queries.set(query, cached = new Map());
+    }
+    const labelHits = [], memberHits = [];
+    for (let index = 0; index < available.length; index++) {
+      const group = available[index];
+      const labelMatches = normalized(group.label || group.group_id).includes(query);
+      let variableMatch = "";
+      if (!labelMatches) {
+        if (cached?.has(group.group_id)) variableMatch = cached.get(group.group_id);
+        else {
+          const prepared = this.groupById.get(group.group_id);
+          const ids = group.variable_ids || [];
+          const candidate = !cacheable || prepared.haystack.includes(query);
+          for (let member = 0; candidate && member < ids.length; member++) {
+            const hydrated = variableById.size ? variableById.get(ids[member]) : null;
+            if (hydrated) {
+              variableMatch = [hydrated.display_label, hydrated.concept_label, hydrated.raw_variable_text, hydrated.variable_id]
+                .filter(Boolean).find(text => normalized(text).includes(query)) || "";
+            } else {
+              const fields = prepared.fields[member];
+              if (fields) for (let i = 0; i < fields.length; i++) {
+                if (fields[i][1].includes(query)) { variableMatch = fields[i][0]; break; }
+              }
+            }
+            if (variableMatch) break;
+          }
+          cached?.set(group.group_id, variableMatch);
+        }
+      }
+      if (labelMatches || variableMatch) {
+        (labelMatches ? labelHits : memberHits).push({ group, index, labelMatches, variableMatch, matches: true });
+      }
+    }
+    return labelHits.concat(memberHits).slice(0, limit);
+  }
+}

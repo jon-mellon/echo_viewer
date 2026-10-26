@@ -102,8 +102,30 @@ export function snapshotProject(project, phase) {
     instrument_group_id: project.instrument_group_id, phase });
 }
 
+// Anchor promotion changes roles and its decision log, never memberships.
+// Keep its history independent of the potentially huge evidence membership.
+export function snapshotAnchors(project, phase) {
+  return JSON.stringify({ snapshot_kind: "anchors-v1", phase,
+    iv_group_id: project.iv_group_id, dv_group_id: project.dv_group_id,
+    instrument_group_id: project.instrument_group_id, decisions: project.decisions,
+    groups: project.groups.map(({ group_id, type, updated_at }) => ({ group_id, type, updated_at })) });
+}
+
 export function restoreSnapshot(project, json) {
   const snap = JSON.parse(json);
+  if (snap.snapshot_kind === "anchors-v1") {
+    const roles = new Map(snap.groups.map(group => [group.group_id, group]));
+    return { phase: snap.phase, project: { ...project,
+      iv_group_id: snap.iv_group_id, dv_group_id: snap.dv_group_id,
+      instrument_group_id: snap.instrument_group_id, decisions: snap.decisions || [],
+      groups: project.groups.map(group => {
+        const role = roles.get(group.group_id);
+        if (!role) return group;
+        const { type, updated_at, status, ...definition } = group;
+        return { ...definition, ...role };
+      }),
+    } };
+  }
   return { project: { ...project, groups: snap.groups.map(withoutGroupReviewStatus),
     link_decisions: snap.link_decisions,
     finding_decisions: snap.finding_decisions || {},
@@ -387,4 +409,19 @@ export function updateSplitCategories(project, {
       payload: { split_id: splitId, source_group_ids: sourceIds, new_group_id: newGroupId },
     }],
   };
+}
+
+// Role promotion shares membership arrays and all evidence/decision inputs.
+// Never take this shortcut for a real schema edit or an undo snapshot.
+export function isAnchorOnlyChange(previous, next) {
+  if (!previous || !next || previous.groups.length !== next.groups.length) return false;
+  if (!["iv_group_id", "dv_group_id", "instrument_group_id"].some(key => previous[key] !== next[key])) return false;
+  const anchorKeys = new Set(["iv_group_id", "dv_group_id", "instrument_group_id", "groups"]);
+  if (Object.keys(previous).length !== Object.keys(next).length) return false;
+  if (Object.keys(previous).some(key => !anchorKeys.has(key) && previous[key] !== next[key])) return false;
+  return previous.groups.every((group, i) => {
+    const other = next.groups[i];
+    const keys = new Set([...Object.keys(group), ...Object.keys(other)]);
+    return [...keys].every(key => key === "type" || key === "updated_at" || group[key] === other[key]);
+  });
 }

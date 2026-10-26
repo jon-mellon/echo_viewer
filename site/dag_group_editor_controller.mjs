@@ -71,14 +71,14 @@ function assignGroupAsAnchor(side, sourceGroupId) {
     notifyWhenAnchorsReady();
     return;
   }
-  const before = takeSnapshot();
+  const before = takeSnapshot("anchors");
   const variableIds = (source.variable_ids || []).slice();
   const label = clean(source.label) || (side === "dv" ? "Dependent variable" : "Independent variable");
   if (!promoteGroupToAnchor(side, sourceGroupId)) return;
   Object.assign(state, workflow.transition(state, { type: "anchor-selected", side, groupId: sourceGroupId }));
   setMapMode("select");
   addDecision(`group_promoted_to_${side}`, { source_group_id: sourceGroupId, target_group_id: sourceGroupId });
-  addToUndoHistory(`Use "${label}" as ${side.toUpperCase()}`, before);
+  addToUndoHistory(`Use "${label}" as ${side.toUpperCase()}`, before, "anchors");
   fitMap(variableIds);
   renderAll();
   notifyWhenAnchorsReady();

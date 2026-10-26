@@ -105,3 +105,17 @@ export function displayPaperTableKey(key) {
   if (!paper || paper === "unknown") return `Occurrence ${occurrence}`;
   return `${paper}::${occurrence}`;
 }
+
+
+export function groupMapCentroid(group, variableById, clusterRep = id => id) {
+  if (!variableById.size) return { x: 0, y: 0 };
+  let x = 0, y = 0, count = 0;
+  for (const id of group.variable_ids || []) {
+    const variable = variableById.get(clusterRep(id));
+    if (!variable) continue;
+    x += Number(variable.map_x || 0);
+    y += Number(variable.map_y || 0);
+    count++;
+  }
+  return count ? { x: x / count, y: y / count } : { x: 0, y: 0 };
+}

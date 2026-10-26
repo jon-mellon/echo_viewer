@@ -287,3 +287,47 @@ test("inspector controller resolves selected edges without owning graph state", 
   const controller = createDagInspectorController({ state, elements: {} });
   assert.equal(controller.selectedEdge(), state.project.links[0]);
 });
+
+test("promoting a split to an anchor leaves its publishable definition unchanged", () => {
+  const group = { group_id: "split", label: "Split", variable_ids: ["v1"],
+    type: null, updated_at: "before", provenance: { operation: "split_categories", sources: ["source"] } };
+  const state = { data: { grouping_sets: [] }, clusterOf: new Map(),
+    project: { active_grouping_set_id: "schema", groups: [group] } };
+  const controller = createGroupingSetController({ state, elements: {},
+    rejectedVariableEntries: () => [], rejectedVariableIdSet: () => new Set() });
+  const before = controller.workingSchema();
+  group.type = "iv"; group.updated_at = "after";
+  assert.deepEqual(controller.workingSchema(), before);
+  assert.deepEqual(before.groups[0].provenance, group.provenance);
+});
+
+test("anchor history composes with membership history and survives serialization", () => {
+  const state = createDagAppState();
+  state.data = { generated_at: "fixture", default_grouping_set_id: "none", grouping_sets: [] };
+  let invalidations = 0;
+  const controller = createDagProjectController({ state, storage: memoryStorage(), storagePrefix: "anchor-test",
+    nowIso: () => "now", invalidateMapCaches: () => invalidations++, renderAll() {}, renderUndoRedo() {}, renderActionHistory() {} });
+  controller.initialize();
+  state.project.groups = [{ group_id: "a", variable_ids: ["v1"] }, { group_id: "b", variable_ids: ["v2"] }];
+  const before = controller.snapshot("anchors");
+  state.project.iv_group_id = "a"; state.project.groups[0].type = "iv";
+  controller.record("Choose IV", before, "anchors");
+  const beforeMembership = controller.snapshot();
+  state.project.groups[0].variable_ids = ["v1", "v3"];
+  controller.record("Add member", beforeMembership);
+  // Persisted history uses the same opaque string contract as older entries.
+  state.undoHistory = JSON.parse(JSON.stringify(state.undoHistory));
+  controller.undo();
+  assert.deepEqual(state.project.groups[0].variable_ids, ["v1"]);
+  const members = state.project.groups[0].variable_ids;
+  const afterMembershipUndo = invalidations;
+  controller.undo();
+  assert.equal(state.project.iv_group_id, "g_iv");
+  assert.equal(state.project.groups[0].variable_ids, members);
+  assert.equal(invalidations, afterMembershipUndo);
+  controller.redo();
+  assert.equal(state.project.iv_group_id, "a");
+  assert.equal(state.project.groups[0].variable_ids, members);
+  controller.redo();
+  assert.deepEqual(state.project.groups[0].variable_ids, ["v1", "v3"]);
+});

@@ -131,15 +131,7 @@ function visNetworkOptions(p = {}) {
 }
 
 function groupMapCentroid(group) {
-  const points = (group.variable_ids || [])
-    .map((id) => state.variableById.get(clusterRep(id)))
-    .filter(Boolean)
-    .map((variable) => ({ x: Number(variable.map_x || 0), y: Number(variable.map_y || 0) }));
-  if (!points.length) return { x: 0, y: 0 };
-  return {
-    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
-    y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
-  };
+  return dagDisplay.groupMapCentroid(group, state.variableById, clusterRep);
 }
 
 function dagStudyArrowCorridor({ ivId, dvId, positions, boxes, fontSize = 12 }) {
@@ -237,17 +229,18 @@ function drawConfounderPathLanes(context) {
   });
 }
 
-function clearConfounderPathHover() {
+function clearConfounderPathHover({ redraw = true } = {}) {
+  const hadLanes = _dagPathLaneSegments.length > 0;
   _dagPathLaneSegments = [];
   _dagHoveredConfounderId = null;
   if (!_dagHoverBaseline || !_visNodes || !_visEdges) {
-    _visNetwork?.redraw();
+    if (redraw && hadLanes) _visNetwork?.redraw();
     return;
   }
   _visNodes.update(_dagHoverBaseline.nodes);
   _visEdges.update(_dagHoverBaseline.edges);
   _dagHoverBaseline = null;
-  _visNetwork?.redraw();
+  if (redraw) _visNetwork?.redraw();
 }
 
 function clearLogicalDagEdgeHover(segmentId = null) {
@@ -350,7 +343,7 @@ function renderDag({ reuseGeometry = false } = {}) {
   let resolveRendered;
   _dagRenderedPromise = new Promise(resolve => { resolveRendered = resolve; });
   clearLogicalDagEdgeHover();
-  clearConfounderPathHover();
+  clearConfounderPathHover({ redraw: false });
   const groups = dagVisibleGroups();
 
   // A worker render can take long enough for the previous diagnostic graph to

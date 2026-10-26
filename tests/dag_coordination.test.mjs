@@ -105,7 +105,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
     }
     on(name, handler) { this.handlers.set(name, handler); }
     off(name) { this.handlers.delete(name); }
-    redraw() {} fit() {} moveTo() {}
+    redraw() { this.redrawCalls = (this.redrawCalls || 0) + 1; } fit() {} moveTo() {}
     getScale() { return 0.5; }
     getViewPosition() { return { x: 0, y: 0 }; }
     setOptions(options) { this.options = options; this.setOptionsCalls++; }
@@ -124,6 +124,10 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   });
   controller.renderDag();
   await controller.whenRendered();
+  const redraws = networks[0].redrawCalls || 0;
+  controller.clearConfounderPathHover();
+  controller.clearConfounderPathHover();
+  assert.equal(networks[0].redrawCalls || 0, redraws, "clearing an absent hover does not synchronously paint the whole graph");
   const firstScale = controller.minimumDagScale();
   controller.isFullyVisible();
   assert.equal(networks[0].boundingBoxCalls, networks[0].data.nodes.getIds().length);
@@ -281,7 +285,7 @@ test("render coordination preserves rebuild order, comparison precedence and fin
     < calls.findIndex(c => c[0] === "renderDag"));
   calls.length = 0; comparing = true;
   coordinator.renderAll();
-  assert.deepEqual(calls.filter(c => c[0] === "renderSearch"), [["renderSearch", "iv"], ["renderSearch", "dv"]]);
+  assert.deepEqual(calls.filter(c => c[0] === "renderSearch"), [["renderSearch", "iv", { renderPicker: false }], ["renderSearch", "dv", { renderPicker: false }]]);
   assert.equal(calls.some(c => c[0] === "renderSelectedEdge"), false);
   assert.equal(calls.at(-1)[0], "saveProjectLocally");
   calls.length = 0;

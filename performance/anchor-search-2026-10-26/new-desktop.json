@@ -1,0 +1,185 @@
+{
+  "url": "http://127.0.0.1:8768/",
+  "runs": [
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "first search: education",
+          "ms": 81.40000009536743,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "warm search: income",
+          "ms": 32.59999990463257,
+          "longestTaskMs": 0,
+          "rows": 1
+        },
+        {
+          "name": "warm search: education",
+          "ms": 32.59999990463257,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "warm search: health",
+          "ms": 33.200000286102295,
+          "longestTaskMs": 0,
+          "rows": 6
+        },
+        {
+          "name": "warm search: e",
+          "ms": 32.69999980926514,
+          "longestTaskMs": 0,
+          "rows": 94
+        },
+        {
+          "name": "warm search: zzzznomatch",
+          "ms": 32.60000038146973,
+          "longestTaskMs": 0,
+          "rows": 0
+        },
+        {
+          "name": "warm search: (clear)",
+          "ms": 32.59999990463257,
+          "longestTaskMs": 0,
+          "rows": 111
+        },
+        {
+          "name": "select IV",
+          "ms": 310.69999980926514,
+          "longestTaskMs": 156,
+          "rows": 110
+        }
+      ],
+      "catalog": {
+        "records": 14284,
+        "membersInCatalog": 0
+      }
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "first search: education",
+          "ms": 71.7999997138977,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "warm search: income",
+          "ms": 32.700000286102295,
+          "longestTaskMs": 0,
+          "rows": 1
+        },
+        {
+          "name": "warm search: education",
+          "ms": 32.89999961853027,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "warm search: health",
+          "ms": 32.700000286102295,
+          "longestTaskMs": 0,
+          "rows": 6
+        },
+        {
+          "name": "warm search: e",
+          "ms": 32.80000019073486,
+          "longestTaskMs": 0,
+          "rows": 94
+        },
+        {
+          "name": "warm search: zzzznomatch",
+          "ms": 32.89999961853027,
+          "longestTaskMs": 0,
+          "rows": 0
+        },
+        {
+          "name": "warm search: (clear)",
+          "ms": 33.700000286102295,
+          "longestTaskMs": 0,
+          "rows": 111
+        },
+        {
+          "name": "select IV",
+          "ms": 259.7000002861023,
+          "longestTaskMs": 157,
+          "rows": 110
+        }
+      ],
+      "catalog": {
+        "records": 14284,
+        "membersInCatalog": 0
+      }
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "first search: education",
+          "ms": 66.40000009536743,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "warm search: income",
+          "ms": 31.299999713897705,
+          "longestTaskMs": 0,
+          "rows": 1
+        },
+        {
+          "name": "warm search: education",
+          "ms": 32.80000019073486,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "warm search: health",
+          "ms": 33.40000009536743,
+          "longestTaskMs": 0,
+          "rows": 6
+        },
+        {
+          "name": "warm search: e",
+          "ms": 33.5,
+          "longestTaskMs": 0,
+          "rows": 94
+        },
+        {
+          "name": "warm search: zzzznomatch",
+          "ms": 32.5,
+          "longestTaskMs": 0,
+          "rows": 0
+        },
+        {
+          "name": "warm search: (clear)",
+          "ms": 32.89999961853027,
+          "longestTaskMs": 0,
+          "rows": 111
+        },
+        {
+          "name": "select IV",
+          "ms": 295.1000003814697,
+          "longestTaskMs": 151,
+          "rows": 110
+        }
+      ],
+      "catalog": {
+        "records": 14284,
+        "membersInCatalog": 0
+      }
+    }
+  ]
+}

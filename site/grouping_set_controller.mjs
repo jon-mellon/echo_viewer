@@ -26,6 +26,13 @@ export function createGroupingSetController({ state, elements, publicationContro
     else window.prompt("Copy this permalink:", url);
   }
 
+  function splitDefinition(group) {
+    // Anchor roles/timestamps are view state. Keep source metadata stable while
+    // retaining the provenance needed to reopen a split in a private draft.
+    const { type, updated_at, ...definition } = projectOps.withoutGroupReviewStatus(group);
+    return definition;
+  }
+
   function workingSchema() {
     const source = active() || {};
     const sourceGroups = new Map((source.groups || []).map(group => [group.group_id, group]));
@@ -43,7 +50,7 @@ export function createGroupingSetController({ state, elements, publicationContro
         ...(sourceGroups.get(group.group_id) || {}),
         // Split provenance is needed to reopen a private draft after reload.
         ...(group.provenance?.operation === "split_categories"
-          ? projectOps.withoutGroupReviewStatus(group) : {}),
+          ? splitDefinition(group) : {}),
         group_id: group.group_id, label: group.label || "", notes: group.notes || "",
         ...(group.description !== undefined ? { description: group.description } : {}),
         source: group.source || "project_export",

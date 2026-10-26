@@ -1,6 +1,6 @@
 import * as duckdb from "./vendor/duckdb/duckdb-browser.mjs";
 import { evidenceManifestUrl, evidenceSnapshotIdFromManifestUrl, groupingSchemaUrl,
-  PRODUCTION_EVIDENCE_MANIFEST, schemaPublicationId } from "./dag_data_config.mjs";
+  schemaPublicationId } from "./dag_data_config.mjs";
 import { browserV2ManifestLayout, browserV2ShardPath,
   validateBrowserV2EvidenceBinding } from "./dag_manifest.mjs";
 import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
@@ -61,14 +61,7 @@ export class ParquetManifestDagDataSource {
       performance.measure("echo:evidence:publication", { start: publicationStart, end: performance.now() });
       this.groupingSet = loaded.schema;
       this.loadedPublication = loaded.publication;
-      const permalinkVersion = new URL(globalThis.location?.href || "http://localhost/")
-        .searchParams.get("data_version") || "";
-      // Early publication permalinks accidentally wrote the evidence record
-      // signature as data_version. Preserve those links while newly generated
-      // links use the actual immutable snapshot-directory ID.
-      if (permalinkVersion && permalinkVersion === loaded.publication.evidence_snapshot) {
-        this.manifestUrl = PRODUCTION_EVIDENCE_MANIFEST;
-      }
+      this.manifestUrl = evidenceManifestUrl(globalThis.location, loaded.publication.evidence_snapshot);
       if (loaded.compiledDag && !this.skipCompiledOnce) {
         this.compiledPublishedLoad = loaded;
         return;
@@ -138,6 +131,15 @@ export class ParquetManifestDagDataSource {
       };
     }
     throw new Error("Browser-v2 requires a compiled published DAG for startup; full-snapshot reconstruction is not part of the retrieval layout.");
+  }
+
+  async loadVariableSearchRecords() {
+    await this.ensureEvidenceConnection();
+    const canonical = this.canonicalEvidenceRelationUrl("variable_occurrences");
+    const urls = canonical ? [canonical] : this.browserUrls(this.browserLayout.variables);
+    const quoted = urls.map(url => `'${url.replaceAll("'", "''")}'`).join(",");
+    return queryRows(this.connection, `SELECT variable_id, display_label, concept_label,
+      raw_variable_text, paper_id, uoa, index FROM read_parquet([${quoted}]) ORDER BY index`);
   }
 
   async loadVariableMetadata(variableIds, layoutSource = "") {
