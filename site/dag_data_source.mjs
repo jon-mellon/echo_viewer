@@ -5,6 +5,7 @@ import { browserV2ManifestLayout, browserV2ShardPath,
   validateBrowserV2EvidenceBinding } from "./dag_manifest.mjs";
 import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
 import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication-v2";
+import { variableSearchCatalog, SNAPSHOT_SEARCH_CATALOGS } from "./variable_search_catalog.mjs";
 
 // Reading many small remote Parquet shards incurs a separate metadata/range
 // round trip for each shard. The canonical snapshot is cheaper for wide groups.
@@ -180,6 +181,18 @@ export class ParquetManifestDagDataSource {
   }
 
   async loadVariableProvenance(variableIds) {
+    if (!variableIds?.length) return [];
+    await this.initialize();
+    const snapshotId = evidenceSnapshotIdFromManifestUrl(this.manifestUrl);
+    if (SNAPSHOT_SEARCH_CATALOGS[snapshotId]) {
+      try {
+        await variableSearchCatalog.loadSnapshot(snapshotId);
+      } catch {
+        // A failed catalog download must not prevent evidence inspection.
+      }
+    }
+    const labels = variableSearchCatalog.conceptLabels(variableIds, snapshotId);
+    if (labels !== null) return labels;
     await this.ensureEvidenceConnection({ variableIds });
     if (!variableIds?.length || !this.browserShardIds(variableIds).length) return [];
     const placeholders = variableIds.map(() => "?").join(",");

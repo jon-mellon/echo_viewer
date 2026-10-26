@@ -25,6 +25,17 @@ async function loadedCatalog() {
   return catalog;
 }
 
+test("concept labels reuse the matching snapshot without hydrating detail records", async () => {
+  const catalog = await loadedCatalog();
+  catalog.snapshotId = "snapshot-a";
+  assert.deepEqual(catalog.conceptLabels(["v1", "v2", "v1", "missing"], "snapshot-a"), [
+    { variable_id: "v2", concept_label: "Growth", display_label: "Income growth" },
+    { variable_id: "v1", concept_label: "Household income", display_label: "Income" },
+  ]);
+  assert.equal(catalog.conceptLabels(["v1"], "snapshot-b"), null);
+  assert.equal(new StaticVariableSearchCatalog().conceptLabels(["v1"], "snapshot-a"), null);
+});
+
 test("fresh global catalog searches without hydrated variables", async () => {
   const state = { variables: [], variableById: new Map() };
   const catalog = await loadedCatalog();

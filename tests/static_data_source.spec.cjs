@@ -102,6 +102,18 @@ test("content-ID layouts resolve shards through the variable_id lookup", async (
     && document.getElementById("startupLoading")?.hidden, null, { timeout: 78000 });
   const state = await page.evaluate(async () => {
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    const parquetBefore = performance.getEntriesByType("resource").filter(e => e.name.includes(".parquet")).length;
+    const labelStart = performance.now();
+    const [firstLabels, repeatedLabels] = await Promise.all([
+      dagDataSource.loadVariableProvenance(["v00a8a27ccc9fd830"]),
+      dagDataSource.loadVariableProvenance(["v00a8a27ccc9fd830"]),
+    ]);
+    const firstLabelMs = performance.now() - labelStart;
+    const cachedStart = performance.now();
+    const cachedLabels = await dagDataSource.loadVariableProvenance(["v00a8a27ccc9fd830"]);
+    const cachedLabelMs = performance.now() - cachedStart;
+    const labelsWithoutEngine = !dagDataSource.connection;
+    const labelParquetRequests = performance.getEntriesByType("resource").filter(e => e.name.includes(".parquet")).length - parquetBefore;
     await dagDataSource.ensureEvidenceConnection({ variableIds: [], prewarmMapFiles: true });
     const emptyLookup = dagDataSource.shardByVariableId?.size || 0;
     const ids = ["v00008ca8c17b2a4b", "v00a8a27ccc9fd830", "vffffe44b8b970692", "v1"];
@@ -118,6 +130,7 @@ test("content-ID layouts resolve shards through the variable_id lookup", async (
     const projectionMatches = full.length === 40 && JSON.stringify(light) === JSON.stringify(expectedLight);
     await dagDataSource.ensureEvidenceConnection();
     return {
+      firstLabels, repeatedLabels, cachedLabels, firstLabelMs, cachedLabelMs, labelsWithoutEngine, labelParquetRequests,
       emptyLookup, partialLookup, partialShards, projectionMatches,
       completeLookup: dagDataSource.shardLookupComplete,
       fullLookup: dagDataSource.shardByVariableId.size,
@@ -127,6 +140,11 @@ test("content-ID layouts resolve shards through the variable_id lookup", async (
       provenance: await dagDataSource.loadVariableProvenance(["v00a8a27ccc9fd830"]),
     };
   });
+  expect(state.labelsWithoutEngine).toBe(true);
+  expect(state.labelParquetRequests).toBe(0);
+  expect(state.firstLabels).toEqual(state.repeatedLabels);
+  expect(state.firstLabels).toEqual(state.cachedLabels);
+  console.log("Concept label timings (ms)", { first: state.firstLabelMs, cached: state.cachedLabelMs });
   expect(state.emptyLookup).toBe(0);
   expect(state.partialLookup).toBe(3);
   expect(state.partialShards).toEqual([[0], [1], [382], []]);

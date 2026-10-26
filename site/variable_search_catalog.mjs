@@ -120,6 +120,13 @@ export class StaticVariableSearchCatalog {
     }
   }
 
+  conceptLabels(variableIds, snapshotId) {
+    if (this.status !== "ready" || this.snapshotId !== snapshotId) return null;
+    return [...new Set(variableIds)].map(id => this.recordById.get(id)).filter(Boolean)
+      .sort((a, b) => a[9] - b[9])
+      .map(row => ({ variable_id: row[0], concept_label: row[2], display_label: row[1] }));
+  }
+
   searchVariables(query, limit = 20, { selectedUoa = null, uoaFilterEnabled = false,
     uoaMatches = (a, b) => a === b, allowedIds = null } = {}) {
     if (this.status !== "ready") return [];
