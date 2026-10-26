@@ -9,6 +9,7 @@ import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication
 // Reading many small remote Parquet shards incurs a separate metadata/range
 // round trip for each shard. The canonical snapshot is cheaper for wide groups.
 const CANONICAL_READ_SHARD_THRESHOLD = 8;
+const RAW_LINK_QUERY_BATCH_SIZE = 2048;
 // This immutable evidence build's lookup has exactly one row for each index
 // 1..14284, with shard_id = floor((variable_index - 1) / 256). The fallback
 // below still reads the lookup for every other build.
@@ -192,18 +193,23 @@ export class ParquetManifestDagDataSource {
   async loadRawLinksByIds(rawLinkIds) {
     await this.ensureEvidenceConnection();
     if (!rawLinkIds?.length) return [];
-    const placeholders = rawLinkIds.map(() => "?").join(",");
     const canonicalUrl = this.canonicalEvidenceRelationUrl("causal_link_occurrences");
-    if (canonicalUrl) {
-      const url = canonicalUrl.replaceAll("'", "''");
-      return queryRows(this.connection, `SELECT * FROM read_parquet('${url}')
-        WHERE raw_causal_link_id IN (${placeholders})`, rawLinkIds);
+    if (!canonicalUrl) await this.ensureBrowserRelation("causal_link_occurrences");
+    const relation = canonicalUrl
+      ? `read_parquet('${canonicalUrl.replaceAll("'", "''")}')`
+      : "causal_link_occurrences";
+    // Bound both the WASM parameter buffer and result batches. A map can
+    // reference tens of thousands of findings; one giant query can exhaust
+    // DuckDB-WASM before any evidence is returned.
+    const rows = [];
+    const ids = [...new Set(rawLinkIds)];
+    for (let offset = 0; offset < ids.length; offset += RAW_LINK_QUERY_BATCH_SIZE) {
+      const batch = ids.slice(offset, offset + RAW_LINK_QUERY_BATCH_SIZE);
+      const placeholders = batch.map(() => "?").join(",");
+      rows.push(...await queryRows(this.connection, `SELECT * FROM ${relation}
+        WHERE raw_causal_link_id IN (${placeholders})`, batch));
     }
-    // Older browser manifests did not advertise their canonical snapshot.
-    // IDs carry no shard ownership, so those layouts must scan every source shard.
-    await this.ensureBrowserRelation("causal_link_occurrences");
-    return queryRows(this.connection, `SELECT * FROM causal_link_occurrences
-      WHERE raw_causal_link_id IN (${placeholders})`, rawLinkIds);
+    return rows;
   }
 
   async loadRawLinkEndpointsByIds(rawLinkIds) {

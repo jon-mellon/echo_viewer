@@ -1202,19 +1202,25 @@ function hasAnyMapping(sourceIds, targetIds) {
 
 let sparseEdgeEvidencePromise = null;
 function computeVisibleLinks() {
-  if (state.excludeSparseEdges && !sparseEdgeEvidencePromise) {
-    const missing = [...new Set((state.project?.links || []).flatMap(link =>
+  const missingSparseEvidence = state.excludeSparseEdges
+    ? [...new Set((state.project?.links || []).flatMap(link =>
       [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))]
-      .filter(id => !state.rawLinksById.has(id));
-    if (missing.length) {
-      sparseEdgeEvidencePromise = dagDataSource.loadRawLinksByIds(missing).then(rows => {
-        for (const row of rows) state.rawLinksById.set(row.raw_causal_link_id, row);
-        computeVisibleLinks();
-        renderAll();
-      }).catch(error => {
-        console.error("Could not load sparse edge evidence", error);
-      }).finally(() => { sparseEdgeEvidencePromise = null; });
-    }
+      .filter(id => !state.rawLinksById.has(id)) : [];
+  if (missingSparseEvidence.length && !sparseEdgeEvidencePromise) {
+    sparseEdgeEvidencePromise = dagDataSource.loadRawLinksByIds(missingSparseEvidence).then(rows => {
+      const returned = new Set(rows.map(row => row.raw_causal_link_id));
+      if (missingSparseEvidence.some(id => !returned.has(id))) {
+        throw new Error("Some sparse edge evidence is unavailable in this snapshot");
+      }
+      for (const row of rows) state.rawLinksById.set(row.raw_causal_link_id, row);
+    }).catch(error => {
+      state.excludeSparseEdges = false;
+      console.error("Could not load sparse edge evidence", error);
+    }).finally(() => {
+      sparseEdgeEvidencePromise = null;
+      computeVisibleLinks();
+      renderAll();
+    });
   }
   const instrumentId = state.project.instrument_group_id;
   if (instrumentId && (instrumentId === state.project.iv_group_id
@@ -1240,7 +1246,7 @@ function computeVisibleLinks() {
     maxPathLength: state.confounderMaxPathLength,
     exclusionMaxPathLength: state.exclusionMaxPathLength,
     excludeBottlenecked: state.excludeBottleneckedConfounders,
-    excludeSparseEdges: state.excludeSparseEdges,
+    excludeSparseEdges: state.excludeSparseEdges && !missingSparseEvidence.length,
     minimumEdgePapers: state.minimumEdgePapers,
     rawLinksById: state.rawLinksById,
     filterByCausalRelevance: false,

@@ -21,6 +21,7 @@
     "test:browser:new-data": "playwright test --config=playwright.new-data.config.cjs",
     "build:search-catalog": "node scripts/generate_variable_search_catalog.mjs",
     "build:site": "node scripts/build_site.mjs",
+    "profile:sparse-edges:new-data": "node scripts/prepare_new_data_site.mjs && node scripts/profile_sparse_edges.mjs",
     "profile": "node scripts/profile_viewer.mjs",
     "agent:mcp": "node agent/mcp.mjs"
   },
