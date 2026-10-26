@@ -137,8 +137,28 @@ export class AnchorGroupSearchIndex {
     const prepared = [];
     let sliceStart = performance.now();
     for (const group of groups) {
-      catalog.assertCoverage(group.variable_ids || []);
-      prepared.push(this.entry(group, catalog, previous?.get(group.group_id)));
+      const ids = group.variable_ids || [];
+      const old = previous?.get(group.group_id);
+      if (old?.ids === group.variable_ids && old.length === ids.length) {
+        prepared.push(old);
+        continue;
+      }
+      const fields = [], chunks = [];
+      // One category can contain most of the dataset. Yield inside categories,
+      // rather than only between them, so search preparation cannot freeze input.
+      for (let start = 0; start < ids.length; start += 1000) {
+        const batch = ids.slice(start, start + 1000);
+        catalog.assertCoverage(batch);
+        for (const id of batch) fields.push(catalog.fieldsById.get(id));
+        chunks.push(batch.map(id => catalog.recordById.get(id)?.[6] || "").join("\0"));
+        if (performance.now() - sliceStart >= 8) {
+          if (globalThis.scheduler?.yield) await globalThis.scheduler.yield();
+          else await new Promise(resolve => setTimeout(resolve, 0));
+          sliceStart = performance.now();
+        }
+      }
+      prepared.push({ id: group.group_id, ids: group.variable_ids, length: ids.length,
+        fields, haystack: chunks.join("\0") });
       if (performance.now() - sliceStart >= 8) {
         if (globalThis.scheduler?.yield) await globalThis.scheduler.yield();
         else await new Promise(resolve => setTimeout(resolve, 0));

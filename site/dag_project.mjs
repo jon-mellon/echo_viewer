@@ -174,10 +174,13 @@ export function normalizeDuplicateAssignments(project, clusterOf, clusterMembers
       if (!ownerByRep.has(repId)) ownerByRep.set(repId, group.group_id);
     }
   }
+  const repsByGroup = new Map();
+  for (const [repId, groupId] of ownerByRep) {
+    if (!repsByGroup.has(groupId)) repsByGroup.set(groupId, []);
+    repsByGroup.get(groupId).push(repId);
+  }
   for (const group of project.groups || []) {
-    const ownedReps = [...ownerByRep.entries()]
-      .filter(([, groupId]) => groupId === group.group_id)
-      .map(([repId]) => repId);
+    const ownedReps = repsByGroup.get(group.group_id) || [];
     group.variable_ids = [...new Set(ownedReps.flatMap((repId) => clusterMemberIds(repId)))];
     if (Array.isArray(group.seed_variable_ids)) {
       group.seed_variable_ids = [...new Set(

@@ -10,6 +10,21 @@ export function createGroupingSetController({ state, elements, publicationContro
   rejectedVariableEntries, rejectedVariableIdSet, applyProjectOperation, normalizeProjectDuplicateAssignments,
   groupById, nowIso }) {
   const presenter = createGroupingSetPresenter({ elements });
+  let canonicalMemberships = new WeakMap();
+  let membershipClusters = state.clusterOf;
+  function canonicalIds(ids) {
+    if (membershipClusters !== state.clusterOf) {
+      membershipClusters = state.clusterOf;
+      canonicalMemberships = new WeakMap();
+    }
+    let cached = canonicalMemberships.get(ids);
+    if (!cached || cached.original.length !== ids.length
+      || ids.some((id, index) => id !== cached.original[index])) {
+      cached = { original: [...ids], canonical: [...new Set(ids.map(id => state.clusterOf.get(id) || id))].sort() };
+      canonicalMemberships.set(ids, cached);
+    }
+    return [...cached.canonical];
+  }
   function active() {
     return (state.data.grouping_sets || []).find(set => set.grouping_set_id === state.project.active_grouping_set_id)
       || (state.data.grouping_sets || [])[0];
@@ -38,7 +53,7 @@ export function createGroupingSetController({ state, elements, publicationContro
     const sourceGroups = new Map((source.groups || []).map(group => [group.group_id, group]));
     const owners = new Map();
     const groups = state.project.groups.filter(group => group.variable_ids?.length).map(group => {
-      const variable_ids = [...new Set(group.variable_ids.map(id => state.clusterOf.get(id) || id))].sort();
+      const variable_ids = canonicalIds(group.variable_ids);
       for (const id of variable_ids) {
         const owner = owners.get(id);
         if (owner && owner !== group.group_id) throw new Error(`Canonical variable ${id} belongs to both ${owner} and ${group.group_id}.`);

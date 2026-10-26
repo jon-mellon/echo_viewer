@@ -1424,8 +1424,12 @@ function renderSelectedEdge() {
     && els.edgeInspector.classList.contains("excluded-links-list")) return;
   if (!state.selectedEdgeId && state.selectedEvidenceGroupId && inspectorController.renderGroupDefinition()) return;
   const selected = (state.project?.links || []).find(edge => edge.edge_id === state.selectedEdgeId);
-  const owners = new Map((state.project?.groups || []).flatMap(group =>
-    (group.variable_ids || []).map(id => [id, group.group_id])));
+  const owners = new Map();
+  if (selected && Object.keys(state.project.finding_decisions || {}).length) {
+    for (const group of state.project.groups) {
+      for (const id of group.variable_ids || []) owners.set(id, group.group_id);
+    }
+  }
   const rawIds = [...new Set([...(selected?.a_to_b_raw_link_ids || []), ...(selected?.b_to_a_raw_link_ids || []),
     ...(selected ? Object.keys(state.project.finding_decisions || {}) : [])])];
   const missing = rawIds.filter(id => !state.rawLinksById.has(id));

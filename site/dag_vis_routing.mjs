@@ -16,9 +16,11 @@ export function routesToVisData(routes, { edgeStyle, edgeTitle }) {
   const edgeData = [];
   const edgeSegments = new Map();
   for (const { link, sourceId, targetId, points } of routes) {
+    const style = edgeStyle(link);
+    const title = edgeTitle(link);
     if (points.length <= 2) {
       edgeSegments.set(link.edge_id, link.edge_id);
-      edgeData.push({ id: link.edge_id, from: sourceId, to: targetId, ...edgeStyle(link), title: edgeTitle(link) });
+      edgeData.push({ id: link.edge_id, from: sourceId, to: targetId, ...style, title });
       continue;
     }
     const bendIds = points.slice(1, -1).map((point, index) => {
@@ -32,7 +34,7 @@ export function routesToVisData(routes, { edgeStyle, edgeTitle }) {
       edgeSegments.set(segmentId, link.edge_id);
       edgeData.push({
         id: segmentId, from: ids[index], to: ids[index + 1],
-        ...edgeStyle(link), title: edgeTitle(link),
+        ...style, title,
         arrows: { to: index === ids.length - 2 ? { enabled: true, scaleFactor: 0.7 } : { enabled: false },
           from: link.direction_type === "BIDIRECTIONAL" && index === 0 ? { enabled: true, scaleFactor: 0.7 } : undefined },
       });

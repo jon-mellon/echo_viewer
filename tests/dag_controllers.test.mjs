@@ -113,6 +113,14 @@ test("untouched published schema does not gain an empty hidden-variable field", 
     applyProjectOperation() {}, normalizeProjectDuplicateAssignments() {}, groupById() {}, nowIso: () => "",
   });
   assert.deepEqual(controller.workingSchema(), schema);
+  // Cached canonical memberships must still observe in-place restoration,
+  // replacement without a length change, and a rebuilt duplicate index.
+  state.project.groups[0].variable_ids.push("v2");
+  assert.deepEqual(controller.workingSchema().groups[0].variable_ids, ["v1", "v2"]);
+  state.project.groups[0].variable_ids[1] = "v3";
+  assert.deepEqual(controller.workingSchema().groups[0].variable_ids, ["v1", "v3"]);
+  state.clusterOf = new Map([["v3", "v1"]]);
+  assert.deepEqual(controller.workingSchema().groups[0].variable_ids, ["v1"]);
 });
 
 test("project controller preserves live group identity and owns history transitions", () => {

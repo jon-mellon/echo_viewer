@@ -19,6 +19,7 @@ test('edge decisions reuse existing graph geometry and refresh link metadata', (
   assert.equal(reused.routes[0].points, route.points);
   assert.equal(reuseDagGeometry(geometry, groups, [{ edge_id: 'new' }]), null);
   assert.equal(reuseDagGeometry(geometry, [{ group_id: 'a' }], []), null);
+  assert.equal(reuseDagGeometry(geometry, groups, [{ ...restored, direction_type: 'B_TO_A' }]), null);
 });
 
 test('cached label sizes update when a group label or font changes', () => {
