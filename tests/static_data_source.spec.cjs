@@ -98,16 +98,42 @@ test("content-ID layouts resolve shards through the variable_id lookup", async (
   page.on("pageerror", error => errors.push(error.message));
   await page.goto(`${base}/?schema=${publication}&data_version=${contentSnapshot}`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
+    && window.__dagBuilderState?.publishedSchemaHydrated
     && document.getElementById("startupLoading")?.hidden, null, { timeout: 78000 });
   const state = await page.evaluate(async () => {
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    await dagDataSource.ensureEvidenceConnection({ variableIds: [], prewarmMapFiles: true });
+    const emptyLookup = dagDataSource.shardByVariableId?.size || 0;
+    const ids = ["v00008ca8c17b2a4b", "v00a8a27ccc9fd830", "vffffe44b8b970692", "v1"];
+    await Promise.all([
+      dagDataSource.ensureEvidenceConnection({ variableIds: ids.slice(0, 2) }),
+      dagDataSource.ensureEvidenceConnection({ variableIds: ids.slice(1) }),
+    ]);
+    const partialLookup = dagDataSource.shardByVariableId.size;
+    const partialShards = ids.map(id => dagDataSource.browserShardIds([id]));
+    const requested = window.__dagBuilderState.project.groups.find(g => g.variable_ids.length >= 40).variable_ids.slice(0, 40);
+    const full = await dagDataSource.loadVariableMetadata(requested);
+    const light = await dagDataSource.loadVariableMetadata(requested, "", { mapOnly: true });
+    const expectedLight = full.map(({ field_preview_json, metadata_blob_json, ...row }) => row);
+    const projectionMatches = full.length === 40 && JSON.stringify(light) === JSON.stringify(expectedLight);
     await dagDataSource.ensureEvidenceConnection();
     return {
+      emptyLookup, partialLookup, partialShards, projectionMatches,
+      completeLookup: dagDataSource.shardLookupComplete,
+      fullLookup: dagDataSource.shardByVariableId.size,
+      prefetchedFiles: dagDataSource.localParquetFiles.size,
       shards: ["v00008ca8c17b2a4b", "v00a8a27ccc9fd830", "vffffe44b8b970692", "v1"]
         .map(id => dagDataSource.browserShardIds([id])),
       provenance: await dagDataSource.loadVariableProvenance(["v00a8a27ccc9fd830"]),
     };
   });
+  expect(state.emptyLookup).toBe(0);
+  expect(state.partialLookup).toBe(3);
+  expect(state.partialShards).toEqual([[0], [1], [382], []]);
+  expect(state.completeLookup).toBe(true);
+  expect(state.fullLookup).toBe(97818);
+  expect(state.prefetchedFiles).toBe(3);
+  expect(state.projectionMatches).toBe(true);
   expect(state.shards).toEqual([[0], [1], [382], []]);
   expect(state.provenance).toEqual([expect.objectContaining({
     variable_id: "v00a8a27ccc9fd830", concept_label: "uoa's emergency department use" })]);

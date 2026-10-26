@@ -12,6 +12,7 @@ import {
   simplifyRoute,
   appendOverlapSegments,
   routeOverlapPenalty,
+  ParallelSegmentIndex,
 } from '../site/dag_routing_geometry.mjs';
 import { routeEdge, routeEdges, studyArrowCorridor } from '../site/dag_router.mjs';
 import { routeNodeData, routesToVisData } from '../site/dag_vis_routing.mjs';
@@ -53,6 +54,37 @@ test('prepared overlap segments preserve scoring across bends and crossings', ()
     [{ x: 180, y: -100 }, { x: 180, y: 100 }],
   ]) {
     assert.equal(routeOverlapPenalty(candidate, routes, prepared), routeOverlapPenalty(candidate, routes));
+  }
+});
+
+test('parallel segment index exactly preserves overlap scores across headings, reversals and thresholds', () => {
+  let seed = 20261026;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32);
+  const routes = [];
+  for (let i = 0; i < 500; i++) {
+    const x = random() * 1000 - 500, y = random() * 1000 - 500;
+    const angle = random() * Math.PI * 2, length = random() * 600;
+    routes.push([{ x, y }, { x: x + Math.cos(angle) * length, y: y + Math.sin(angle) * length }]);
+  }
+  for (const y of [0, 15.999, 16, 16.001]) routes.push([{ x: 0, y }, { x: 500, y }]);
+  const index = new ParallelSegmentIndex();
+  routes.forEach(route => index.addRoute(route));
+  const prepared = [];
+  routes.forEach(route => appendOverlapSegments(prepared, route));
+  const candidates = routes.slice(0, 100).flatMap(route => [route, [...route].reverse()]);
+  for (const angle of [0, Math.PI, Math.asin(0.12), Math.PI - Math.asin(0.12)]) {
+    candidates.push([{ x: 0, y: 0 }, { x: 500 * Math.cos(angle), y: 500 * Math.sin(angle) }]);
+  }
+  candidates.push([{ x: 0, y: 0 }, { x: 18, y: 0 }],
+    [{ x: 0, y: 0 }, { x: 18.001, y: 0 }], [{ x: 0, y: 0 }, { x: 0, y: 0 }]);
+  for (const points of candidates) {
+    const expected = routeOverlapPenalty(points, routes, prepared);
+    assert.equal(index.penalty(points), expected);
+    for (const cutoff of [0, expected / 2, expected, expected + 1, Infinity]) {
+      const actual = index.penalty(points, cutoff);
+      if (expected < cutoff) assert.equal(actual, expected);
+      else assert.ok(actual >= cutoff && actual <= expected);
+    }
   }
 });
 

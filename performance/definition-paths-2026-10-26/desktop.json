@@ -1,0 +1,1871 @@
+{
+  "started": "2026-10-26T20:58:54.883Z",
+  "url": "http://127.0.0.1:8767/",
+  "browser": "chromium",
+  "profileScenario": "default",
+  "device": "desktop",
+  "scenarios": [
+    {
+      "name": "open variable definition",
+      "wallMs": 136,
+      "browserMs": 136.4,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 48,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "choose definition method",
+      "wallMs": 74,
+      "browserMs": 74.5,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 24,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "select definition source",
+      "wallMs": 1961,
+      "browserMs": 1956.2,
+      "longTaskMs": 58,
+      "longestTaskMs": 58,
+      "longestEventMs": 48,
+      "maxFrameGapMs": 83.4,
+      "requestCount": 4,
+      "transferMB": 0.7,
+      "slowestRequests": [
+        {
+          "name": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/variable_layouts.parquet",
+          "durationMs": 80.6
+        },
+        {
+          "name": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/lookup/variable-shards.parquet",
+          "durationMs": 57.5
+        },
+        {
+          "name": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "durationMs": 47.2
+        }
+      ],
+      "appMeasures": [
+        {
+          "name": "echo:evidence:variables",
+          "durationMs": 1634
+        },
+        {
+          "name": "echo:evidence:engine",
+          "durationMs": 280.8
+        },
+        {
+          "name": "echo:evidence:lookup",
+          "durationMs": 0.1
+        },
+        {
+          "name": "echo:evidence:validation",
+          "durationMs": 520.8
+        },
+        {
+          "name": "echo:evidence:variable-layouts-metadata",
+          "durationMs": 0
+        },
+        {
+          "name": "echo:evidence:variable-layouts-view",
+          "durationMs": 287.7
+        },
+        {
+          "name": "echo:evidence:variable-layouts",
+          "durationMs": 0
+        },
+        {
+          "name": "echo:evidence:variables-query",
+          "durationMs": 480.9
+        }
+      ],
+      "heapMB": 98.2
+    },
+    {
+      "name": "select definition variable",
+      "wallMs": 151,
+      "browserMs": 151.2,
+      "longTaskMs": 51,
+      "longestTaskMs": 51,
+      "longestEventMs": 72,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "variable map zoom",
+      "wallMs": 103,
+      "browserMs": 102.4,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 32,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "map labels and group regions",
+      "wallMs": 174,
+      "browserMs": 173.9,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 40,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "map zoom out and fit",
+      "wallMs": 141,
+      "browserMs": 140.7,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 32,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "map wheel zoom",
+      "wallMs": 102,
+      "browserMs": 101.3,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 0,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "map drag pan",
+      "wallMs": 280,
+      "browserMs": 277.3,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 40,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "map fullscreen and Escape",
+      "wallMs": 163,
+      "browserMs": 161.5,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 64,
+      "maxFrameGapMs": 0,
+      "requestCount": 10,
+      "transferMB": 0,
+      "slowestRequests": [
+        {
+          "name": "http://127.0.0.1:8767/dag_render_compute.mjs",
+          "durationMs": 0.3
+        },
+        {
+          "name": "http://127.0.0.1:8767/dag_router.mjs",
+          "durationMs": 0.3
+        },
+        {
+          "name": "http://127.0.0.1:8767/dag_layout.mjs",
+          "durationMs": 0.3
+        }
+      ],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "map mode selection",
+      "wallMs": 148,
+      "browserMs": 147.4,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 24,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "history panel",
+      "wallMs": 106,
+      "browserMs": 105.1,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 24,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "close variable definition",
+      "wallMs": 210,
+      "browserMs": 207.7,
+      "longTaskMs": 77,
+      "longestTaskMs": 77,
+      "longestEventMs": 96,
+      "maxFrameGapMs": 66.6,
+      "requestCount": 5,
+      "transferMB": 0,
+      "slowestRequests": [
+        {
+          "name": "http://127.0.0.1:8767/dag_router.mjs",
+          "durationMs": 0.3
+        },
+        {
+          "name": "http://127.0.0.1:8767/dag_layout.mjs",
+          "durationMs": 0.3
+        },
+        {
+          "name": "http://127.0.0.1:8767/dag_render_compute.mjs",
+          "durationMs": 0.2
+        }
+      ],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "incident links (40 variables)",
+      "wallMs": 235,
+      "browserMs": 234.7,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 0,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "group search",
+      "wallMs": 407,
+      "browserMs": 405,
+      "longTaskMs": 95,
+      "longestTaskMs": 95,
+      "longestEventMs": 0,
+      "maxFrameGapMs": 100.1,
+      "requestCount": 2,
+      "transferMB": 0,
+      "slowestRequests": [
+        {
+          "name": "http://127.0.0.1:8767/variable_search_catalog.mjs",
+          "durationMs": 0.4
+        },
+        {
+          "name": "http://127.0.0.1:8767/variable_search_catalog_worker.mjs",
+          "durationMs": 0
+        }
+      ],
+      "appMeasures": [
+        {
+          "name": "echo:dag:layout",
+          "durationMs": 63.7
+        }
+      ],
+      "heapMB": 98.2
+    },
+    {
+      "name": "select IV",
+      "wallMs": 165,
+      "browserMs": 164.5,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 56,
+      "maxFrameGapMs": 0,
+      "requestCount": 5,
+      "transferMB": 0,
+      "slowestRequests": [
+        {
+          "name": "http://127.0.0.1:8767/dag_render_compute.mjs",
+          "durationMs": 0.3
+        },
+        {
+          "name": "http://127.0.0.1:8767/dag_router.mjs",
+          "durationMs": 0.3
+        },
+        {
+          "name": "http://127.0.0.1:8767/dag_layout.mjs",
+          "durationMs": 0.2
+        }
+      ],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "select DV",
+      "wallMs": 138,
+      "browserMs": 138.7,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 56,
+      "maxFrameGapMs": 0,
+      "requestCount": 5,
+      "transferMB": 0,
+      "slowestRequests": [
+        {
+          "name": "http://127.0.0.1:8767/dag_router.mjs",
+          "durationMs": 0.3
+        },
+        {
+          "name": "http://127.0.0.1:8767/dag_render_compute.mjs",
+          "durationMs": 0.2
+        },
+        {
+          "name": "http://127.0.0.1:8767/dag_layout.mjs",
+          "durationMs": 0.2
+        }
+      ],
+      "appMeasures": [
+        {
+          "name": "echo:dag:layout",
+          "durationMs": 3
+        },
+        {
+          "name": "echo:dag:routing",
+          "durationMs": 1.5
+        }
+      ],
+      "heapMB": 98.2
+    },
+    {
+      "name": "DAG layout: auto",
+      "wallMs": 39,
+      "browserMs": 38.6,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 0,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "DAG zoom",
+      "wallMs": 72,
+      "browserMs": 71.3,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 16,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "unfiltered view",
+      "wallMs": 125,
+      "browserMs": 122.5,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 48,
+      "maxFrameGapMs": 0,
+      "requestCount": 2,
+      "transferMB": 0,
+      "slowestRequests": [
+        {
+          "name": "http://127.0.0.1:8767/dag_render_compute.mjs",
+          "durationMs": 0.3
+        },
+        {
+          "name": "http://127.0.0.1:8767/dag_layout_worker.mjs",
+          "durationMs": 0
+        }
+      ],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "exclude edge promptly",
+      "wallMs": 473,
+      "browserMs": 473.1,
+      "longTaskMs": 111,
+      "longestTaskMs": 111,
+      "longestEventMs": 144,
+      "maxFrameGapMs": 116.6,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "settle graph after exclusion",
+      "wallMs": 54,
+      "browserMs": 52.4,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 0,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "restore edge",
+      "wallMs": 236,
+      "browserMs": 236,
+      "longTaskMs": 101,
+      "longestTaskMs": 101,
+      "longestEventMs": 128,
+      "maxFrameGapMs": 116.6,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "exclude edge",
+      "wallMs": 323,
+      "browserMs": 321.3,
+      "longTaskMs": 100,
+      "longestTaskMs": 100,
+      "longestEventMs": 128,
+      "maxFrameGapMs": 116.6,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "restore excluded edge",
+      "wallMs": 203,
+      "browserMs": 201.6,
+      "longTaskMs": 103,
+      "longestTaskMs": 103,
+      "longestEventMs": 128,
+      "maxFrameGapMs": 99.9,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "close evidence",
+      "wallMs": 143,
+      "browserMs": 141.9,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 56,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "undo edge decision",
+      "wallMs": 182,
+      "browserMs": 181,
+      "longTaskMs": 58,
+      "longestTaskMs": 58,
+      "longestEventMs": 88,
+      "maxFrameGapMs": 66.7,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "redo edge decision",
+      "wallMs": 172,
+      "browserMs": 170.3,
+      "longTaskMs": 57,
+      "longestTaskMs": 57,
+      "longestEventMs": 88,
+      "maxFrameGapMs": 66.7,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "confounders filter",
+      "wallMs": 165,
+      "browserMs": 165.2,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 72,
+      "maxFrameGapMs": 50.1,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "colliders filter",
+      "wallMs": 154,
+      "browserMs": 152.8,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 48,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [
+        {
+          "name": "echo:dag:layout",
+          "durationMs": 3.4
+        },
+        {
+          "name": "echo:dag:routing",
+          "durationMs": 1.2
+        }
+      ],
+      "heapMB": 98.2
+    },
+    {
+      "name": "bottleneck filter",
+      "wallMs": 135,
+      "browserMs": 133,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 48,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "path links filter",
+      "wallMs": 168,
+      "browserMs": 168.6,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 48,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [
+        {
+          "name": "echo:dag:layout",
+          "durationMs": 4.8
+        },
+        {
+          "name": "echo:dag:routing",
+          "durationMs": 2.9
+        }
+      ],
+      "heapMB": 98.2
+    },
+    {
+      "name": "path length",
+      "wallMs": 568,
+      "browserMs": 566.8,
+      "longTaskMs": 104,
+      "longestTaskMs": 104,
+      "longestEventMs": 48,
+      "maxFrameGapMs": 100,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [
+        {
+          "name": "echo:dag:routing",
+          "durationMs": 295.2
+        },
+        {
+          "name": "echo:dag:layout",
+          "durationMs": 40.5
+        }
+      ],
+      "heapMB": 98.2
+    },
+    {
+      "name": "DAG zoom out and fit",
+      "wallMs": 134,
+      "browserMs": 133.8,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 32,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "DAG fullscreen and Escape",
+      "wallMs": 267,
+      "browserMs": 266.6,
+      "longTaskMs": 149,
+      "longestTaskMs": 149,
+      "longestEventMs": 168,
+      "maxFrameGapMs": 133.4,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "export drawer",
+      "wallMs": 85,
+      "browserMs": 83.2,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 16,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "project JSON download",
+      "wallMs": 371,
+      "browserMs": 367.8,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 48,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "working map download",
+      "wallMs": 166,
+      "browserMs": 165.1,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 32,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "grouping folder download",
+      "wallMs": 102,
+      "browserMs": 99.9,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 24,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "change IV",
+      "wallMs": 166,
+      "browserMs": 164.6,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 24,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    },
+    {
+      "name": "change DV",
+      "wallMs": 168,
+      "browserMs": 165.9,
+      "longTaskMs": 0,
+      "longestTaskMs": 0,
+      "longestEventMs": 16,
+      "maxFrameGapMs": 0,
+      "requestCount": 0,
+      "transferMB": 0,
+      "slowestRequests": [],
+      "appMeasures": [],
+      "heapMB": 98.2
+    }
+  ],
+  "errors": [],
+  "startup": {
+    "visibleMs": 1785,
+    "schemaReadyMs": 3613,
+    "membershipWaitMs": 1828,
+    "domContentLoadedMs": 143,
+    "lcpMs": 1780,
+    "cls": 0.001,
+    "layoutShifts": [
+      {
+        "at": 145.90000009536743,
+        "value": 0.0004927107047070417,
+        "sources": [
+          {
+            "element": "startup-loading-card",
+            "previousRect": {
+              "x": 448.5,
+              "y": 365,
+              "width": 468,
+              "height": 194,
+              "top": 365,
+              "right": 916.5,
+              "bottom": 559,
+              "left": 448.5
+            },
+            "currentRect": {
+              "x": 439.71875,
+              "y": 365,
+              "width": 485.5625,
+              "height": 194,
+              "top": 365,
+              "right": 925.28125,
+              "bottom": 559,
+              "left": 439.71875
+            }
+          }
+        ]
+      },
+      {
+        "at": 1227.9000000953674,
+        "value": 0.0004927107047070417,
+        "sources": [
+          {
+            "element": "startup-loading-card",
+            "previousRect": {
+              "x": 439.71875,
+              "y": 365,
+              "width": 485.5625,
+              "height": 194,
+              "top": 365,
+              "right": 925.28125,
+              "bottom": 559,
+              "left": 439.71875
+            },
+            "currentRect": {
+              "x": 448.5,
+              "y": 365,
+              "width": 468,
+              "height": 194,
+              "top": 365,
+              "right": 916.5,
+              "bottom": 559,
+              "left": 448.5
+            }
+          }
+        ]
+      }
+    ],
+    "longTaskMs": 293,
+    "longestTaskMs": 180,
+    "appMeasures": [
+      {
+        "name": "echo:startup:data",
+        "durationMs": 1059
+      },
+      {
+        "name": "echo:evidence:publication",
+        "durationMs": 1058
+      },
+      {
+        "name": "echo:startup:graph",
+        "durationMs": 528.9
+      },
+      {
+        "name": "echo:dag:routing",
+        "durationMs": 311.4
+      },
+      {
+        "name": "echo:dag:layout",
+        "durationMs": 67.1
+      },
+      {
+        "name": "echo:schema:structure",
+        "durationMs": 515.6
+      },
+      {
+        "name": "echo:schema:priority",
+        "durationMs": 515.7
+      },
+      {
+        "name": "echo:schema:memberships",
+        "durationMs": 1146.6
+      },
+      {
+        "name": "echo:schema:integrity",
+        "durationMs": 1.8
+      }
+    ],
+    "resourceCount": 216,
+    "transferMB": 2,
+    "largestResources": [
+      {
+        "name": "http://127.0.0.1:8767/visjs-min.js",
+        "transferMB": 0.7,
+        "durationMs": 4.1
+      },
+      {
+        "name": "http://127.0.0.1:8767/vendor/supabase.mjs",
+        "transferMB": 0.2,
+        "durationMs": 6.4
+      },
+      {
+        "name": "http://127.0.0.1:8767/vendor/duckdb/duckdb-browser.mjs",
+        "transferMB": 0.2,
+        "durationMs": 15.9
+      },
+      {
+        "name": "http://127.0.0.1:8767/dag_builder.js?v=evidence-pane-v1",
+        "transferMB": 0.1,
+        "durationMs": 3.2
+      },
+      {
+        "name": "http://127.0.0.1:8767/styles.css?v=sidebar-evidence-v1",
+        "transferMB": 0.1,
+        "durationMs": 3.8
+      },
+      {
+        "name": "http://127.0.0.1:8767/dag_router.mjs",
+        "transferMB": 0,
+        "durationMs": 8.8
+      },
+      {
+        "name": "http://127.0.0.1:8767/dag_layout.mjs",
+        "transferMB": 0,
+        "durationMs": 13.4
+      },
+      {
+        "name": "http://127.0.0.1:8767/dag_map_ui_controller.mjs",
+        "transferMB": 0,
+        "durationMs": 6.7
+      }
+    ],
+    "slowestResources": [
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/rest/v1/published_schemas?select=id%2Cowner_id%2Ccontent_hash%2Cstorage_prefix%2Cparent_schema_id%2Ctitle%2Cdescription%2Cevidence_snapshot%2Ccompiled_manifest_path%2Ccompiled_manifest_hash%2Ccompiler_version&id=eq.c221423a-9470-4c82-8a3d-8bcf4a01ef7c",
+        "durationMs": 506.1
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/compiled/dag.json",
+        "durationMs": 319.4
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/memberships/category-diet.tsv",
+        "durationMs": 227.7
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/memberships/category-sexual-behavior.tsv",
+        "durationMs": 215.8
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/memberships/category-vaccination.tsv",
+        "durationMs": 211.7
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/memberships/category-experienced-prices.tsv",
+        "durationMs": 206.5
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/memberships/category-educational-experience-evaluation.tsv",
+        "durationMs": 186
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/memberships/category-motivation-behavioral-readiness.tsv",
+        "durationMs": 185.1
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/memberships/category-academic-achievement.tsv",
+        "durationMs": 183.1
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/memberships/category-aesthetic-evaluation.tsv",
+        "durationMs": 183
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/memberships/category-educational-attainment.tsv",
+        "durationMs": 178
+      },
+      {
+        "name": "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/48dc0b0c-963a-4370-a6da-36b5dd802796/c221423a-9470-4c82-8a3d-8bcf4a01ef7c/memberships/category-gender.tsv",
+        "durationMs": 177.9
+      }
+    ]
+  },
+  "budgetFailures": [],
+  "baselineComparisons": [
+    {
+      "metric": "open variable definition wall time",
+      "observed": 136,
+      "baseline": 750,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "open variable definition longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "open variable definition longest event",
+      "observed": 48,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "choose definition method wall time",
+      "observed": 74,
+      "baseline": 750,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "choose definition method longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "choose definition method longest event",
+      "observed": 24,
+      "baseline": 150,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select definition source wall time",
+      "observed": 1961,
+      "baseline": 2500,
+      "ratio": 0.8,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select definition source longest task",
+      "observed": 58,
+      "baseline": 150,
+      "ratio": 0.4,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select definition source longest event",
+      "observed": 48,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select definition variable wall time",
+      "observed": 151,
+      "baseline": 1000,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select definition variable longest task",
+      "observed": 51,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select definition variable longest event",
+      "observed": 72,
+      "baseline": 150,
+      "ratio": 0.5,
+      "withinBaseline": true
+    },
+    {
+      "metric": "variable map zoom wall time",
+      "observed": 103,
+      "baseline": 500,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "variable map zoom longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "variable map zoom longest event",
+      "observed": 32,
+      "baseline": 150,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map labels and group regions wall time",
+      "observed": 174,
+      "baseline": 1000,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map labels and group regions longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map labels and group regions longest event",
+      "observed": 40,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map zoom out and fit wall time",
+      "observed": 141,
+      "baseline": 1000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map zoom out and fit longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map zoom out and fit longest event",
+      "observed": 32,
+      "baseline": 150,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map wheel zoom wall time",
+      "observed": 102,
+      "baseline": 1000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map wheel zoom longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map wheel zoom longest event",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map drag pan wall time",
+      "observed": 280,
+      "baseline": 1000,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map drag pan longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map drag pan longest event",
+      "observed": 40,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map fullscreen and Escape wall time",
+      "observed": 163,
+      "baseline": 1000,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map fullscreen and Escape longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map fullscreen and Escape longest event",
+      "observed": 64,
+      "baseline": 150,
+      "ratio": 0.4,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map mode selection wall time",
+      "observed": 148,
+      "baseline": 1000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map mode selection longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "map mode selection longest event",
+      "observed": 24,
+      "baseline": 150,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "history panel wall time",
+      "observed": 106,
+      "baseline": 1000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "history panel longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "history panel longest event",
+      "observed": 24,
+      "baseline": 150,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "close variable definition wall time",
+      "observed": 210,
+      "baseline": 750,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "close variable definition longest task",
+      "observed": 77,
+      "baseline": 150,
+      "ratio": 0.5,
+      "withinBaseline": true
+    },
+    {
+      "metric": "close variable definition longest event",
+      "observed": 96,
+      "baseline": 150,
+      "ratio": 0.6,
+      "withinBaseline": true
+    },
+    {
+      "metric": "incident links (40 variables) wall time",
+      "observed": 235,
+      "baseline": 1000,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "incident links (40 variables) longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "incident links (40 variables) longest event",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "group search wall time",
+      "observed": 407,
+      "baseline": 2000,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "group search longest task",
+      "observed": 95,
+      "baseline": 150,
+      "ratio": 0.6,
+      "withinBaseline": true
+    },
+    {
+      "metric": "group search longest event",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select IV wall time",
+      "observed": 165,
+      "baseline": 750,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select IV longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select IV longest event",
+      "observed": 56,
+      "baseline": 150,
+      "ratio": 0.4,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select DV wall time",
+      "observed": 138,
+      "baseline": 1000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select DV longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "select DV longest event",
+      "observed": 56,
+      "baseline": 150,
+      "ratio": 0.4,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG layout: auto wall time",
+      "observed": 39,
+      "baseline": 750,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG layout: auto longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG layout: auto longest event",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG zoom wall time",
+      "observed": 72,
+      "baseline": 500,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG zoom longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG zoom longest event",
+      "observed": 16,
+      "baseline": 150,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "unfiltered view wall time",
+      "observed": 125,
+      "baseline": 1000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "unfiltered view longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "unfiltered view longest event",
+      "observed": 48,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "exclude edge promptly wall time",
+      "observed": 473,
+      "baseline": 750,
+      "ratio": 0.6,
+      "withinBaseline": true
+    },
+    {
+      "metric": "exclude edge promptly longest task",
+      "observed": 111,
+      "baseline": 150,
+      "ratio": 0.7,
+      "withinBaseline": true
+    },
+    {
+      "metric": "exclude edge promptly longest event",
+      "observed": 144,
+      "baseline": 150,
+      "ratio": 1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "settle graph after exclusion wall time",
+      "observed": 54,
+      "baseline": 300,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "settle graph after exclusion longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "settle graph after exclusion longest event",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "restore edge wall time",
+      "observed": 236,
+      "baseline": 750,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "restore edge longest task",
+      "observed": 101,
+      "baseline": 150,
+      "ratio": 0.7,
+      "withinBaseline": true
+    },
+    {
+      "metric": "restore edge longest event",
+      "observed": 128,
+      "baseline": 150,
+      "ratio": 0.9,
+      "withinBaseline": true
+    },
+    {
+      "metric": "exclude edge wall time",
+      "observed": 323,
+      "baseline": 750,
+      "ratio": 0.4,
+      "withinBaseline": true
+    },
+    {
+      "metric": "exclude edge longest task",
+      "observed": 100,
+      "baseline": 150,
+      "ratio": 0.7,
+      "withinBaseline": true
+    },
+    {
+      "metric": "exclude edge longest event",
+      "observed": 128,
+      "baseline": 150,
+      "ratio": 0.9,
+      "withinBaseline": true
+    },
+    {
+      "metric": "restore excluded edge wall time",
+      "observed": 203,
+      "baseline": 750,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "restore excluded edge longest task",
+      "observed": 103,
+      "baseline": 150,
+      "ratio": 0.7,
+      "withinBaseline": true
+    },
+    {
+      "metric": "restore excluded edge longest event",
+      "observed": 128,
+      "baseline": 150,
+      "ratio": 0.9,
+      "withinBaseline": true
+    },
+    {
+      "metric": "close evidence wall time",
+      "observed": 143,
+      "baseline": 1000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "close evidence longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "close evidence longest event",
+      "observed": 56,
+      "baseline": 150,
+      "ratio": 0.4,
+      "withinBaseline": true
+    },
+    {
+      "metric": "undo edge decision wall time",
+      "observed": 182,
+      "baseline": 1000,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "undo edge decision longest task",
+      "observed": 58,
+      "baseline": 150,
+      "ratio": 0.4,
+      "withinBaseline": true
+    },
+    {
+      "metric": "undo edge decision longest event",
+      "observed": 88,
+      "baseline": 150,
+      "ratio": 0.6,
+      "withinBaseline": true
+    },
+    {
+      "metric": "redo edge decision wall time",
+      "observed": 172,
+      "baseline": 1000,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "redo edge decision longest task",
+      "observed": 57,
+      "baseline": 150,
+      "ratio": 0.4,
+      "withinBaseline": true
+    },
+    {
+      "metric": "redo edge decision longest event",
+      "observed": 88,
+      "baseline": 150,
+      "ratio": 0.6,
+      "withinBaseline": true
+    },
+    {
+      "metric": "confounders filter wall time",
+      "observed": 165,
+      "baseline": 4000,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "confounders filter longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "confounders filter longest event",
+      "observed": 72,
+      "baseline": 150,
+      "ratio": 0.5,
+      "withinBaseline": true
+    },
+    {
+      "metric": "colliders filter wall time",
+      "observed": 154,
+      "baseline": 4000,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "colliders filter longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "colliders filter longest event",
+      "observed": 48,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "bottleneck filter wall time",
+      "observed": 135,
+      "baseline": 4000,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "bottleneck filter longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "bottleneck filter longest event",
+      "observed": 48,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "path links filter wall time",
+      "observed": 168,
+      "baseline": 4000,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "path links filter longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "path links filter longest event",
+      "observed": 48,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "path length wall time",
+      "observed": 568,
+      "baseline": 4000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "path length longest task",
+      "observed": 104,
+      "baseline": 150,
+      "ratio": 0.7,
+      "withinBaseline": true
+    },
+    {
+      "metric": "path length longest event",
+      "observed": 48,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG zoom out and fit wall time",
+      "observed": 134,
+      "baseline": 1000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG zoom out and fit longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG zoom out and fit longest event",
+      "observed": 32,
+      "baseline": 150,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG fullscreen and Escape wall time",
+      "observed": 267,
+      "baseline": 1000,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG fullscreen and Escape longest task",
+      "observed": 149,
+      "baseline": 150,
+      "ratio": 1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "DAG fullscreen and Escape longest event",
+      "observed": 168,
+      "baseline": 150,
+      "ratio": 1.1,
+      "withinBaseline": false
+    },
+    {
+      "metric": "export drawer wall time",
+      "observed": 85,
+      "baseline": 1000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "export drawer longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "export drawer longest event",
+      "observed": 16,
+      "baseline": 150,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "project JSON download wall time",
+      "observed": 371,
+      "baseline": 4000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "project JSON download longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "project JSON download longest event",
+      "observed": 48,
+      "baseline": 150,
+      "ratio": 0.3,
+      "withinBaseline": true
+    },
+    {
+      "metric": "working map download wall time",
+      "observed": 166,
+      "baseline": 4000,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "working map download longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "working map download longest event",
+      "observed": 32,
+      "baseline": 150,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "grouping folder download wall time",
+      "observed": 102,
+      "baseline": 4000,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "grouping folder download longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "grouping folder download longest event",
+      "observed": 24,
+      "baseline": 150,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "change IV wall time",
+      "observed": 166,
+      "baseline": 1000,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "change IV longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "change IV longest event",
+      "observed": 24,
+      "baseline": 150,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "change DV wall time",
+      "observed": 168,
+      "baseline": 1000,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "change DV longest task",
+      "observed": 0,
+      "baseline": 150,
+      "ratio": 0,
+      "withinBaseline": true
+    },
+    {
+      "metric": "change DV longest event",
+      "observed": 16,
+      "baseline": 150,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "startup visible time",
+      "observed": 1785,
+      "baseline": 12000,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "startup graph layout",
+      "observed": 67.1,
+      "baseline": 600,
+      "ratio": 0.1,
+      "withinBaseline": true
+    },
+    {
+      "metric": "startup graph routing",
+      "observed": 311.4,
+      "baseline": 750,
+      "ratio": 0.4,
+      "withinBaseline": true
+    },
+    {
+      "metric": "schema ready time",
+      "observed": 3613,
+      "baseline": 8000,
+      "ratio": 0.5,
+      "withinBaseline": true
+    },
+    {
+      "metric": "membership wait",
+      "observed": 1828,
+      "baseline": 4000,
+      "ratio": 0.5,
+      "withinBaseline": true
+    },
+    {
+      "metric": "startup LCP",
+      "observed": 1780,
+      "baseline": 9000,
+      "ratio": 0.2,
+      "withinBaseline": true
+    },
+    {
+      "metric": "startup longest task",
+      "observed": 180,
+      "baseline": 250,
+      "ratio": 0.7,
+      "withinBaseline": true
+    },
+    {
+      "metric": "startup transfer",
+      "observed": 2,
+      "baseline": 2.5,
+      "ratio": 0.8,
+      "withinBaseline": true
+    },
+    {
+      "metric": "startup CLS",
+      "observed": 0.001,
+      "baseline": 0.05,
+      "ratio": 0,
+      "withinBaseline": true
+    }
+  ],
+  "finished": "2026-10-26T20:59:09.774Z"
+}

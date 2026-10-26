@@ -500,14 +500,23 @@ function applyDagRender(groups, layout, routes) {
 
     const changedNodes = nodeData.filter(node =>
       JSON.stringify(node) !== JSON.stringify(previousNodeData.get(node.id)));
-    if (changedNodes.length) _visNodes.update(changedNodes);
     const dropNodes = [...prevNodeIds].filter((id) => !nextNodeIds.has(id));
-    if (dropNodes.length) _visNodes.remove(dropNodes);
-
-    const nextEdgeIds = new Set(edgeData.map((e) => e.id));
-    _visEdges.update(edgeData);
-    const dropEdges = _visEdges.getIds().filter((id) => !nextEdgeIds.has(id));
-    if (dropEdges.length) _visEdges.remove(dropEdges);
+    if (nodeSetChanged && Math.max(prevNodeIds.size, nodeData.length) > 500
+      && changedNodes.length + dropNodes.length > Math.max(prevNodeIds.size, nodeData.length) / 2) {
+      // A large filter transition replaces most route bends. Bind the complete
+      // data once rather than repeatedly rebuilding adjacency as nodes and edges
+      // are updated and removed. Preserve the Network instance and its handlers.
+      _visNodes = new visApi.DataSet(nodeData);
+      _visEdges = new visApi.DataSet(edgeData);
+      _visNetwork.setData({ nodes: _visNodes, edges: _visEdges });
+    } else {
+      if (changedNodes.length) _visNodes.update(changedNodes);
+      if (dropNodes.length) _visNodes.remove(dropNodes);
+      const nextEdgeIds = new Set(edgeData.map((e) => e.id));
+      _visEdges.update(edgeData);
+      const dropEdges = _visEdges.getIds().filter((id) => !nextEdgeIds.has(id));
+      if (dropEdges.length) _visEdges.remove(dropEdges);
+    }
 
     const optionSignature = visOptionSignature(layout.params);
     if (optionSignature !== _visOptionSignature) {

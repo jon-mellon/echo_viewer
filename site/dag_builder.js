@@ -984,7 +984,7 @@ async function hydrateVariableDetails(variableIds, { skipNeighbors = false } = {
   const requested = [...new Set(variableIds || [])];
   const missing = requested.filter(id => !state.variableById.has(id));
   if (missing.length) {
-    const variablesPromise = dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource);
+    const variablesPromise = dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource, { mapOnly: skipNeighbors });
     const neighborsPromise = skipNeighbors ? null : dagDataSource.loadNeighbors(missing);
     const [variables, neighbors] = skipNeighbors
       ? [await variablesPromise, null]
@@ -1708,7 +1708,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   },
   onCommitFailureRestored: () => persistentViewer.clearSaveFailure(),
   prewarmEvidence: async () => {
-    await dagDataSource.ensureEvidenceConnection();
+    await dagDataSource.ensureEvidenceConnection({ variableIds: [], prewarmMapFiles: true });
     // DuckDB fetches the remote layout metadata when it creates this view.
     // Do that while the source picker is open instead of after Continue.
     await dagDataSource.ensureVariableLayouts();
