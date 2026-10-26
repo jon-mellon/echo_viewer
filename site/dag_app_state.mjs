@@ -7,7 +7,7 @@ export function createDagAppState(interfaceMode = "classic") {
     interfaceMode,
     data: null,
     variables: [], variableById: new Map(), clusterOf: new Map(), clusterMembers: new Map(),
-    rawLinks: [], rawLinksById: new Map(), linkLookup: new Map(), similarityEdgeMap: new Map(),
+    rawLinks: [], rawLinksById: new Map(), edgeSupportById: new Map(), linkLookup: new Map(), similarityEdgeMap: new Map(),
     compiledDag: null, compiledDagValid: false,
     compiledDagUpdatePromise: null,
     publishedSchemaHydrating: false, publishedSchemaHydrated: true, publishedSchemaLoadFailed: false,

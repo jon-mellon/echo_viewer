@@ -458,6 +458,11 @@ function rebuildProject(options) {
   renderCoordinator.rebuildProject(options);
 }
 
+function updateDagFilters() {
+  renderCoordinator.updateDagFilters();
+  persistentViewer.viewerChanged();
+}
+
 function rebuildLinkDecision() {
   renderCoordinator.rebuildLinkDecision();
 }
@@ -1215,21 +1220,24 @@ function computeVisibleLinks() {
   const missingSparseEvidence = state.excludeSparseEdges
     ? [...new Set((state.project?.links || []).flatMap(link =>
       [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))]
-      .filter(id => !state.rawLinksById.has(id)) : [];
+      .filter(id => !state.edgeSupportById.has(id) && !state.rawLinksById.has(id)) : [];
   if (missingSparseEvidence.length && !sparseEdgeEvidencePromise) {
-    sparseEdgeEvidencePromise = dagDataSource.loadRawLinksByIds(missingSparseEvidence).then(rows => {
+    const supportCache = state.edgeSupportById;
+    sparseEdgeEvidencePromise = dagDataSource.loadRawLinkSupportByIds(missingSparseEvidence).then(rows => {
+      if (state.edgeSupportById !== supportCache) return;
       const returned = new Set(rows.map(row => row.raw_causal_link_id));
       if (missingSparseEvidence.some(id => !returned.has(id))) {
         throw new Error("Some sparse edge evidence is unavailable in this snapshot");
       }
-      for (const row of rows) state.rawLinksById.set(row.raw_causal_link_id, row);
+      for (const row of rows) state.edgeSupportById.set(row.raw_causal_link_id, row);
     }).catch(error => {
-      state.excludeSparseEdges = false;
-      console.error("Could not load sparse edge evidence", error);
+      if (state.edgeSupportById === supportCache) {
+        state.excludeSparseEdges = false;
+        console.error("Could not load sparse edge evidence", error);
+      }
     }).finally(() => {
       sparseEdgeEvidencePromise = null;
-      computeVisibleLinks();
-      renderAll();
+      updateDagFilters();
     });
   }
   const instrumentId = state.project.instrument_group_id;
@@ -1258,6 +1266,7 @@ function computeVisibleLinks() {
     excludeBottlenecked: state.excludeBottleneckedConfounders,
     excludeSparseEdges: state.excludeSparseEdges && !missingSparseEvidence.length,
     minimumEdgePapers: state.minimumEdgePapers,
+    edgeSupportById: state.edgeSupportById,
     rawLinksById: state.rawLinksById,
     filterByCausalRelevance: false,
     showConfoundersOnly: state.showConfoundersOnly,
@@ -1819,6 +1828,7 @@ const exportController = createDagExportController({
       excludeBottlenecked: state.excludeBottleneckedConfounders,
       excludeSparseEdges: state.excludeSparseEdges,
       minimumEdgePapers: state.minimumEdgePapers,
+      edgeSupportById: state.edgeSupportById,
       rawLinksById: state.rawLinksById,
       showConfoundersOnly: state.showConfoundersOnly,
       showCollidersOnly: state.showCollidersOnly,
@@ -1934,7 +1944,7 @@ const eventController = createDagEventController({
   setWorkflowMode, renderGroupList, closeGroupEditor, discardGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
-  saveProjectLocally, applyActiveGroupingSet, rebuildProject, exportGroupingFolder,
+  saveProjectLocally, applyActiveGroupingSet, rebuildProject, updateDagFilters, exportGroupingFolder,
   copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
   canvasHeight, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber, setMapMode,
   undo, redo, renderActionHistory, renderDag, setFullscreenPanel,

@@ -299,3 +299,19 @@ test("render coordination preserves rebuild order, comparison precedence and fin
   coordinator.selectEdge({ redraw: false });
   assert.deepEqual(calls[0], ["refreshDagEdgeSelection", { redraw: false }]);
 });
+
+
+test("filter updates preserve project membership and reuse routed graph geometry", () => {
+  const calls = [];
+  const coordinator = createRenderCoordinator(new Proxy({}, {
+    get: (_, name) => (...args) => calls.push([name, ...args]),
+  }));
+  coordinator.updateDagFilters();
+  assert.equal(calls[0][0], "computeVisibleLinks");
+  assert.deepEqual(calls.find(call => call[0] === "renderDag"), ["renderDag", { reuseGeometry: true }]);
+  for (const method of ["aggregateGroupLinks", "buildCandidateQueue", "drawMap", "saveProjectLocally"]) {
+    assert.equal(calls.some(call => call[0] === method), false, `${method} is unnecessary for a view filter`);
+  }
+  assert.ok(calls.find(call => call[0] === "renderMapToolbarToggles"));
+  assert.ok(calls.find(call => call[0] === "renderGroupList"));
+});

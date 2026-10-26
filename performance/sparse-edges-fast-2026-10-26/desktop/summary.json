@@ -1,0 +1,356 @@
+{
+  "scenario": "sparse-edges",
+  "dataTransport": "Playwright proxy (localhost CORS)",
+  "cpuThrottle": 1,
+  "url": "http://127.0.0.1:8787/",
+  "runs": [
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "enable sparse filter (cold evidence, minimum 2)",
+          "ms": 1779.5,
+          "longestTaskMs": 197,
+          "totalLongTaskMs": 270,
+          "requestCount": 2,
+          "decodedBodyBytes": 772759,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 3 (warm evidence)",
+          "ms": 102.40000009536743,
+          "longestTaskMs": 63,
+          "totalLongTaskMs": 63,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1476,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 5 (warm evidence)",
+          "ms": 89.10000038146973,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1012,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 2 (warm evidence)",
+          "ms": 122.40000009536743,
+          "longestTaskMs": 71,
+          "totalLongTaskMs": 71,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "disable sparse filter",
+          "ms": 154.69999980926514,
+          "longestTaskMs": 72,
+          "totalLongTaskMs": 72,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 2818,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "enable sparse filter (warm evidence, minimum 2)",
+          "ms": 127.5,
+          "longestTaskMs": 51,
+          "totalLongTaskMs": 51,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "baselineEdges": 2818,
+      "checks": [
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        },
+        {
+          "minimum": 3,
+          "enabled": true,
+          "edges": 1476
+        },
+        {
+          "minimum": 5,
+          "enabled": true,
+          "edges": 1012
+        },
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        },
+        {
+          "minimum": 2,
+          "enabled": false,
+          "edges": 2818
+        },
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        }
+      ]
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "enable sparse filter (cold evidence, minimum 2)",
+          "ms": 1709.9000000953674,
+          "longestTaskMs": 183,
+          "totalLongTaskMs": 253,
+          "requestCount": 2,
+          "decodedBodyBytes": 772759,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 3 (warm evidence)",
+          "ms": 86.40000009536743,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1476,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 5 (warm evidence)",
+          "ms": 73.59999990463257,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1012,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 2 (warm evidence)",
+          "ms": 123.19999980926514,
+          "longestTaskMs": 72,
+          "totalLongTaskMs": 72,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "disable sparse filter",
+          "ms": 161.5,
+          "longestTaskMs": 71,
+          "totalLongTaskMs": 71,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 2818,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "enable sparse filter (warm evidence, minimum 2)",
+          "ms": 115.10000038146973,
+          "longestTaskMs": 50,
+          "totalLongTaskMs": 50,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "baselineEdges": 2818,
+      "checks": [
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        },
+        {
+          "minimum": 3,
+          "enabled": true,
+          "edges": 1476
+        },
+        {
+          "minimum": 5,
+          "enabled": true,
+          "edges": 1012
+        },
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        },
+        {
+          "minimum": 2,
+          "enabled": false,
+          "edges": 2818
+        },
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        }
+      ]
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "enable sparse filter (cold evidence, minimum 2)",
+          "ms": 1617.0999999046326,
+          "longestTaskMs": 179,
+          "totalLongTaskMs": 249,
+          "requestCount": 2,
+          "decodedBodyBytes": 772759,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 3 (warm evidence)",
+          "ms": 86.69999980926514,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1476,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 5 (warm evidence)",
+          "ms": 72,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1012,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 2 (warm evidence)",
+          "ms": 122.2999997138977,
+          "longestTaskMs": 74,
+          "totalLongTaskMs": 74,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "disable sparse filter",
+          "ms": 154.59999990463257,
+          "longestTaskMs": 69,
+          "totalLongTaskMs": 69,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 2818,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "enable sparse filter (warm evidence, minimum 2)",
+          "ms": 123.80000019073486,
+          "longestTaskMs": 50,
+          "totalLongTaskMs": 50,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "baselineEdges": 2818,
+      "checks": [
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        },
+        {
+          "minimum": 3,
+          "enabled": true,
+          "edges": 1476
+        },
+        {
+          "minimum": 5,
+          "enabled": true,
+          "edges": 1012
+        },
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        },
+        {
+          "minimum": 2,
+          "enabled": false,
+          "edges": 2818
+        },
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        }
+      ]
+    }
+  ]
+}

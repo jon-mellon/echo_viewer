@@ -199,6 +199,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     state.rawLinks = state.data.raw_causal_links || [];
     state.compiledDag = state.data.compiled_dag || null;
     state.compiledDagValid = Boolean(state.compiledDag);
+    state.edgeSupportById = new Map();
     state.rawLinksById = new Map(state.rawLinks.map((l) => [l.raw_causal_link_id, l]));
     state.linkLookup = new Map();
     for (const link of state.rawLinks) {

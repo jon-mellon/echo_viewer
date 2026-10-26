@@ -27,6 +27,7 @@ export function deriveDagView({
   excludeSparseEdges = false,
   minimumEdgePapers = 2,
   rawLinksById = new Map(),
+  edgeSupportById = rawLinksById,
   filterByCausalRelevance = false,
   showConfoundersOnly = false,
   showCollidersOnly = false,
@@ -38,7 +39,7 @@ export function deriveDagView({
   const retainedLinks = excludeSparseEdges ? links.filter(link => {
     const ids = [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])];
     const papers = new Set(ids.flatMap(id => {
-      const evidence = rawLinksById.get(id);
+      const evidence = edgeSupportById.get(id) || rawLinksById.get(id);
       return evidence?.paper_id && isPresentLink(evidence) ? [evidence.paper_id] : [];
     }));
     return papers.size >= minimumEdgePapers;

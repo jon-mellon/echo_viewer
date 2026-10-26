@@ -92,7 +92,8 @@ try {
           // Resource sizes may be zero across origins without Timing-Allow-Origin.
           decodedBodyBytes: resources.reduce((sum, r) => sum + r.decodedBodySize, 0),
           visibleEdges: window.__dagBuilderState.visibleLinks.length,
-          loadedEvidence: window.__dagBuilderState.rawLinksById.size };
+          loadedEvidence: window.__dagBuilderState.rawLinksById.size,
+          supportRecords: window.__dagBuilderState.edgeSupportById?.size || 0 };
       }, { start, name });
       result.timings.push({ ...timing, status: failure ? 'failed' : 'passed' });
       if (failure) throw failure;
@@ -110,18 +111,27 @@ try {
         if (window.__sparseProfileFailure) throw new Error(window.__sparseProfileFailure);
         const s = window.__dagBuilderState;
         return !s.compiledDagUpdating && (!s.excludeSparseEdges || s.project.links.every(link =>
-          [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])].every(id => s.rawLinksById.has(id))));
+          [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])].every(id => s.edgeSupportById?.has(id) || s.rawLinksById.has(id))));
       }, null, { timeout: 180000 });
       await page.evaluate(async src => (await import(src)).whenDagRendered(), apiUrl);
     }
     async function verify(minimum) {
+      if (process.env.PROFILE_VERIFY_RAW === '1') await page.evaluate(async () => {
+        if (window.__profileRawSupport) return;
+        const s = window.__dagBuilderState;
+        const ids = [...new Set(s.project.links.flatMap(link =>
+          [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))];
+        const { dagDataSource } = await import('/dag_data_source.mjs?v=browser-v2');
+        window.__profileRawSupport = new Map((await dagDataSource.loadRawLinksByIds(ids))
+          .map(row => [row.raw_causal_link_id, row]));
+      });
       return page.evaluate(async ({ minimum, apiUrl }) => {
         const s = window.__dagBuilderState;
         const expected = s.project.links.filter(link => {
           if (link.display_status === 'excluded' && !link.is_target_relation) return false;
           if (!s.excludeSparseEdges) return true;
           const papers = new Set([...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])].flatMap(id => {
-            const raw = s.rawLinksById.get(id);
+            const raw = (window.__profileRawSupport || s.edgeSupportById || s.rawLinksById).get(id) || s.rawLinksById.get(id);
             const claim = String(raw?.causal_link_existence || '').trim().toLowerCase();
             return raw?.paper_id && (!claim || claim === 'present') ? [raw.paper_id] : [];
           }));
@@ -131,6 +141,10 @@ try {
         if (JSON.stringify(expected) !== JSON.stringify(actual)) throw new Error('Sparse filter evidence mismatch');
         const rendered = new Set((await import(apiUrl)).renderedDagEdgeIds());
         if (actual.some(id => !rendered.has(id))) throw new Error('Filtered edges missing from rendered map');
+        const evidenceIds = new Set(s.project.links.map(link => link.edge_id));
+        if ([...rendered].some(id => evidenceIds.has(id) && !actual.includes(id))) {
+          throw new Error('Excluded sparse edges remain rendered');
+        }
         return { minimum, enabled: s.excludeSparseEdges, edges: actual.length };
       }, { minimum, apiUrl });
     }
@@ -172,16 +186,16 @@ try {
           const { dagDataSource } = await import('/dag_data_source.mjs?v=browser-v2');
           const s = window.__dagBuilderState;
           const id = s.project.links.flatMap(link => link.a_to_b_raw_link_ids || [])[0];
-          const row = s.rawLinksById.get(id);
-          s.rawLinksById.delete(id);
-          const original = dagDataSource.loadRawLinksByIds;
-          dagDataSource.loadRawLinksByIds = () => new Promise((resolve, reject) => {
+          const row = s.edgeSupportById.get(id);
+          s.edgeSupportById.delete(id);
+          const original = dagDataSource.loadRawLinkSupportByIds;
+          dagDataSource.loadRawLinkSupportByIds = () => new Promise((resolve, reject) => {
             window.__finishSparseTest = mode => mode === 'reject'
               ? reject(new Error('Injected sparse evidence failure')) : resolve([]);
           });
           window.__restoreSparseTest = () => {
-            dagDataSource.loadRawLinksByIds = original;
-            s.rawLinksById.set(id, row);
+            dagDataSource.loadRawLinkSupportByIds = original;
+            s.edgeSupportById.set(id, row);
           };
         });
         await page.locator('#toggleSparseEdges').click();
@@ -202,6 +216,20 @@ try {
         (result.failureRecoveryChecks ||= []).push({ mode, pendingEdges, recoveredEdges });
       }
       expectedEvidenceFailure = false;
+    }
+    if (process.env.PROFILE_VERIFY_RAW === '1') {
+      const evidenceIds = await page.evaluate(async apiUrl => {
+        const s = window.__dagBuilderState;
+        const edge = [...s.visibleLinks].filter(link => !link.is_target_relation)
+          .sort((a, b) => (a.a_to_b_raw_link_ids.length + a.b_to_a_raw_link_ids.length)
+            - (b.a_to_b_raw_link_ids.length + b.b_to_a_raw_link_ids.length))[0];
+        (await import(apiUrl)).inspectDagEdge(edge.edge_id);
+        return [...edge.a_to_b_raw_link_ids, ...edge.b_to_a_raw_link_ids];
+      }, apiUrl);
+      await page.waitForFunction(ids => !window.__dagBuilderState.pendingEdgeEvidence && ids.every(id =>
+        window.__dagBuilderState.rawLinksById.get(id)?.source_variable_id), evidenceIds);
+      result.fullEvidenceVerified = true;
+      result.inspectorDetailRecords = evidenceIds.length;
     }
     if (errors.length) throw new Error(`Browser errors: ${errors.join('; ')}`);
     const { profile } = await cdp.send('Profiler.stop');

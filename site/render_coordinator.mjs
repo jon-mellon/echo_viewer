@@ -30,6 +30,15 @@ export function createRenderCoordinator(view) {
     view.renderUndoRedo();
     view.saveProjectLocally();
   }
+  function updateDagFilters() {
+    view.computeVisibleLinks();
+    view.renderConfounderStatuses?.();
+    view.renderGroupList();
+    view.renderMapToolbarToggles();
+    view.renderDag({ reuseGeometry: true });
+    view.renderSelectedEdge();
+    view.renderExportStatus();
+  }
   function renderAll({ rebuild = true, reuseDagGeometry = false } = {}) {
     view.renderModeUI();
     view.renderAnchorBar();
@@ -52,5 +61,5 @@ export function createRenderCoordinator(view) {
     view.refreshDagEdgeSelection({ redraw });
     view.renderSelectedEdge();
   }
-  return { renderAll, rebuildProject, rebuildLinkDecision, selectEdge };
+  return { renderAll, rebuildProject, rebuildLinkDecision, updateDagFilters, selectEdge };
 }

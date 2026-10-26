@@ -212,6 +212,24 @@ export class ParquetManifestDagDataSource {
     return rows;
   }
 
+  async loadRawLinkSupportByIds(rawLinkIds) {
+    if (!rawLinkIds?.length) return [];
+    await this.ensureEvidenceConnection();
+    const canonicalUrl = this.canonicalEvidenceRelationUrl("causal_link_occurrences");
+    if (!canonicalUrl) await this.ensureBrowserRelation("causal_link_occurrences");
+    const relation = canonicalUrl
+      ? `read_parquet('${canonicalUrl.replaceAll("'", "''")}')`
+      : "causal_link_occurrences";
+    // One scan of three columns avoids repeatedly scanning full evidence rows
+    // for a map-wide filter. Keep these partial records out of the detail cache.
+    const requested = new Set(rawLinkIds);
+    const columns = await queryRows(this.connection, `DESCRIBE SELECT * FROM ${relation}`);
+    const claim = columns.some(column => column.column_name === "causal_link_existence")
+      ? "causal_link_existence" : "NULL::VARCHAR AS causal_link_existence";
+    return (await queryRows(this.connection, `SELECT raw_causal_link_id, paper_id,
+      ${claim} FROM ${relation}`)).filter(row => requested.has(row.raw_causal_link_id));
+  }
+
   async loadRawLinkEndpointsByIds(rawLinkIds) {
     if (!rawLinkIds?.length) return [];
     await this.ensureEvidenceConnection();
