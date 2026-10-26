@@ -74,6 +74,22 @@ test("excluding and restoring individual findings changes counts and can remove 
   assert.deepEqual(counts(restored), counts(original));
 });
 
+test("finding-only updates preserve unaffected edges and target relation", () => {
+  const project = { iv_group_id: "a", dv_group_id: "c" };
+  const findings = [link("ab", "v1", "v3"), link("bc", "v3", "v4")];
+  const groups = [group("a", ["v1"]), group("b", ["v3"]), group("c", ["v4"]),
+    group("unrelated", ["v5"])];
+  const originalSchema = { groups, finding_decisions: {} };
+  const excludedSchema = { groups, finding_decisions: { ab: { display_status: "excluded" } } };
+  const original = fullCompileDag({ schema: originalSchema, project, rawLinks: findings });
+  const excluded = incrementCompiledDag({ compiledDag: original, oldSchema: originalSchema,
+    newSchema: excludedSchema, incidentRawLinks: [findings[0]], project });
+  assert.ok(dagEquals(excluded, fullCompileDag({ schema: excludedSchema, project, rawLinks: findings })));
+  const restored = incrementCompiledDag({ compiledDag: excluded, oldSchema: excludedSchema,
+    newSchema: originalSchema, incidentRawLinks: [findings[0]], project });
+  assert.ok(dagEquals(restored, original));
+});
+
 test("excluded findings remain reviewable in an edge evidence pane", () => {
   const findings = [link("one", "v1", "v3"), link("two", "v1", "v3")];
   const schemaWithExclusion = { groups: [group("a", ["v1"]), group("b", ["v3"])],

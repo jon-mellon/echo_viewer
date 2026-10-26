@@ -801,6 +801,9 @@ function applyProjectOperation(next) {
     return false;
   }
   const oldProject = state.project;
+  const findingOnly = oldProject && next.groups === oldProject.groups
+    && Object.keys(next).length === Object.keys(oldProject).length
+    && Object.keys(next).every(key => key === "finding_decisions" || next[key] === oldProject[key]);
   if (projectOps.isAnchorOnlyChange(oldProject, next)) {
     // Compiled evidence nodes/edges do not contain anchor roles. Candidates and
     // anchor-dependent visibility are refreshed by the following render pass.
@@ -816,13 +819,15 @@ function applyProjectOperation(next) {
     decisions: project?.link_decisions || {},
     findings: project?.finding_decisions || {},
   });
-  const schemaChanged = oldProject && structural(oldProject) !== structural(next);
+  const schemaChanged = findingOnly || (oldProject && structural(oldProject) !== structural(next));
   const asSchema = project => ({ finding_decisions: project?.finding_decisions || {},
     groups: (project?.groups || []).map(group => ({
     group_id: group.group_id, label: group.label || "", variable_ids: [...(group.variable_ids || [])],
     ...(Number.isFinite(group.similarity_coherence) ? { similarity_coherence: group.similarity_coherence } : {}),
   })) });
-  const oldSchema = asSchema(oldProject);
+  const oldSchema = findingOnly
+    ? { groups: oldProject.groups, finding_decisions: oldProject.finding_decisions || {} }
+    : asSchema(oldProject);
   projectController.applyOperation(next);
   if (schemaChanged || anchorChanged) publicationController?.workingCopyChanged?.();
   if (schemaChanged && !state.activeGroupId && !state.definitionDraft && !schemaBatchDepth
@@ -836,11 +841,16 @@ function applyProjectOperation(next) {
     });
   }
   if (state.compiledDagValid && state.compiledDag && oldProject) {
-    const newSchema = asSchema(next);
+    const newSchema = findingOnly
+      ? { groups: oldSchema.groups, finding_decisions: next.finding_decisions || {} }
+      : asSchema(next);
     const owner = schema => new Map(schema.groups.flatMap(group => group.variable_ids.map(id => [id, group.group_id])));
-    const before = owner(oldSchema), after = owner(newSchema);
-    const changedIds = [...new Set([...before.keys(), ...after.keys()])]
-      .filter(id => before.get(id) !== after.get(id));
+    const changedIds = (() => {
+      if (findingOnly) return [];
+      const before = owner(oldSchema), after = owner(newSchema);
+      return [...new Set([...before.keys(), ...after.keys()])]
+        .filter(id => before.get(id) !== after.get(id));
+    })();
     const changedRawIds = [...new Set([...Object.keys(oldSchema.finding_decisions),
       ...Object.keys(newSchema.finding_decisions)])].filter(id =>
       (oldSchema.finding_decisions[id]?.display_status === "excluded")
@@ -1376,6 +1386,8 @@ function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 let pendingEdgeEvidencePromise = null;
 
 function renderSelectedEdgePanels() {
+  if (!state.selectedEdgeId && !state.selectedEvidenceGroupId && !els.edgeInspector.hidden
+    && els.edgeInspector.classList.contains("excluded-links-list")) return;
   inspectorController.renderEdge();
   inspectorController.renderProvenance();
 }
@@ -1399,6 +1411,8 @@ function excludeGroupConcept(groupId, variableId, label) {
 }
 
 function renderSelectedEdge() {
+  if (!state.selectedEdgeId && !state.selectedEvidenceGroupId && !els.edgeInspector.hidden
+    && els.edgeInspector.classList.contains("excluded-links-list")) return;
   if (!state.selectedEdgeId && state.selectedEvidenceGroupId && inspectorController.renderGroupDefinition()) return;
   const selected = (state.project?.links || []).find(edge => edge.edge_id === state.selectedEdgeId);
   const owners = new Map((state.project?.groups || []).flatMap(group =>

@@ -36,3 +36,9 @@ PROFILE_SCENARIO=final-support PROFILE_RUNS=1 node scripts/profile_finding_exclu
 Selects a rendered, non-target edge with exactly one present supporting finding across both directions, then excludes that specific finding through the UI. Requires the compiled DAG to finish updating, remain valid, and omit the edge; separately requires the rendered edge to disappear. It does not substitute inspector feedback for edge removal. Output defaults to `/private/tmp/echo-finding-final-support`. The scenario then restores the finding from the Excluded findings list and verifies that the edge returns to the compiled and rendered graphs.
 
 **Validation: passed.** Three Chromium runs against the new 97,818-member schema excluded finding `r8e4930302d2b7964bdeeacb0` from `category-academic-achievement__category-aesthetic-evaluation`. Each run verified that the compiled graph was valid, the edge was absent from it, and the rendered edge disappeared; restoring the finding brought the edge back to both graphs. Median time from confirmation to edge removal plus two animation frames: 226.6 ms; median restoration time: 214.3 ms. The 37 focused compiled-DAG, controller, and coordination tests and the type check also pass.
+
+## Optimized final-support result
+
+Three runs on the same 97,818-member snapshot verified removal and restoration in both compiled and rendered graphs. Median removal improved from 226.6 to 191.5 ms and restoration from 214.3 to 148.2 ms; the longest removal task fell from 152 to 113 ms. CPU sampling showed repeated membership indexing, so finding-only updates reuse unchanged group ownership and compile incident links using only the affected endpoint groups. A separate ordinary-finding run verified exclusion and restoration through the Excluded findings list.
+
+These are small local samples, with no network throttling; they are directional measurements, not a general performance guarantee.
