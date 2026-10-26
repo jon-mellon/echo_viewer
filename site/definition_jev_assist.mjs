@@ -5,6 +5,7 @@ export { cappedKeyStatus, randomSampleIds } from "./definition_jev_core.mjs";
 
 const OAUTH_PENDING_KEY = "echo-openrouter-pkce-v1";
 const OAUTH_DRAFT_KEY = "echo-openrouter-definition-draft-v1";
+const OAUTH_RETURN_URL_KEY = "echo-openrouter-return-url-v1";
 const REVIEW_PAGE_SIZE = 40;
 const SPOT_CHECK_PER_GROUP = 12;
 
@@ -413,6 +414,10 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     const callback = new URL(location.href);
     callback.searchParams.delete("code");
     callback.searchParams.delete("state");
+    // Keep the exact viewer URL locally as a fallback. OpenRouter normally
+    // echoes callback_url, but a provider redirect must not be able to drop
+    // the immutable dataset binding from the viewer permalink.
+    sessionStorage.setItem(OAUTH_RETURN_URL_KEY, callback.href);
     url.searchParams.set("callback_url", callback.href);
     url.searchParams.set("code_challenge", challenge);
     url.searchParams.set("code_challenge_method", "S256");
@@ -428,7 +433,20 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     const returnedState = url.searchParams.get("state");
     url.searchParams.delete("code");
     url.searchParams.delete("state");
-    history.replaceState(history.state, "", url.href);
+    const savedReturnUrl = sessionStorage.getItem(OAUTH_RETURN_URL_KEY);
+    sessionStorage.removeItem(OAUTH_RETURN_URL_KEY);
+    let returnUrl = url.href;
+    if (savedReturnUrl) {
+      try {
+        const candidate = new URL(savedReturnUrl);
+        // Only restore a same-origin viewer URL captured by this tab. This
+        // keeps the fallback from becoming an open redirect.
+        if (candidate.origin === location.origin && candidate.pathname === location.pathname) {
+          returnUrl = candidate.href;
+        }
+      } catch { /* Ignore a malformed saved URL and use the callback URL. */ }
+    }
+    history.replaceState(history.state, "", returnUrl);
     const pending = JSON.parse(sessionStorage.getItem(OAUTH_PENDING_KEY) || "null");
     sessionStorage.removeItem(OAUTH_PENDING_KEY);
     if (!pending || pending.state !== returnedState) {
