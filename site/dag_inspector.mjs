@@ -92,6 +92,15 @@ export function provenanceVariable(variableId, variables, labelsByVariable) {
   };
 }
 
+/** One page of evidence rows, with the requested page clamped to those available. */
+export function provenancePage(rows, page, pageSize) {
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const current = Math.min(Math.max(0, page), pageCount - 1);
+  const start = current * pageSize;
+  return { page: current, pageCount, start, end: Math.min(start + pageSize, rows.length),
+    rows: rows.slice(start, start + pageSize), total: rows.length };
+}
+
 export function provenanceModel(link, project, rawLinksById, variables, diagnosticView = {}) {
   const edge = edgeInspector(link, project, diagnosticView);
   if (!edge) return null;

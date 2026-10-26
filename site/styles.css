@@ -1795,7 +1795,8 @@ h2 {
   cursor: default;
 }
 
-.group-concept-pagination {
+.group-concept-pagination,
+.provenance-pagination {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2128,6 +2129,11 @@ h2 {
   margin: 0 0 8px;
   color: var(--ink);
   font-size: 14px;
+}
+
+.provenance-direction h3 .provenance-count {
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .excluded-links-list {

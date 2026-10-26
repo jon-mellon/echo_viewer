@@ -29,6 +29,10 @@ export function createDagInspectorController({
   let conceptViewKey = null;
   let conceptPage = 0;
   const conceptPageSize = 10;
+  const provenancePageSize = 5;
+  // Evidence pages per direction, reset whenever a different edge is selected.
+  let provenancePagesEdgeId = null;
+  const provenancePages = new Map();
   const clearPendingExclude = () => { pendingExclude = null; };
   const diagnosticView = () => ({
     showConfoundersOnly: state.showConfoundersOnly,
@@ -394,13 +398,34 @@ export function createDagInspectorController({
         reason, detail, confirm, cancel))];
     };
     const headings = ["Paper", "Source concept", "Target concept", "Claim", "Strategy", "Population", "Decision"];
-    replaceChildren(elements.provenancePanel,
-      model.sections.map(section => h("section", { className: "provenance-direction" },
-        h("h3", { textContent: `Evidence for ${section.sourceLabel} → ${section.targetLabel}` }),
+    if (provenancePagesEdgeId !== link.edge_id) {
+      provenancePagesEdgeId = link.edge_id;
+      provenancePages.clear();
+    }
+    const renderSection = section => {
+      const page = inspector.provenancePage(section.rows, provenancePages.get(section.direction) || 0, provenancePageSize);
+      provenancePages.set(section.direction, page.page);
+      const goTo = next => {
+        provenancePages.set(section.direction, next);
+        pendingFindingId = null;
+        renderProvenance();
+      };
+      const records = `${section.rows.length} record${section.rows.length === 1 ? "" : "s"}`;
+      return h("section", { className: "provenance-direction" },
+        h("h3", {}, `Evidence for ${section.sourceLabel} → ${section.targetLabel} `,
+          h("span", { className: "provenance-count", textContent: `(${records})` })),
         h("table", { className: "provenance-table provenance-table--edge" },
           h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))),
-          h("tbody", {}, section.rows.length ? section.rows.map(renderRow)
-            : h("tr", {}, h("td", { colSpan: headings.length, textContent: "No evidence records for this direction." })))))));
+          h("tbody", {}, page.rows.length ? page.rows.map(renderRow)
+            : h("tr", {}, h("td", { colSpan: headings.length, textContent: "No evidence records for this direction." })))),
+        page.pageCount > 1 ? h("div", { className: "provenance-pagination" },
+          h("button", { className: "toolbar-button", type: "button", disabled: page.page === 0,
+            textContent: "Previous", onclick: () => goTo(page.page - 1) }),
+          h("span", { textContent: `${page.start + 1}–${page.end} of ${page.total}` }),
+          h("button", { className: "toolbar-button", type: "button", disabled: page.page >= page.pageCount - 1,
+            textContent: "Next", onclick: () => goTo(page.page + 1) })) : null);
+    };
+    replaceChildren(elements.provenancePanel, model.sections.map(renderSection));
   }
 
   return { renderEdge, renderProvenance, renderGroupDefinition, selectedEdge, clearPendingExclude };

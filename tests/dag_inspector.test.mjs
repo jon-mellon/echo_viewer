@@ -46,6 +46,16 @@ test("provenance classifications follow schema order across overlapping groups",
   assert.deepEqual(inspector.provenanceVariable("z", new Map(), labels), { concept: "z", classifications: [] });
 });
 
+test("evidence rows page five at a time and clamp out-of-range pages", () => {
+  const rows = Array.from({ length: 12 }, (_, index) => index);
+  assert.deepEqual(inspector.provenancePage(rows, 0, 5),
+    { page: 0, pageCount: 3, start: 0, end: 5, rows: [0, 1, 2, 3, 4], total: 12 });
+  assert.deepEqual(inspector.provenancePage(rows, 2, 5).rows, [10, 11]);
+  assert.equal(inspector.provenancePage(rows, 9, 5).page, 2);
+  assert.equal(inspector.provenancePage(rows, -1, 5).page, 0);
+  assert.deepEqual(inspector.provenancePage([], 3, 5), { page: 0, pageCount: 1, start: 0, end: 0, rows: [], total: 0 });
+});
+
 test("absent evidence preserves empty provenance and comparison directions", () => {
   const project = { groups: [], link_decisions: {} };
   const link = { edge_id: "e", group_a: "a", group_b: "b", direction_type: "BIDIRECTIONAL",
