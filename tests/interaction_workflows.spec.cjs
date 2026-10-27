@@ -314,6 +314,17 @@ test("Map tab returns from mobile evidence to the DAG", async ({ page }) => {
   await expect(page.locator("#closeEvidencePane")).toBeVisible();
   await expect(page.locator(".dag-network-wrapper")).toBeHidden();
 
+  const closeBox = await page.locator("#closeEvidencePane").boundingBox();
+  expect(closeBox.x).toBeGreaterThanOrEqual(0);
+  expect(closeBox.x + closeBox.width).toBeLessThanOrEqual(390);
+  await page.locator("#closeEvidencePane").click();
+  await expect(page.locator(".dag-network-wrapper")).toBeVisible();
+  await page.evaluate(async () => {
+    const { renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
+    inspectDagEdge(renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__"));
+  });
+  await expect(page.locator("#closeEvidencePane")).toBeVisible();
+
   await page.locator('button[data-mobile-panel="dag"]').click();
   await expect(page.locator("#closeEvidencePane")).toBeHidden();
   await expect(page.locator(".dag-network-wrapper")).toBeVisible();
