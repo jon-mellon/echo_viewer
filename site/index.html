@@ -76,6 +76,8 @@
           <div class="mini-toolbar dag2-history-controls">
             <button id="dag2UndoBtn" class="toolbar-button" type="button" disabled>↩ Undo</button>
             <button id="dag2RedoBtn" class="toolbar-button" type="button" disabled>Redo ↪</button>
+            <span id="dag2HistoryStatus" class="history-status" aria-live="polite"></span>
+            <span class="history-help">Undo and redo cover project edits and exclude/restore decisions, not display filters.</span>
           </div>
         </div>
 
@@ -340,6 +342,8 @@
           <button id="undoBtn" class="toolbar-button" type="button" title="Undo last action" disabled>↩ Undo</button>
           <button id="redoBtn" class="toolbar-button" type="button" title="Redo" disabled>Redo ↪</button>
           <button id="historyToggle" class="toolbar-button" type="button" title="Toggle action history">History</button>
+          <span id="historyStatus" class="history-status" aria-live="polite"></span>
+          <span class="history-help">Undo and redo cover project edits and exclude/restore decisions, not display filters.</span>
           <div class="toolbar-sep"></div>
           <button id="fullscreenVariableMap" class="toolbar-button fullscreen-toggle" type="button" aria-pressed="false" title="Expand the variable viewer to fill the window; press Escape to exit">Full screen map</button>
         </div>

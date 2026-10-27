@@ -135,7 +135,7 @@ function initElements() {
     "definitionManualReview", "definitionValidation", "definitionReviewBack", "definitionSave",
     "workflowHint", "dagStatusBadge",
     "variablePanel", "variableDefineNew", "variablePanelDisclosure", "variablePanelCount", "variablePanelList", "variablePanelPagination",
-    "anchorBar", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn",
+    "anchorBar", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn", "dag2HistoryStatus", "historyStatus",
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",
     // Grouping schema
@@ -388,11 +388,21 @@ function renderUndoRedo() {
   els.undoBtn.title = last ? `Undo: ${last}` : "Nothing to undo";
   els.redoBtn.title = state.undoPointer < state.undoHistory.length - 1
     ? `Redo: ${state.undoHistory[state.undoPointer + 1]?.description}` : "Nothing to redo";
+  const next = state.undoPointer < state.undoHistory.length - 1
+    ? state.undoHistory[state.undoPointer + 1]?.description : null;
+  const status = [last && `Undo: ${last}`, next && `Redo: ${next}`].filter(Boolean).join(" · ") || "No edits to undo or redo";
+  for (const element of [els.historyStatus, els.dag2HistoryStatus]) {
+    if (element) element.textContent = status;
+  }
+  els.undoBtn.setAttribute("aria-label", els.undoBtn.title);
+  els.redoBtn.setAttribute("aria-label", els.redoBtn.title);
   if (els.dag2UndoBtn) {
     els.dag2UndoBtn.disabled = els.undoBtn.disabled;
     els.dag2UndoBtn.title = els.undoBtn.title;
     els.dag2RedoBtn.disabled = els.redoBtn.disabled;
     els.dag2RedoBtn.title = els.redoBtn.title;
+    els.dag2UndoBtn.setAttribute("aria-label", els.undoBtn.title);
+    els.dag2RedoBtn.setAttribute("aria-label", els.redoBtn.title);
   }
 }
 
