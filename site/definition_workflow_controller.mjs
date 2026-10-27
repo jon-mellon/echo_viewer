@@ -175,7 +175,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   async function continueDefinition() {
     const draft = state.definitionDraft;
     const sources = definitionSources();
-    if (!draft || !state.definitionMethod || !sources.length) return;
+    if (!draft || draft.details_loading || !state.definitionMethod || !sources.length) return;
     lastBatch = null;
     const revision = ++hydrationRevision;
     draft.source_snapshot = sources.map(group => ({ group_id: group.group_id, label: group.label,
@@ -186,7 +186,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.reviewed_variable_ids = [];
     draft.residual_labels = Object.fromEntries(sources.map(group =>
       [group.group_id, `Other: ${group.label || group.group_id}`]));
-    draft.step = "partition";
+    draft.details_loading = true;
     state.selectedVariableIds.clear();
     presenter.setContinueLoading();
     try {
@@ -194,13 +194,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         || hydrateVariableDetails(source.variable_ids)));
     } catch (error) {
       if (revision === hydrationRevision && state.definitionDraft === draft) {
-        draft.step = "sources";
+        draft.details_loading = false;
         renderDefinition();
         presenter.showLoadError(error);
       }
       return;
     }
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
+    draft.details_loading = false;
+    draft.step = "partition";
     invalidateMapCaches();
     setMapMode("select");
     renderDraft();

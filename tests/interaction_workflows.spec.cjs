@@ -361,6 +361,29 @@ test("pinching the mobile variable map zooms the map without selecting a variabl
   expect(await page.evaluate(() => window.__dagBuilderState.selectedVariableIds.size)).toBe(0);
 });
 
+test("mobile definition waits for variable data before opening the map", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto(viewer);
+  await ready(page);
+  await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    const load = dagDataSource.loadVariableMetadata.bind(dagDataSource);
+    const gate = new Promise(resolve => { window.__releaseVariableLoad = resolve; });
+    dagDataSource.loadVariableMetadata = async (...args) => { await gate; return load(...args); };
+  });
+  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await page.locator("#definitionChooseManual").click();
+  await page.locator('#definitionSourceList input[data-source-id]').first().check();
+  await page.locator("#definitionContinue").click();
+  await expect(page.locator("#definitionContinue")).toHaveText("Loading selected variables…");
+  await expect(page.locator('button[data-mobile-panel="variables"]')).toBeHidden();
+  await page.evaluate(() => window.__releaseVariableLoad());
+  await expect(page.locator('button[data-mobile-panel="variables"]')).toBeVisible();
+  await page.locator('button[data-mobile-panel="variables"]').click();
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variables.length)).toBeGreaterThan(0);
+});
+
 test("project export can be imported with its anchors intact", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);
