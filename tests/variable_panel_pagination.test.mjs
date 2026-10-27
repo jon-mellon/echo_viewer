@@ -44,6 +44,7 @@ test("Variables panel shows ten per page and remembers expanded definitions", as
     const controller = createDagSetupGroupController({ state, elements,
       groupById: id => state.project.groups.find(group => group.group_id === id) });
 
+    state.componentGroupIds ||= new Set(state.project.groups.map(group => group.group_id));
     controller.renderVariablePanel();
     assert.equal(elements.variablePanelCount.textContent, "23");
     assert.equal(elements.variablePanelList.findAll("details").length, 10);
@@ -68,6 +69,14 @@ test("Variables panel shows ten per page and remembers expanded definitions", as
     controller.renderVariablePanel();
     assert.equal(elements.variablePanelList.findAll("details").length, 2);
     assert.equal(elements.variablePanelPagination.hidden, true);
+    state.componentGroupIds = new Set(["g1"]);
+    controller.renderVariablePanel();
+    assert.equal(elements.variablePanelCount.textContent, "1");
+    assert.match(elements.variablePanelList.textContent, /Variable 01/);
+    assert.doesNotMatch(elements.variablePanelList.textContent, /Variable 02/);
+    state.componentGroupIds.add("g2");
+    controller.renderVariablePanel();
+    assert.equal(elements.variablePanelCount.textContent, "2");
     await new Promise(resolve => setImmediate(resolve));
   } finally {
     globalThis.document = previousDocument;
@@ -100,6 +109,7 @@ test("expanded Variables row loads concepts in pages and keeps the definition vi
       excludeConcept: (...args) => exclusions.push(args),
     });
 
+    state.componentGroupIds = new Set(groups.map(group => group.group_id));
     controller.renderVariablePanel();
     const row = elements.variablePanelList.findAll("details")[1];
     assert.match(row.textContent, /Existing definition/);
@@ -143,6 +153,7 @@ test("Variables list opens the shared split editor for editable groups", () => {
       startEditSplit: id => opened.push(id),
     });
 
+    state.componentGroupIds = new Set(groups.map(group => group.group_id));
     controller.renderVariablePanel();
     const rows = elements.variablePanelList.findAll("details");
     assert.equal(rows[0].findAll("button").length, 0);

@@ -314,4 +314,5 @@ test("filter updates preserve project membership and reuse routed graph geometry
   }
   assert.ok(calls.find(call => call[0] === "renderMapToolbarToggles"));
   assert.ok(calls.find(call => call[0] === "renderGroupList"));
+  assert.ok(calls.findIndex(call => call[0] === "renderVariablePanel") > 0);
 });
