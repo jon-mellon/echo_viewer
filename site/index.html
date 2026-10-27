@@ -410,6 +410,9 @@
           <div class="dag-ws-header section-title">
             <h2>Causal diagram</h2>
             <div class="dag-ws-controls">
+              <details class="filter-dropdown">
+                <summary class="toolbar-button">Filters</summary>
+                <div class="filter-dropdown-panel" aria-label="Diagram filters">
               <button id="showUnfiltered" class="toolbar-button" type="button" aria-pressed="false" title="Show all groups without a confounder or collider filter">Unfiltered</button>
               <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the IV, DV, and groups that could point into both; bidirectional edges count in either direction">Confounders only</button>
               <button id="toggleCollidersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the IV, DV, and groups that both could point into; bidirectional edges count in either direction">Colliders only</button>
@@ -429,6 +432,8 @@
               <button id="toggleAllExclusionLinks" class="toolbar-button" type="button" aria-pressed="false" title="Show every link between groups visible in the exclusion restriction view" hidden>All visible links</button>
               <button id="showExcludedLinks" class="toolbar-button" type="button" hidden>Excluded links</button>
               <button id="showExcludedFindings" class="toolbar-button" type="button" hidden>Excluded findings</button>
+                </div>
+              </details>
               <button id="dagSvgZoomIn" class="icon-button" type="button" title="Zoom in">+</button>
               <button id="dagSvgZoomOut" class="icon-button" type="button" title="Zoom out">−</button>
               <button id="dagSvgFit" class="toolbar-button" type="button" title="Reset zoom">Fit</button>

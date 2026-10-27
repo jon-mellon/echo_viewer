@@ -1834,6 +1834,48 @@ h2 {
   flex-wrap: wrap;
   gap: 4px;
 }
+/* Keep diagram filters together while retaining their existing toggle state. */
+.filter-dropdown {
+  position: relative;
+}
+.filter-dropdown > summary {
+  cursor: pointer;
+  list-style: none;
+}
+.filter-dropdown > summary::-webkit-details-marker { display: none; }
+.filter-dropdown > summary::after { content: " ▾"; }
+.filter-dropdown-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  width: max-content;
+  max-width: min(320px, 90vw);
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+.filter-dropdown-panel > button {
+  text-align: left;
+  white-space: normal;
+}
+.filter-dropdown-panel > button[aria-pressed]::before {
+  content: "✓";
+  display: inline-block;
+  width: 1.4em;
+  visibility: hidden;
+}
+.filter-dropdown-panel > button[aria-pressed="true"]::before { visibility: visible; }
+.filter-dropdown-panel > [hidden] { display: none; }
+.filter-dropdown-panel .path-length-control { justify-content: space-between; }
 .path-length-control {
   display: inline-flex;
   align-items: center;
@@ -2592,8 +2634,7 @@ h2 {
     width: 100%;
     justify-content: flex-start;
     flex-wrap: nowrap;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
+    overflow: visible;
     padding-bottom: 3px;
     scrollbar-width: none;
   }
