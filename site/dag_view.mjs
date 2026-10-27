@@ -45,7 +45,6 @@ export function deriveDagView({
     return papers.size >= minimumEdgePapers;
   }) : links;
   const fullGraph = createGraph(groups.map((group) => group.group_id), retainedLinks);
-  const connectivityGraph = filterGraphLinks(fullGraph, (link) => !excludedForConnectivity(link));
   const traversableLink = (link) => !excludedForConnectivity(link);
   const diagnosticOptions = {
     ivId,
@@ -66,8 +65,7 @@ export function deriveDagView({
     exogeneityGraph.nodeIds.add(ivId);
     exogeneityGraph.metadata.pathIds.add(ivId);
   }
-  const componentGraph = connectedComponentGraph(connectivityGraph, ivId);
-  const canFilterFromIv = filterByCausalRelevance && connectivityGraph.nodeIds.has(ivId);
+  const canFilterFromIv = filterByCausalRelevance && fullGraph.nodeIds.has(ivId);
   const anchorsReady = fullGraph.nodeIds.has(ivId) && fullGraph.nodeIds.has(dvId) && ivId !== dvId;
 
   let selectedGraph;
@@ -75,7 +73,9 @@ export function deriveDagView({
   else if (showExclusionViolations && anchorsReady && instrumentId) selectedGraph = exclusionGraph;
   else if (showConfoundersOnly && anchorsReady) selectedGraph = confounderGraph;
   else if (showCollidersOnly && anchorsReady) selectedGraph = colliderGraph;
-  else selectedGraph = canFilterFromIv ? componentGraph : fullGraph;
+  else selectedGraph = canFilterFromIv
+    ? connectedComponentGraph(filterGraphLinks(fullGraph, traversableLink), ivId)
+    : fullGraph;
 
   const componentGroupIds = new Set(selectedGraph.nodeIds);
   let visibleGraph = filterGraphNodes(fullGraph, componentGroupIds);
