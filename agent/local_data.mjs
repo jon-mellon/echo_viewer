@@ -13,7 +13,6 @@ import { loadGroupingSchemaFolder } from "../site/grouping_schema_loader.mjs";
 import { canonicalFolderHash } from "../site/grouping_schema_writer.mjs";
 import { validateCompiledArtifact } from "../site/compiled_dag.mjs";
 import { validateGroupingSchema } from "../site/data_validation.mjs";
-import { searchVariables as echoSearchVariables } from "../site/dag_search.mjs";
 import { pairKey } from "../site/dag_link_aggregation.mjs";
 import { lookupPublishedSchema, publicSchemaBaseUrl } from "../site/publication_access.mjs";
 import { fetchPublishedFile } from "../site/published_schema_loader.mjs";
@@ -168,7 +167,7 @@ export async function openLocalPublication(publicationId = DEFAULT_SCHEMA_PUBLIC
 export function sqlString(value) { return `'${String(value).replaceAll("'", "''")}'`; }
 export async function duckRows(sql) {
   const { stdout } = await execFileAsync("duckdb", ["-json", "-c", sql], { maxBuffer: 50 * 1024 * 1024 });
-  return JSON.parse(stdout);
+  return stdout.trim() ? JSON.parse(stdout) : [];
 }
 export function localEvidence(snapshotDir) {
   const relation = name => sqlString(join(snapshotDir, `canonical/${name}.parquet`));
@@ -186,16 +185,34 @@ export function localEvidence(snapshotDir) {
     },
     async searchVariables(query, limit = 40) {
       const n = Math.max(1, Math.min(200, Number(limit) || 40));
-      const variables = await duckRows(`SELECT * FROM read_parquet(${relation("variable_occurrences")})`);
-      return echoSearchVariables(query, { variables, selectedUoa: null, uoaFilterEnabled: false }, n);
+      const terms = String(query ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+      if (!terms.length) return [];
+      const fields = ["variable_id", "display_label", "concept_label", "raw_variable_text", "paper_id", "uoa"];
+      const normalized = field => `lower(trim(coalesce(${field}, '')))`;
+      const haystack = `lower(concat_ws(' ', ${fields.map(field => `coalesce(${field}, '')`).join(", ")}))`;
+      const label = `lower(trim(coalesce(nullif(display_label, ''), concept_label, '')))`;
+      const concept = normalized("concept_label");
+      const score = terms.map(term => {
+        const value = sqlString(term);
+        return `(CASE WHEN ${label} = ${value} OR ${concept} = ${value} THEN 20 WHEN starts_with(${label}, ${value}) OR starts_with(${concept}, ${value}) THEN 10 ELSE 1 END)`;
+      }).join(" + ");
+      return duckRows(`SELECT * FROM read_parquet(${relation("variable_occurrences")}) WHERE ${terms.map(term => `contains(${haystack}, ${sqlString(term)})`).join(" AND ")} ORDER BY (${score}) DESC, index LIMIT ${n}`);
     },
     async neighbors(ids) {
       if (!ids.length) return [];
       return duckRows(`SELECT * FROM read_parquet(${relation("variable_neighbors")}) WHERE variable_id IN (${list(ids)}) ORDER BY variable_id,display_rank`);
     },
-    async rawLinks(ids = null) {
+    async rawLinks(ids = null, limit = null) {
       const where = ids?.length ? ` WHERE raw_causal_link_id IN (${list(ids)})` : "";
-      return duckRows(`SELECT * FROM read_parquet(${relation("causal_link_occurrences")})${where}`);
+      const base = `SELECT * FROM read_parquet(${relation("causal_link_occurrences")})${where}`;
+      if (limit != null) return duckRows(`${base} LIMIT ${Math.max(1, Math.min(500, Number(limit) || 100))}`);
+      const rows = [];
+      const pageSize = 5000;
+      while (true) {
+        const page = await duckRows(`${base} LIMIT ${pageSize} OFFSET ${rows.length}`);
+        rows.push(...page);
+        if (page.length < pageSize) return rows;
+      }
     },
     async incidentLinks(ids) {
       if (!ids.length) return [];
