@@ -10,8 +10,16 @@ function showStatus(element, message, isError = false) {
 }
 
 async function copyText(text, navigatorApi, windowApi) {
-  if (navigatorApi.clipboard?.writeText) await navigatorApi.clipboard.writeText(text);
-  else windowApi.prompt("Copy this permalink:", text);
+  if (navigatorApi.clipboard?.writeText) {
+    try {
+      await navigatorApi.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Clipboard access can expire while the schema is being validated on mobile.
+    }
+  }
+  windowApi.prompt("Copy this permalink:", text);
+  return false;
 }
 
 export function createPublicationController({
@@ -187,13 +195,32 @@ export function createPublicationController({
 
   async function share() {
     if (busy) return null;
-    const resolved = await publicPermalink();
+    const resolving = publicPermalink();
+    // Safari requires clipboard.write to start in the tap handler. Its promised
+    // data lets the schema validation finish before any link is copied.
+    let pendingCopy = null;
+    if (navigatorApi.clipboard?.write && windowApi.ClipboardItem) {
+      try {
+        const data = resolving.then(result => {
+          if (!result) throw new Error("View is not shareable");
+          return new Blob([result.permalink], { type: "text/plain" });
+        });
+        pendingCopy = navigatorApi.clipboard.write([new windowApi.ClipboardItem({ "text/plain": data })]);
+        pendingCopy.catch(() => {});
+      } catch { /* Fall back to writeText and the copy dialog. */ }
+    }
+    const resolved = await resolving;
     if (!resolved) return null;
     const { permalink } = resolved;
     try {
-      await copyText(permalink, navigatorApi, windowApi);
-      showShareCopied();
-      showStatus(elements.status, "Copied a permalink to this view of the public schema.");
+      let copied = false;
+      if (pendingCopy) {
+        try { await pendingCopy; copied = true; } catch { /* Try the fallback. */ }
+      }
+      if (!copied) copied = await copyText(permalink, navigatorApi, windowApi);
+      if (copied) showShareCopied();
+      showStatus(elements.status, copied ? "Copied a permalink to this view of the public schema."
+        : "Copy the permalink from the dialog.");
       return permalink;
     } catch (error) {
       const message = `Could not share: ${formatSupabaseError(error)}`;

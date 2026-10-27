@@ -644,6 +644,20 @@ function minimumDagScale() {
     Math.max(1, els.dagNetwork.clientHeight - 68) / Math.max(1, height), 1);
 }
 
+function fitDag() {
+  const boxes = dagBounds()?.boxes;
+  const width = els.dagNetwork.clientWidth, height = els.dagNetwork.clientHeight;
+  if (!_visNetwork || !boxes?.length || !width || !height) return;
+  const left = Math.min(...boxes.map(box => box.left));
+  const right = Math.max(...boxes.map(box => box.right));
+  const top = Math.min(...boxes.map(box => box.top));
+  const bottom = Math.max(...boxes.map(box => box.bottom));
+  const padding = 16;
+  const scale = Math.min(Math.max(1, width - 2 * padding) / Math.max(1, right - left),
+    Math.max(1, height - 2 * padding) / Math.max(1, bottom - top));
+  _visNetwork.moveTo({ position: { x: (left + right) / 2, y: (top + bottom) / 2 }, scale, animation: false });
+}
+
 let detachDagInteractions = null;
 
 function attachDagNetworkHandlers(network) {
@@ -709,7 +723,7 @@ function edgeHoverText(link) {
     getPathLaneSegments: () => _dagPathLaneSegments,
     zoomIn: () => _visNetwork?.moveTo({ scale: _visNetwork.getScale() * 1.3 }),
     zoomOut: () => _visNetwork?.moveTo({ scale: Math.max(minimumDagScale(), _visNetwork.getScale() / 1.3) }),
-    fit: () => _visNetwork?.fit(DAG_FIT_OPTIONS),
+    fit: fitDag,
     redraw: () => _visNetwork?.redraw(),
   };
 }

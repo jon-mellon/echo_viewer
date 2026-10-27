@@ -464,6 +464,62 @@ test("Share view copies the selected public permalink", async ({ page, context }
   await expect(page.locator("#copyPermalink")).toContainText("Copied");
 });
 
+test("mobile map controls accept taps and sharing falls back when clipboard access fails", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: () => Promise.reject(new Error("denied")) } });
+  });
+  await page.goto(viewer);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
+  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('[data-mobile-panel="dag"]').last().tap();
+  const fit = page.locator("#dagSvgFit");
+  await fit.scrollIntoViewIfNeeded();
+  await page.evaluate(async () => {
+    const original = window.vis.Network.prototype.moveTo;
+    window.vis.Network.prototype.moveTo = function (...args) {
+      const result = original.apply(this, args);
+      window.__fitNetwork = this;
+      return result;
+    };
+  });
+  await fit.tap();
+  await expect.poll(() => page.evaluate(() => Boolean(window.__fitNetwork))).toBe(true);
+  expect(await page.evaluate(() => {
+    const net = window.__fitNetwork, rect = document.querySelector('#dagNetwork').getBoundingClientRect();
+    return net.body.nodeIndices.every(id => {
+      const box = net.getBoundingBox(id);
+      const a = net.canvasToDOM({ x: box.left, y: box.top });
+      const b = net.canvasToDOM({ x: box.right, y: box.bottom });
+      return a.x >= -1 && a.y >= -1 && b.x <= rect.width + 1 && b.y <= rect.height + 1;
+    });
+  })).toBe(true);
+  const share = page.locator("#copyPermalink");
+  await share.scrollIntoViewIfNeeded();
+  page.once("dialog", dialog => {
+    expect(dialog.message()).toContain("Copy this permalink");
+    expect(dialog.defaultValue()).toContain("iv=");
+    return dialog.dismiss();
+  });
+  await share.tap();
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      write: async items => { window.__shareGestureActive = navigator.userActivation.isActive;
+        window.__sharedText = await (await items[0].getType("text/plain")).text(); },
+    } });
+  });
+  await share.tap();
+  await expect(share).toContainText("Copied");
+  expect(await page.evaluate(() => window.__shareGestureActive)).toBe(true);
+  expect(await page.evaluate(() => window.__sharedText)).toContain("iv=");
+  await context.close();
+});
+
 test("bibliography, Markdown, and LaTeX export controls produce downloads", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.route("https://api.crossref.org/**", route => route.fulfill({ status: 404, body: "" }));
