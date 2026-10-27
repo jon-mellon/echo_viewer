@@ -34,11 +34,11 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const isPathMediator = (view.showConfoundersOnly || view.showCollidersOnly || view.showExogeneity)
     && diagnosticRole === "mediator" && !isIv && !isDv && !isInstrument;
   const overlapBorder = !isIv && !isDv && !isInstrument
-    ? view.showConfoundersOnly && view.colliderGroupIds?.has(group.group_id) ? "#176b80"
+    ? view.showConfoundersOnly && view.colliderGroupIds?.has(group.group_id) ? "#801744"
       : view.showCollidersOnly && view.confounderGroupIds?.has(group.group_id) ? "#c62828" : null
     : null;
   const isSelected = group.group_id === view.activeGroupId;
-  const color = isViolation ? "#c62828" : isInstrument ? "#166534" : isExogeneityCandidate ? "#c62828" : isConfounder ? "#c62828" : isCollider ? "#176b80" : isPathMediator ? "#6b7280" : view.groupColor;
+  const color = isViolation ? "#c62828" : isInstrument ? "#166534" : isExogeneityCandidate ? "#c62828" : isConfounder ? "#c62828" : isCollider ? "#801744" : isPathMediator ? "#6b7280" : view.groupColor;
   const roleTag = isIv ? " (Ind var)" : isDv ? " (Dep var)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : isExogeneityCandidate ? " (potential common cause of instrument and Dep var)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
@@ -54,8 +54,8 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     mass: 1 + Math.min(3, Math.sqrt(group.variable_ids.length || group.member_count || 1) / 6),
     color: {
       background: color,
-      border: overlapBorder || (isSelected ? "#b83b5e" : isViolation ? "#7f1d1d" : isConfounder || isExogeneityCandidate ? "#7f1d1d" : isCollider ? "#104757" : isPathMediator ? "#374151" : "#fbfcfa"),
-      highlight: { background: color, border: overlapBorder || (isConfounder || isExogeneityCandidate ? "#4c0d0d" : isCollider ? "#0b303b" : isPathMediator ? "#1f2937" : "#b83b5e") },
+      border: overlapBorder || (isSelected ? "#b83b5e" : isViolation ? "#7f1d1d" : isConfounder || isExogeneityCandidate ? "#7f1d1d" : isCollider ? "#550f2d" : isPathMediator ? "#374151" : "#fbfcfa"),
+      highlight: { background: color, border: overlapBorder || (isConfounder || isExogeneityCandidate ? "#4c0d0d" : isCollider ? "#380a1e" : isPathMediator ? "#1f2937" : "#b83b5e") },
       hover: { background: color, border: overlapBorder || "#ffffff" },
     },
     shape: (isIv || isDv || isInstrument) ? "ellipse" : "box",
@@ -67,7 +67,7 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
       : isConfounder || isExogeneityCandidate
         ? { enabled: true, color: "rgba(198,40,40,0.34)", size: 11, x: 0, y: 2 }
         : isCollider
-          ? { enabled: true, color: "rgba(23,107,128,0.34)", size: 11, x: 0, y: 2 }
+          ? { enabled: true, color: "rgba(128,23,68,0.34)", size: 11, x: 0, y: 2 }
         : isPathMediator
           ? { enabled: true, color: "rgba(55,65,81,0.28)", size: 9, x: 0, y: 2 }
       : { enabled: true, color: "rgba(25, 38, 34, 0.14)", size: 7, x: 0, y: 2 },

@@ -125,7 +125,7 @@ test("overlapping diagnostic roles retain the opposite role outline", () => {
   const group = { group_id: "both", label: "Both", variable_ids: [] };
   const base = { confounderGroupIds: new Set(["both"]), colliderGroupIds: new Set(["both"]),
     confounderPathGroupIds: new Set(), colliderPathGroupIds: new Set(), groupColor: "#123456" };
-  for (const [mode, color] of [["showConfoundersOnly", "#176b80"], ["showCollidersOnly", "#c62828"]]) {
+  for (const [mode, color] of [["showConfoundersOnly", "#801744"], ["showCollidersOnly", "#c62828"]]) {
     const node = display.visNodeData(group, null, {}, { ...base, [mode]: true, activeGroupId: "both" });
     assert.equal(node.color.border, color);
     assert.equal(node.color.highlight.border, color);
