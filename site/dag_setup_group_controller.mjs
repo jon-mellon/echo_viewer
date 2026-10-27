@@ -1,3 +1,4 @@
+import { isDagDisplayGroup } from "./dag_network_controller.mjs";
 import * as groupListModel from "./dag_group_list.mjs";
 import * as searchModel from "./dag_search.mjs";
 import * as workflow from "./dag_workflow.mjs";
@@ -222,7 +223,8 @@ export function createDagSetupGroupController({
       && anchorHasMembers(state, dv) && !state.definitionDraft;
     elements.variablePanel.hidden = !show;
     if (!show) return;
-    const groups = (project?.groups || []).slice()
+    const groups = (project?.groups || []).filter(group =>
+      state.componentGroupIds?.has(group.group_id) && isDagDisplayGroup(group))
       .sort((a, b) => (a.label || a.group_id).localeCompare(b.label || b.group_id));
     elements.variablePanelCount.textContent = String(groups.length);
     for (const detail of elements.variablePanelList.querySelectorAll("details[data-group-id]")) {
@@ -308,7 +310,7 @@ export function createDagSetupGroupController({
       elements.currentStepTitle.textContent = !ivSet || changingIv
         ? "Select independent variable"
         : !dvSet || changingDv ? "Select dependent variable"
-          : changingInstrument ? "Select instrument (optional)" : "Working causal map";
+          : changingInstrument ? "Select instrument (optional)" : "Setup complete";
       elements.dagStatusBadge.textContent = changingInstrument ? "Instrument"
         : ivSet && dvSet ? "Ready" : ivSet ? "Select DV" : "Select IV";
       elements.dagStatusBadge.className = `status-pill${ivSet && dvSet && !changingInstrument ? " muted" : ""}`;

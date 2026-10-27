@@ -33,7 +33,6 @@
       <aside class="dag-left-panel">
         <header class="panel-header">
           <div>
-            <p class="eyebrow">Working causal map</p>
             <h1>ECHO</h1>
           </div>
         </header>
@@ -48,9 +47,6 @@
           <button id="saveIndependentCopy" class="text-button" type="button" hidden>Save independent copy</button>
           <div class="mini-toolbar">
             <button id="previousSessions" class="text-button" type="button" aria-expanded="false" aria-controls="previousSessionsPanel">Previous Sessions</button>
-            <button id="exportLocalDraft" class="text-button" type="button" title="Includes private edge exclusion reasons">Export private draft</button>
-            <label class="text-button" for="importLocalDraft">Import draft</label>
-            <input id="importLocalDraft" type="file" accept="application/json,.json" hidden>
           </div>
           <div id="previousSessionsPanel" class="previous-sessions-panel" hidden>
             <p class="dag-label">Previous views in this browser</p>
@@ -295,7 +291,6 @@
           </div>
           <select id="groupingSetSelect" class="select-input"></select>
           <div class="mini-toolbar">
-            <button id="exportGroupingFolder" class="toolbar-button" type="button">Download folder ZIP</button>
             <button id="publishSchema" class="primary-button" type="button" hidden>Publish publicly</button>
           </div>
           <div id="publicationStatus" class="publication-status" role="status" aria-live="polite"></div>
@@ -409,7 +404,7 @@
         <!-- DAG workspace — shown when no group is open -->
         <section id="dagWorkspaceSection" class="panel-section dag-workspace">
           <div class="dag-ws-header section-title">
-            <h2>Working Map</h2>
+            <h2>Causal diagram</h2>
             <div class="dag-ws-controls">
               <button id="showUnfiltered" class="toolbar-button" type="button" aria-pressed="false" title="Show all groups without a confounder or collider filter">Unfiltered</button>
               <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the IV, DV, and groups that could point into both; bidirectional edges count in either direction">Confounders only</button>
@@ -459,8 +454,16 @@
           </div>
           <div id="exportBody" class="export-body">
             <div class="mini-toolbar">
+              <button id="exportGroupingFolder" class="toolbar-button" type="button">Download schema folder ZIP</button>
+              <button id="exportLocalDraft" class="toolbar-button" type="button" title="Includes private edge exclusion reasons">Export private draft</button>
+              <label class="toolbar-button file-button">
+                Import draft
+                <input id="importLocalDraft" type="file" accept="application/json,.json">
+              </label>
+            </div>
+            <div class="mini-toolbar">
               <button id="exportProject" class="toolbar-button" type="button">Project JSON</button>
-              <button id="exportWorkingMap" class="toolbar-button" type="button">Working map</button>
+              <button id="exportWorkingMap" class="toolbar-button" type="button">Causal diagram JSON</button>
               <label class="toolbar-button file-button">
                 Import project
                 <input id="projectImport" type="file" accept="application/json,.json">
