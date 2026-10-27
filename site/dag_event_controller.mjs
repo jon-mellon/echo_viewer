@@ -1,3 +1,4 @@
+import { attachGraphTouchGuard } from "./graph_touch.mjs";
 import * as projectOps from "./dag_project.mjs";
 import * as mapInteractions from "./map_interactions.mjs";
 
@@ -276,6 +277,7 @@ function installHandlers() {
 
 function installMapHandlers() {
   const canvas = state.map.canvas;
+  attachGraphTouchGuard(canvas);
   const touchPoints = new Map();
   const pinchedPointers = new Set();
   let pinch = null;

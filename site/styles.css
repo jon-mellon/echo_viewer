@@ -2850,3 +2850,10 @@ h2 {
   font-size: 0.75rem;
   opacity: 0.75;
 }
+
+/* Establish gesture ownership before the browser begins a graph pinch. */
+.dag-map-panel,
+.dag-svg-wrapper,
+.dag-network-wrapper {
+  touch-action: none;
+}
