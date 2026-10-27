@@ -3,6 +3,58 @@ const { test, expect } = require("playwright/test");
 const base = process.env.DAG_VIEWER_URL || "http://127.0.0.1:8767";
 const snapshotId = "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0";
 
+for (const corrupt of ["none", "map", "neighbors", "incidents"]) {
+  test(`definition data equals canonical coordinates and metadata, corrupt=${corrupt}`, async ({ page }) => {
+    test.setTimeout(90000);
+    await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+    if (corrupt !== "none") await page.route(`**/variable-${corrupt === "map" ? "maps" : corrupt}/**/*.json.gz`, async route => {
+      if (route.request().url().endsWith("index.json.gz")) return route.continue();
+      return route.fulfill({ status: 200, body: "corrupt" });
+    });
+    await page.goto(`${base}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b`);
+    await page.waitForFunction(() => window.__dagBuilderState?.project
+      && window.__dagBuilderState.publishedSchemaHydrated
+      && document.getElementById("startupLoading")?.hidden);
+    const result = await page.evaluate(async () => {
+      const { dagDataSource: source } = await import("/dag_data_source.mjs?v=browser-v2");
+      const ids = window.__dagBuilderState.project.groups.find(g => g.group_id === "category-academic-achievement").variable_ids;
+      await source.prewarmVariableMap();
+      const map = await source.loadVariableMetadata(ids, "", { mapOnly: true });
+      const engineAfterMap = Boolean(source.connection);
+      const neighborIds = ids.slice(0, 2);
+      const fastNeighbors = await source.loadNeighbors(neighborIds);
+      const engineAfterNeighbors = Boolean(source.connection);
+      const incidentIds = ids.slice(0, 40);
+      const fastIncidents = await source.loadIncidentRawLinks(incidentIds);
+      const engineAfterIncidents = Boolean(source.connection);
+      const full = await source.loadVariableMetadata(ids);
+      const { variableNeighborCatalog } = await import("/variable_neighbor_catalog.mjs");
+      const bindings = variableNeighborCatalog.bindings;
+      let expectedNeighbors;
+      try {
+        variableNeighborCatalog.bindings = {};
+        expectedNeighbors = await source.loadNeighbors(neighborIds);
+      } finally { variableNeighborCatalog.bindings = bindings; }
+      const expectedIncidents = await source.queryBrowserIncidentLinks(incidentIds);
+      const normalizedIncidents = rows => JSON.stringify([...rows].sort((a, b) => a.raw_causal_link_id.localeCompare(b.raw_causal_link_id)));
+      const expected = full.map(({ field_preview_json, metadata_blob_json, ...row }) => row);
+      map[0].concept_label = "mutated view copy";
+      const second = await source.loadVariableMetadata(ids, "", { mapOnly: true });
+      return { count: second.length, engineAfterMap, engineAfterNeighbors, engineAfterIncidents,
+        incidentsMatch: fastIncidents.length > 0 && normalizedIncidents(fastIncidents) === normalizedIncidents(expectedIncidents),
+        neighborsMatch: fastNeighbors.length === 24 && JSON.stringify(fastNeighbors) === JSON.stringify(expectedNeighbors),
+        matches: JSON.stringify(second) === JSON.stringify(expected) };
+    });
+    expect(result.count).toBe(1775);
+    expect(result.matches).toBe(true);
+    expect(result.engineAfterMap).toBe(corrupt === "map");
+    expect(result.engineAfterNeighbors).toBe(corrupt === "map" || corrupt === "neighbors");
+    expect(result.neighborsMatch).toBe(true);
+    expect(result.engineAfterIncidents).toBe(corrupt !== "none");
+    expect(result.incidentsMatch).toBe(true);
+  });
+}
+
 for (const rejectBuffer of [false, true]) {
   test(`cold findings prefetch preserves evidence with rejected buffer=${rejectBuffer}`, async ({ page }) => {
     test.setTimeout(90000);

@@ -69,3 +69,58 @@ for (const corrupt of [false, true]) {
     console.log("Mobile evidence", { corrupt, browserName, firstMs, requests: requests.length });
   });
 }
+
+test("a newer path filter supersedes a dense graph while installation is pending", async ({ page }) => {
+  test.setTimeout(90000);
+  await page.addInitScript(() => {
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      constructor(url, options) {
+        super(url, options);
+        if (String(url).includes("dag_layout_worker")) this.addEventListener("message", () => {
+          if (!window.__supersedeDenseGraph) return;
+          window.__supersedeDenseGraph = false;
+          queueMicrotask(() => {
+            const input = document.getElementById("confounderPathLength");
+            input.value = "1";
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            window.__supersededDenseGraph = true;
+          });
+        });
+      }
+    };
+  });
+  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}`);
+  await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
+    && window.__dagBuilderState?.project && document.getElementById("startupLoading")?.hidden);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids.length).slice(0, 2).map(group => group.group_id));
+  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
+  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('button[data-mobile-panel="dag"]').click();
+  const settled = () => page.evaluate(async () => (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).whenDagRendered());
+  await settled();
+  await page.locator("#showUnfiltered").click();
+  await settled();
+  for (const id of ["toggleConfoundersOnly", "toggleCollidersOnly", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks"]) {
+    await page.locator(`#${id}`).click();
+    await settled();
+  }
+  await page.evaluate(() => { window.__supersedeDenseGraph = true; });
+  await page.locator("#confounderPathLength").fill("2");
+  await page.waitForFunction(() => window.__supersededDenseGraph, null, { timeout: 30000 });
+  await settled();
+  const state = await page.evaluate(async () => {
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const s = window.__dagBuilderState;
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    const groups = new Set(s.project.groups.filter(g => s.componentGroupIds.has(g.group_id)
+      && g.type !== "other" && g.group_id !== "other" && String(g.label || "").trim().toLowerCase() !== "other").map(g => g.group_id));
+    return { length: s.confounderMaxPathLength,
+      expected: s.visibleLinks.filter(e => !e.is_target_relation && groups.has(e.group_a) && groups.has(e.group_b)).map(e => e.edge_id).sort(),
+      actual: api.renderedDagEdgeIds().filter(id => !id.startsWith("__study_")).sort() };
+  });
+  expect(state.length).toBe(1);
+  expect(state.actual).toEqual(state.expected);
+});

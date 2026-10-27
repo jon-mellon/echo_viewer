@@ -1726,6 +1726,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   },
   onCommitFailureRestored: () => persistentViewer.clearSaveFailure(),
   prewarmEvidence: async () => {
+    if (await dagDataSource.prewarmVariableMap(state.variableLayoutSource)) return;
     await dagDataSource.ensureEvidenceConnection({ variableIds: [], prewarmMapFiles: true });
     // DuckDB fetches the remote layout metadata when it creates this view.
     // Do that while the source picker is open instead of after Continue.

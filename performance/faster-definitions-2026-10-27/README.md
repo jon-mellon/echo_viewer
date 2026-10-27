@@ -1,0 +1,26 @@
+# Faster definition data and dense graph updates
+
+Full Chromium profiles for the 97,818-variable snapshot `f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b`. Desktop is unthrottled; mobile uses a 390 × 844 viewport and 4× CPU slowdown. Application files were fulfilled from the local working tree on the allowed evidence origin; canonical data still used the remote host. Results are single full-suite runs with fresh contexts, not percentile or physical-phone measurements. Small bundle transfers were local and are optimistic for a slow connection.
+
+| Full-suite measurement | Desktop before → after | Mobile before → after |
+|---|---:|---:|
+| Cold definition source | 2,472 → 254 ms | 1,948 → 815 ms |
+| Incident findings for 40 variables | 305 → 52 ms | 731 → 128 ms |
+| Dense path expansion, total | 582 → 534 ms | 1,318 → 1,383 ms |
+| Dense path expansion, longest task | 118 → 96 ms | 450 → 442 ms |
+
+The prior full-suite incident query benefited from the evidence engine already being warm, whereas the final fast path does not start it. In focused three-run tests, the first desktop definition-source median was 1,977 → 209 ms; mobile was 2,153 → 608 ms. Those focused after-runs predate the final small neighbor/incident index prefetch, so the full-suite after numbers are the current-build measurements. First dense mobile expansion did not become materially faster overall; yielding between route conversion and network installation reduces the longest continuous block, and the first render still has to build the dense graph. Intermediate focused repeated expansions were modestly faster, but should not be treated as a guarantee.
+
+The canonical snapshot files now have three optional, immutable, digest-verified retrieval layouts:
+
+- Definition maps are grouped by exact variable-ID set and layout source. The profiled 1,775-variable group is a 303,142-byte compressed bundle; the shared index is 8,703 bytes. The bundle contains exactly the existing map-only projection, including coordinates. Full metadata still uses the canonical adapter.
+- Neighbor suggestions use ID-prefix chunks and an 11,144-byte shared index. The small-selection path supports up to 40 requested IDs and preserves all canonical neighbor rows and ordering. The profiled first concept loaded one approximately 0.1 MiB chunk, avoiding the query engine.
+- Incident findings use ID-prefix chunks and an 11,207-byte shared index. Each finding is indexed by both endpoints; results are deduplicated and restored to canonical row order. The profiled 40-ID selection loaded six chunks totaling approximately 0.5 MiB.
+
+The layouts use 17,661,964, 33,408,214, and 22,180,413 compressed bytes respectively across the published site. A browser fetches only the relevant files. Each index has a pinned SHA-256 and length; each chunk is likewise verified and bound to its snapshot. Index and chunk requests are shared and the in-memory caches are bounded. Unsupported snapshots/layouts, edited or partial groups without an exact map match, large neighbor/incident requests, unavailable files, and failed checks retain the canonical Parquet fallback. Regenerate layouts with `scripts/generate_variable_maps.mjs` and `scripts/generate_variable_neighbors.mjs`; both verify input Parquet against the immutable manifest.
+
+Dense graph installation is separated from route conversion by a task boundary, and a request superseded during that boundary is discarded. Invisible route anchors have tiny finite bounds; viewport fitting uses their fixed points without asking vis.js to measure empty labels. A browser regression test triggers a newer path filter while the dense installation is pending and verifies that the rendered edge set matches the newer view.
+
+Both final full profiles passed every existing and original budget. The closest original mobile measurements were definition-source event 352/400 ms, close-definition event 384/400 ms, path task 442/500 ms, and startup transfer 2.2/2.5 MiB. One mobile run concurrent with browser tests recorded a 518 ms path task; the isolated rerun passed. The staging diagnostic-switching gate passed three mobile runs. `npm test`, the versioned build, eight existing Chromium browser cases, four corrupted/normal canonical-data comparisons, a Safari/WebKit canonical-data check, and the superseded-render browser check passed. All generated chunks were checked for digest, coverage, and snapshot binding. Canonical browser comparisons verified all 1,775 map rows, neighbor records, and incident findings for 40 variables; deliberately corrupted bundles fell back correctly.
+
+The full reports are `before-desktop.json`, `before-mobile.json`, `desktop.json`, `mobile.json`, and `diagnostics.json`. CPU traces and focused three-run reports remain under `/private/tmp/echo-faster-*`. Reproduce the full profiles with `node scripts/prepare_new_data_site.mjs` followed by `PROFILE_URL=https://echo.epistemicinfra.org/ PROFILE_ROUTE_SITE_DIR=dist/new-data-site PROFILE_OUTPUT=/private/tmp/echo-profile npm run profile`; add `PROFILE_DEVICE=mobile` for mobile. The deployment gate runs as `PROFILE_SITE_DIR=dist/site npm run profile:diagnostics` after a staging-configured build.

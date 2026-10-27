@@ -7,6 +7,9 @@ import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
 import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication-v2";
 import { variableSearchCatalog, SNAPSHOT_SEARCH_CATALOGS } from "./variable_search_catalog.mjs";
 import { evidencePanelCatalog } from "./evidence_panel_catalog.mjs";
+import { variableMapCatalog } from "./variable_map_catalog.mjs";
+import { variableNeighborCatalog } from "./variable_neighbor_catalog.mjs";
+import { variableIncidentCatalog } from "./variable_incident_catalog.mjs";
 
 // Reading many small remote Parquet shards incurs a separate metadata/range
 // round trip for each shard. The canonical snapshot is cheaper for wide groups.
@@ -156,6 +159,18 @@ export class ParquetManifestDagDataSource {
 
   async loadVariableMetadata(variableIds, layoutSource = "", { mapOnly = false } = {}) {
     const start = performance.now();
+    if (mapOnly && variableIds?.length) {
+      try {
+        const payload = await variableMapCatalog.load(evidenceSnapshotIdFromManifestUrl(this.manifestUrl), variableIds, layoutSource);
+        if (payload) {
+          this.defaultVariableLayoutSource ||= payload.layout_source;
+          performance.measure("echo:evidence:variables", { start, end: performance.now() });
+          // Callers annotate records with neighbor state. Keep the shared cache
+          // immutable and separate from those per-view records.
+          return payload.variables.map(row => ({ ...row }));
+        }
+      } catch (error) { console.warn("Variable map bundle unavailable; using snapshot retrieval.", error); }
+    }
     await this.ensureEvidenceConnection({ variableIds });
     if (!variableIds?.length) return [];
     if (!this.browserShardIds(variableIds).length) return [];
@@ -203,7 +218,24 @@ export class ParquetManifestDagDataSource {
       FROM read_parquet([${urls}]) WHERE variable_id IN (${placeholders})`, variableIds);
   }
 
+  async prewarmVariableMap(layoutSource = "") {
+    this.prewarmMapFiles = true;
+    try {
+      const snapshot = evidenceSnapshotIdFromManifestUrl(this.manifestUrl);
+      const ready = Boolean(await variableMapCatalog.prepare(snapshot, layoutSource));
+      if (ready) void variableNeighborCatalog.prepare(snapshot).catch(() => {});
+      if (ready) void variableIncidentCatalog.prepare(snapshot).catch(() => {});
+      return ready;
+    } catch { return false; }
+  }
+
   async loadIncidentRawLinks(variableIds) {
+    if (variableIds?.length) {
+      try {
+        const rows = await variableIncidentCatalog.load(evidenceSnapshotIdFromManifestUrl(this.manifestUrl), variableIds);
+        if (rows) return rows;
+      } catch (error) { console.warn("Incident bundle unavailable; using snapshot retrieval.", error); }
+    }
     await this.ensureEvidenceConnection({ variableIds });
     if (!variableIds?.length) return [];
     if (!this.browserShardIds(variableIds).length) return [];
@@ -288,6 +320,15 @@ export class ParquetManifestDagDataSource {
 
   async loadNeighbors(variableIds) {
     const start = performance.now();
+    if (variableIds?.length) {
+      try {
+        const rows = await variableNeighborCatalog.load(evidenceSnapshotIdFromManifestUrl(this.manifestUrl), variableIds);
+        if (rows) {
+          performance.measure("echo:evidence:neighbors", { start, end: performance.now() });
+          return rows;
+        }
+      } catch (error) { console.warn("Neighbor bundle unavailable; using snapshot retrieval.", error); }
+    }
     await this.ensureEvidenceConnection({ variableIds });
     if (!variableIds?.length) return [];
     if (!this.browserShardIds(variableIds).length) return [];

@@ -6,10 +6,9 @@ export function routeNodeData(id, point) {
     // An empty text node anchors the routed segments without painting a
     // transparent circle for every bend on every canvas frame.
     label: "", shape: "text", size: 0.1, borderWidth: 0,
-    color: { background: "rgba(0,0,0,0)", border: "rgba(0,0,0,0)",
-      highlight: { background: "rgba(0,0,0,0)", border: "rgba(0,0,0,0)" },
-      hover: { background: "rgba(0,0,0,0)", border: "rgba(0,0,0,0)" } },
-    font: { size: 0, color: "rgba(0,0,0,0)" }, chosen: false,
+    margin: 0, widthConstraint: { minimum: 0.2, maximum: 0.2 }, heightConstraint: { minimum: 0.2 },
+    color: "rgba(0,0,0,0)",
+    font: { size: 1, color: "rgba(0,0,0,0)" }, chosen: false,
   };
 }
 

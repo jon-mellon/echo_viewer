@@ -345,6 +345,7 @@ function highlightConfounderPaths(groupId) {
 
 let _dagRenderWorker = null;
 let _dagRenderRequest = 0;
+let _dagApplyingRequest = null;
 let _dagRenderedPromise = Promise.resolve();
 const _dagGeometryCache = new Map();
 
@@ -354,7 +355,7 @@ function rememberGeometry(key, geometry) {
   if (_dagGeometryCache.size > 8) _dagGeometryCache.delete(_dagGeometryCache.keys().next().value);
 }
 
-function renderDag({ reuseGeometry = false } = {}) {
+async function renderDag({ reuseGeometry = false } = {}) {
   let resolveRendered;
   _dagRenderedPromise = new Promise(resolve => { resolveRendered = resolve; });
   clearLogicalDagEdgeHover();
@@ -373,7 +374,7 @@ function renderDag({ reuseGeometry = false } = {}) {
 
   const links = state.visibleLinks.filter((link) => !link.is_target_relation
     && nextGroupIds.has(link.group_a) && nextGroupIds.has(link.group_b));
-  if (reuseGeometry && !_dagRenderWorker && _visNetwork) {
+  if (reuseGeometry && !_dagRenderWorker && _dagApplyingRequest === null && _visNetwork) {
     const reused = reuseDagGeometry(_dagGeometry, groups, links);
     if (reused) {
       applyReusedDagRender(groups, reused.layout, reused.routes);
@@ -417,29 +418,29 @@ function renderDag({ reuseGeometry = false } = {}) {
     rememberGeometry(geometryKey, cached);
     _dagGeometry = cached;
     const reused = reuseDagGeometry(cached, groups, links);
-    applyDagRender(groups, reused.layout, reused.routes);
+    await applyDagRender(groups, reused.layout, reused.routes);
     resolveRendered();
     return;
   }
-  function acceptGeometry(layout, routes) {
+  async function acceptGeometry(layout, routes) {
     const linksById = new Map(links.map(link => [link.edge_id, link]));
     const currentRoutes = routes.map(route => ({ ...route, link: linksById.get(route.link.edge_id) }));
     _dagGeometry = { groupIds: groups.map(group => group.group_id), layout, routes: currentRoutes };
     rememberGeometry(geometryKey, _dagGeometry);
-    applyDagRender(groups, layout, currentRoutes);
+    await applyDagRender(groups, layout, currentRoutes);
   }
   const requestId = ++_dagRenderRequest;
   _dagRenderWorker?.terminate();
 
   if (typeof Worker === "undefined") {
     const { layout, routes } = computeDagRender(input);
-    acceptGeometry(layout, routes);
+    await acceptGeometry(layout, routes);
     resolveRendered();
     return;
   }
   const worker = new Worker(new URL("./dag_layout_worker.mjs", import.meta.url), { type: "module" });
   _dagRenderWorker = worker;
-  worker.addEventListener("message", (event) => {
+  worker.addEventListener("message", async (event) => {
     if (event.data.requestId !== _dagRenderRequest) return;
     const timingEnd = performance.now();
     for (const [phase, duration] of Object.entries(event.data.timings || {})) {
@@ -452,23 +453,32 @@ function renderDag({ reuseGeometry = false } = {}) {
     };
     worker.terminate();
     if (_dagRenderWorker === worker) _dagRenderWorker = null;
-    acceptGeometry(layout, event.data.routes);
+    await acceptGeometry(layout, event.data.routes);
     resolveRendered();
   });
-  worker.addEventListener("error", () => {
+  worker.addEventListener("error", async () => {
     if (requestId !== _dagRenderRequest) return;
     worker.terminate();
     if (_dagRenderWorker === worker) _dagRenderWorker = null;
     const { layout, routes } = computeDagRender(input);
-    acceptGeometry(layout, routes);
+    await acceptGeometry(layout, routes);
     resolveRendered();
   }, { once: true });
   worker.postMessage({ requestId, input });
 }
 
-function applyDagRender(groups, layout, routes) {
-  _dagBoundsCache = null;
+async function applyDagRender(groups, layout, routes) {
+  const requestId = _dagRenderRequest;
   const { nodeData, edgeData, edgeSegments } = routedDagDataFromRoutes(groups, routes, layout);
+  if (nodeData.length + edgeData.length > 1000) {
+    // Route conversion and network installation are separate large stages.
+    // Give input a turn between them, and discard a superseded installation.
+    _dagApplyingRequest = requestId;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    if (_dagApplyingRequest === requestId) _dagApplyingRequest = null;
+    if (requestId !== _dagRenderRequest) return;
+  }
+  _dagBoundsCache = null;
   const previousNodeData = _dagNodeDataById;
   _dagNodeDataById = new Map(nodeData.map(node => [node.id, node]));
   edgeData.push(...studyDesignEdgeData(groups, state.project));
@@ -585,7 +595,13 @@ function dagBounds() {
   if (_dagBoundsCache) return _dagBoundsCache;
   const ids = _visNodes?.getIds() || [];
   if (!ids.length || !_visNetwork) return null;
-  const all = ids.map(id => ({ id, box: _visNetwork.getBoundingBox(id) }));
+  const all = ids.map(id => {
+    // Invisible routing points have fixed coordinates; their empty text labels
+    // need not be measured by vis merely to establish graph bounds.
+    const point = String(id).startsWith("__route__") ? _dagNodeDataById.get(id) : null;
+    return { id, box: point ? { left: point.x - 0.1, right: point.x + 0.1,
+      top: point.y - 0.1, bottom: point.y + 0.1 } : _visNetwork.getBoundingBox(id) };
+  }).filter(({ box }) => [box.left, box.right, box.top, box.bottom].every(Number.isFinite));
   const boxes = all.map(item => item.box);
   const groupBoxes = all.filter(item => Boolean(groupById(item.id))).map(item => item.box);
   const contentBounds = groupBoxes.length ? {
