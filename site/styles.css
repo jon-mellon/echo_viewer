@@ -450,6 +450,10 @@ h2 {
   line-height: 1;
 }
 
+#dagZoomIn, #dagZoomOut, #dagSvgZoomIn, #dagSvgZoomOut {
+  touch-action: manipulation;
+}
+
 .toolbar-button {
   padding: 0 12px;
 }
