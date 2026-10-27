@@ -16,3 +16,6 @@ tests/dagitty_cache/
 !.env.example
 .echo-agent/
 /supabase/.branches
+
+profile-results-diagnostics/
+profile-results-diagnostics-mobile/

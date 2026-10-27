@@ -141,35 +141,35 @@ function installHandlers() {
     state.showExogeneity = false;
     state.showConfoundersOnly = false;
     state.showCollidersOnly = false;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleConfoundersOnly.addEventListener("click", () => {
     state.showExclusionViolations = false;
     state.showExogeneity = false;
     state.showConfoundersOnly = true;
     state.showCollidersOnly = false;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleCollidersOnly.addEventListener("click", () => {
     state.showExclusionViolations = false;
     state.showExogeneity = false;
     state.showCollidersOnly = true;
     state.showConfoundersOnly = false;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleExclusionViolations.addEventListener("click", () => {
     state.showExclusionViolations = true;
     state.showExogeneity = false;
     state.showConfoundersOnly = false;
     state.showCollidersOnly = false;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleExogeneity.addEventListener("click", () => {
     state.showExogeneity = true;
     state.showExclusionViolations = false;
     state.showConfoundersOnly = false;
     state.showCollidersOnly = false;
-    rebuildProject();
+    updateDagFilters();
   });
   els.confounderPathLength.addEventListener("input", () => {
     const requested = Math.trunc(Number(els.confounderPathLength.value));
@@ -179,7 +179,7 @@ function installHandlers() {
     state[field] = clampNumber(requested, minimum, 99);
     els.confounderPathLength.value = String(state[field]);
     if (!state.showCollidersOnly && !state.showExclusionViolations && !state.showExogeneity) state.showConfoundersOnly = true;
-    rebuildProject();
+    updateDagFilters();
   });
   els.confounderPathLength.addEventListener("change", () => {
     const field = state.showExclusionViolations ? "exclusionMaxPathLength" : "confounderMaxPathLength";
@@ -203,16 +203,16 @@ function installHandlers() {
   els.toggleBottleneckedConfounders.addEventListener("click", () => {
     state.excludeBottleneckedConfounders = !state.excludeBottleneckedConfounders;
     if (!state.showCollidersOnly && !state.showExogeneity) state.showConfoundersOnly = true;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleIrrelevantConfounderLinks.addEventListener("click", () => {
     state.hideIrrelevantConfounderLinks = !state.hideIrrelevantConfounderLinks;
     if (!state.showCollidersOnly && !state.showExogeneity) state.showConfoundersOnly = true;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleAllExclusionLinks.addEventListener("click", () => {
     state.showAllExclusionLinks = !state.showAllExclusionLinks;
-    rebuildProject();
+    updateDagFilters();
   });
   els.dagSelectMode.addEventListener("click", () => setMapMode("select"));
   els.dagBrushMode.addEventListener("click", () => setMapMode("draw_add"));
