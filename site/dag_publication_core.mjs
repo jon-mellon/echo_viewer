@@ -1,4 +1,5 @@
-import { canonicalFolderHash, writeGroupingSchemaFolder } from "./grouping_schema_writer.mjs";
+import { canonicalFolderHash, stableJson, writeGroupingSchemaFolder } from "./grouping_schema_writer.mjs";
+import { publicSchemaBaseUrl, lookupPublishedSchema } from "./publication_access.mjs";
 import { PUBLISHED_SCHEMA_BUCKET } from "./publication_constants.mjs";
 import { ensureAnonymousPublicationUser } from "./dag_anonymous_auth.mjs";
 import { createCompiledArtifacts, evidenceSnapshotForSchema, fullCompileDag,
@@ -49,6 +50,7 @@ export async function publishWorkingSchema({
   client,
   cryptoApi = globalThis.crypto,
   onProgress = () => {},
+  fetchImpl = globalThis.fetch,
 }) {
   const user = await ensureAnonymousPublicationUser(client);
   const publicSchema = publicSchemaProjection(schema);
@@ -68,6 +70,47 @@ export async function publishWorkingSchema({
   const compiled = await createCompiledArtifacts({ publicationId, schemaHash: canonical.contentHash,
     evidenceSnapshot, dag, cryptoApi });
   const files = new Map(canonical.files);
+  // Compare exact canonical membership bytes with the parent. References are
+  // flattened to their original immutable object, avoiding chains of manifests.
+  const parentId = previousPublication?.publication_id || CANONICAL_BASELINE_ID;
+  let parentPrefix = previousPublication?.storage_prefix;
+  if (!parentPrefix && /^[0-9a-f-]{36}$/i.test(parentId)) {
+    parentPrefix = (await lookupPublishedSchema(parentId, client)).storage_prefix;
+  }
+  if (parentPrefix) {
+    const base = publicSchemaBaseUrl(client, parentPrefix);
+    const response = await fetchImpl(new URL("manifest.json", base));
+    if (!response.ok) throw new Error(`Could not read parent manifest: ${response.status}`);
+    const parent = await response.json();
+    const manifest = JSON.parse(new TextDecoder().decode(files.get("manifest.json")));
+    const references = {};
+    const candidates = Object.entries(manifest.group_membership_files);
+    let next = 0;
+    async function compareMemberships() {
+      while (next < candidates.length) {
+        const [groupId, path] = candidates[next++];
+        const oldPath = parent.group_membership_files?.[groupId];
+        if (!oldPath) continue;
+        const url = new URL(parent.group_membership_references?.[groupId] || oldPath, base);
+        if (url.origin !== new URL(base).origin || !url.pathname.startsWith("/storage/v1/object/public/published-schemas/")) {
+          throw new Error(`Invalid parent membership reference for ${groupId}.`);
+        }
+        const oldResponse = await fetchImpl(url);
+        if (!oldResponse.ok) throw new Error(`Could not read parent membership for ${groupId}: ${oldResponse.status}`);
+        const oldBytes = new Uint8Array(await oldResponse.arrayBuffer());
+        const current = files.get(path);
+        if (oldBytes.length === current.length && oldBytes.every((byte, index) => byte === current[index])) {
+          references[groupId] = url.href;
+          files.delete(path);
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(16, candidates.length) }, compareMemberships));
+    if (Object.keys(references).length) {
+      manifest.group_membership_references = references;
+      files.set("manifest.json", new TextEncoder().encode(stableJson(manifest)));
+    }
+  }
   files.set(COMPILED_DAG_PATH, compiled.dagBytes);
   files.set(COMPILED_MANIFEST_PATH, compiled.manifestBytes);
   const entries = [...files.entries()].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
