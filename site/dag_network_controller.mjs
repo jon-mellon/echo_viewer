@@ -470,7 +470,8 @@ async function renderDag({ reuseGeometry = false } = {}) {
 async function applyDagRender(groups, layout, routes) {
   const requestId = _dagRenderRequest;
   const { nodeData, edgeData, edgeSegments } = routedDagDataFromRoutes(groups, routes, layout);
-  if (nodeData.length + edgeData.length > 1000) {
+  const largeUpdate = nodeData.length + edgeData.length > 300;
+  if (largeUpdate) {
     // Route conversion and network installation are separate large stages.
     // Give input a turn between them, and discard a superseded installation.
     _dagApplyingRequest = requestId;
@@ -528,6 +529,16 @@ async function applyDagRender(groups, layout, routes) {
     } else {
       if (changedNodes.length) _visNodes.update(changedNodes);
       if (dropNodes.length) _visNodes.remove(dropNodes);
+      if (largeUpdate) {
+        // Updating route nodes and installing their edges can each be costly.
+        // Keep the partial network hidden and let the browser handle input
+        // before adding edges; a newer render supersedes this one.
+        els.dagNetwork.style.visibility = "hidden";
+        _dagApplyingRequest = requestId;
+        await new Promise(resolve => setTimeout(resolve, 0));
+        if (_dagApplyingRequest === requestId) _dagApplyingRequest = null;
+        if (requestId !== _dagRenderRequest) return;
+      }
       const nextEdgeIds = new Set(edgeData.map((e) => e.id));
       _visEdges.update(edgeData);
       const dropEdges = _visEdges.getIds().filter((id) => !nextEdgeIds.has(id));
