@@ -332,6 +332,35 @@ test("Map tab returns from mobile evidence to the DAG", async ({ page }) => {
   await expect(page.locator('button[data-mobile-panel="dag"]')).toHaveAttribute("aria-pressed", "true");
 });
 
+test("mobile evidence tables reopen at their left edge", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto(viewer);
+  await ready(page);
+  await page.locator('button[data-mobile-panel="dag"]').click();
+  const openEvidence = () => page.evaluate(async () => {
+    const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
+    await whenDagRendered();
+    inspectDagEdge(renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__"
+      && window.__dagBuilderState.project.links.some(link => link.edge_id === id
+        && (link.a_to_b_raw_link_ids?.length || link.b_to_a_raw_link_ids?.length))));
+  });
+  await openEvidence();
+  const panel = page.locator("#provenancePanel");
+  const table = panel.locator("table").first();
+  await expect(table).toBeVisible();
+  const initial = await panel.evaluate(node => ({ scroll: node.scrollLeft,
+    left: node.getBoundingClientRect().left, tableLeft: node.querySelector("table").getBoundingClientRect().left }));
+  expect(initial.scroll).toBe(0);
+  expect(initial.tableLeft).toBeGreaterThanOrEqual(initial.left);
+  await panel.evaluate(node => { node.scrollLeft = node.scrollWidth; });
+  expect(await panel.evaluate(node => node.scrollLeft)).toBeGreaterThan(0);
+  await page.locator("#closeEvidencePane").click();
+  await openEvidence();
+  await expect(table).toBeVisible();
+  expect(await panel.evaluate(node => node.scrollLeft)).toBe(0);
+});
+
 test("pinching the mobile variable map zooms the map without selecting a variable", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.setViewportSize({ width: 390, height: 800 });

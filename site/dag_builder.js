@@ -1501,6 +1501,8 @@ function renderSelectedEdge() {
 
 function dismissEvidencePane() {
   inspectorController.clearPendingExclude();
+  els.provenancePanel.scrollLeft = 0;
+  els.closeEvidencePane.closest(".dag-ws-footer").scrollLeft = 0;
   state.selectedEdgeId = null;
   state.selectedEvidenceGroupId = null;
   state.comparisonVariableIds = [];
