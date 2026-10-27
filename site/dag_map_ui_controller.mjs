@@ -303,7 +303,7 @@ function applyBrush() {
     renderAll({ rebuild: false, refreshView: true });
     return;
   }
-  // Draw-to-seed: no group yet, drawing during DV/IV selection picks the enclosed
+  // Draw-to-seed: no group yet, drawing during Dep var/Ind var selection picks the enclosed
   // variables as the seed set and opens the target group.
   if (!group && isSeedSelectionPhase() && brush.action !== "remove") {
     const side = state.phase === "select_dv" ? "dv" : "iv";

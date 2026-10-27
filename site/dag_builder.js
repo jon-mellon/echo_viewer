@@ -47,9 +47,9 @@ const ROLE_LABELS = {
   possible_confounder: "Confounder candidate",
   possible_mediator: "Mediator candidate",
   possible_common_consequence_or_collider: "Common consequence",
-  other_possible_cause_of_dv: "Other cause of DV",
-  other_possible_cause_of_iv: "Other cause of IV",
-  near_iv_dv_map_region: "Near IV/DV region",
+  other_possible_cause_of_dv: "Other cause of Dep var",
+  other_possible_cause_of_iv: "Other cause of Ind var",
+  near_iv_dv_map_region: "Near Ind var/Dep var region",
 };
 
 const GROUP_COLORS = {
@@ -59,7 +59,7 @@ const GROUP_COLORS = {
   active: "#b83b5e",
 };
 
-// Distinct colors for groups (IV and DV use GROUP_COLORS above).
+// Distinct colors for groups (Ind var and Dep var use GROUP_COLORS above).
 const GROUP_PALETTE = [
   "#0f766e", "#9f1239", "#1d4ed8", "#b45309", "#4d7c0f",
   "#7c3aed", "#be123c", "#0369a1", "#92400e", "#047857",
@@ -1622,7 +1622,7 @@ function isDrawMode(mode = state.map.mode) {
   return mapViewController.isDrawMode(mode);
 }
 
-// During DV/IV selection the user can draw a boundary before picking a seed; the
+// During Dep var/Ind var selection the user can draw a boundary before picking a seed; the
 // enclosed variables become the seed set and open the target group directly.
 function isSeedSelectionPhase() {
   return mapViewController.isSeedSelectionPhase();

@@ -12,7 +12,7 @@ test("editor display preserves member order, fallbacks and setup-only anchor act
   const model = buildGroupEditorModel(group, context);
   assert.equal(model.title, "Dependent variable group");
   assert.equal(model.choosingAnchor, true);
-  assert.equal(model.anchorButtonLabel, "Use as DV");
+  assert.equal(model.anchorButtonLabel, "Use as Dep var");
   assert.equal(model.notes, "");
   assert.equal(model.description, "Measured outcome.");
   assert.deepEqual(model.members, [
@@ -38,7 +38,7 @@ test("focus, open, review and import transitions preserve their distinct behavio
 });
 
 const step = (state, event) => ({ ...state, ...transition(state, event) });
-test("initial setup proceeds UOA → DV editor → IV editor → schema → review", () => {
+test("initial setup proceeds UOA → Dep var editor → Ind var editor → schema → review", () => {
   let state = { workflowMode: "setup", phase: "select_uoa" };
   state = step(state, { type: "uoa", uoa: "people" });
   assert.equal(state.phase, "select_dv");
@@ -55,7 +55,7 @@ test("initial setup proceeds UOA → DV editor → IV editor → schema → revi
   assert.equal(state.phase, "build");
 });
 
-test("DAG2 setup proceeds IV → DV → optional UOA without a schema-choice step", () => {
+test("DAG2 setup proceeds Ind var → Dep var → optional UOA without a schema-choice step", () => {
   let state = { interfaceMode: "dag2", workflowMode: "setup", phase: "select_iv" };
   state = step(state, { type: "anchor-selected", side: "iv", groupId: "i" });
   assert.equal(state.phase, "select_dv");

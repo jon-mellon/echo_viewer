@@ -27,7 +27,7 @@ function visNodeData(group, layoutPoint, layoutParams = {}) {
     && diagnosticRole === "mediator";
   const isSelected = group.group_id === state.activeGroupId;
   const color = isConfounder ? "#c62828" : isCollider ? "#7c3aed" : isPathMediator ? "#6b7280" : groupColor(group);
-  const roleTag = isIv ? " (IV)" : isDv ? " (DV)" : "";
+  const roleTag = isIv ? " (Ind var)" : isDv ? " (Dep var)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
   return {

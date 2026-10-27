@@ -66,8 +66,8 @@ export function studyInspector(project, rawLinksById) {
     return raw ? displayPaperTableKey(`${raw.paper_id || "unknown"}::${raw.within_table_occurrence_id || "unknown"}`) : "";
   }).filter(Boolean))].slice(0, 8);
   return {
-    sourceLabel: project.groups.find(g => g.group_id === project.iv_group_id)?.label || "IV",
-    targetLabel: project.groups.find(g => g.group_id === project.dv_group_id)?.label || "DV",
+    sourceLabel: project.groups.find(g => g.group_id === project.iv_group_id)?.label || "Ind var",
+    targetLabel: project.groups.find(g => g.group_id === project.dv_group_id)?.label || "Dep var",
     rawIds, keys,
   };
 }

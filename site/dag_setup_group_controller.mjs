@@ -243,8 +243,8 @@ export function createDagSetupGroupController({
       editButton?.addEventListener("click", () => startEditSplit?.(group.group_id));
       const detail = h("details", { className: "variable-panel-item", dataset: { groupId: group.group_id }, open: expandedVariableIds.has(group.group_id) },
         h("summary", {}, h("span", { textContent: group.label || group.group_id }),
-          group.group_id === project.iv_group_id ? h("span", { className: "variable-panel-role", textContent: "IV" }) : null,
-          group.group_id === project.dv_group_id ? h("span", { className: "variable-panel-role", textContent: "DV" }) : null,
+          group.group_id === project.iv_group_id ? h("span", { className: "variable-panel-role", textContent: "Ind var" }) : null,
+          group.group_id === project.dv_group_id ? h("span", { className: "variable-panel-role", textContent: "Dep var" }) : null,
           group.group_id === project.instrument_group_id ? h("span", { className: "variable-panel-role", textContent: "Instrument" }) : null),
         h("p", { textContent: group.description || "No definition available." }), editButton, concepts);
       detail.addEventListener("toggle", () => {
@@ -312,7 +312,7 @@ export function createDagSetupGroupController({
         : !dvSet || changingDv ? "Select dependent variable"
           : changingInstrument ? "Select instrument (optional)" : "Setup complete";
       elements.dagStatusBadge.textContent = changingInstrument ? "Instrument"
-        : ivSet && dvSet ? "Ready" : ivSet ? "Select DV" : "Select IV";
+        : ivSet && dvSet ? "Ready" : ivSet ? "Select Dep var" : "Select Ind var";
       elements.dagStatusBadge.className = `status-pill${ivSet && dvSet && !changingInstrument ? " muted" : ""}`;
       elements.workflowHint.textContent = !ivSet || changingIv
         ? "Choose the independent-variable group from the default schema."
@@ -331,9 +331,9 @@ export function createDagSetupGroupController({
       elements.dagStatusBadge.className = "status-pill muted";
       return;
     }
-    const labels = { select_dv: "Select DV", define_dv: "Define DV", select_iv: "Select IV",
+    const labels = { select_dv: "Select Dep var", define_dv: "Define Dep var", select_iv: "Select Ind var",
       select_instrument: "Instrument",
-      define_iv: "Define IV", schema_choice: "Schema", build: "Build map" };
+      define_iv: "Define Ind var", schema_choice: "Schema", build: "Build map" };
     const titles = { select_dv: "Select dependent variable",
       select_instrument: "Select instrument (optional)",
       define_dv: "Define dependent-variable group", select_iv: "Select independent variable",
@@ -448,7 +448,7 @@ export function createDagSetupGroupController({
     elements.groupingSummary.textContent = active
       ? state.interfaceMode === "dag2"
         ? `${active.groups?.length || 0} groups loaded. Import a compatible JSON schema to replace this view.`
-        : `${active.groups?.length || 0} groups available; import to view all groups, or load the groups relevant to an IV/DV setup.`
+        : `${active.groups?.length || 0} groups available; import to view all groups, or load the groups relevant to an Ind var/Dep var setup.`
       : "No schema loaded. Import a schema or create groups manually.";
   }
 

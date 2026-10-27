@@ -176,7 +176,7 @@ function renderGroupEditor() {
 }
 
 // In-editor search to add any variable (its whole duplicate cluster) to the open group.
-// Available for every group — including IV/DV, which is how "Change IV/DV" lets a user
+// Available for every group — including Ind var/Dep var, which is how "Change Ind var/Dep var" lets a user
 // swap the anchor variable without restarting Setup.
 function renderGroupSeedSearch() {
   if (!els.groupSeedInput) return;

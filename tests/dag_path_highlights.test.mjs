@@ -37,7 +37,7 @@ test("highlight model classifies path edges, dims others and preserves inputs", 
   assert.deepEqual({ visibleLinks, edges, nodes }, before);
 });
 
-test("exclusion hover draws the complete instrument-to-DV path in purple", () => {
+test("exclusion hover draws the complete instrument-to-Dep var path in purple", () => {
   const visibleLinks = [
     { edge_id: "z_k", group_a: "z", group_b: "k", direction_type: "A_TO_B" },
     { edge_id: "k_y", group_a: "k", group_b: "y", direction_type: "A_TO_B" },
@@ -55,7 +55,7 @@ test("exclusion hover draws the complete instrument-to-DV path in purple", () =>
   assert.equal(model.nodeUpdates.find(node => node.id === "k").color.border, "#7c3aed");
   assert.equal(model.nodeUpdates.find(node => node.id === "x").opacity, 0.16);
   assert.ok(model.edgeUpdates.every(edge => edge.id !== "instrument-study"));
-  assert.match(model.edgeUpdates[0].title, /Instrument-to-DV exclusion path/);
+  assert.match(model.edgeUpdates[0].title, /Instrument-to-Dep var exclusion path/);
 });
 
 test("polyline helpers separate overlapping runs and place clear arrowheads", () => {

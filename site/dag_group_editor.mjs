@@ -3,7 +3,7 @@ export function buildGroupEditorModel(group, { variables, workflowMode, phase })
   return {
     title: group.type === "dv" ? "Dependent variable group" : group.type === "iv" ? "Independent variable group" : "Group",
     choosingAnchor: workflowMode === "setup" && ["define_iv", "define_dv"].includes(phase),
-    anchorButtonLabel: "Use as " + (phase === "define_dv" ? "DV" : "IV"),
+    anchorButtonLabel: "Use as " + (phase === "define_dv" ? "Dep var" : "Ind var"),
     hint: "Edit variables, label and notes. Changes update the DAG immediately.",
     label: group.label || "", description: group.description || "", notes: group.notes || "",
     members: group.variable_ids.map(variableId => {

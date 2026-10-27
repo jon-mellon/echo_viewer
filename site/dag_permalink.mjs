@@ -62,7 +62,7 @@ export function applyPermalink(params, state) {
   const dv = resolveGroup(params.get("dv"));
   const partialSetup = params.get("mode") === "setup" && (!iv || !dv);
   if ((!iv || !dv || iv === dv) && !partialSetup) {
-    throw new Error("Permalink IV or DV is absent from the referenced schema.");
+    throw new Error("Permalink Ind var or Dep var is absent from the referenced schema.");
   }
   state.project.iv_group_id = iv || "";
   state.project.dv_group_id = dv || "";

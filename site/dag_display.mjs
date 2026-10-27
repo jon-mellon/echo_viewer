@@ -35,7 +35,7 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     && diagnosticRole === "mediator" && !isIv && !isDv && !isInstrument;
   const isSelected = group.group_id === view.activeGroupId;
   const color = isViolation ? "#c62828" : isInstrument ? "#166534" : isExogeneityCandidate ? "#c62828" : isConfounder ? "#c62828" : isCollider ? "#7c3aed" : isPathMediator ? "#6b7280" : view.groupColor;
-  const roleTag = isIv ? " (IV)" : isDv ? " (DV)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : isExogeneityCandidate ? " (potential common cause of instrument and DV)" : "";
+  const roleTag = isIv ? " (Ind var)" : isDv ? " (Dep var)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : isExogeneityCandidate ? " (potential common cause of instrument and Dep var)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
   return {

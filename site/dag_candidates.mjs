@@ -90,14 +90,14 @@ export function buildCandidateQueue(project, inputs) {
     const yConnected = cToY || yToC;
     const roles = [];
     const why = [];
-    if (cToX && cToY) { roles.push("possible_confounder"); why.push(`${group.label} → IV group; ${group.label} → DV group`); }
-    if (xToC && cToY) { roles.push("possible_mediator"); why.push(`IV group → ${group.label} → DV group`); }
-    if (xToC && yToC) { roles.push("possible_common_consequence_or_collider"); why.push(`IV group → ${group.label} ← DV group`); }
-    if (cToY && !xConnected) { roles.push("other_possible_cause_of_dv"); why.push(`${group.label} → DV group`); }
-    if (cToX && !yConnected) { roles.push("other_possible_cause_of_iv"); why.push(`${group.label} → IV group`); }
+    if (cToX && cToY) { roles.push("possible_confounder"); why.push(`${group.label} → Ind var group; ${group.label} → Dep var group`); }
+    if (xToC && cToY) { roles.push("possible_mediator"); why.push(`Ind var group → ${group.label} → Dep var group`); }
+    if (xToC && yToC) { roles.push("possible_common_consequence_or_collider"); why.push(`Ind var group → ${group.label} ← Dep var group`); }
+    if (cToY && !xConnected) { roles.push("other_possible_cause_of_dv"); why.push(`${group.label} → Dep var group`); }
+    if (cToX && !yConnected) { roles.push("other_possible_cause_of_iv"); why.push(`${group.label} → Ind var group`); }
     if (!roles.length && isNearTarget(group)) {
       roles.push("near_iv_dv_map_region");
-      why.push("Shares a map-region boundary with the IV or DV group");
+      why.push("Shares a map-region boundary with the Ind var or Dep var group");
     }
     if (!roles.length) continue;
     const orderedRoles = roles.sort((a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b));
