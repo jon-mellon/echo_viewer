@@ -3003,3 +3003,16 @@ h2 {
 .diagnostic-key-instrument { background: #166534; border-radius: 50%; }
 .diagnostic-key-violation { background: #c62828; }
 .diagnostic-key-path { background: #176b80; height: 3px; border-radius: 0; }
+
+.schema-summary {
+  cursor: pointer;
+  list-style: none;
+}
+.schema-summary::-webkit-details-marker { display: none; }
+.schema-summary::before {
+  content: "▸";
+  color: var(--ink);
+}
+#groupingPanel details[open] > .schema-summary::before { content: "▾"; }
+.schema-summary h2 { margin-right: auto; }
+#groupingPanel details:not([open]) > .schema-summary { margin-bottom: 0; }

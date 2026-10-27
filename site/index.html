@@ -54,6 +54,29 @@
           </div>
         </div>
 
+        <!-- Grouping schema (shown in setup + groups modes) -->
+        <section id="groupingPanel" class="panel-section">
+          <details>
+          <summary class="section-title schema-summary">
+            <h2>Variable schema</h2>
+            <span id="schemaPublicationBadge" class="status-pill muted">Private working copy</span>
+          </summary>
+          <select id="groupingSetSelect" class="select-input"></select>
+          <div class="mini-toolbar">
+            <button id="publishSchema" class="primary-button" type="button" hidden>Publish publicly</button>
+          </div>
+          <div id="publicationStatus" class="publication-status" role="status" aria-live="polite"></div>
+          <a id="publishedSchemaPermalink" class="published-schema-permalink" href="#" target="_blank" rel="noopener" hidden>Open public version</a>
+          <div id="groupingSummary" class="small-note"></div>
+          <div class="mini-toolbar">
+            <label class="toolbar-button file-button">
+              Import draft
+              <input id="importLocalDraft" type="file" accept="application/json,.json">
+            </label>
+          </div>
+          </details>
+        </section>
+
         <!-- Study anchors: change the selected groups at any time -->
         <div id="anchorBar" class="anchor-bar" hidden>
           <div class="anchor-row">
@@ -285,21 +308,6 @@
           <div id="groupList" class="group-list"></div>
         </section>
 
-        <!-- Grouping schema (shown in setup + groups modes) -->
-        <section id="groupingPanel" class="panel-section">
-          <div class="section-title">
-            <h2>Grouping Schema</h2>
-            <span id="schemaPublicationBadge" class="status-pill muted">Private working copy</span>
-          </div>
-          <select id="groupingSetSelect" class="select-input"></select>
-          <div class="mini-toolbar">
-            <button id="publishSchema" class="primary-button" type="button" hidden>Publish publicly</button>
-          </div>
-          <div id="publicationStatus" class="publication-status" role="status" aria-live="polite"></div>
-          <a id="publishedSchemaPermalink" class="published-schema-permalink" href="#" target="_blank" rel="noopener" hidden>Open public version</a>
-          <div id="groupingSummary" class="small-note"></div>
-        </section>
-
         <section id="rejectedVariablesPanel" class="panel-section" hidden>
           <div class="section-title">
             <h2>Rejected Variables</h2>
@@ -466,10 +474,6 @@
             <div class="mini-toolbar">
               <button id="exportGroupingFolder" class="toolbar-button" type="button">Download schema folder ZIP</button>
               <button id="exportLocalDraft" class="toolbar-button" type="button" title="Includes private edge exclusion reasons">Export private draft</button>
-              <label class="toolbar-button file-button">
-                Import draft
-                <input id="importLocalDraft" type="file" accept="application/json,.json">
-              </label>
             </div>
             <div class="mini-toolbar">
               <button id="exportProject" class="toolbar-button" type="button">Project JSON</button>
