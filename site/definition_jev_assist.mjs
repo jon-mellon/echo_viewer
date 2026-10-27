@@ -355,7 +355,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     const description = String(draft?.ai_description || "").trim();
     if (active && description) void restoreForDraft().catch(() => {});
     const canRun = active && key && !cappedKeyStatus(keyInfo) && !busy && description
-      && draft.eligible_variable_ids?.length;
+      && [...description].length >= 20 && draft.eligible_variable_ids?.length;
     els.definitionAiRun.disabled = activePhase === "test" ? false : !canRun;
     const testSaved = completedCount("test");
     const fullSaved = completedCount("full");
@@ -522,7 +522,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     const draft = getDraft();
     if (!draft || draft.step !== "partition" || !key || busy || !draft.eligible_variable_ids?.length) return;
     const description = String(draft.ai_description || "").trim();
-    if (!description) return;
+    if ([...description].length < 20) return;
     const revision = ++runRevision;
     busy = true;
     activePhase = "test";

@@ -165,7 +165,8 @@
                 <div class="section-title compact-title"><h2 id="definitionAiTitle">Classify with AI</h2></div>
                 <p class="small-note">Describe the new variable, test 24 examples, then review the suggestions before running the full split. Leftover includes anything that does not clearly fit, including uncertain cases. Your description and variable labels and text go to OpenRouter; your account is charged for each run.</p>
                 <label class="dag-label" for="definitionAiDescription">New variable description</label>
-                <textarea id="definitionAiDescription" class="search-input" rows="3" maxlength="1000" placeholder="For example: academic grades, tests, and skills assessed in school or college; exclude informal learning outside those settings"></textarea>
+                <div id="definitionAiDescriptionHelp" class="small-note">Write at least 20 characters. This description will also be used when you save.</div>
+                <textarea id="definitionAiDescription" class="search-input" rows="3" minlength="20" maxlength="1000" aria-describedby="definitionAiDescriptionHelp" placeholder="For example: academic grades, tests, and skills assessed in school or college; exclude informal learning outside those settings"></textarea>
                 <p class="small-note"><strong>Required before AI classification:</strong> Set this OpenRouter key's maximum spend to $5 or less and choose a limit that never resets. The app rejects keys with no limit, a higher limit, or a resetting limit. After changing the key settings, select Recheck limit.</p>
                 <div class="mini-toolbar">
                   <button id="definitionAiConnect" class="toolbar-button" type="button">Connect OpenRouter</button>
@@ -235,11 +236,11 @@
               <label class="dag-label" for="definitionNewLabel">New variable name</label>
               <input id="definitionNewLabel" class="search-input" type="text" placeholder="New variable">
               <label class="dag-label" for="definitionNewDescription">New group definition</label>
-              <textarea id="definitionNewDescription" class="search-input" rows="3" minlength="20" maxlength="1000" placeholder="Describe what belongs in this group (at least 20 characters)"></textarea>
+              <textarea id="definitionNewDescription" class="search-input" rows="3" minlength="20" maxlength="1000" aria-describedby="definitionValidation" placeholder="Describe what belongs in this group (at least 20 characters)"></textarea>
+              <div id="definitionValidation" class="small-note" aria-live="polite">Enter at least 20 characters for the group definition.</div>
               <div class="section-title compact-title"><h2>New group variables</h2></div>
               <div id="definitionReviewVariables" class="definition-review-variables"></div>
               <div id="definitionResidualLabels"></div>
-              <div id="definitionValidation" class="small-note" aria-live="polite"></div>
               <div class="mini-toolbar">
                 <button id="definitionReviewBack" class="toolbar-button" type="button">Back</button>
                 <button id="definitionSave" class="primary-button" type="button">Save and use</button>

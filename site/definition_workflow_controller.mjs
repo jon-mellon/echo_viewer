@@ -340,7 +340,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.new_label = clean(draft.new_label);
     draft.new_description = clean(draft.new_description || "");
     if ([...draft.new_description].length < 20) {
-      showSaveError(new Error("Write a description of at least 20 characters."));
+      showSaveError(new Error("Group definition must be at least 20 characters. Please add more detail."));
+      els.definitionNewDescription.setAttribute("aria-invalid", "true");
+      els.definitionNewDescription.focus();
       return;
     }
     draft.residual_labels = Object.fromEntries(Object.entries(draft.residual_labels)
@@ -470,6 +472,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     });
     els.definitionNewDescription.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_description = els.definitionNewDescription.value;
+      els.definitionNewDescription.removeAttribute("aria-invalid");
+      els.definitionValidation.textContent = "Enter at least 20 characters for the group definition.";
       persistProjectLocally();
     });
     els.definitionSave.addEventListener("click", saveDefinition);
