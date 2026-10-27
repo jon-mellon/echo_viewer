@@ -2141,6 +2141,7 @@ h2 {
 }
 
 .provenance-direction h3 .provenance-count {
+  display: block;
   color: var(--muted);
   font-weight: 500;
 }
