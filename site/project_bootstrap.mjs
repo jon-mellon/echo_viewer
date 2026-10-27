@@ -177,7 +177,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.publishedMembershipReadyGroups = new Set(schema.groups.map(group => group.group_id));
         state.publishedSchemaLoadFailed = false;
         await applyLoadedSchema(schema, true);
-        void loadVariableSearchCatalog();
+        if (!state.project.iv_group_id || !state.project.dv_group_id) void loadVariableSearchCatalog();
         publicationController.setSchemaReady?.(true);
         void publicationController.refreshPublicationState?.();
         onReady();
@@ -189,7 +189,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         console.error("Could not finish loading the published schema.", error);
       });
     } else {
-      void loadVariableSearchCatalog();
+      if (!state.project.iv_group_id || !state.project.dv_group_id) void loadVariableSearchCatalog();
       onReady();
     }
   }
