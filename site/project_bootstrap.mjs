@@ -145,8 +145,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     finishStartupLoading();
-    // The large variable catalog is loaded when someone searches for the
-    // first time. Group-label browsing does not need it at startup.
+    // Keep membership loading ahead of the search index; start warming the
+    // catalog after hydration so subsequent searches are ready during setup.
     if (state.data.load_published_schema) {
       const revision = state.compiledDagRevision || 0;
       const applyLoadedSchema = async (schema, complete = false) => {
@@ -177,6 +177,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.publishedMembershipReadyGroups = new Set(schema.groups.map(group => group.group_id));
         state.publishedSchemaLoadFailed = false;
         await applyLoadedSchema(schema, true);
+        void loadVariableSearchCatalog();
         publicationController.setSchemaReady?.(true);
         void publicationController.refreshPublicationState?.();
         onReady();
@@ -188,6 +189,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         console.error("Could not finish loading the published schema.", error);
       });
     } else {
+      void loadVariableSearchCatalog();
       onReady();
     }
   }

@@ -10,7 +10,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails = async () => {}, hydrateNeighbors = async () => {},
   prewarmEvidence = async () => {}, commitSchema = async () => {},
-  onCommitFailureRestored = () => {} }) {
+  onCommitFailureRestored = () => {}, onInstrumentReady = () => {} }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
   let lastBatch = null;
@@ -380,8 +380,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       state.selectedVariableIds.clear();
       state.activeGroupId = null;
       state.focusedGroupId = newGroupId;
-      state.phase = "build";
-      state.workflowMode = "group_review";
+      const initialAnchor = draft.mode !== "edit" && !state.changingAnchorSide;
+      state.phase = initialAnchor && draft.role === "iv" ? "select_dv"
+        : initialAnchor && draft.role === "dv" ? "select_instrument" : "build";
+      state.workflowMode = state.phase === "build" ? "group_review" : "setup";
       state.changingAnchorSide = null;
       invalidateMapCaches();
       addToUndoHistory(draft.mode === "edit" ? `Updated split "${draft.new_label}"`
@@ -389,6 +391,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
           : `Defined "${draft.new_label}" as ${draft.role.toUpperCase()}`, before);
       setMapMode("select");
       renderAll();
+      if (draft.role === "instrument") onInstrumentReady();
     } catch (error) {
       state.compiledDagRevision = (state.compiledDagRevision || 0) + 1;
       state.compiledDag = previousCompiledDag;

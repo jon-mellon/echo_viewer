@@ -364,7 +364,8 @@ async function renderDag({ reuseGeometry = false } = {}) {
       || (state.publishedSchemaHydrating && Number(group?.member_count) > 0));
   };
   if (state.interfaceMode === "dag2"
-    && (!hasAnchor(state.project?.iv_group_id) || !hasAnchor(state.project?.dv_group_id))) return;
+    && (!hasAnchor(state.project?.iv_group_id) || !hasAnchor(state.project?.dv_group_id)
+      || (state.phase === "select_instrument" && !state.changingAnchorSide))) return;
   let resolveRendered;
   _dagRenderedPromise = new Promise(resolve => { resolveRendered = resolve; });
   clearLogicalDagEdgeHover();

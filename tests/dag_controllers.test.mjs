@@ -116,7 +116,7 @@ test("a permalink keeps its restored anchors while published memberships hydrate
   assert.equal(dag2AnchorPickerIsActive(state, "iv", groupById), true);
 });
 
-test("DAG2 advances after the second anchor is selected", () => {
+test("DAG2 asks for an instrument after the second anchor", () => {
   const state = {
     interfaceMode: "dag2", workflowMode: "setup", phase: "select_dv", changingAnchorSide: null,
     project: {
@@ -139,8 +139,8 @@ test("DAG2 advances after the second anchor is selected", () => {
   controller.assignGroupAsAnchor("dv", "dv");
 
   assert.equal(state.project.dv_group_id, "dv");
-  assert.equal(state.phase, "build");
-  assert.equal(advances, 1);
+  assert.equal(state.phase, "select_instrument");
+  assert.equal(advances, 0);
 });
 
 test("untouched published schema does not gain an empty hidden-variable field", () => {

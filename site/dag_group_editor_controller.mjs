@@ -15,7 +15,7 @@ export function createDagGroupEditorController({
   beginEditor = () => {},
 }) {
 function notifyWhenAnchorsReady() {
-  if (state.interfaceMode !== "dag2") return;
+  if (state.interfaceMode !== "dag2" || state.phase === "select_instrument") return;
   const iv = groupById(state.project?.iv_group_id);
   const dv = groupById(state.project?.dv_group_id);
   if (iv?.variable_ids?.length && dv?.variable_ids?.length) onAnchorsReady();

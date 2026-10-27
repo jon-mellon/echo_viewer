@@ -55,12 +55,15 @@ test("initial setup proceeds UOA → Dep var editor → Ind var editor → schem
   assert.equal(state.phase, "build");
 });
 
-test("DAG2 setup proceeds Ind var → Dep var → optional UOA without a schema-choice step", () => {
+test("DAG2 setup proceeds through both anchors and optional instrument", () => {
   let state = { interfaceMode: "dag2", workflowMode: "setup", phase: "select_iv" };
   state = step(state, { type: "anchor-selected", side: "iv", groupId: "i" });
   assert.equal(state.phase, "select_dv");
   assert.equal(state.workflowMode, "setup");
   state = step(state, { type: "anchor-selected", side: "dv", groupId: "d" });
+  assert.equal(state.phase, "select_instrument");
+  assert.equal(state.workflowMode, "setup");
+  state = step(state, { type: "anchor-selected", side: "instrument", groupId: null });
   assert.equal(state.phase, "build");
   assert.equal(state.workflowMode, "group_review");
   state = step(state, { type: "uoa", uoa: "person", nextPhase: "build" });

@@ -606,6 +606,7 @@ function assignGroupAsInstrument(groupId) {
   renderMapModeControls();
   renderUndoRedo();
   drawMap();
+  shellController.showMobilePanel("dag");
 }
 
 
@@ -1746,6 +1747,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
     publicationController.workingCopyChanged();
   },
   onCommitFailureRestored: () => persistentViewer.clearSaveFailure(),
+  onInstrumentReady: () => shellController.showMobilePanel("dag"),
   prewarmEvidence: async () => {
     if (await dagDataSource.prewarmVariableMap(state.variableLayoutSource)) return;
     await dagDataSource.ensureEvidenceConnection({ variableIds: [], prewarmMapFiles: true });

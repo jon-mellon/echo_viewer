@@ -391,6 +391,7 @@ try {
     await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
     await page.waitForFunction(() => window.__dagBuilderState?.project?.dv_group_id != null);
   });
+  await page.locator("#instrumentGroupPicker button[data-select-none]").click();
   if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
   await measure("DAG layout: auto", async () => {
     await page.waitForFunction(() => window.__dagBuilderState.dagLayoutMode === "auto");

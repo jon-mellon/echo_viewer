@@ -55,8 +55,9 @@ export function transition(state, event) {
       if (state.interfaceMode === "dag2") {
         return event.side === "iv"
           ? { phase: "select_dv", activeGroupId: null, focusedGroupId: event.groupId }
-          : { phase: "build", workflowMode: "group_review", activeGroupId: null,
-              focusedGroupId: event.groupId };
+          : event.side === "dv"
+            ? { phase: "select_instrument", workflowMode: "setup", activeGroupId: null, focusedGroupId: event.groupId }
+            : { phase: "build", workflowMode: "group_review", activeGroupId: null, focusedGroupId: event.groupId };
       }
       return { phase: event.side === "dv" ? "select_iv" : "schema_choice",
         activeGroupId: null, focusedGroupId: event.fromEditor ? null : event.groupId };

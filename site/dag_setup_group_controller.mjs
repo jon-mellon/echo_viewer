@@ -12,7 +12,7 @@ export function dag2AnchorPickerIsActive(state, side, groupById) {
   const changingIv = state.changingAnchorSide === "iv";
   const changingDv = state.changingAnchorSide === "dv";
   if (side === "instrument") return ivSet && dvSet
-    && state.changingAnchorSide === "instrument";
+    && (state.changingAnchorSide === "instrument" || state.phase === "select_instrument");
   return side === "iv"
     ? !ivSet || changingIv
     : ivSet && (!dvSet || changingDv) && !changingIv;
@@ -50,9 +50,9 @@ export function createDagSetupGroupController({
     if (state.interfaceMode === "dag2") {
       const iv = groupById(state.project?.iv_group_id);
       const dv = groupById(state.project?.dv_group_id);
-      document.body.classList.toggle("initial-setup", !(anchorHasMembers(state, iv) && anchorHasMembers(state, dv)));
+      document.body.classList.toggle("initial-setup", !(anchorHasMembers(state, iv) && anchorHasMembers(state, dv)) || state.phase === "select_instrument" && !state.changingAnchorSide);
       elements.setupSection.hidden = anchorHasMembers(state, iv) && anchorHasMembers(state, dv)
-        && !state.changingAnchorSide && !state.definitionDraft;
+        && state.phase !== "select_instrument" && !state.changingAnchorSide && !state.definitionDraft;
       elements.groupListPanel.hidden = true;
       elements.groupingPanel.hidden = false;
       return;
@@ -307,7 +307,7 @@ export function createDagSetupGroupController({
       const ivSet = anchorHasMembers(state, iv), dvSet = anchorHasMembers(state, dv);
       const changingIv = state.changingAnchorSide === "iv";
       const changingDv = state.changingAnchorSide === "dv";
-      const changingInstrument = state.changingAnchorSide === "instrument" && ivSet && dvSet;
+      const changingInstrument = (state.changingAnchorSide === "instrument" || state.phase === "select_instrument") && ivSet && dvSet;
       elements.currentStepTitle.textContent = !ivSet || changingIv
         ? "Select independent variable"
         : !dvSet || changingDv ? "Select dependent variable"
@@ -377,10 +377,10 @@ export function createDagSetupGroupController({
     const defineRow = h("div", { className: "setup-group-picker-row define-new-row" },
       h("div", {}, h("strong", { textContent: "Define a group" }), h("span", { textContent: "Chop one or more existing categories in the spatial viewer" })),
       h("button", { className: "action-button", type: "button", dataset: { defineSide: side }, textContent: "Define" }));
-    const noneRow = side === "instrument" ? h("div", { className: "setup-group-picker-row" },
+    const noneRow = side === "instrument" ? h("div", { className: "setup-group-picker-row instrument-none-row" },
       h("div", {}, h("strong", { textContent: "None" }),
         h("span", { textContent: "Work without an instrument" })),
-      h("button", { className: "action-button", type: "button",
+      h("button", { className: "primary-button", type: "button",
         dataset: { selectNone: "true" }, textContent: "Use None" })) : null;
     const rows = groups.map(({ group, variableMatch }) => h("div", { className: "setup-group-picker-row" },
       h("div", {}, h("strong", { textContent: group.label || group.group_id }),
@@ -404,8 +404,8 @@ export function createDagSetupGroupController({
         : query && state.variableSearchStatus === "error"
           ? "Existing groups · variable search unavailable"
           : "Existing groups";
-    replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: title }),
-      h("div", { className: "setup-group-picker-list" }, noneRow, defineRow, ...rows));
+    replaceChildren(container, noneRow, h("div", { className: "setup-group-picker-title", textContent: title }),
+      h("div", { className: "setup-group-picker-list" }, defineRow, ...rows));
     container.querySelectorAll("button[data-group-id]").forEach(button =>
       button.addEventListener("click", () => button.dataset.side === "instrument"
         ? assignGroupAsInstrument(button.dataset.groupId)
