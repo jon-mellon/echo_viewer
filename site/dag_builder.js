@@ -162,7 +162,7 @@ function initElements() {
     "groupSeedInput", "groupSeedResults",
     "includedVariables", "neighborSuggestions",
     // Right: DAG workspace
-    "dagWorkspaceSection", "dagNetwork", "confounderConfig", "confounderDisclosure", "confounderSummary", "confounderStatusList",
+    "dagWorkspaceSection", "dagNetwork", "diagnosticOverlapKey", "confounderConfig", "confounderDisclosure", "confounderSummary", "confounderStatusList",
     "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export

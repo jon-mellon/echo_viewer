@@ -414,8 +414,8 @@
                 <summary class="toolbar-button">Filters</summary>
                 <div class="filter-dropdown-panel" aria-label="Diagram filters">
               <button id="showUnfiltered" class="toolbar-button" type="button" aria-pressed="false" title="Show all groups without a confounder or collider filter">Unfiltered</button>
-              <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that could point into both; bidirectional edges count in either direction">Confounders only</button>
-              <button id="toggleCollidersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that both could point into; bidirectional edges count in either direction">Colliders only</button>
+              <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that could point into both; bidirectional edges count in either direction">Confounders</button>
+              <button id="toggleCollidersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that both could point into; bidirectional edges count in either direction">Colliders</button>
               <button id="toggleExclusionViolations" class="toolbar-button" type="button" aria-pressed="false" hidden>Exclusion restriction violations</button>
               <button id="toggleExogeneity" class="toolbar-button" type="button" aria-pressed="false" hidden>Exogeneity</button>
               <label class="path-length-control" for="confounderPathLength" title="Maximum number of directed edges allowed on each path from a confounder to the Ind var and Dep var">
@@ -443,6 +443,7 @@
           </div>
           <div class="dag-network-wrapper">
             <div id="dagNetwork" class="dag-network"></div>
+            <div id="diagnosticOverlapKey" class="diagnostic-overlap-key" hidden></div>
           </div>
           <div class="dag-ws-footer">
             <div class="evidence-pane-header">

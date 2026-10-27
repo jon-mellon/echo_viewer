@@ -49,6 +49,15 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
       element.classList.toggle("active", active);
       element.setAttribute("aria-pressed", active ? "true" : "false");
     }
+    if (elements.diagnosticOverlapKey) {
+      const showKey = anchorsReady && !state.showExogeneity && !state.showExclusionViolations
+        && (state.showConfoundersOnly || state.showCollidersOnly);
+      elements.diagnosticOverlapKey.hidden = !showKey;
+      elements.diagnosticOverlapKey.classList.toggle("collider-key", state.showConfoundersOnly);
+      elements.diagnosticOverlapKey.classList.toggle("confounder-key", state.showCollidersOnly);
+      elements.diagnosticOverlapKey.textContent = state.showConfoundersOnly
+        ? "Purple outline: also a collider" : "Red outline: also a confounder";
+    }
     const confounderCount = state.confounderGroupIds?.size || 0;
     const instrumentReady = anchorsReady && Boolean(state.project?.instrument_group_id)
       && Boolean(groupById(state.project.instrument_group_id))
@@ -72,7 +81,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     elements.toggleConfoundersOnly.disabled = !anchorsReady;
     elements.toggleConfoundersOnly.classList.toggle("active", state.showConfoundersOnly);
     elements.toggleConfoundersOnly.setAttribute("aria-pressed", state.showConfoundersOnly ? "true" : "false");
-    elements.toggleConfoundersOnly.textContent = `Confounders only (${confounderCount})`;
+    elements.toggleConfoundersOnly.textContent = `Confounders (${confounderCount})`;
     elements.toggleConfoundersOnly.title = anchorsReady
       ? `Show the Ind var, Dep var, and ${confounderCount} potential common cause${confounderCount === 1 ? "" : "s"} within ${state.confounderMaxPathLength} directed edge${state.confounderMaxPathLength === 1 ? "" : "s"} of each anchor. Bidirectional edges are treated pessimistically as possibly running either way.`
       : "Select an Ind var and Dep var before filtering to confounders.";
@@ -80,7 +89,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     elements.toggleCollidersOnly.disabled = !anchorsReady;
     elements.toggleCollidersOnly.classList.toggle("active", state.showCollidersOnly);
     elements.toggleCollidersOnly.setAttribute("aria-pressed", state.showCollidersOnly ? "true" : "false");
-    elements.toggleCollidersOnly.textContent = `Colliders only (${colliderCount})`;
+    elements.toggleCollidersOnly.textContent = `Colliders (${colliderCount})`;
     elements.toggleCollidersOnly.title = anchorsReady
       ? `Show the Ind var, Dep var, and ${colliderCount} potential common descendant${colliderCount === 1 ? "" : "s"} reachable from both anchors within ${state.confounderMaxPathLength} directed edge${state.confounderMaxPathLength === 1 ? "" : "s"}. Bidirectional edges are treated pessimistically as possibly running either way.`
       : "Select an Ind var and Dep var before filtering to colliders.";
