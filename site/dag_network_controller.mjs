@@ -412,12 +412,21 @@ async function renderDag({ reuseGeometry = false } = {}) {
   const geometryKey = JSON.stringify({ ...input, viewSignature: undefined });
   const cached = _dagGeometryCache.get(geometryKey);
   if (cached) {
-    ++_dagRenderRequest;
+    const requestId = ++_dagRenderRequest;
     _dagRenderWorker?.terminate();
     _dagRenderWorker = null;
     rememberGeometry(geometryKey, cached);
     _dagGeometry = cached;
     const reused = reuseDagGeometry(cached, groups, links);
+    // Applying cached geometry can be substantial, and this branch runs in
+    // the filter's input handler. Let that handler finish before updating vis.
+    _dagApplyingRequest = requestId;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    if (_dagApplyingRequest === requestId) _dagApplyingRequest = null;
+    if (requestId !== _dagRenderRequest) {
+      resolveRendered();
+      return;
+    }
     await applyDagRender(groups, reused.layout, reused.routes);
     resolveRendered();
     return;
