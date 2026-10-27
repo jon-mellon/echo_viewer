@@ -84,6 +84,35 @@ test("group definition renders before concepts and paginates ten at a time", asy
   }
 });
 
+test("tall panels load a bounded larger page and reuse cached labels", async () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName) };
+  try {
+    const ids = Array.from({ length: 80 }, (_, index) => `v${index + 1}`);
+    const state = { project: { groups: [{ group_id: "g1", variable_ids: ids }] },
+      selectedEvidenceGroupId: "g1", variableById: new Map() };
+    const edgeInspector = new Element("div");
+    edgeInspector.parentElement = { clientHeight: 2000 };
+    const elements = { edgeInspector, closeEvidencePane: new Element("button"), provenancePanel: new Element("div") };
+    const requests = [];
+    const controller = createDagInspectorController({ state, elements, loadConceptLabels: async requested => {
+      requests.push(requested);
+      return requested.map(variable_id => ({ variable_id, concept_label: variable_id }));
+    } });
+    controller.renderGroupDefinition();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(requests[0].length, 30);
+    assert.equal(edgeInspector.findAll("li").length, 30);
+    edgeInspector.querySelector("[data-concept-page='next']").click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(requests[1], ids.slice(30, 60));
+    edgeInspector.querySelector("[data-concept-page='previous']").click();
+    assert.equal(requests.length, 2);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("a concept without a loaded label has no exclude control", async () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement: tagName => new Element(tagName) };

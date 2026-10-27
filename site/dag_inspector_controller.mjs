@@ -29,7 +29,7 @@ export function createDagInspectorController({
   let conceptGroupId = null;
   let conceptViewKey = null;
   let conceptPage = 0;
-  const conceptPageSize = 10;
+  let conceptPageSize = 10;
   const provenancePageSize = 5;
   // Evidence pages per direction, reset whenever a different edge is selected.
   let provenancePagesEdgeId = null;
@@ -117,6 +117,10 @@ export function createDagInspectorController({
     if (conceptGroupId !== group.group_id) {
       conceptGroupId = group.group_id;
       conceptPage = 0;
+      // Bound label hydration while using the space available in taller panels.
+      const height = elements.edgeInspector.parentElement?.clientHeight || 0;
+      const descriptionLines = Math.ceil((group.description || "").length / 40);
+      conceptPageSize = Math.max(10, Math.min(30, Math.floor((height - 190 - descriptionLines * 18) / 28)));
     }
     const ids = group.variable_ids || [];
     const count = ids.length || (state.publishedSchemaHydrating ? Number(group.member_count) || 0 : 0);
