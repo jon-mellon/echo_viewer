@@ -14,7 +14,8 @@ export function createDagInspectorController({
   loadVisibleLinkEndpoints = async () => [],
   excludeConcept = () => {},
 }) {
-  const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
+  const selectedEdge = () => state.project?.links?.find(link => state.selectedEdgeId === STUDY_DESIGN_EDGE_ID
+    ? link.is_target_relation : link.edge_id === state.selectedEdgeId) || null;
   let pendingExclude = null;
   let pendingFindingId = null;
   const conceptLabels = new Map();

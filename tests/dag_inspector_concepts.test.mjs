@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDagInspectorController } from "../site/dag_inspector_controller.mjs";
+import { createDagInspectorController, STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "../site/dag_inspector_controller.mjs";
 
 class Element {
   constructor(tagName) {
@@ -244,4 +244,35 @@ test("concept exclude control passes the selected concept to the group update pa
   } finally {
     globalThis.document = previousDocument;
   }
+});
+
+
+test("focal study tie shows the target relationship's evidence in both directions", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName),
+    createTextNode: text => ({ textContent: text }) };
+  try {
+    const edge = { edge_id: "a__b", group_a: "a", group_b: "b", is_target_relation: true,
+      a_to_b_raw_link_ids: ["r1"], b_to_a_raw_link_ids: ["r2"] };
+    const raw = (id, source, target) => ({ raw_causal_link_id: id, paper_id: id,
+      source_variable_id: source, target_variable_id: target });
+    const state = { project: { groups: [{ group_id: "a", label: "Exposure", variable_ids: ["v1"] },
+      { group_id: "b", label: "Outcome", variable_ids: ["v2"] }], links: [edge],
+      iv_group_id: "a", dv_group_id: "b", link_decisions: {}, finding_decisions: {} },
+      selectedEdgeId: STUDY_DESIGN_EDGE_ID, rawLinksById: new Map([["r1", raw("r1", "v1", "v2")],
+        ["r2", raw("r2", "v2", "v1")]]), variableById: new Map([["v1", { concept_label: "Source" }],
+        ["v2", { concept_label: "Target" }]]) };
+    const elements = { edgeInspector: new Element("div"), closeEvidencePane: new Element("button"),
+      provenancePanel: new Element("div") };
+    const controller = createDagInspectorController({ state, elements, truncate: text => text });
+    assert.equal(controller.selectedEdge(), edge);
+    controller.renderEdge();
+    controller.renderProvenance();
+    assert.equal(elements.provenancePanel.findAll("section").length, 2);
+    assert.match(elements.provenancePanel.textContent, /r1/);
+    assert.match(elements.provenancePanel.textContent, /r2/);
+    state.selectedEdgeId = STUDY_INSTRUMENT_EDGE_ID;
+    controller.renderProvenance();
+    assert.equal(elements.provenancePanel.hidden, true);
+  } finally { globalThis.document = previousDocument; }
 });
