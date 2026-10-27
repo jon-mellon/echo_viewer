@@ -50,6 +50,7 @@ export function createDagSetupGroupController({
     if (state.interfaceMode === "dag2") {
       const iv = groupById(state.project?.iv_group_id);
       const dv = groupById(state.project?.dv_group_id);
+      document.body.classList.toggle("initial-setup", !(anchorHasMembers(state, iv) && anchorHasMembers(state, dv)));
       elements.setupSection.hidden = anchorHasMembers(state, iv) && anchorHasMembers(state, dv)
         && !state.changingAnchorSide && !state.definitionDraft;
       elements.groupListPanel.hidden = true;

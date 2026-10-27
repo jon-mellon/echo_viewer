@@ -356,6 +356,15 @@ function rememberGeometry(key, geometry) {
 }
 
 async function renderDag({ reuseGeometry = false } = {}) {
+  // Data loading and filtering continue during setup, but there is no graph to
+  // lay out until both study variables have been chosen.
+  const hasAnchor = id => {
+    const group = state.project?.groups?.find(item => item.group_id === id);
+    return Boolean(group?.variable_ids?.length
+      || (state.publishedSchemaHydrating && Number(group?.member_count) > 0));
+  };
+  if (state.interfaceMode === "dag2"
+    && (!hasAnchor(state.project?.iv_group_id) || !hasAnchor(state.project?.dv_group_id))) return;
   let resolveRendered;
   _dagRenderedPromise = new Promise(resolve => { resolveRendered = resolve; });
   clearLogicalDagEdgeHover();

@@ -104,6 +104,7 @@ try {
     const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(g => g.variable_ids.length).slice(0, 2).map(g => g.group_id));
     await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
     await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+    await page.locator('.filter-dropdown > summary').click();
     await page.locator('#showUnfiltered').click();
     const apiUrl = await page.locator('script[type="module"][src*="dag_builder.js"]').getAttribute('src');
     async function settled() {

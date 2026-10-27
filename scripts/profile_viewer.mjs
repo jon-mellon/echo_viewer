@@ -129,7 +129,6 @@ async function measure(name, action) {
     throw new Error(`Profile scenario "${name}" failed:\n${error?.stack || error}`);
   }
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  await page.locator('.filter-dropdown > summary').click();
   const after = await snapshot();
   const longTasks = after.longTasks.filter(entry => entry.startTime >= before.at);
   const events = after.events.filter(entry => entry.startTime >= before.at);
@@ -400,6 +399,7 @@ try {
   await measure("DAG zoom", async () => {
     await page.locator("#dagSvgZoomIn").click();
   });
+  await page.locator(".filter-dropdown > summary").click();
   await measure("unfiltered view", async () => {
     await page.locator("#showUnfiltered").click();
   });

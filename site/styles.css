@@ -757,6 +757,15 @@ h2 {
   display: none;
 }
 
+.dag2-mode.defining-variable .dag-map-toolbar {
+  left: 10px;
+  right: 10px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.dag2-mode.defining-variable .dag-map-toolbar > * { flex-shrink: 0; }
+
 .dag2-mode.defining-variable .dag-map-panel {
   display: flex !important;
   grid-column: 3;
@@ -2138,7 +2147,7 @@ h2 {
 
 .provenance-table--edge {
   table-layout: fixed;
-  min-width: 620px;
+  min-width: 800px;
 }
 
 .provenance-table--edge th,
@@ -2156,6 +2165,7 @@ h2 {
 .provenance-table--edge th:nth-child(4) { width: 10%; }
 .provenance-table--edge th:nth-child(5),
 .provenance-table--edge th:nth-child(6) { width: 14%; }
+.provenance-table--edge th:nth-child(6) { white-space: nowrap; }
 .provenance-table--edge th:nth-child(7) { width: 12%; }
 
 .finding-exclude-button {
@@ -2973,3 +2983,19 @@ h2 {
 .confounder-key .diagnostic-key-fill { background: #176b80; }
 .collider-key .diagnostic-key-outline { background: #c62828; border: 3px solid #176b80; }
 .confounder-key .diagnostic-key-outline { background: #176b80; border: 3px solid #c62828; }
+
+/* Give the initial variable selection the whole viewport. */
+.dag2-mode.initial-setup:not(.defining-variable) .dag-shell {
+  display: block;
+  height: 100dvh;
+}
+.dag2-mode.initial-setup:not(.defining-variable) .dag-left-panel {
+  width: 100%;
+  height: 100%;
+  padding: 0 max(24px, calc((100vw - 760px) / 2));
+}
+.dag2-mode.initial-setup:not(.defining-variable) #leftResizer,
+.dag2-mode.initial-setup:not(.defining-variable) .dag-right-panel,
+.dag2-mode.initial-setup:not(.defining-variable) .mobile-panel-nav {
+  display: none !important;
+}
