@@ -1722,7 +1722,7 @@ const toolbarController = createToolbarController({
 });
 
 const definitionWorkflowController = createDefinitionWorkflowController({
-  state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll, drawMap,
+  state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll, drawMap, renderAssignmentCoverage,
   setMapMode, fitMap, groupById, persistProjectLocally, visibleVariables,
   searchVariables: searchVisibleVariables,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,

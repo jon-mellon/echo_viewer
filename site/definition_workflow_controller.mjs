@@ -5,7 +5,7 @@ import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
 import { browsePublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
-  invalidateMapCaches, renderAll, drawMap = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
+  invalidateMapCaches, renderAll, drawMap = () => {}, renderAssignmentCoverage = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
   visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails = async () => {}, hydrateNeighbors = async () => {},
@@ -80,6 +80,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     // Definition steps change selection and map contents, not the project DAG.
     // The DAG is hidden until cancel/save, where a full render is performed.
     renderAll({ rebuild: false });
+    renderAssignmentCoverage();
     jevAssist.render();
     if (redrawMap) drawMap();
   };

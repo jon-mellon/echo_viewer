@@ -393,6 +393,7 @@ test("mobile definition waits for variable data before opening the map", async (
   await expect(page.locator('button[data-mobile-panel="variables"]')).toBeVisible();
   await page.locator('button[data-mobile-panel="variables"]').click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variables.length)).toBeGreaterThan(0);
+  await expect(page.locator('#variableAssignmentCounts')).not.toHaveText(/0 assigned\s*0 unassigned/);
 });
 
 test("project export can be imported with its anchors intact", async ({ page }) => {
