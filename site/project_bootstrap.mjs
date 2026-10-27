@@ -149,7 +149,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     // first time. Group-label browsing does not need it at startup.
     if (state.data.load_published_schema) {
       const revision = state.compiledDagRevision || 0;
-      const applyLoadedSchema = schema => {
+      const applyLoadedSchema = async (schema, complete = false) => {
         state.data.grouping_sets = [schema];
         state.data.default_grouping_set_id = schema.grouping_set_id;
         state.project.link_decisions = structuredClone(schema.link_decisions || {});
@@ -157,6 +157,13 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.project.confounder_statuses = structuredClone(schema.confounder_statuses || {});
         loadLatestSchemaGroups();
         normalizeProjectDuplicateAssignments();
+        // Membership hydration and the following DOM/canvas refresh are
+        // separate stages. Let input and painting run between them.
+        await new Promise(resolve => setTimeout(resolve, 0));
+        if (complete) {
+          state.publishedSchemaHydrating = false;
+          state.publishedSchemaHydrated = true;
+        }
         // Compiled nodes and routes already describe this publication. Hydrating
         // memberships updates controls and metadata without changing geometry.
         renderAll({ reuseDagGeometry: true });
@@ -164,14 +171,12 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       void state.data.load_published_schema({ onPriorityReady: ({ schema, groupIds }) => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.publishedMembershipReadyGroups = new Set(groupIds);
-        applyLoadedSchema(schema);
-      } }).then(({ schema }) => {
+        return applyLoadedSchema(schema);
+      } }).then(async ({ schema }) => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.publishedMembershipReadyGroups = new Set(schema.groups.map(group => group.group_id));
-        state.publishedSchemaHydrating = false;
-        state.publishedSchemaHydrated = true;
         state.publishedSchemaLoadFailed = false;
-        applyLoadedSchema(schema);
+        await applyLoadedSchema(schema, true);
         publicationController.setSchemaReady?.(true);
         void publicationController.refreshPublicationState?.();
         onReady();

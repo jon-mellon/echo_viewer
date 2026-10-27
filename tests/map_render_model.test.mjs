@@ -17,6 +17,13 @@ const colors = { iv: "#315f9d", dv: "#9b5c2e", assigned: "#1f7a67", active: "#b8
 const palette = ["#0f766e", "#9f1239", "#1d4ed8"];
 const identity = (x, y) => ({ x, y });
 
+test("scoped map ownership retains first-group precedence and omits unrelated memberships", () => {
+  const first = { group_id: "first", variable_ids: ["a", "b"] };
+  const second = { group_id: "second", variable_ids: ["a", "c"] };
+  assert.deepEqual([...firstGroupByVariable([first, second], new Set(["a", "c"]))],
+    [["a", first], ["c", second]]);
+});
+
 test("actual point renderer applies unassigned, assigned and UOA opacity", () => {
   const variables = [
     { variable_id: "a", map_x: 10, map_y: 20, uoa: "x" },

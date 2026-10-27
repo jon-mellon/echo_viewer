@@ -8,6 +8,29 @@ import { createDagProjectController } from "../site/dag_project_controller.mjs";
 import { dag2AnchorPickerIsActive } from "../site/dag_setup_group_controller.mjs";
 import { createDagGroupEditorController } from "../site/dag_group_editor_controller.mjs";
 import { createGroupingSetController } from "../site/grouping_set_controller.mjs";
+import { createDagShellController } from "../site/dag_shell_controller.mjs";
+
+test("fullscreen resizes the existing graph and only fits the variable map when shown", () => {
+  const original = { document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame, setTimeout: globalThis.setTimeout };
+  const calls = [];
+  const button = () => ({ classList: { toggle() {} }, setAttribute() {}, textContent: "" });
+  globalThis.document = { body: { classList: { toggle() {} } } };
+  globalThis.requestAnimationFrame = callback => callback();
+  globalThis.setTimeout = callback => { callback(); return 0; };
+  try {
+    const controller = createDagShellController({ state: { fullscreenPanel: null },
+      elements: { fullscreenVariableMap: button(), fullscreenDag: button() },
+      resizeMap: () => calls.push("resize-map"), fitMap: () => calls.push("fit-map"),
+      renderDag: () => calls.push("rebuild"),
+      getNetwork: () => ({ setSize: (...size) => calls.push(size), fit: () => calls.push("fit-dag") }),
+    });
+    controller.setFullscreen("dag");
+    controller.setFullscreen(null);
+    assert.deepEqual(calls, [["100%", "100%"], "fit-dag", ["100%", "100%"], "fit-dag"]);
+    controller.setFullscreen("variable-map");
+    assert.deepEqual(calls.slice(4), ["resize-map", "fit-map", ["100%", "100%"], "fit-dag"]);
+  } finally { Object.assign(globalThis, original); }
+});
 
 function memoryStorage() {
   const values = new Map();

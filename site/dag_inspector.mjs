@@ -73,10 +73,11 @@ export function studyInspector(project, rawLinksById) {
 }
 
 /** Group labels per variable, in schema order, so each evidence row avoids scanning every membership. */
-export function groupLabelsByVariable(groups) {
+export function groupLabelsByVariable(groups, requestedIds = null) {
   const labels = new Map();
   for (const group of groups || []) {
     for (const id of group.variable_ids || []) {
+      if (requestedIds && !requestedIds.has(id)) continue;
       if (!labels.has(id)) labels.set(id, []);
       labels.get(id).push(group.label || group.group_id);
     }
@@ -105,8 +106,14 @@ export function provenanceModel(link, project, rawLinksById, variables, diagnost
   const edge = edgeInspector(link, project, diagnosticView);
   if (!edge) return null;
   const groupLabel = id => project.groups.find(group => group.group_id === id)?.label || id;
-  const owners = new Map(project.groups.flatMap(group => (group.variable_ids || []).map(id => [id, group.group_id])));
   const excluded = Object.keys(project.finding_decisions || {}).map(id => rawLinksById.get(id)).filter(Boolean);
+  const owners = new Map();
+  if (excluded.length) {
+    const endpoints = new Set(excluded.flatMap(raw => [raw.source_variable_id, raw.target_variable_id]));
+    for (const group of project.groups) for (const id of group.variable_ids || []) {
+      if (endpoints.has(id)) owners.set(id, group.group_id);
+    }
+  }
   const excludedFor = (source, target) => excluded.filter(raw =>
     owners.get(raw.source_variable_id) === source && owners.get(raw.target_variable_id) === target)
     .map(raw => raw.raw_causal_link_id);
@@ -118,7 +125,11 @@ export function provenanceModel(link, project, rawLinksById, variables, diagnost
   ];
   if (diagnosticEvidenceDirection(link, diagnosticView) === "B_TO_A") sections.reverse();
   const seen = new Set();
-  const labelsByVariable = groupLabelsByVariable(project.groups);
+  const endpoints = new Set(sections.flatMap(section => section.rawIds.flatMap(id => {
+    const raw = rawLinksById.get(id);
+    return raw ? [raw.source_variable_id, raw.target_variable_id] : [];
+  })));
+  const labelsByVariable = groupLabelsByVariable(project.groups, endpoints);
   const populatedSections = sections.map(section => ({
     ...section,
     rows: section.rawIds.filter(id => {

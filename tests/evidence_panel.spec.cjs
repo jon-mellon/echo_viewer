@@ -48,6 +48,23 @@ for (const corrupt of [false, true]) {
     if (!corrupt) {
       expect(requests.filter(url => /duckdb|\.parquet|search-catalogs/.test(url))).toEqual([]);
       expect(requests.filter(url => /evidence-panels.*json.gz/.test(url))).toHaveLength(2);
+      await page.evaluate(() => {
+        const s = window.__dagBuilderState;
+        window.__decisionCompiled = s.compiledDag;
+        window.__decisionMembers = s.project.groups.map(g => g.variable_ids);
+      });
+      await page.locator('[data-edge-action="exclude"]').click();
+      await page.locator("#excludeReasonInput").fill("Verify display-only exclusion");
+      await page.locator("#excludeConfirmBtn").click();
+      await page.locator('[data-edge-action="restore"]').waitFor();
+      await page.locator('[data-edge-action="restore"]').click();
+      await page.locator('[data-edge-action="exclude"]').waitFor();
+      expect(await page.evaluate(() => {
+        const s = window.__dagBuilderState;
+        return s.compiledDag === window.__decisionCompiled
+          && s.project.groups.every((g, i) => g.variable_ids === window.__decisionMembers[i])
+          && !s.project.link_decisions["category-academic-achievement__category-macroeconomic-context"];
+      })).toBe(true);
     }
     console.log("Mobile evidence", { corrupt, browserName, firstMs, requests: requests.length });
   });

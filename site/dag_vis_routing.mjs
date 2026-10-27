@@ -3,7 +3,9 @@
 export function routeNodeData(id, point) {
   return {
     id, x: point.x, y: point.y, fixed: { x: true, y: true }, physics: false,
-    label: "", shape: "dot", size: 0.1, borderWidth: 0,
+    // An empty text node anchors the routed segments without painting a
+    // transparent circle for every bend on every canvas frame.
+    label: "", shape: "text", size: 0.1, borderWidth: 0,
     color: { background: "rgba(0,0,0,0)", border: "rgba(0,0,0,0)",
       highlight: { background: "rgba(0,0,0,0)", border: "rgba(0,0,0,0)" },
       hover: { background: "rgba(0,0,0,0)", border: "rgba(0,0,0,0)" } },

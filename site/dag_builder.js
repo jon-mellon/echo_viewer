@@ -806,6 +806,15 @@ function applyProjectOperation(next) {
     return false;
   }
   const oldProject = state.project;
+  const linkDecisionOnly = oldProject && next.groups === oldProject.groups
+    && Object.keys(next).length === Object.keys(oldProject).length
+    && Object.keys(next).every(key => key === "link_decisions" || next[key] === oldProject[key]);
+  if (linkDecisionOnly) {
+    // Display decisions are applied by aggregateGroupLinks. Evidence ownership
+    // and compiled occurrence counts are unchanged, so do not rescan members.
+    projectController.applyOperation(next, { preserveMembership: true });
+    return true;
+  }
   const findingOnly = oldProject && next.groups === oldProject.groups
     && Object.keys(next).length === Object.keys(oldProject).length
     && Object.keys(next).every(key => key === "finding_decisions" || next[key] === oldProject[key]);

@@ -9,10 +9,12 @@ export function variableVisualStatus(variableId, groups, activeGroupId) {
 }
 
 /** The first group listing each variable, matching variableVisualStatus's lookup order. */
-export function firstGroupByVariable(groups) {
+export function firstGroupByVariable(groups, requestedIds = null) {
   const owners = new Map();
   for (const group of groups || []) {
-    for (const id of group.variable_ids || []) if (!owners.has(id)) owners.set(id, group);
+    for (const id of group.variable_ids || []) {
+      if ((!requestedIds || requestedIds.has(id)) && !owners.has(id)) owners.set(id, group);
+    }
   }
   return owners;
 }
@@ -242,7 +244,9 @@ export function buildMapPointModels({ variables, groups, activeGroupId, selected
   for (const variable of variables) {
     const screen = worldToScreen(variable.map_x, variable.map_y, transform);
     if (screen.x < -24 || screen.x > width + 24 || screen.y < -24 || screen.y > height + 24) continue;
-    owners ??= firstGroupByVariable(groups);
+    // The lazy variable map often has only one group's coordinates. Index
+    // those hydrated points rather than allocating entries for all 98k members.
+    owners ??= firstGroupByVariable(groups, new Set(variables.map(point => point.variable_id)));
     const status = groupVisualStatus(owners.get(variable.variable_id), activeGroupId);
     const selected = clusterRep(selectedVariableId || "") === variable.variable_id || selectedVariableIds.has(variable.variable_id);
     const hovered = clusterRep(hoveredVariableId || "") === variable.variable_id;

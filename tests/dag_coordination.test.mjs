@@ -184,8 +184,8 @@ test("network events use live state and dispose only their own listeners", () =>
   const network = { on: (n, h) => handlers.set(n, h), off: (n, h) => { assert.equal(handlers.get(n), h); handlers.delete(n); },
     getScale: () => 0.1, getViewPosition: () => ({ x: 0, y: 0 }), moveTo: p => calls.push(["zoom", p.scale]),
     unselectAll: () => calls.push("unselect") };
-  const element = { addEventListener: (n, h) => listeners.set(n, h),
-    removeEventListener: (n, h) => { assert.equal(listeners.get(n), h); listeners.delete(n); },
+  const element = { addEventListener: (n, h) => { if (!listeners.has(n)) listeners.set(n, new Set()); listeners.get(n).add(h); },
+    removeEventListener: (n, h) => { assert.ok(listeners.get(n)?.delete(h)); if (!listeners.get(n).size) listeners.delete(n); },
     clientWidth: 200, clientHeight: 120 };
   let diagnostic = false;
   const detach = attachDagInteractions(network, element, {
@@ -211,7 +211,7 @@ test("network events use live state and dispose only their own listeners", () =>
   handlers.get("hoverNode")({ node: "g" });
   diagnostic = true;
   handlers.get("hoverNode")({ node: "g" });
-  listeners.get("mouseleave")();
+  for (const listener of listeners.get("mouseleave")) listener();
   assert.deepEqual(calls, [["zoom", 0.5], ["focus", "g"], "unselect", ["open", "g"],
     ["zoomAt", { x: 42, y: -7 }], ["edge", "logical"], "unselect", ["clearEdge", "old-segment"],
     "clearPath", ["nodeEdges", "g"], ["clearEdge", undefined], ["paths", "g"],

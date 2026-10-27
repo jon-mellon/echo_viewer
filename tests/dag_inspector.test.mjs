@@ -46,6 +46,15 @@ test("provenance classifications follow schema order across overlapping groups",
   assert.deepEqual(inspector.provenanceVariable("z", new Map(), labels), { concept: "z", classifications: [] });
 });
 
+test("scoped provenance labels retain overlapping classifications without indexing unrelated concepts", () => {
+  const groups = [
+    { group_id: "a", label: "First", variable_ids: ["x", "unrelated"] },
+    { group_id: "b", label: "Second", variable_ids: ["x", "y"] },
+  ];
+  const labels = inspector.groupLabelsByVariable(groups, new Set(["x"]));
+  assert.deepEqual([...labels], [["x", ["First", "Second"]]]);
+});
+
 test("evidence rows page five at a time and clamp out-of-range pages", () => {
   const rows = Array.from({ length: 12 }, (_, index) => index);
   assert.deepEqual(inspector.provenancePage(rows, 0, 5),
