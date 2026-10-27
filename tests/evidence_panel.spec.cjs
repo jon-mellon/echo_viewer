@@ -101,6 +101,7 @@ test("a newer path filter supersedes a dense graph while installation is pending
   await page.locator('button[data-mobile-panel="dag"]').click();
   const settled = () => page.evaluate(async () => (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).whenDagRendered());
   await settled();
+  await page.locator('.filter-dropdown > summary').click();
   await page.locator("#showUnfiltered").click();
   await settled();
   for (const id of ["toggleConfoundersOnly", "toggleCollidersOnly", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks"]) {

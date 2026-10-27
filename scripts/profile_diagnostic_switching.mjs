@@ -61,6 +61,7 @@ try {
     }
     if (mobile) await page.locator('[data-mobile-panel="dag"]').click();
     await settled();
+    await page.locator('.filter-dropdown > summary').click();
     await page.evaluate(() => {
       const s = window.__dagBuilderState;
       window.__diagnosticBaseline = { compiled: s.compiledDag, links: s.project.links, groups: s.project.groups, evidence: s.rawLinksById.size };

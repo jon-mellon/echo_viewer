@@ -129,6 +129,7 @@ async function measure(name, action) {
     throw new Error(`Profile scenario "${name}" failed:\n${error?.stack || error}`);
   }
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.locator('.filter-dropdown > summary').click();
   const after = await snapshot();
   const longTasks = after.longTasks.filter(entry => entry.startTime >= before.at);
   const events = after.events.filter(entry => entry.startTime >= before.at);
