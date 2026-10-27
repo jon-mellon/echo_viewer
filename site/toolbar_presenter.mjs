@@ -1,5 +1,14 @@
 import { h, replaceChildren } from "./dom_builder.mjs";
 
+export function diagnosticViewTitle(state, anchorsReady) {
+  if (!anchorsReady) return "Unfiltered";
+  if (state.showExclusionViolations) return "Exclusion restriction";
+  if (state.showExogeneity) return "Exogeneity";
+  if (state.showConfoundersOnly) return "Confounders";
+  if (state.showCollidersOnly) return "Colliders";
+  return "Unfiltered";
+}
+
 export function createToolbarPresenter({ state, elements, groupById, visibleVariables,
   uoaMatches, clusterRep, rejectedVariableIdSet }) {
   function assignmentCoverage() {
@@ -32,6 +41,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
   }
 
   function render(anchorsReady, { includeCoverage = true } = {}) {
+    if (elements.dagViewTitle) elements.dagViewTitle.textContent = diagnosticViewTitle(state, anchorsReady);
     if (elements.toggleSparseEdges) {
       elements.toggleSparseEdges.classList.toggle("active", state.excludeSparseEdges);
       elements.toggleSparseEdges.setAttribute("aria-pressed", state.excludeSparseEdges ? "true" : "false");

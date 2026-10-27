@@ -9,7 +9,7 @@ import { dag2AnchorPickerIsActive } from "../site/dag_setup_group_controller.mjs
 import { createDagGroupEditorController } from "../site/dag_group_editor_controller.mjs";
 import { createGroupingSetController } from "../site/grouping_set_controller.mjs";
 import { createDagShellController } from "../site/dag_shell_controller.mjs";
-import { createToolbarPresenter } from "../site/toolbar_presenter.mjs";
+import { createToolbarPresenter, diagnosticViewTitle } from "../site/toolbar_presenter.mjs";
 import { createRenderCoordinator } from "../site/render_coordinator.mjs";
 
 test("graph-only filters update controls without recomputing assignment coverage", () => {
@@ -388,4 +388,15 @@ test("anchor history composes with membership history and survives serialization
   assert.equal(state.project.groups[0].variable_ids, members);
   controller.redo();
   assert.deepEqual(state.project.groups[0].variable_ids, ["v1", "v3"]);
+});
+
+
+test("diagram heading follows the active diagnostic view", () => {
+  for (const [flag, title] of [["showConfoundersOnly", "Confounders"],
+    ["showCollidersOnly", "Colliders"], ["showExogeneity", "Exogeneity"],
+    ["showExclusionViolations", "Exclusion restriction"]]) {
+    assert.equal(diagnosticViewTitle({ [flag]: true }, true), title);
+    assert.equal(diagnosticViewTitle({ [flag]: true }, false), "Unfiltered");
+  }
+  assert.equal(diagnosticViewTitle({}, true), "Unfiltered");
 });
