@@ -2950,28 +2950,26 @@ h2 {
   }
 }
 
-.diagnostic-overlap-key {
+ .diagnostic-overlap-key {
   position: absolute;
   top: 10px;
   left: 10px;
-  z-index: 1;
+  z-index: 2;
   display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 9px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 7px 10px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
   font-size: 12px;
   pointer-events: none;
 }
 .diagnostic-overlap-key[hidden] { display: none; }
-.diagnostic-overlap-key::before {
-  content: "";
-  width: 14px;
-  height: 14px;
-  border: 3px solid;
-  border-radius: 3px;
-}
-.diagnostic-overlap-key.collider-key::before { border-color: #7c3aed; }
-.diagnostic-overlap-key.confounder-key::before { border-color: #c62828; }
+.diagnostic-key-item { display: inline-flex; align-items: center; gap: 6px; }
+.diagnostic-key-swatch { width: 15px; height: 15px; border-radius: 3px; }
+.collider-key .diagnostic-key-fill, .confounder-key .diagnostic-key-outline { background: #c62828; }
+.confounder-key .diagnostic-key-fill { background: #176b80; }
+.collider-key .diagnostic-key-outline { background: #c62828; border: 3px solid #176b80; }
+.confounder-key .diagnostic-key-outline { background: #176b80; border: 3px solid #c62828; }

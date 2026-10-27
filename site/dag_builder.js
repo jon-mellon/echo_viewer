@@ -62,7 +62,7 @@ const GROUP_COLORS = {
 // Distinct colors for groups (Ind var and Dep var use GROUP_COLORS above).
 const GROUP_PALETTE = [
   "#0f766e", "#9f1239", "#1d4ed8", "#b45309", "#4d7c0f",
-  "#7c3aed", "#be123c", "#0369a1", "#92400e", "#047857",
+  "#176b80", "#be123c", "#0369a1", "#92400e", "#047857",
   "#4338ca", "#c2410c", "#166534", "#a21caf", "#7e22ce",
   "#b91c1c", "#1e40af", "#a16207", "#065f46", "#6d28d9",
   "#0ea5e9", "#ca8a04", "#15803d", "#db2777",

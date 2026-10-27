@@ -37,7 +37,7 @@ test("highlight model classifies path edges, dims others and preserves inputs", 
   assert.deepEqual({ visibleLinks, edges, nodes }, before);
 });
 
-test("exclusion hover draws the complete instrument-to-Dep var path in purple", () => {
+test("exclusion hover draws the complete instrument-to-Dep var path in teal", () => {
   const visibleLinks = [
     { edge_id: "z_k", group_a: "z", group_b: "k", direction_type: "A_TO_B" },
     { edge_id: "k_y", group_a: "k", group_b: "y", direction_type: "A_TO_B" },
@@ -51,8 +51,8 @@ test("exclusion hover draws the complete instrument-to-Dep var path in purple", 
     groupId: "k", ivId: "x", dvId: "y", showExclusionViolations: true,
     instrumentDesignEdgeId: "instrument-study",
   });
-  assert.deepEqual(model.laneSegments.map(segment => segment.color), ["#7c3aed", "#7c3aed"]);
-  assert.equal(model.nodeUpdates.find(node => node.id === "k").color.border, "#7c3aed");
+  assert.deepEqual(model.laneSegments.map(segment => segment.color), ["#176b80", "#176b80"]);
+  assert.equal(model.nodeUpdates.find(node => node.id === "k").color.border, "#176b80");
   assert.equal(model.nodeUpdates.find(node => node.id === "x").opacity, 0.16);
   assert.ok(model.edgeUpdates.every(edge => edge.id !== "instrument-study"));
   assert.match(model.edgeUpdates[0].title, /Instrument-to-Dep var exclusion path/);
