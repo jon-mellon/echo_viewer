@@ -290,7 +290,7 @@ function applyBrush() {
     state.selectedVariableIds = new Set(selected);
     state.selectedVariableId = picked[picked.length - 1] || state.selectedVariableId;
     invalidateMapCaches();
-    renderAll();
+    renderAll({ rebuild: false, refreshView: true });
     return;
   }
   if (brush.action === "select_vars") {
@@ -300,7 +300,7 @@ function applyBrush() {
     }
     state.selectedVariableIds = new Set(picked);
     state.selectedVariableId = picked[picked.length - 1] || null;
-    renderAll();
+    renderAll({ rebuild: false, refreshView: true });
     return;
   }
   // Draw-to-seed: no group yet, drawing during DV/IV selection picks the enclosed
@@ -682,7 +682,7 @@ function renderMapContextMenu() {
       state.definitionDraft.new_variable_ids = [...selected];
       state.selectedVariableIds = new Set(selected);
       hideMapContextMenu();
-      renderAll();
+      renderAll({ rebuild: false, refreshView: true });
     });
     els.dagMapContextMenu.hidden = false;
     const position = mapInteractions.contextMenuPosition({ ...state.mapContextMenu, rect,

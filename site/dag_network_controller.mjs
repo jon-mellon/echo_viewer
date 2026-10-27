@@ -658,7 +658,7 @@ function attachDagNetworkHandlers(network) {
       }
       Object.assign(state, workflow.transition(state, { type: "review-group", groupId: id }));
       setMapMode("select");
-      renderAll();
+      renderAll({ rebuild: false, refreshView: true });
     },
     zoomToPoint(position) {
       network.moveTo({ position, scale: network.getScale() * 1.3 });

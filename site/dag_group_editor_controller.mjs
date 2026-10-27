@@ -80,7 +80,8 @@ function assignGroupAsAnchor(side, sourceGroupId) {
   addDecision(`group_promoted_to_${side}`, { source_group_id: sourceGroupId, target_group_id: sourceGroupId });
   addToUndoHistory(`Use "${label}" as ${side.toUpperCase()}`, before, "anchors");
   fitMap(variableIds);
-  renderAll();
+  // Anchor roles do not change group membership or aggregated evidence links.
+  renderAll({ reuseLinks: true, reuseDagGeometry: true });
   notifyWhenAnchorsReady();
 }
 
@@ -128,7 +129,7 @@ function createCustomGroup() {
 function closeGroupEditor() {
   Object.assign(state, workflow.transition(state, { type: "close-editor" }));
   setMapMode("select");
-  renderAll();
+  renderAll({ rebuild: false, refreshView: true });
 }
 
 // ─── Group editor (right panel) ───────────────────────────────────────────────

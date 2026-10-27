@@ -164,7 +164,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.selectedVariableId = null;
     invalidateMapCaches();
     setMapMode("select");
-    renderAll();
+    renderAll({ rebuild: false, refreshView: true });
   }
 
   function definitionSources() {

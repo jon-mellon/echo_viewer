@@ -1,9 +1,9 @@
 // Render synchronously so controls reflect each edit before its event returns.
 // Project persistence is coalesced separately by the project controller.
 export function createRenderCoordinator(view) {
-  function rebuildProject({ reuseDagGeometry = false } = {}) {
+  function rebuildProject({ reuseDagGeometry = false, reuseLinks = false } = {}) {
     view.buildCandidateQueue();
-    view.aggregateGroupLinks();
+    if (!reuseLinks) view.aggregateGroupLinks();
     view.computeVisibleLinks();
     view.renderConfounderStatuses?.();
     view.renderGroupList();
@@ -40,7 +40,7 @@ export function createRenderCoordinator(view) {
     view.renderSelectedEdge();
     view.renderExportStatus();
   }
-  function renderAll({ rebuild = true, reuseDagGeometry = false } = {}) {
+  function renderAll({ rebuild = true, reuseDagGeometry = false, refreshView = false, reuseLinks = false } = {}) {
     view.renderModeUI();
     view.renderAnchorBar();
     view.renderStatus();
@@ -56,7 +56,15 @@ export function createRenderCoordinator(view) {
     view.renderGroupEditor();
     view.renderDefinition?.();
     view.renderRightPanel();
-    if (rebuild) rebuildProject({ reuseDagGeometry });
+    if (rebuild) rebuildProject({ reuseDagGeometry, reuseLinks });
+    else if (refreshView) {
+      view.renderGroupList();
+      view.renderDag({ reuseGeometry: true });
+      if (!view.renderVariableComparison()) view.renderSelectedEdge();
+      view.renderMapModeControls();
+      view.renderMapToolbarToggles({ includeCoverage: false });
+      view.drawMap();
+    }
   }
   function selectEdge({ redraw = true } = {}) {
     view.refreshDagEdgeSelection({ redraw });

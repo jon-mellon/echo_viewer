@@ -174,6 +174,16 @@ source and target files.
 The suite uses synthetic browser sessions only. It does not collect viewer
 analytics or retain user activity.
 
+### Selection and concept exclusion profile
+
+Run `npm run profile:selection-concept` to profile DV and instrument selection,
+opening a variable, and excluding a concept against a published schema. It records
+visible feedback and settled graph times separately, captures long tasks and CPU
+profiles, and checks that anchor selection reuses aggregated links. Set
+`PROFILE_DEVICE=mobile` for a 4× CPU-throttled mobile viewport, `PROFILE_RUNS` to
+change the run count, and `PROFILE_OUTPUT` to choose the output directory. The
+default output is `/private/tmp/echo-selection-concept-profile`.
+
 ### Diagnostic view switching profile
 
 `npm run profile:diagnostics` profiles the current source against the published

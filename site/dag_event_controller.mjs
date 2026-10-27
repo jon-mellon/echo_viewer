@@ -467,7 +467,7 @@ function installMapHandlers() {
           state.selectedVariableIds = new Set(selection.selectedVariableIds);
           state.comparisonVariableIds = selection.comparisonVariableIds;
         }
-        renderAll();
+        renderAll({ rebuild: false, refreshView: true });
       }
     }
     state.map.dragging = false;

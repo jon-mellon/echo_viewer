@@ -434,7 +434,7 @@ export function createDagSetupGroupController({
       if (!group) return;
       beginEditor();
       Object.assign(state, workflow.transition(state, { type: "open-editor", groupId: group.group_id }));
-      setMapMode("select"); renderAll();
+      setMapMode("select"); renderAll({ rebuild: false, refreshView: true });
     }));
   }
 

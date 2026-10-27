@@ -589,7 +589,13 @@ function assignGroupAsInstrument(groupId) {
   }));
   setMapMode("select");
   if (group) fitMap(group.variable_ids);
-  renderAll();
+  // Instrument selection changes the view, but not group membership or link
+  // aggregation. Keep the existing project graph and candidate queue.
+  renderAll({ rebuild: false });
+  updateDagFilters();
+  renderMapModeControls();
+  renderUndoRedo();
+  drawMap();
 }
 
 
@@ -600,7 +606,7 @@ function toggleAnchorSearchMode(side) {
   state.searchMatches[side] = [];
   const input = side === "dv" ? els.dvInput : els.ivInput;
   input.value = "";
-  renderAll();
+  renderAll({ rebuild: false, refreshView: true });
   setTimeout(() => input.focus(), 0);
 }
 
@@ -1420,7 +1426,10 @@ function excludeGroupConcept(groupId, variableId, label) {
   if (applyProjectOperation(next) === false) return;
   addDecision("concept_excluded", { group_id: groupId, variable_id: variableId });
   addToUndoHistory(`Excluded concept from "${group.label || groupId}"`, before);
-  renderAll();
+  // The incremental evidence update will rebuild the graph when its incident
+  // links arrive. Update the visible selection now instead of rebuilding twice.
+  if (state.compiledDagUpdating) renderAll({ rebuild: false, refreshView: true });
+  else renderAll();
   if (state.activeGroupId && !persistentViewer.editorOpen) {
     void persistentViewer.commitDecision().then(() =>
       publicationController.workingCopyChanged()).catch(error =>

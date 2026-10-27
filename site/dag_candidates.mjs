@@ -1,5 +1,5 @@
 import { centroid, computeVoronoiCells, distance, worldToScreen } from "./map_geometry.mjs";
-import { rawLinksBetween, pairKey } from "./dag_link_aggregation.mjs";
+import { pairKey } from "./dag_link_aggregation.mjs";
 
 const ROLE_PRIORITY = [
   "possible_confounder",
@@ -31,6 +31,15 @@ export function groupCoherence(variableIds, similarityEdgeMap) {
 }
 
 function candidateContext(project, { variables, similarityEdgeMap, linkLookup }) {
+  const outgoing = new Map();
+  for (const [key, links] of linkLookup) {
+    if (!links.length) continue;
+    const separator = key.indexOf("->");
+    if (separator < 0) continue;
+    const source = key.slice(0, separator), target = key.slice(separator + 2);
+    if (!outgoing.has(source)) outgoing.set(source, new Set());
+    outgoing.get(source).add(target);
+  }
   const iv = project.groups.find(g => g.group_id === project.iv_group_id);
   const dv = project.groups.find(g => g.group_id === project.dv_group_id);
   const groupSites = project.groups
@@ -53,7 +62,10 @@ function candidateContext(project, { variables, similarityEdgeMap, linkLookup })
   }
   return {
     iv, dv,
-    hasAnyMapping: (a, b) => linkLookup.size > 0 && rawLinksBetween(a, b, linkLookup).length > 0,
+    hasAnyMapping: (a, b) => {
+      const targets = new Set(b);
+      return a.some(source => [...(outgoing.get(source) || [])].some(target => targets.has(target)));
+    },
     groupCoherence: ids => groupCoherence(ids, similarityEdgeMap),
     groupProximity: (g, x, y) => Math.min(
       distance(centroid(g.variable_ids, variables), centroid(x.variable_ids, variables)),
