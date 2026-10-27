@@ -2999,3 +2999,7 @@ h2 {
 .dag2-mode.initial-setup:not(.defining-variable) .mobile-panel-nav {
   display: none !important;
 }
+
+.diagnostic-key-instrument { background: #166534; border-radius: 50%; }
+.diagnostic-key-violation { background: #c62828; }
+.diagnostic-key-path { background: #176b80; height: 3px; border-radius: 0; }
