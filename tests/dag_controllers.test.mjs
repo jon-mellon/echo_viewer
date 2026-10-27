@@ -9,6 +9,33 @@ import { dag2AnchorPickerIsActive } from "../site/dag_setup_group_controller.mjs
 import { createDagGroupEditorController } from "../site/dag_group_editor_controller.mjs";
 import { createGroupingSetController } from "../site/grouping_set_controller.mjs";
 import { createDagShellController } from "../site/dag_shell_controller.mjs";
+import { createToolbarPresenter } from "../site/toolbar_presenter.mjs";
+import { createRenderCoordinator } from "../site/render_coordinator.mjs";
+
+test("graph-only filters update controls without recomputing assignment coverage", () => {
+  const calls = [];
+  const view = new Proxy({}, { get: (_, key) => key === "renderMapToolbarToggles"
+    ? options => calls.push(options) : () => {} });
+  createRenderCoordinator(view).updateDagFilters();
+  assert.deepEqual(calls, [{ includeCoverage: false }]);
+});
+
+test("assignment coverage skips memberships until variables are loaded and preserves overlap and UOA counts", () => {
+  let variables = [];
+  let membershipReads = 0;
+  const state = { project: { groups: [
+    { get variable_ids() { membershipReads++; return ["a", "b"]; } },
+    { variable_ids: ["a", "c"] },
+  ] }, uoaFilterEnabled: true, selectedUoa: "person" };
+  const presenter = createToolbarPresenter({ state, elements: {}, groupById: () => null,
+    visibleVariables: () => variables, uoaMatches: (a, b) => a === b,
+    clusterRep: id => id === "b" ? "a" : id, rejectedVariableIdSet: () => new Set(["z"]) });
+  assert.deepEqual(presenter.assignmentCoverage(), { assigned: 0, unassigned: 0, total: 0, plottedNodes: 0, rejected: 1, uoaFiltered: true });
+  assert.equal(membershipReads, 0);
+  variables = [{ variable_id: "a", uoa: "person" }, { variable_id: "b", uoa: "person" },
+    { variable_id: "c", uoa: "country" }, { variable_id: "d", uoa: "person" }];
+  assert.deepEqual(presenter.assignmentCoverage(), { assigned: 2, unassigned: 1, total: 3, plottedNodes: 2, rejected: 1, uoaFiltered: true });
+});
 
 test("fullscreen resizes the existing graph and only fits the variable map when shown", () => {
   const original = { document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame, setTimeout: globalThis.setTimeout };

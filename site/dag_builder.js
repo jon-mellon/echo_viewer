@@ -467,7 +467,7 @@ function rebuildLinkDecision() {
   renderCoordinator.rebuildLinkDecision();
 }
 
-function renderMapToolbarToggles() { return toolbarController.render(); }
+function renderMapToolbarToggles(options) { return toolbarController.render(options); }
 
 function assignmentCoverage() { return toolbarController.assignmentCoverage(); }
 

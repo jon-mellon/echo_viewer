@@ -34,7 +34,8 @@ export function createRenderCoordinator(view) {
     view.computeVisibleLinks();
     view.renderConfounderStatuses?.();
     view.renderGroupList();
-    view.renderMapToolbarToggles();
+    // Graph filters do not change variable assignments, membership or UOA.
+    view.renderMapToolbarToggles({ includeCoverage: false });
     view.renderDag({ reuseGeometry: true });
     view.renderSelectedEdge();
     view.renderExportStatus();

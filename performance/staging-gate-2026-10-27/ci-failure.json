@@ -1,0 +1,47 @@
+{
+  "url": "https://www.jonathanmellon.com/?p=1&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&iv=category-income-earnings&dv=category-fertility-reproductive-behavior&instrument=category-weather&path=1&exclusion_path=2&conf=0&coll=0&excl=0&exog=1&sparse=0&bottle=1&paths=1&excl_links=0&mode=group_review",
+  "mobile": true,
+  "cpuThrottle": 4,
+  "source": "/home/runner/work/echo_viewer/echo_viewer/dist/site",
+  "budgets": {
+    "wallMs": 500,
+    "longestTaskMs": 100
+  },
+  "runs": [
+    {
+      "timings": [
+        {
+          "name": "exclusion 1",
+          "ms": 311,
+          "longestTaskMs": 79,
+          "totalLongTaskMs": 153,
+          "visibleEdges": 30
+        },
+        {
+          "name": "exogeneity 1",
+          "ms": 231.39999999999418,
+          "longestTaskMs": 96,
+          "totalLongTaskMs": 96,
+          "visibleEdges": 8
+        },
+        {
+          "name": "exclusion 2",
+          "ms": 230.5,
+          "longestTaskMs": 107,
+          "totalLongTaskMs": 107,
+          "visibleEdges": 30
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "error": "Error: Performance budget exceeded: exclusion 2",
+  "failureState": {
+    "text": "Working Map\nExclusion restriction violations (15)\nExogeneity (4)\nMax path\nExclude sparse edges\nMin papers\nAll visible links\n+\n−\nFit\nShare view\nSetup\nMap\nPrivacy",
+    "scripts": [
+      "https://www.jonathanmellon.com/password_gate.js?v=818b0aff66013c4a",
+      "https://www.jonathanmellon.com/visjs-min.js?v=818b0aff66013c4a",
+      "https://www.jonathanmellon.com/dag_builder.js?v=818b0aff66013c4a"
+    ]
+  }
+}

@@ -59,7 +59,10 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await expect(page.locator("#definitionReviewVariables .definition-review-variable")).toHaveCount(1);
 
   await page.locator("#definitionNewLabel").fill("Browser test construct");
+  await page.locator("#definitionNewDescription").evaluate(element => element.setAttribute("aria-invalid", "true"));
   await page.locator("#definitionNewDescription").fill("A browser test construct with defined source members.");
+  await expect(page.locator("#definitionNewDescription")).not.toHaveAttribute("aria-invalid");
+  await expect(page.locator("#definitionValidation")).toHaveText("Enter at least 20 characters for the group definition.");
   const residualInputs = page.locator("#definitionResidualLabels input[data-residual-id]");
   await expect(residualInputs).toHaveCount(2);
   await residualInputs.nth(0).fill("Browser residual one");

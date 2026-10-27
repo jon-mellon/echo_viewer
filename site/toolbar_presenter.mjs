@@ -6,8 +6,13 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     const uoaActive = state.uoaFilterEnabled && state.selectedUoa;
     const variables = visibleVariables().filter(variable => !uoaActive || uoaMatches(variable.uoa, state.selectedUoa));
     const variableIds = new Set(variables.map(variable => variable.variable_id));
-    const assignedIds = new Set((state.project?.groups || []).flatMap(group => group.variable_ids || [])
-      .filter(variableId => variableIds.has(variableId)));
+    const assignedIds = new Set();
+    // A compiled graph can be used before any variable coordinates are loaded.
+    // In that case there is no coverage to count, so avoid scanning all 98k
+    // group memberships on every graph-filter change.
+    if (variableIds.size) for (const group of state.project?.groups || []) {
+      for (const id of group.variable_ids || []) if (variableIds.has(id)) assignedIds.add(id);
+    }
     return {
       assigned: assignedIds.size, unassigned: Math.max(0, variables.length - assignedIds.size),
       total: variables.length,
@@ -26,7 +31,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     elements.variableAssignmentCounts.title = `${coverage.total.toLocaleString()} variables${scope} represented by ${coverage.plottedNodes.toLocaleString()} plotted nodes${rejected}`;
   }
 
-  function render(anchorsReady) {
+  function render(anchorsReady, { includeCoverage = true } = {}) {
     if (elements.toggleSparseEdges) {
       elements.toggleSparseEdges.classList.toggle("active", state.excludeSparseEdges);
       elements.toggleSparseEdges.setAttribute("aria-pressed", state.excludeSparseEdges ? "true" : "false");
@@ -37,7 +42,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
       h("option", { value: source.source, textContent: source.label || source.source })));
     elements.variableLayoutSelect.value = state.variableLayoutSource;
     elements.variableLayoutSelect.hidden = layoutSources.length < 2;
-    renderAssignmentCoverage();
+    if (includeCoverage) renderAssignmentCoverage();
     for (const [element, active] of [[elements.toggleVariableLabels, state.showVariableLabels],
       [elements.toggleGroupLabels, state.showGroupLabels],
       [elements.showUnfiltered, !state.showConfoundersOnly && !state.showCollidersOnly && !state.showExclusionViolations && !state.showExogeneity]]) {

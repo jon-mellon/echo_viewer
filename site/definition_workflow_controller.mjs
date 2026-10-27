@@ -472,8 +472,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     });
     els.definitionNewDescription.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_description = els.definitionNewDescription.value;
-      els.definitionNewDescription.removeAttribute("aria-invalid");
-      els.definitionValidation.textContent = "Enter at least 20 characters for the group definition.";
+      presenter.clearDescriptionValidation();
       persistProjectLocally();
     });
     els.definitionSave.addEventListener("click", saveDefinition);
