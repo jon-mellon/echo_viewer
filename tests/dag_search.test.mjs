@@ -94,6 +94,24 @@ test("group search uses lightweight global records for unhydrated members", () =
   assert.equal(variableById.size, 0);
 });
 
+test("instrument search ranks rainfall ahead of unrelated training matches", async () => {
+  const { StaticVariableSearchCatalog, variableSearchPayload } = await import("../site/variable_search_catalog.mjs");
+  const variables = [
+    { variable_id: "training", display_label: "Job training" },
+    { variable_id: "rain", display_label: "Annual rainfall" },
+  ];
+  const project = { groups: [
+    { group_id: "training", label: "Training", variable_ids: ["training"] },
+    { group_id: "weather", label: "Weather", variable_ids: ["training", "rain"] },
+  ] };
+  const catalog = new StaticVariableSearchCatalog();
+  await catalog.load("/catalog.json", async () => new Response(JSON.stringify(variableSearchPayload(variables, "x"))));
+  const index = new search.AnchorGroupSearchIndex();
+  const results = index.search(project, "instrument", "rain", new Map(), catalog);
+  assert.deepEqual(results.map(result => result.group.group_id), ["weather", "training"]);
+  assert.equal(results[0].variableMatch, "Annual rainfall");
+});
+
 test("indexed group search preserves constituent fields, order, and hydrated precedence", async () => {
   const { StaticVariableSearchCatalog, variableSearchPayload } = await import("../site/variable_search_catalog.mjs");
   const catalog = new StaticVariableSearchCatalog();

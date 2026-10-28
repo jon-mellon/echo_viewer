@@ -1,5 +1,18 @@
 // Search decisions only; callers supply visibility and unit-of-analysis policy.
 const normalized = value => String(value ?? "").trim().toLowerCase();
+const wordStartMatch = (value, query) => {
+  if (!query) return false;
+  const text = normalized(value);
+  let at = text.indexOf(query);
+  while (at !== -1) {
+    if (at === 0 || !/[\p{L}\p{N}]/u.test(text[at - 1])) return true;
+    at = text.indexOf(query, at + 1);
+  }
+  return false;
+};
+const matchRank = (result, query) => result.labelMatches
+  ? (wordStartMatch(result.group.label || result.group.group_id, query) ? 3 : 1)
+  : (wordStartMatch(result.variableMatch, query) ? 2 : 0);
 
 export function anchorGroupSearchMatch(group, query, index, variableById, searchRecordById = null) {
   const labelMatches = !query || normalized(group.label || group.group_id).includes(query);
@@ -14,10 +27,11 @@ export function anchorGroupSearchMatch(group, query, index, variableById, search
         variable.raw_variable_text,
         variable.variable_id,
       ].filter(Boolean);
-      const matchedField = fields.find((field) => normalized(field).includes(query));
+      const matchingFields = fields.filter((field) => normalized(field).includes(query));
+      const matchedField = matchingFields.find(field => wordStartMatch(field, query)) || matchingFields[0];
       if (!matchedField) continue;
-      variableMatch = matchedField;
-      break;
+      if (!variableMatch || wordStartMatch(matchedField, query)) variableMatch = matchedField;
+      if (wordStartMatch(variableMatch, query)) break;
     }
   }
   return {
@@ -95,7 +109,7 @@ export function searchAnchorGroups(project, side, query, variableById, limit = 1
     .map((group, index) => anchorGroupSearchMatch(group, normalized(query), index,
       variableById, searchRecordById))
     .filter(result => result.matches)
-    .sort((a, b) => Number(b.labelMatches) - Number(a.labelMatches) || a.index - b.index)
+    .sort((a, b) => matchRank(b, normalized(query)) - matchRank(a, normalized(query)) || a.index - b.index)
     .slice(0, limit);
 }
 
@@ -194,15 +208,20 @@ export class AnchorGroupSearchIndex {
           for (let member = 0; candidate && member < ids.length; member++) {
             const hydrated = variableById.size ? variableById.get(ids[member]) : null;
             if (hydrated) {
-              variableMatch = [hydrated.display_label, hydrated.concept_label, hydrated.raw_variable_text, hydrated.variable_id]
-                .filter(Boolean).find(text => normalized(text).includes(query)) || "";
+              const matches = [hydrated.display_label, hydrated.concept_label, hydrated.raw_variable_text, hydrated.variable_id]
+                .filter(text => text && normalized(text).includes(query));
+              const match = matches.find(text => wordStartMatch(text, query)) || matches[0] || "";
+              if (match && (!variableMatch || wordStartMatch(match, query))) variableMatch = match;
             } else {
               const fields = prepared.fields[member];
               if (fields) for (let i = 0; i < fields.length; i++) {
-                if (fields[i][1].includes(query)) { variableMatch = fields[i][0]; break; }
+                if (fields[i][1].includes(query) && (!variableMatch || wordStartMatch(fields[i][0], query))) {
+                  variableMatch = fields[i][0];
+                  if (wordStartMatch(variableMatch, query)) break;
+                }
               }
             }
-            if (variableMatch) break;
+            if (variableMatch && wordStartMatch(variableMatch, query)) break;
           }
           cached?.set(group.group_id, variableMatch);
         }
@@ -211,6 +230,6 @@ export class AnchorGroupSearchIndex {
         (labelMatches ? labelHits : memberHits).push({ group, index, labelMatches, variableMatch, matches: true });
       }
     }
-    return labelHits.concat(memberHits).slice(0, limit);
+    return labelHits.concat(memberHits).sort((a, b) => matchRank(b, query) - matchRank(a, query) || a.index - b.index).slice(0, limit);
   }
 }
