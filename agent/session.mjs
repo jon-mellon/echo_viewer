@@ -12,7 +12,7 @@ import { groupNeighborSuggestions } from "../site/dag_search.mjs";
 import { validateGroupingSchema } from "../site/data_validation.mjs";
 import { canonicalizeWorkingSchema, publishWorkingSchema } from "../site/dag_publication_core.mjs";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "../site/supabase_config.mjs";
-import { DEFAULT_SCHEMA_PUBLICATION_ID } from "../site/dag_data_config.mjs";
+import { agentDataSelection } from "./default_data.mjs";
 import { publicationPermalink } from "../site/published_schema_loader.mjs";
 import { browsePublishedSplits, loadPublishedSplitMembership } from "../site/published_split_browser.mjs";
 import { JEV_BATCH_SIZE, JEV_TEST_SIZE, cappedKeyStatus, randomSampleIds,
@@ -36,6 +36,9 @@ function projectFromSchema(schema, anchors = {}) {
     rejected_variables: structuredClone(schema.rejected_variables || []) };
 }
 
+/** The catch-all group is not a concept, so it can never be a confounder or lie on a path. */
+export const CATCH_ALL_GROUP_IDS = new Set(["category-other"]);
+
 export class EchoAgentSession {
   constructor(record, home = agentHome()) {
     this.record = record;
@@ -43,8 +46,9 @@ export class EchoAgentSession {
     this.evidence = localEvidence(join(home, "snapshots", record.snapshotId));
   }
 
-  static async start({ publicationId = DEFAULT_SCHEMA_PUBLICATION_ID, snapshotId = "", home = agentHome(),
-    sync = true, onProgress } = {}) {
+  static async start(options = {}) {
+    const { home = agentHome(), sync = true, onProgress } = options;
+    const { publicationId, snapshotId } = agentDataSelection(options);
     const source = sync
       ? await clonePublication({ publicationId, snapshotId, home, onProgress })
       : await openLocalPublication(publicationId, home);
@@ -377,10 +381,13 @@ export class EchoAgentSession {
   async graph(options = {}) {
     const rawLinks = await this.evidence.rawLinks();
     const project = projectFromSchema(this.schema, this.record.anchors);
-    const dag = fullCompileDag({ schema: this.schema, project, rawLinks });
-    const view = deriveDagView({ groups: this.schema.groups, links: dag.edges,
-      ivId: project.iv_group_id, dvId: project.dv_group_id, instrumentId: project.instrument_group_id,
-      ...options });
+    const compiled = fullCompileDag({ schema: this.schema, project, rawLinks });
+    const dag = { ...compiled,
+      nodes: compiled.nodes.filter(node => !CATCH_ALL_GROUP_IDS.has(node.group_id)),
+      edges: compiled.edges.filter(edge => !CATCH_ALL_GROUP_IDS.has(edge.group_a) && !CATCH_ALL_GROUP_IDS.has(edge.group_b)) };
+    const view = deriveDagView({ groups: this.schema.groups.filter(group => !CATCH_ALL_GROUP_IDS.has(group.group_id)),
+      links: dag.edges, ivId: project.iv_group_id, dvId: project.dv_group_id,
+      instrumentId: project.instrument_group_id, ...options });
     return jsonSafe({ dag, view });
   }
   async candidates() {

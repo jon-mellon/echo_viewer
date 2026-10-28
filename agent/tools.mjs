@@ -19,7 +19,7 @@ export function createEchoTools({ getSession, setSession }) {
         return { publicationId: result.publication.id, snapshotId: result.snapshotId,
           groupCount: result.schema.groups.length };
       }),
-    define("echo_start", "Start a local working session. Defaults to Echo's current published schema; optionally choose a publication and compatible evidence snapshot.",
+    define("echo_start", "Start a local working session. Defaults to the combined 100k + socsci publication and snapshot the Echo UI uses; optionally choose a publication and compatible evidence snapshot.",
       obj({ publicationId: str, snapshotId: str, sync: bool }), async a => {
         const value = await EchoAgentSession.start(a);
         setSession(value);
