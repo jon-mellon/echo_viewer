@@ -839,6 +839,7 @@ function applyProjectOperation(next) {
     // Compiled evidence nodes/edges do not contain anchor roles. Candidates and
     // anchor-dependent visibility are refreshed by the following render pass.
     projectController.applyOperation(next, { preserveMembership: true });
+    publicationController?.workingCopyChanged?.();
     return true;
   }
   const anchorChanged = oldProject && ["iv_group_id", "dv_group_id", "instrument_group_id"]
