@@ -382,7 +382,9 @@ test("mobile evidence tables reopen at their left edge", async ({ page }) => {
   await openEvidence();
   const panel = page.locator("#provenancePanel");
   const table = panel.locator("table").first();
-  await expect(table).toBeVisible();
+  // This exercises live evidence retrieval; allow slower CI data fetches while
+  // still requiring the table to render before testing scroll behavior.
+  await expect(table).toBeVisible({ timeout: 60_000 });
   const initial = await panel.evaluate(node => ({ scroll: node.scrollLeft,
     left: node.getBoundingClientRect().left, tableLeft: node.querySelector("table").getBoundingClientRect().left }));
   expect(initial.scroll).toBe(0);
