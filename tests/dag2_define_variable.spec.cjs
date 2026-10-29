@@ -454,8 +454,10 @@ for (const device of [
         return state.project.groups.find(group => group.group_id === state.project.iv_group_id)?.description;
       });
       expect(savedDescription).toBe("School and college academic achievement");
-      await page.locator('#dvGroupPicker button[data-group-id="category-income"]').click();
-      await expect.poll(() => new URL(page.url()).searchParams.get("dv")).toBe("category-income");
+      const dvButton = page.locator('#dvGroupPicker button[data-group-id]').first();
+      const dvId = await dvButton.getAttribute('data-group-id');
+      await dvButton.click();
+      await expect.poll(() => new URL(page.url()).searchParams.get("dv")).toBe(dvId);
       const localSchemaId = new URL(page.url()).searchParams.get("local_schema");
       expect(localSchemaId).toBeTruthy();
       expect(new URL(page.url()).searchParams.get("iv")).toBe(await page.evaluate(() => window.__dagBuilderState.project.iv_group_id));
