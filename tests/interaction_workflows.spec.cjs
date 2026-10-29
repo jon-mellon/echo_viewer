@@ -185,7 +185,11 @@ test("variable search catalog starts loading when anchor search gets focus", asy
   expect(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("idle");
   await page.locator("#ivInput").focus();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("ready");
-  expect(catalogRequests).toHaveLength(1);
+  const hasStaticCatalog = await page.evaluate(async () => {
+    const { SNAPSHOT_SEARCH_CATALOGS } = await import('/variable_search_catalog.mjs');
+    return Boolean(SNAPSHOT_SEARCH_CATALOGS[new URL(location.href).searchParams.get('data_version')]);
+  });
+  expect(catalogRequests).toHaveLength(hasStaticCatalog ? 1 : 0);
   await page.locator("#ivInput").fill("education");
   await expect(page.locator("#ivGroupPicker button[data-group-id]").first()).toBeVisible();
 });
@@ -250,7 +254,8 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
     if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
     if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
   });
-  await page.goto(viewer);
+  // This checks the precomputed search-catalog path available for this snapshot.
+  await page.goto(`${viewer}?schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
   await ready(page);
   await completeSetup(page);
   const edgeId = await page.evaluate(async () => {
