@@ -6,7 +6,7 @@ const EDGE_PALETTE = {
   iv: { color: "#d32f2f", shadow: "rgba(211,47,47,0.34)" },
   dv: { color: "#1976d2", shadow: "rgba(25,118,210,0.34)" },
   shared: { color: "#d18b08", shadow: "rgba(209,139,8,0.38)" },
-  exclusion: { color: "#7c3aed", shadow: "rgba(124,58,237,0.38)" },
+  exclusion: { color: "#176b80", shadow: "rgba(23,107,128,0.38)" },
 };
 
 export function addPathDirectionTargets(targetsByPair, path = []) {
@@ -101,10 +101,10 @@ export function buildPathHighlightModel({
         from: { ...(arrows?.from || {}), enabled: false },
       },
       shadow: false,
-      title: `${edge.title || ""}\n${role === "exclusion" ? "Instrument-to-DV exclusion path"
-        : role === "iv" ? `Path to ${showExogeneity ? "instrument" : "IV"}`
-          : role === "dv" ? "Path to DV"
-            : `Shared segment of ${showExogeneity ? "instrument" : "IV"} and DV paths`}`.trim(),
+      title: `${edge.title || ""}\n${role === "exclusion" ? "Instrument-to-Dep var exclusion path"
+        : role === "iv" ? `Path to ${showExogeneity ? "instrument" : "Ind var"}`
+          : role === "dv" ? "Path to Dep var"
+            : `Shared segment of ${showExogeneity ? "instrument" : "Ind var"} and Dep var paths`}`.trim(),
     });
   }
 

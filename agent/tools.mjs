@@ -19,7 +19,7 @@ export function createEchoTools({ getSession, setSession }) {
         return { publicationId: result.publication.id, snapshotId: result.snapshotId,
           groupCount: result.schema.groups.length };
       }),
-    define("echo_start", "Start a local working session. Defaults to Echo's current published schema; optionally choose a publication and compatible evidence snapshot.",
+    define("echo_start", "Start a local working session. Defaults to the combined 100k + socsci publication and snapshot the Echo UI uses; optionally choose a publication and compatible evidence snapshot.",
       obj({ publicationId: str, snapshotId: str, sync: bool }), async a => {
         const value = await EchoAgentSession.start(a);
         setSession(value);
@@ -57,7 +57,7 @@ export function createEchoTools({ getSession, setSession }) {
       obj({ rawLinkIds: strings, variableIds: strings, limit: num }), async a => {
         const rows = a.rawLinkIds ? await session().evidence.rawLinks(a.rawLinkIds)
           : a.variableIds ? await session().evidence.incidentLinks(a.variableIds)
-            : await session().evidence.rawLinks();
+            : await session().evidence.rawLinks(null, a.limit || 100);
         return rows.slice(0, Math.max(1, Math.min(500, a.limit || 100)));
       }),
     define("echo_upsert_group", "Create or edit a schema group using Echo's project operation.",

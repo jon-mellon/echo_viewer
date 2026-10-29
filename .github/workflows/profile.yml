@@ -25,6 +25,8 @@ jobs:
       - run: PROFILE_DEVICE=mobile npm run profile
       - run: PROFILE_SCENARIO=permalink npm run profile
       - run: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile npm run profile
+      - name: Enforce mobile diagnostic switching budgets
+        run: npm run profile:diagnostics
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -34,4 +36,5 @@ jobs:
             profile-results-mobile/
             profile-results-permalink/
             profile-results-permalink-mobile/
+            profile-results-diagnostics-mobile/
           retention-days: 1

@@ -1,0 +1,44 @@
+{
+  "scenario": "sparse-edges",
+  "dataTransport": "Playwright proxy (localhost CORS)",
+  "cpuThrottle": 1,
+  "url": "http://127.0.0.1:8776/",
+  "runs": [],
+  "currentRun": {
+    "groups": 111,
+    "members": 97818,
+    "hydratedVariables": 0,
+    "errors": [
+      "Could not load sparse edge evidence RuntimeError: memory access out of bounds\n    at fw.onMessage (http://127.0.0.1:8776/vendor/duckdb/duckdb-browser.mjs:10:59260)"
+    ],
+    "timings": [
+      {
+        "name": "enable sparse filter (cold evidence, minimum 2)",
+        "ms": 1615.6000003814697,
+        "longestTaskMs": 71,
+        "totalLongTaskMs": 71,
+        "requestCount": 7,
+        "decodedBodyBytes": 867879,
+        "visibleEdges": 0,
+        "loadedEvidence": 0,
+        "status": "failed"
+      }
+    ],
+    "snapshot": {
+      "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+    },
+    "baselineEdges": 2818,
+    "checks": [],
+    "pendingScenario": "enable sparse filter (cold evidence, minimum 2)"
+  },
+  "error": "Error: page.waitForFunction: Error: Could not load sparse edge evidence RuntimeError: memory access out of bounds\n    at fw.onMessage (http://127.0.0.1:8776/vendor/duckdb/duckdb-browser.mjs:10:59260)\n    at fw.onMessage (http://127.0.0.1:8776/vendor/duckdb/duckdb-browser.mjs:10:59260)\n    at eval (eval at predicate (eval at evaluate (:311:30)), <anonymous>:2:50)\n    at predicate (eval at evaluate (:311:30), <anonymous>:7:27)\n    at next (eval at evaluate (:311:30), <anonymous>:29:33)",
+  "failureState": {
+    "sparse": true,
+    "minimum": 2,
+    "valid": true,
+    "visibleEdges": 0,
+    "totalEdges": 2818,
+    "loadedEvidence": 0,
+    "requiredEvidence": 66081
+  }
+}

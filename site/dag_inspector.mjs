@@ -66,27 +66,54 @@ export function studyInspector(project, rawLinksById) {
     return raw ? displayPaperTableKey(`${raw.paper_id || "unknown"}::${raw.within_table_occurrence_id || "unknown"}`) : "";
   }).filter(Boolean))].slice(0, 8);
   return {
-    sourceLabel: project.groups.find(g => g.group_id === project.iv_group_id)?.label || "IV",
-    targetLabel: project.groups.find(g => g.group_id === project.dv_group_id)?.label || "DV",
+    sourceLabel: project.groups.find(g => g.group_id === project.iv_group_id)?.label || "Ind var",
+    targetLabel: project.groups.find(g => g.group_id === project.dv_group_id)?.label || "Dep var",
     rawIds, keys,
   };
 }
 
-export function provenanceVariable(variableId, variables, groups) {
+/** Group labels per variable, in schema order, so each evidence row avoids scanning every membership. */
+export function groupLabelsByVariable(groups, requestedIds = null) {
+  const labels = new Map();
+  for (const group of groups || []) {
+    for (const id of group.variable_ids || []) {
+      if (requestedIds && !requestedIds.has(id)) continue;
+      if (!labels.has(id)) labels.set(id, []);
+      labels.get(id).push(group.label || group.group_id);
+    }
+  }
+  return labels;
+}
+
+export function provenanceVariable(variableId, variables, labelsByVariable) {
   const variable = variables.get(variableId);
   return {
     concept: variable?.concept_label || variable?.display_label || variableId || "",
-    classifications: [...new Set(groups.filter(g => (g.variable_ids || []).includes(variableId))
-      .map(g => g.label || g.group_id))],
+    classifications: [...new Set(labelsByVariable.get(variableId) || [])],
   };
+}
+
+/** One page of evidence rows, with the requested page clamped to those available. */
+export function provenancePage(rows, page, pageSize) {
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const current = Math.min(Math.max(0, page), pageCount - 1);
+  const start = current * pageSize;
+  return { page: current, pageCount, start, end: Math.min(start + pageSize, rows.length),
+    rows: rows.slice(start, start + pageSize), total: rows.length };
 }
 
 export function provenanceModel(link, project, rawLinksById, variables, diagnosticView = {}) {
   const edge = edgeInspector(link, project, diagnosticView);
   if (!edge) return null;
   const groupLabel = id => project.groups.find(group => group.group_id === id)?.label || id;
-  const owners = new Map(project.groups.flatMap(group => (group.variable_ids || []).map(id => [id, group.group_id])));
   const excluded = Object.keys(project.finding_decisions || {}).map(id => rawLinksById.get(id)).filter(Boolean);
+  const owners = new Map();
+  if (excluded.length) {
+    const endpoints = new Set(excluded.flatMap(raw => [raw.source_variable_id, raw.target_variable_id]));
+    for (const group of project.groups) for (const id of group.variable_ids || []) {
+      if (endpoints.has(id)) owners.set(id, group.group_id);
+    }
+  }
   const excludedFor = (source, target) => excluded.filter(raw =>
     owners.get(raw.source_variable_id) === source && owners.get(raw.target_variable_id) === target)
     .map(raw => raw.raw_causal_link_id);
@@ -98,6 +125,11 @@ export function provenanceModel(link, project, rawLinksById, variables, diagnost
   ];
   if (diagnosticEvidenceDirection(link, diagnosticView) === "B_TO_A") sections.reverse();
   const seen = new Set();
+  const endpoints = new Set(sections.flatMap(section => section.rawIds.flatMap(id => {
+    const raw = rawLinksById.get(id);
+    return raw ? [raw.source_variable_id, raw.target_variable_id] : [];
+  })));
+  const labelsByVariable = groupLabelsByVariable(project.groups, endpoints);
   const populatedSections = sections.map(section => ({
     ...section,
     rows: section.rawIds.filter(id => {
@@ -106,8 +138,8 @@ export function provenanceModel(link, project, rawLinksById, variables, diagnost
       return true;
     }).map(id => rawLinksById.get(id)).filter(Boolean).map(raw => ({
       raw,
-      source: provenanceVariable(raw.source_variable_id, variables, project.groups),
-      target: provenanceVariable(raw.target_variable_id, variables, project.groups),
+      source: provenanceVariable(raw.source_variable_id, variables, labelsByVariable),
+      target: provenanceVariable(raw.target_variable_id, variables, labelsByVariable),
     })),
   }));
   return { ...edge, rawIds: [...seen], sections: populatedSections,

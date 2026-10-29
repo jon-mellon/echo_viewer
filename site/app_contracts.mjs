@@ -135,6 +135,7 @@
  * @property {Map<string, string>} clusterOf
  * @property {Map<string, string[]>} clusterMembers
  * @property {JsonValue[]} rawLinks
+ * @property {Map<string, JsonValue>} edgeSupportById
  * @property {Map<string, JsonValue>} rawLinksById
  * @property {Map<string, string[]>} linkLookup
  * @property {Map<string, JsonValue>} similarityEdgeMap

@@ -1,0 +1,514 @@
+{
+  "scenario": "load-evidence",
+  "option": "baseline",
+  "dataTransport": "Direct browser requests",
+  "sourceOverride": "/private/tmp/echo-evidence-source-before.mjs",
+  "cpuThrottle": 1,
+  "url": "https://www.jonathanmellon.com/echo_viewer_staging/",
+  "runs": [
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "cold edge selection to visible findings",
+          "ms": 1872.5999999046326,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "remaining evidence metadata",
+          "ms": 32.700000286102295,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "warm edge selection to visible findings",
+          "ms": 85.5,
+          "longestTaskMs": 0,
+          "rows": 10
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-cognitive-ability",
+      "rawLinksBefore": 0,
+      "evidence": {
+        "rawLinks": 93,
+        "variables": 126,
+        "findings": 10,
+        "measures": [
+          {
+            "name": "echo:evidence:publication",
+            "ms": 364
+          },
+          {
+            "name": "echo:evidence:manifest",
+            "ms": 101.90000009536743
+          },
+          {
+            "name": "echo:evidence:engine",
+            "ms": 485.30000019073486
+          },
+          {
+            "name": "echo:evidence:lookup",
+            "ms": 0.09999990463256836
+          },
+          {
+            "name": "echo:evidence:validation",
+            "ms": 463.30000019073486
+          }
+        ]
+      },
+      "requests": [
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/manifest.json",
+          "ms": 101.13074999999981,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 356078
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/vendor/duckdb/duckdb-browser-eh.worker.js?v=c072f4e9bc302b4b",
+          "ms": 73.83879200000001,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 772759
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/vendor/duckdb/duckdb-eh.wasm",
+          "ms": 355.7995420000002,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://extensions.duckdb.org/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm",
+          "ms": 330.38129200000003,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 3045039
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 33.13133300000027,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 46.22241600000007,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 1989
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 17.864666999999827,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 131.6381669999996,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7087503
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 73.1919170000001,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/variable_search_catalog_worker.mjs?v=c072f4e9bc302b4b",
+          "ms": 13.146208000000115,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 1324
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/variable_search_catalog.mjs?v=c072f4e9bc302b4b",
+          "ms": 21.9003330000005,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7985
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/search-catalogs/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b.json.gz",
+          "ms": 180.61729099999957,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7564095
+        }
+      ],
+      "optionStats": {
+        "option": "baseline",
+        "catalogStatusBefore": "idle",
+        "labelCalls": [
+          {
+            "ids": 126,
+            "ms": 310.90000009536743
+          }
+        ],
+        "downloadedBytes": 0,
+        "labelsVerified": 126
+      }
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "cold edge selection to visible findings",
+          "ms": 2885.3999996185303,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "remaining evidence metadata",
+          "ms": 33.90000009536743,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "warm edge selection to visible findings",
+          "ms": 92.59999990463257,
+          "longestTaskMs": 0,
+          "rows": 10
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-cognitive-ability",
+      "rawLinksBefore": 0,
+      "evidence": {
+        "rawLinks": 93,
+        "variables": 126,
+        "findings": 10,
+        "measures": [
+          {
+            "name": "echo:evidence:publication",
+            "ms": 347
+          },
+          {
+            "name": "echo:evidence:manifest",
+            "ms": 77.69999980926514
+          },
+          {
+            "name": "echo:evidence:engine",
+            "ms": 768
+          },
+          {
+            "name": "echo:evidence:lookup",
+            "ms": 0.09999990463256836
+          },
+          {
+            "name": "echo:evidence:validation",
+            "ms": 524.8000001907349
+          }
+        ]
+      },
+      "requests": [
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/manifest.json",
+          "ms": 77.1421250000003,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 356078
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/vendor/duckdb/duckdb-browser-eh.worker.js?v=c072f4e9bc302b4b",
+          "ms": 30.42633300000034,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 772759
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/vendor/duckdb/duckdb-eh.wasm",
+          "ms": 683.0975830000007,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://extensions.duckdb.org/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm",
+          "ms": 390.5689170000005,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 3045039
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 33.46791699999994,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 48.058583,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 1989
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 27.014999999999418,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 256.2613330000004,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7087503
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 82.04320800000096,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/variable_search_catalog_worker.mjs?v=c072f4e9bc302b4b",
+          "ms": 14.283791999998357,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 1324
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/variable_search_catalog.mjs?v=c072f4e9bc302b4b",
+          "ms": 11.096166999999696,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7985
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/search-catalogs/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b.json.gz",
+          "ms": 485.24370799999997,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7564095
+        }
+      ],
+      "optionStats": {
+        "option": "baseline",
+        "catalogStatusBefore": "idle",
+        "labelCalls": [
+          {
+            "ids": 126,
+            "ms": 606.8000001907349
+          }
+        ],
+        "downloadedBytes": 0,
+        "labelsVerified": 126
+      }
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "cold edge selection to visible findings",
+          "ms": 2353.2000002861023,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "remaining evidence metadata",
+          "ms": 33.30000019073486,
+          "longestTaskMs": 0,
+          "rows": 10
+        },
+        {
+          "name": "warm edge selection to visible findings",
+          "ms": 79.5,
+          "longestTaskMs": 0,
+          "rows": 10
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-cognitive-ability",
+      "rawLinksBefore": 0,
+      "evidence": {
+        "rawLinks": 93,
+        "variables": 126,
+        "findings": 10,
+        "measures": [
+          {
+            "name": "echo:evidence:publication",
+            "ms": 353.59999990463257
+          },
+          {
+            "name": "echo:evidence:manifest",
+            "ms": 80.89999961853027
+          },
+          {
+            "name": "echo:evidence:engine",
+            "ms": 626.5999999046326
+          },
+          {
+            "name": "echo:evidence:lookup",
+            "ms": 0
+          },
+          {
+            "name": "echo:evidence:validation",
+            "ms": 673.5999999046326
+          }
+        ]
+      },
+      "requests": [
+        {
+          "url": "https://data.epistemicinfra.org/evidence/layouts/browser-v2/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/manifest.json",
+          "ms": 80.47808299999997,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 356078
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/vendor/duckdb/duckdb-browser-eh.worker.js?v=c072f4e9bc302b4b",
+          "ms": 46.20129199999974,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 772759
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/vendor/duckdb/duckdb-eh.wasm",
+          "ms": 525.4734590000007,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://extensions.duckdb.org/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm",
+          "ms": 554.0723339999986,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 3045039
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 20.61529100000007,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/build_metadata.parquet",
+          "ms": 47.504666999999245,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 1989
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 17.140042000000903,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 155.13037500000064,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7087503
+        },
+        {
+          "url": "https://data.epistemicinfra.org/evidence/snapshots/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/causal_link_occurrences.parquet",
+          "ms": 86.53333399999974,
+          "status": 200,
+          "method": "HEAD",
+          "range": null,
+          "bodyBytes": 0
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/variable_search_catalog_worker.mjs?v=c072f4e9bc302b4b",
+          "ms": 13.610584000000017,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 1324
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/variable_search_catalog.mjs?v=c072f4e9bc302b4b",
+          "ms": 13.424457999999504,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7985
+        },
+        {
+          "url": "https://www.jonathanmellon.com/echo_viewer_staging/search-catalogs/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b.json.gz",
+          "ms": 421.462125,
+          "status": 200,
+          "method": "GET",
+          "range": null,
+          "bodyBytes": 7564095
+        }
+      ],
+      "optionStats": {
+        "option": "baseline",
+        "catalogStatusBefore": "idle",
+        "labelCalls": [
+          {
+            "ids": 126,
+            "ms": 545.5999999046326
+          }
+        ],
+        "downloadedBytes": 0,
+        "labelsVerified": 126
+      }
+    }
+  ]
+}

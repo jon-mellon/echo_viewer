@@ -1,0 +1,44 @@
+[
+  {
+    "action": "enable sparse filter (cold evidence, minimum 2)",
+    "baselineDesktopMedianMs": 5696.1,
+    "optimizedDesktopMedianMs": 1709.9,
+    "speedup": 3.33,
+    "optimized4xCpuMs": 2654.1
+  },
+  {
+    "action": "change minimum papers to 3 (warm evidence)",
+    "baselineDesktopMedianMs": 524.8,
+    "optimizedDesktopMedianMs": 86.7,
+    "speedup": 6.05,
+    "optimized4xCpuMs": 267.6
+  },
+  {
+    "action": "change minimum papers to 5 (warm evidence)",
+    "baselineDesktopMedianMs": 358.1,
+    "optimizedDesktopMedianMs": 73.6,
+    "speedup": 4.87,
+    "optimized4xCpuMs": 226
+  },
+  {
+    "action": "change minimum papers to 2 (warm evidence)",
+    "baselineDesktopMedianMs": 691,
+    "optimizedDesktopMedianMs": 122.4,
+    "speedup": 5.65,
+    "optimized4xCpuMs": 410.6
+  },
+  {
+    "action": "disable sparse filter",
+    "baselineDesktopMedianMs": 1425.6,
+    "optimizedDesktopMedianMs": 154.7,
+    "speedup": 9.22,
+    "optimized4xCpuMs": 529.6
+  },
+  {
+    "action": "enable sparse filter (warm evidence, minimum 2)",
+    "baselineDesktopMedianMs": 780.1,
+    "optimizedDesktopMedianMs": 123.8,
+    "speedup": 6.3,
+    "optimized4xCpuMs": 362.6
+  }
+]

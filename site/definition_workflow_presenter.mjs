@@ -225,6 +225,11 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionValidation.textContent = error?.message || String(error);
   }
 
+  function clearDescriptionValidation() {
+    els.definitionNewDescription.removeAttribute("aria-invalid");
+    els.definitionValidation.textContent = "Enter at least 20 characters for the group definition.";
+  }
+
   function setContinueLoading() {
     els.definitionContinue.disabled = true;
     els.definitionContinue.textContent = "Loading selected variables…";
@@ -240,6 +245,6 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       ? `AI ${mode === "test" ? "sample" : "full"} preview only · ${ids.length} suggested for new` : "";
   }
 
-  return { render, showValidationError, setContinueLoading, showLoadError,
+  return { render, showValidationError, clearDescriptionValidation, setContinueLoading, showLoadError,
     setJevPreviewStatus, selectedTermIds: () => [...currentTermIds], changeTermPage };
 }

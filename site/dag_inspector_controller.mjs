@@ -14,7 +14,8 @@ export function createDagInspectorController({
   loadVisibleLinkEndpoints = async () => [],
   excludeConcept = () => {},
 }) {
-  const selectedEdge = () => state.project?.links.find(link => link.edge_id === state.selectedEdgeId) || null;
+  const selectedEdge = () => state.project?.links?.find(link => state.selectedEdgeId === STUDY_DESIGN_EDGE_ID
+    ? link.is_target_relation : link.edge_id === state.selectedEdgeId) || null;
   let pendingExclude = null;
   let pendingFindingId = null;
   const conceptLabels = new Map();
@@ -28,7 +29,11 @@ export function createDagInspectorController({
   let conceptGroupId = null;
   let conceptViewKey = null;
   let conceptPage = 0;
-  const conceptPageSize = 10;
+  let conceptPageSize = 10;
+  const provenancePageSize = 5;
+  // Evidence pages per direction, reset whenever a different edge is selected.
+  let provenancePagesEdgeId = null;
+  const provenancePages = new Map();
   const clearPendingExclude = () => { pendingExclude = null; };
   const diagnosticView = () => ({
     showConfoundersOnly: state.showConfoundersOnly,
@@ -112,6 +117,10 @@ export function createDagInspectorController({
     if (conceptGroupId !== group.group_id) {
       conceptGroupId = group.group_id;
       conceptPage = 0;
+      // Bound label hydration while using the space available in taller panels.
+      const height = elements.edgeInspector.parentElement?.clientHeight || 0;
+      const descriptionLines = Math.ceil((group.description || "").length / 40);
+      conceptPageSize = Math.max(10, Math.min(30, Math.floor((height - 190 - descriptionLines * 18) / 28)));
     }
     const ids = group.variable_ids || [];
     const count = ids.length || (state.publishedSchemaHydrating ? Number(group.member_count) || 0 : 0);
@@ -353,7 +362,7 @@ export function createDagInspectorController({
           if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
           addDecision("finding_restored", { raw_causal_link_id: id });
           addToUndoHistory("Restored finding", before, "finding-decision");
-          renderAll();
+          rebuildLinkDecision();
           persistFindingDecision();
         } else {
           pendingFindingId = pendingFindingId === id ? null : id;
@@ -385,7 +394,7 @@ export function createDagInspectorController({
         pendingFindingId = null;
         addDecision("finding_excluded", { raw_causal_link_id: id });
         addToUndoHistory("Excluded finding", before, "finding-decision");
-        renderAll();
+        rebuildLinkDecision();
         persistFindingDecision();
       });
       const cancel = h("button", { className: "text-button", type: "button", textContent: "Cancel" });
@@ -394,13 +403,34 @@ export function createDagInspectorController({
         reason, detail, confirm, cancel))];
     };
     const headings = ["Paper", "Source concept", "Target concept", "Claim", "Strategy", "Population", "Decision"];
-    replaceChildren(elements.provenancePanel,
-      model.sections.map(section => h("section", { className: "provenance-direction" },
-        h("h3", { textContent: `Evidence for ${section.sourceLabel} → ${section.targetLabel}` }),
+    if (provenancePagesEdgeId !== link.edge_id) {
+      provenancePagesEdgeId = link.edge_id;
+      provenancePages.clear();
+    }
+    const renderSection = section => {
+      const page = inspector.provenancePage(section.rows, provenancePages.get(section.direction) || 0, provenancePageSize);
+      provenancePages.set(section.direction, page.page);
+      const goTo = next => {
+        provenancePages.set(section.direction, next);
+        pendingFindingId = null;
+        renderProvenance();
+      };
+      const records = `${section.rows.length} record${section.rows.length === 1 ? "" : "s"}`;
+      return h("section", { className: "provenance-direction" },
+        h("h3", {}, `Evidence for ${section.sourceLabel} → ${section.targetLabel} `,
+          h("span", { className: "provenance-count", textContent: `(${records})` })),
         h("table", { className: "provenance-table provenance-table--edge" },
           h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))),
-          h("tbody", {}, section.rows.length ? section.rows.map(renderRow)
-            : h("tr", {}, h("td", { colSpan: headings.length, textContent: "No evidence records for this direction." })))))));
+          h("tbody", {}, page.rows.length ? page.rows.map(renderRow)
+            : h("tr", {}, h("td", { colSpan: headings.length, textContent: "No evidence records for this direction." })))),
+        page.pageCount > 1 ? h("div", { className: "provenance-pagination" },
+          h("button", { className: "toolbar-button", type: "button", disabled: page.page === 0,
+            textContent: "Previous", onclick: () => goTo(page.page - 1) }),
+          h("span", { textContent: `${page.start + 1}–${page.end} of ${page.total}` }),
+          h("button", { className: "toolbar-button", type: "button", disabled: page.page >= page.pageCount - 1,
+            textContent: "Next", onclick: () => goTo(page.page + 1) })) : null);
+    };
+    replaceChildren(elements.provenancePanel, model.sections.map(renderSection));
   }
 
   return { renderEdge, renderProvenance, renderGroupDefinition, selectedEdge, clearPendingExclude };

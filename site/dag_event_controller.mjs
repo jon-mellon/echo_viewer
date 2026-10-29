@@ -1,3 +1,4 @@
+import { attachGraphTouchGuard } from "./graph_touch.mjs";
 import * as projectOps from "./dag_project.mjs";
 import * as mapInteractions from "./map_interactions.mjs";
 
@@ -9,7 +10,7 @@ export function createDagEventController({
   setWorkflowMode, renderGroupList, closeGroupEditor, discardGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
-  saveProjectLocally, applyActiveGroupingSet, rebuildProject, exportGroupingFolder,
+  saveProjectLocally, applyActiveGroupingSet, rebuildProject, updateDagFilters, exportGroupingFolder,
   copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
   canvasHeight, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber, setMapMode,
   undo, redo, renderActionHistory, renderDag, setFullscreenPanel,
@@ -120,8 +121,8 @@ function installHandlers() {
       els.variableLayoutSelect.disabled = false;
     }
   });
-  els.dagZoomIn.addEventListener("click", () => zoomMap(canvasWidth() / 2, canvasHeight() / 2, 1.12));
-  els.dagZoomOut.addEventListener("click", () => zoomMap(canvasWidth() / 2, canvasHeight() / 2, 1 / 1.12));
+  els.dagZoomIn.addEventListener("click", () => zoomMap(canvasWidth() / 2, canvasHeight() / 2, 1.12, true));
+  els.dagZoomOut.addEventListener("click", () => zoomMap(canvasWidth() / 2, canvasHeight() / 2, 1 / 1.12, true));
   els.dagFitView.addEventListener("click", () => fitMap());
   els.dagFitAll.addEventListener("click", () => fitMap(null, { all: true }));
   els.fullscreenVariableMap.addEventListener("click", () => toggleFullscreenPanel("variable-map"));
@@ -140,35 +141,35 @@ function installHandlers() {
     state.showExogeneity = false;
     state.showConfoundersOnly = false;
     state.showCollidersOnly = false;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleConfoundersOnly.addEventListener("click", () => {
     state.showExclusionViolations = false;
     state.showExogeneity = false;
     state.showConfoundersOnly = true;
     state.showCollidersOnly = false;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleCollidersOnly.addEventListener("click", () => {
     state.showExclusionViolations = false;
     state.showExogeneity = false;
     state.showCollidersOnly = true;
     state.showConfoundersOnly = false;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleExclusionViolations.addEventListener("click", () => {
     state.showExclusionViolations = true;
     state.showExogeneity = false;
     state.showConfoundersOnly = false;
     state.showCollidersOnly = false;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleExogeneity.addEventListener("click", () => {
     state.showExogeneity = true;
     state.showExclusionViolations = false;
     state.showConfoundersOnly = false;
     state.showCollidersOnly = false;
-    rebuildProject();
+    updateDagFilters();
   });
   els.confounderPathLength.addEventListener("input", () => {
     const requested = Math.trunc(Number(els.confounderPathLength.value));
@@ -178,7 +179,7 @@ function installHandlers() {
     state[field] = clampNumber(requested, minimum, 99);
     els.confounderPathLength.value = String(state[field]);
     if (!state.showCollidersOnly && !state.showExclusionViolations && !state.showExogeneity) state.showConfoundersOnly = true;
-    rebuildProject();
+    updateDagFilters();
   });
   els.confounderPathLength.addEventListener("change", () => {
     const field = state.showExclusionViolations ? "exclusionMaxPathLength" : "confounderMaxPathLength";
@@ -186,19 +187,32 @@ function installHandlers() {
       els.confounderPathLength.value = String(state[field]);
     }
   });
+  els.toggleSparseEdges.addEventListener("click", () => {
+    state.excludeSparseEdges = !state.excludeSparseEdges;
+    updateDagFilters();
+  });
+  els.minimumEdgePapers.addEventListener("input", () => {
+    const requested = Math.trunc(Number(els.minimumEdgePapers.value));
+    if (!Number.isSafeInteger(requested) || requested < 1) return;
+    state.minimumEdgePapers = requested;
+    updateDagFilters();
+  });
+  els.minimumEdgePapers.addEventListener("change", () => {
+    els.minimumEdgePapers.value = String(state.minimumEdgePapers);
+  });
   els.toggleBottleneckedConfounders.addEventListener("click", () => {
     state.excludeBottleneckedConfounders = !state.excludeBottleneckedConfounders;
     if (!state.showCollidersOnly && !state.showExogeneity) state.showConfoundersOnly = true;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleIrrelevantConfounderLinks.addEventListener("click", () => {
     state.hideIrrelevantConfounderLinks = !state.hideIrrelevantConfounderLinks;
     if (!state.showCollidersOnly && !state.showExogeneity) state.showConfoundersOnly = true;
-    rebuildProject();
+    updateDagFilters();
   });
   els.toggleAllExclusionLinks.addEventListener("click", () => {
     state.showAllExclusionLinks = !state.showAllExclusionLinks;
-    rebuildProject();
+    updateDagFilters();
   });
   els.dagSelectMode.addEventListener("click", () => setMapMode("select"));
   els.dagBrushMode.addEventListener("click", () => setMapMode("draw_add"));
@@ -263,6 +277,7 @@ function installHandlers() {
 
 function installMapHandlers() {
   const canvas = state.map.canvas;
+  attachGraphTouchGuard(canvas);
   const touchPoints = new Map();
   const pinchedPointers = new Set();
   let pinch = null;
@@ -452,7 +467,7 @@ function installMapHandlers() {
           state.selectedVariableIds = new Set(selection.selectedVariableIds);
           state.comparisonVariableIds = selection.comparisonVariableIds;
         }
-        renderAll();
+        renderAll({ rebuild: false, refreshView: true });
       }
     }
     state.map.dragging = false;

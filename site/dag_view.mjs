@@ -1,3 +1,5 @@
+import { isPresentLink } from "./dag_link_aggregation.mjs";
+
 import {
   connectedComponentGraph,
   createGraph,
@@ -22,6 +24,10 @@ export function deriveDagView({
   maxPathLength = 1,
   exclusionMaxPathLength = maxPathLength,
   excludeBottlenecked = false,
+  excludeSparseEdges = false,
+  minimumEdgePapers = 2,
+  rawLinksById = new Map(),
+  edgeSupportById = rawLinksById,
   filterByCausalRelevance = false,
   showConfoundersOnly = false,
   showCollidersOnly = false,
@@ -30,8 +36,15 @@ export function deriveDagView({
   hideIrrelevantDiagnosticLinks = false,
   showAllExclusionLinks = false,
 } = {}) {
-  const fullGraph = createGraph(groups.map((group) => group.group_id), links);
-  const connectivityGraph = filterGraphLinks(fullGraph, (link) => !excludedForConnectivity(link));
+  const retainedLinks = excludeSparseEdges ? links.filter(link => {
+    const ids = [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])];
+    const papers = new Set(ids.flatMap(id => {
+      const evidence = edgeSupportById.get(id) || rawLinksById.get(id);
+      return evidence?.paper_id && isPresentLink(evidence) ? [evidence.paper_id] : [];
+    }));
+    return papers.size >= minimumEdgePapers;
+  }) : links;
+  const fullGraph = createGraph(groups.map((group) => group.group_id), retainedLinks);
   const traversableLink = (link) => !excludedForConnectivity(link);
   const diagnosticOptions = {
     ivId,
@@ -52,8 +65,7 @@ export function deriveDagView({
     exogeneityGraph.nodeIds.add(ivId);
     exogeneityGraph.metadata.pathIds.add(ivId);
   }
-  const componentGraph = connectedComponentGraph(connectivityGraph, ivId);
-  const canFilterFromIv = filterByCausalRelevance && connectivityGraph.nodeIds.has(ivId);
+  const canFilterFromIv = filterByCausalRelevance && fullGraph.nodeIds.has(ivId);
   const anchorsReady = fullGraph.nodeIds.has(ivId) && fullGraph.nodeIds.has(dvId) && ivId !== dvId;
 
   let selectedGraph;
@@ -61,7 +73,9 @@ export function deriveDagView({
   else if (showExclusionViolations && anchorsReady && instrumentId) selectedGraph = exclusionGraph;
   else if (showConfoundersOnly && anchorsReady) selectedGraph = confounderGraph;
   else if (showCollidersOnly && anchorsReady) selectedGraph = colliderGraph;
-  else selectedGraph = canFilterFromIv ? componentGraph : fullGraph;
+  else selectedGraph = canFilterFromIv
+    ? connectedComponentGraph(filterGraphLinks(fullGraph, traversableLink), ivId)
+    : fullGraph;
 
   const componentGroupIds = new Set(selectedGraph.nodeIds);
   let visibleGraph = filterGraphNodes(fullGraph, componentGroupIds);

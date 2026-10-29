@@ -1,0 +1,237 @@
+{
+  "url": "https://www.jonathanmellon.com/?p=1&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&iv=category-income-earnings&dv=category-fertility-reproductive-behavior&instrument=category-weather&path=1&exclusion_path=2&conf=0&coll=0&excl=0&exog=1&sparse=0&bottle=1&paths=1&excl_links=0&mode=group_review",
+  "mobile": true,
+  "cpuThrottle": 4,
+  "source": "/private/tmp/echo-staging-candidate/dist/site",
+  "budgets": {
+    "wallMs": 500,
+    "longestTaskMs": 100
+  },
+  "runs": [
+    {
+      "timings": [
+        {
+          "name": "exclusion 1",
+          "ms": 111.5,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "exogeneity 1",
+          "ms": 93.09999990463257,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "exclusion 2",
+          "ms": 98.5,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "exogeneity 2",
+          "ms": 83.40000009536743,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "exclusion 3",
+          "ms": 99.40000009536743,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "exogeneity 3",
+          "ms": 98.2000002861023,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "bottleneck filter",
+          "ms": 81,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "path links filter",
+          "ms": 82.7000002861023,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 14
+        },
+        {
+          "name": "return to exclusion",
+          "ms": 97.19999980926514,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "all exclusion links",
+          "ms": 135.19999980926514,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 150
+        }
+      ],
+      "errors": []
+    },
+    {
+      "timings": [
+        {
+          "name": "exclusion 1",
+          "ms": 108.09999990463257,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "exogeneity 1",
+          "ms": 97,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "exclusion 2",
+          "ms": 99.2999997138977,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "exogeneity 2",
+          "ms": 85.2000002861023,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "exclusion 3",
+          "ms": 100.30000019073486,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "exogeneity 3",
+          "ms": 98.19999980926514,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "bottleneck filter",
+          "ms": 82.69999980926514,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "path links filter",
+          "ms": 79.5,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 14
+        },
+        {
+          "name": "return to exclusion",
+          "ms": 99.90000009536743,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "all exclusion links",
+          "ms": 146.30000019073486,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 150
+        }
+      ],
+      "errors": []
+    },
+    {
+      "timings": [
+        {
+          "name": "exclusion 1",
+          "ms": 95.60000038146973,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "exogeneity 1",
+          "ms": 91.10000038146973,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "exclusion 2",
+          "ms": 115.19999980926514,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "exogeneity 2",
+          "ms": 99.30000019073486,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "exclusion 3",
+          "ms": 99.59999990463257,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "exogeneity 3",
+          "ms": 99.39999961853027,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "bottleneck filter",
+          "ms": 79.89999961853027,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 8
+        },
+        {
+          "name": "path links filter",
+          "ms": 83.90000009536743,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 14
+        },
+        {
+          "name": "return to exclusion",
+          "ms": 97.90000009536743,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 30
+        },
+        {
+          "name": "all exclusion links",
+          "ms": 136.09999990463257,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "visibleEdges": 150
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

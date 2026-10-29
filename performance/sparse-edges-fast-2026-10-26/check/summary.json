@@ -1,0 +1,138 @@
+{
+  "scenario": "sparse-edges",
+  "dataTransport": "Playwright proxy (localhost CORS)",
+  "cpuThrottle": 1,
+  "url": "http://127.0.0.1:8789/",
+  "runs": [
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "enable sparse filter (cold evidence, minimum 2)",
+          "ms": 2085.7000002861023,
+          "longestTaskMs": 176,
+          "totalLongTaskMs": 246,
+          "requestCount": 2,
+          "decodedBodyBytes": 772759,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 3 (warm evidence)",
+          "ms": 95.40000009536743,
+          "longestTaskMs": 70,
+          "totalLongTaskMs": 70,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1476,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 5 (warm evidence)",
+          "ms": 72.90000009536743,
+          "longestTaskMs": 0,
+          "totalLongTaskMs": 0,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1012,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "change minimum papers to 2 (warm evidence)",
+          "ms": 124.40000009536743,
+          "longestTaskMs": 67,
+          "totalLongTaskMs": 67,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "disable sparse filter",
+          "ms": 156.09999990463257,
+          "longestTaskMs": 68,
+          "totalLongTaskMs": 68,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 2818,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        },
+        {
+          "name": "enable sparse filter (warm evidence, minimum 2)",
+          "ms": 126.90000009536743,
+          "longestTaskMs": 51,
+          "totalLongTaskMs": 51,
+          "requestCount": 0,
+          "decodedBodyBytes": 0,
+          "visibleEdges": 1945,
+          "loadedEvidence": 0,
+          "supportRecords": 66081,
+          "status": "passed"
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "baselineEdges": 2818,
+      "checks": [
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        },
+        {
+          "minimum": 3,
+          "enabled": true,
+          "edges": 1476
+        },
+        {
+          "minimum": 5,
+          "enabled": true,
+          "edges": 1012
+        },
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        },
+        {
+          "minimum": 2,
+          "enabled": false,
+          "edges": 2818
+        },
+        {
+          "minimum": 2,
+          "enabled": true,
+          "edges": 1945
+        }
+      ],
+      "failureRecoveryChecks": [
+        {
+          "mode": "reject",
+          "pendingEdges": 2818,
+          "recoveredEdges": 2818
+        },
+        {
+          "mode": "missing",
+          "pendingEdges": 2818,
+          "recoveredEdges": 2818
+        }
+      ],
+      "fullEvidenceVerified": true,
+      "inspectorDetailRecords": 1
+    }
+  ]
+}

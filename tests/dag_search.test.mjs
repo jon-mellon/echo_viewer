@@ -93,3 +93,72 @@ test("group search uses lightweight global records for unhydrated members", () =
   assert.equal(results[0].variableMatch, "college degree completed");
   assert.equal(variableById.size, 0);
 });
+
+test("instrument search ranks rainfall ahead of unrelated training matches", async () => {
+  const { StaticVariableSearchCatalog, variableSearchPayload } = await import("../site/variable_search_catalog.mjs");
+  const variables = [
+    { variable_id: "training", display_label: "Job training" },
+    { variable_id: "rain", display_label: "Annual rainfall" },
+  ];
+  const project = { groups: [
+    { group_id: "training", label: "Training", variable_ids: ["training"] },
+    { group_id: "weather", label: "Weather", variable_ids: ["training", "rain"] },
+  ] };
+  const catalog = new StaticVariableSearchCatalog();
+  await catalog.load("/catalog.json", async () => new Response(JSON.stringify(variableSearchPayload(variables, "x"))));
+  const index = new search.AnchorGroupSearchIndex();
+  const results = index.search(project, "instrument", "rain", new Map(), catalog);
+  assert.deepEqual(results.map(result => result.group.group_id), ["weather", "training"]);
+  assert.equal(results[0].variableMatch, "Annual rainfall");
+});
+
+test("indexed group search preserves constituent fields, order, and hydrated precedence", async () => {
+  const { StaticVariableSearchCatalog, variableSearchPayload } = await import("../site/variable_search_catalog.mjs");
+  const catalog = new StaticVariableSearchCatalog();
+  const variables = [
+    { variable_id: "v2", display_label: "School attendance", paper_id: "paperneedle", index: 1 },
+    { variable_id: "v1", display_label: "Income", raw_variable_text: "Annual school earnings", index: 2 },
+  ];
+  await catalog.load("/catalog.json", async () => new Response(JSON.stringify(variableSearchPayload(variables, "x"))));
+  const project = { groups: [
+    { group_id: "g1", label: "Resources", variable_ids: ["v1", "v2"] },
+    { group_id: "g2", label: "School quality", variable_ids: ["v2"] },
+  ] };
+  const index = new search.AnchorGroupSearchIndex();
+  await index.prepare(project.groups, catalog);
+  const hydrated = new Map();
+  const records = new Map(variables.map(v => [v.variable_id, v]));
+  for (const query of ["school", "school att", "paperneedle", "come", "zzzz", ""]) {
+    assert.deepEqual(index.search(project, "iv", query, hydrated, catalog),
+      search.searchAnchorGroups(project, "iv", query, hydrated, 12, records));
+  }
+  assert.equal(index.search(project, "iv", "school", hydrated, catalog)[1].variableMatch, "Annual school earnings");
+  hydrated.set("v1", { variable_id: "v1", display_label: "Updated" });
+  assert.equal(index.search(project, "iv", "school", hydrated, catalog)[1].variableMatch, "School attendance");
+  const cachedGroups = index.groups;
+  project.iv_group_id = "g1";
+  index.search(project, "dv", "school", hydrated, catalog);
+  assert.equal(index.groups, cachedGroups);
+  project.groups[0].variable_ids = [];
+  assert.equal(index.search(project, "iv", "school", hydrated, catalog).length, 1);
+});
+
+test("group-first search invalidates cached misses after membership or hydrated-field changes", async () => {
+  const { StaticVariableSearchCatalog, variableSearchPayload } = await import("../site/variable_search_catalog.mjs");
+  const catalog = new StaticVariableSearchCatalog();
+  const records = [{ variable_id: "a", display_label: "Income" }, { variable_id: "b", display_label: "Education" }];
+  await catalog.load("/catalog.json", async () => new Response(JSON.stringify(variableSearchPayload(records, "x"))));
+  const project = { groups: [{ group_id: "g", label: "Group", variable_ids: ["a"] }] };
+  const hydrated = new Map();
+  const index = new search.AnchorGroupSearchIndex();
+  assert.equal(index.search(project, "iv", "education", hydrated, catalog).length, 0);
+  project.groups[0].variable_ids.push("b");
+  assert.equal(index.search(project, "iv", "education", hydrated, catalog).length, 1);
+  hydrated.set("b", { variable_id: "b", display_label: "Updated" });
+  assert.equal(index.search(project, "iv", "education", hydrated, catalog).length, 0);
+  hydrated.get("b").display_label = "Education again";
+  assert.equal(index.search(project, "iv", "education", hydrated, catalog).length, 1);
+  project.groups[0].variable_ids = ["a"];
+  assert.equal(index.search(project, "iv", "education", hydrated, catalog).length, 0);
+  await assert.rejects(index.prepare([{ group_id: "bad", variable_ids: ["missing"] }], catalog), /does not cover/);
+});

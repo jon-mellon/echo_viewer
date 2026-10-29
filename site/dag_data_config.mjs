@@ -32,9 +32,17 @@ export function evidenceManifestUrl(location = globalThis.location, evidenceSnap
   }
   // A permalink's explicit snapshot is the reproducibility contract. The
   // publication binding is only a fallback for shorter ?schema= links.
-  const requested = (location ? new URL(location.href).searchParams.get("data_version") : "")
+  let requested = (location ? new URL(location.href).searchParams.get("data_version") : "")
     || evidenceSnapshot
     || "";
+  // Historical permalinks used the logical record signature instead of the
+  // immutable directory ID. Resolve that alias independently of the default.
+  if (requested === "5887939bf4e5d3619070a522f3ae11eee3f377c584bb8b2b3f77593c2b2248d4") {
+    requested = "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0";
+  }
+  if (requested === "11a8ec4f4868185d15dceae798d7617387eb9216c51a8f5acff4e84282b09acd") {
+    requested = "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b";
+  }
   if (/^[0-9a-f]{64}$/i.test(requested)) {
     return `${PRODUCTION_EVIDENCE_SNAPSHOT_BASE}${requested.toLowerCase()}/manifest.json`;
   }

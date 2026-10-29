@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDagInspectorController } from "../site/dag_inspector_controller.mjs";
+import { createDagInspectorController, STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "../site/dag_inspector_controller.mjs";
 
 class Element {
   constructor(tagName) {
@@ -84,6 +84,35 @@ test("group definition renders before concepts and paginates ten at a time", asy
   }
 });
 
+test("tall panels load a bounded larger page and reuse cached labels", async () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName) };
+  try {
+    const ids = Array.from({ length: 80 }, (_, index) => `v${index + 1}`);
+    const state = { project: { groups: [{ group_id: "g1", variable_ids: ids }] },
+      selectedEvidenceGroupId: "g1", variableById: new Map() };
+    const edgeInspector = new Element("div");
+    edgeInspector.parentElement = { clientHeight: 2000 };
+    const elements = { edgeInspector, closeEvidencePane: new Element("button"), provenancePanel: new Element("div") };
+    const requests = [];
+    const controller = createDagInspectorController({ state, elements, loadConceptLabels: async requested => {
+      requests.push(requested);
+      return requested.map(variable_id => ({ variable_id, concept_label: variable_id }));
+    } });
+    controller.renderGroupDefinition();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(requests[0].length, 30);
+    assert.equal(edgeInspector.findAll("li").length, 30);
+    edgeInspector.querySelector("[data-concept-page='next']").click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(requests[1], ids.slice(30, 60));
+    edgeInspector.querySelector("[data-concept-page='previous']").click();
+    assert.equal(requests.length, 2);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("a concept without a loaded label has no exclude control", async () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement: tagName => new Element(tagName) };
@@ -120,7 +149,7 @@ test("a finding's exclude control waits for both concept labels", () => {
     const controller = createDagInspectorController({ state, elements, truncate: text => text,
       takeSnapshot: () => "before", nowIso: () => "2026-10-10T00:00:00Z",
       applyProjectOperation: next => { state.project = next; },
-      addDecision() {}, addToUndoHistory() {}, renderAll() {} });
+      addDecision() {}, addToUndoHistory() {}, rebuildLinkDecision() {}, renderAll() {} });
     controller.renderProvenance();
     assert.equal(elements.provenancePanel.findAll("button").length, 0);
     state.variableById.set("v1", { concept_label: "Source" });
@@ -244,4 +273,35 @@ test("concept exclude control passes the selected concept to the group update pa
   } finally {
     globalThis.document = previousDocument;
   }
+});
+
+
+test("focal study tie shows the target relationship's evidence in both directions", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName),
+    createTextNode: text => ({ textContent: text }) };
+  try {
+    const edge = { edge_id: "a__b", group_a: "a", group_b: "b", is_target_relation: true,
+      a_to_b_raw_link_ids: ["r1"], b_to_a_raw_link_ids: ["r2"] };
+    const raw = (id, source, target) => ({ raw_causal_link_id: id, paper_id: id,
+      source_variable_id: source, target_variable_id: target });
+    const state = { project: { groups: [{ group_id: "a", label: "Exposure", variable_ids: ["v1"] },
+      { group_id: "b", label: "Outcome", variable_ids: ["v2"] }], links: [edge],
+      iv_group_id: "a", dv_group_id: "b", link_decisions: {}, finding_decisions: {} },
+      selectedEdgeId: STUDY_DESIGN_EDGE_ID, rawLinksById: new Map([["r1", raw("r1", "v1", "v2")],
+        ["r2", raw("r2", "v2", "v1")]]), variableById: new Map([["v1", { concept_label: "Source" }],
+        ["v2", { concept_label: "Target" }]]) };
+    const elements = { edgeInspector: new Element("div"), closeEvidencePane: new Element("button"),
+      provenancePanel: new Element("div") };
+    const controller = createDagInspectorController({ state, elements, truncate: text => text });
+    assert.equal(controller.selectedEdge(), edge);
+    controller.renderEdge();
+    controller.renderProvenance();
+    assert.equal(elements.provenancePanel.findAll("section").length, 2);
+    assert.match(elements.provenancePanel.textContent, /r1/);
+    assert.match(elements.provenancePanel.textContent, /r2/);
+    state.selectedEdgeId = STUDY_INSTRUMENT_EDGE_ID;
+    controller.renderProvenance();
+    assert.equal(elements.provenancePanel.hidden, true);
+  } finally { globalThis.document = previousDocument; }
 });

@@ -164,7 +164,25 @@ export function createDagExportController({
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
-  function downloadJson(payload, filename) {
+  async function downloadJson(payload, filename) {
+    if (typeof Worker !== "undefined") {
+      let worker;
+      try {
+        const blob = await new Promise((resolve, reject) => {
+          worker = new Worker(new URL("./json_export_worker.mjs", import.meta.url), { type: "module" });
+          worker.onmessage = event => resolve(event.data);
+          worker.onerror = reject;
+          worker.onmessageerror = reject;
+          worker.postMessage(payload);
+        });
+        downloadBlob(blob, filename);
+        return;
+      } catch {
+        // Retain downloads where module workers are unavailable.
+      } finally {
+        worker?.terminate();
+      }
+    }
     downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }), filename);
   }
 
@@ -224,7 +242,7 @@ export function createDagExportController({
 
   function exportProject() {
     aggregateGroupLinks();
-    downloadJson({ ...projectPayload(), exported_at: nowIso() }, "dag_project.json");
+    return downloadJson({ ...projectPayload(), exported_at: nowIso() }, "dag_project.json");
   }
 
   function exportWorkingMap() {

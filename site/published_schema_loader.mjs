@@ -2,7 +2,7 @@ import { supabase } from "./supabase_client.mjs";
 import { PRODUCTION_APP_ORIGIN } from "./dag_data_config.mjs";
 import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contracts.mjs";
-import { canonicalFolderHash } from "./grouping_schema_writer.mjs";
+import { canonicalFolderHash, stableJson } from "./grouping_schema_writer.mjs";
 import { buildPermalink } from "./dag_permalink.mjs";
 import { deriveDagView } from "./dag_view.mjs";
 import { COMPILED_DAG_PATH, sha256Hex, stableJsonBytes,
@@ -177,6 +177,20 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
     const complete = await staged.loadComplete();
     performance.measure("echo:schema:memberships", { start: priorityStart, end: performance.now() });
     const integrityStart = performance.now();
+    // Restore the canonical logical folder before hashing: reference metadata is
+    // transport-only, while referenced bytes occupy their original local paths.
+    const references = staged.manifest.group_membership_references || {};
+    if (Object.keys(references).length) {
+      const logicalManifest = { ...staged.manifest };
+      delete logicalManifest.group_membership_references;
+      schemaFiles.set("manifest.json", new TextEncoder().encode(stableJson(logicalManifest)));
+      for (const [groupId, reference] of Object.entries(references)) {
+        const bytes = memory.get(new URL(reference, baseUrl).href);
+        if (!bytes || !staged.manifest.group_membership_files[groupId]) throw new Error(`Missing referenced membership for ${groupId}.`);
+        schemaFiles.set(staged.manifest.group_membership_files[groupId], bytes);
+        schemaFiles.delete(new URL(reference, baseUrl).href.slice(new URL(baseUrl).href.length));
+      }
+    }
     const downloadedHash = await canonicalFolderHash(schemaFiles);
     performance.measure("echo:schema:integrity", { start: integrityStart, end: performance.now() });
     if (downloadedHash !== publication.content_hash) {

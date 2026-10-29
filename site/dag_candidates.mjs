@@ -1,5 +1,5 @@
 import { centroid, computeVoronoiCells, distance, worldToScreen } from "./map_geometry.mjs";
-import { rawLinksBetween, pairKey } from "./dag_link_aggregation.mjs";
+import { pairKey } from "./dag_link_aggregation.mjs";
 
 const ROLE_PRIORITY = [
   "possible_confounder",
@@ -31,6 +31,15 @@ export function groupCoherence(variableIds, similarityEdgeMap) {
 }
 
 function candidateContext(project, { variables, similarityEdgeMap, linkLookup }) {
+  const outgoing = new Map();
+  for (const [key, links] of linkLookup) {
+    if (!links.length) continue;
+    const separator = key.indexOf("->");
+    if (separator < 0) continue;
+    const source = key.slice(0, separator), target = key.slice(separator + 2);
+    if (!outgoing.has(source)) outgoing.set(source, new Set());
+    outgoing.get(source).add(target);
+  }
   const iv = project.groups.find(g => g.group_id === project.iv_group_id);
   const dv = project.groups.find(g => g.group_id === project.dv_group_id);
   const groupSites = project.groups
@@ -53,7 +62,10 @@ function candidateContext(project, { variables, similarityEdgeMap, linkLookup })
   }
   return {
     iv, dv,
-    hasAnyMapping: (a, b) => linkLookup.size > 0 && rawLinksBetween(a, b, linkLookup).length > 0,
+    hasAnyMapping: (a, b) => {
+      const targets = new Set(b);
+      return a.some(source => [...(outgoing.get(source) || [])].some(target => targets.has(target)));
+    },
     groupCoherence: ids => groupCoherence(ids, similarityEdgeMap),
     groupProximity: (g, x, y) => Math.min(
       distance(centroid(g.variable_ids, variables), centroid(x.variable_ids, variables)),
@@ -78,14 +90,14 @@ export function buildCandidateQueue(project, inputs) {
     const yConnected = cToY || yToC;
     const roles = [];
     const why = [];
-    if (cToX && cToY) { roles.push("possible_confounder"); why.push(`${group.label} → IV group; ${group.label} → DV group`); }
-    if (xToC && cToY) { roles.push("possible_mediator"); why.push(`IV group → ${group.label} → DV group`); }
-    if (xToC && yToC) { roles.push("possible_common_consequence_or_collider"); why.push(`IV group → ${group.label} ← DV group`); }
-    if (cToY && !xConnected) { roles.push("other_possible_cause_of_dv"); why.push(`${group.label} → DV group`); }
-    if (cToX && !yConnected) { roles.push("other_possible_cause_of_iv"); why.push(`${group.label} → IV group`); }
+    if (cToX && cToY) { roles.push("possible_confounder"); why.push(`${group.label} → Ind var group; ${group.label} → Dep var group`); }
+    if (xToC && cToY) { roles.push("possible_mediator"); why.push(`Ind var group → ${group.label} → Dep var group`); }
+    if (xToC && yToC) { roles.push("possible_common_consequence_or_collider"); why.push(`Ind var group → ${group.label} ← Dep var group`); }
+    if (cToY && !xConnected) { roles.push("other_possible_cause_of_dv"); why.push(`${group.label} → Dep var group`); }
+    if (cToX && !yConnected) { roles.push("other_possible_cause_of_iv"); why.push(`${group.label} → Ind var group`); }
     if (!roles.length && isNearTarget(group)) {
       roles.push("near_iv_dv_map_region");
-      why.push("Shares a map-region boundary with the IV or DV group");
+      why.push("Shares a map-region boundary with the Ind var or Dep var group");
     }
     if (!roles.length) continue;
     const orderedRoles = roles.sort((a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b));

@@ -145,11 +145,11 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     finishStartupLoading();
-    // The large variable catalog is loaded when someone searches for the
-    // first time. Group-label browsing does not need it at startup.
+    // Keep membership loading ahead of the search index; start warming the
+    // catalog after hydration so subsequent searches are ready during setup.
     if (state.data.load_published_schema) {
       const revision = state.compiledDagRevision || 0;
-      const applyLoadedSchema = schema => {
+      const applyLoadedSchema = async (schema, complete = false) => {
         state.data.grouping_sets = [schema];
         state.data.default_grouping_set_id = schema.grouping_set_id;
         state.project.link_decisions = structuredClone(schema.link_decisions || {});
@@ -157,6 +157,13 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.project.confounder_statuses = structuredClone(schema.confounder_statuses || {});
         loadLatestSchemaGroups();
         normalizeProjectDuplicateAssignments();
+        // Membership hydration and the following DOM/canvas refresh are
+        // separate stages. Let input and painting run between them.
+        await new Promise(resolve => setTimeout(resolve, 0));
+        if (complete) {
+          state.publishedSchemaHydrating = false;
+          state.publishedSchemaHydrated = true;
+        }
         // Compiled nodes and routes already describe this publication. Hydrating
         // memberships updates controls and metadata without changing geometry.
         renderAll({ reuseDagGeometry: true });
@@ -164,14 +171,13 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       void state.data.load_published_schema({ onPriorityReady: ({ schema, groupIds }) => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.publishedMembershipReadyGroups = new Set(groupIds);
-        applyLoadedSchema(schema);
-      } }).then(({ schema }) => {
+        return applyLoadedSchema(schema);
+      } }).then(async ({ schema }) => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.publishedMembershipReadyGroups = new Set(schema.groups.map(group => group.group_id));
-        state.publishedSchemaHydrating = false;
-        state.publishedSchemaHydrated = true;
         state.publishedSchemaLoadFailed = false;
-        applyLoadedSchema(schema);
+        await applyLoadedSchema(schema, true);
+        if (!state.project.iv_group_id || !state.project.dv_group_id) void loadVariableSearchCatalog();
         publicationController.setSchemaReady?.(true);
         void publicationController.refreshPublicationState?.();
         onReady();
@@ -183,6 +189,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         console.error("Could not finish loading the published schema.", error);
       });
     } else {
+      if (!state.project.iv_group_id || !state.project.dv_group_id) void loadVariableSearchCatalog();
       onReady();
     }
   }
@@ -199,6 +206,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     state.rawLinks = state.data.raw_causal_links || [];
     state.compiledDag = state.data.compiled_dag || null;
     state.compiledDagValid = Boolean(state.compiledDag);
+    state.edgeSupportById = new Map();
     state.rawLinksById = new Map(state.rawLinks.map((l) => [l.raw_causal_link_id, l]));
     state.linkLookup = new Map();
     for (const link of state.rawLinks) {

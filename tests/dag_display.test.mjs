@@ -33,6 +33,8 @@ test("display records preserve node roles, selection, edge styles and descriptio
     state.showConfoundersOnly = mode === "confounder";
     state.activeGroupId = selected;
     const view = { ...state, ivId: "iv", dvId: "dv", groupColor: "#123456" };
+    if (mode === "confounder") view.colliderGroupIds = new Set();
+    if (mode === "collider") view.confounderGroupIds = new Set();
     for (const group of groups) for (const width of [160, 220]) for (const point of [undefined, { x: 20, y: -10 }]) {
       assert.deepEqual(plain(display.visNodeData(group, point, { nodeMaxWidth: width }, view)),
         plain(legacy.visNodeData(group, point, { nodeMaxWidth: width })));
@@ -105,4 +107,29 @@ test("exogeneity colors common causes while keeping the three study anchors", ()
   assert.equal(instrument.color.background, "#166534");
   assert.equal(iv.color.background, "#123456");
   assert.equal(instrument.shape, "ellipse");
+});
+
+test("group centroid skips cold membership scans and retains duplicate-representative weighting", async () => {
+  const { groupMapCentroid } = await import("../site/dag_display.mjs");
+  const group = { variable_ids: ["copy", "v1", "v2", "missing"] };
+  const empty = new Map();
+  let representativesVisited = 0;
+  assert.deepEqual(groupMapCentroid(group, empty, id => { representativesVisited++; return id; }), { x: 0, y: 0 });
+  assert.equal(representativesVisited, 0);
+  const variables = new Map([["v1", { map_x: 3, map_y: 6 }], ["v2", { map_x: 9 }]]);
+  assert.deepEqual(groupMapCentroid(group, variables, id => id === "copy" ? "v1" : id), { x: 5, y: 4 });
+});
+
+
+test("overlapping diagnostic roles retain the opposite role outline", () => {
+  const group = { group_id: "both", label: "Both", variable_ids: [] };
+  const base = { confounderGroupIds: new Set(["both"]), colliderGroupIds: new Set(["both"]),
+    confounderPathGroupIds: new Set(), colliderPathGroupIds: new Set(), groupColor: "#123456" };
+  for (const [mode, color] of [["showConfoundersOnly", "#801744"], ["showCollidersOnly", "#c62828"]]) {
+    const node = display.visNodeData(group, null, {}, { ...base, [mode]: true, activeGroupId: "both" });
+    assert.equal(node.color.border, color);
+    assert.equal(node.color.highlight.border, color);
+    assert.equal(node.color.hover.border, color);
+    assert.equal(node.borderWidth, 4);
+  }
 });

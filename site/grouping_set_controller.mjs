@@ -10,6 +10,21 @@ export function createGroupingSetController({ state, elements, publicationContro
   rejectedVariableEntries, rejectedVariableIdSet, applyProjectOperation, normalizeProjectDuplicateAssignments,
   groupById, nowIso }) {
   const presenter = createGroupingSetPresenter({ elements });
+  let canonicalMemberships = new WeakMap();
+  let membershipClusters = state.clusterOf;
+  function canonicalIds(ids) {
+    if (membershipClusters !== state.clusterOf) {
+      membershipClusters = state.clusterOf;
+      canonicalMemberships = new WeakMap();
+    }
+    let cached = canonicalMemberships.get(ids);
+    if (!cached || cached.original.length !== ids.length
+      || ids.some((id, index) => id !== cached.original[index])) {
+      cached = { original: [...ids], canonical: [...new Set(ids.map(id => state.clusterOf.get(id) || id))].sort() };
+      canonicalMemberships.set(ids, cached);
+    }
+    return [...cached.canonical];
+  }
   function active() {
     return (state.data.grouping_sets || []).find(set => set.grouping_set_id === state.project.active_grouping_set_id)
       || (state.data.grouping_sets || [])[0];
@@ -26,12 +41,19 @@ export function createGroupingSetController({ state, elements, publicationContro
     else window.prompt("Copy this permalink:", url);
   }
 
+  function splitDefinition(group) {
+    // Anchor roles/timestamps are view state. Keep source metadata stable while
+    // retaining the provenance needed to reopen a split in a private draft.
+    const { type, updated_at, ...definition } = projectOps.withoutGroupReviewStatus(group);
+    return definition;
+  }
+
   function workingSchema() {
     const source = active() || {};
     const sourceGroups = new Map((source.groups || []).map(group => [group.group_id, group]));
     const owners = new Map();
     const groups = state.project.groups.filter(group => group.variable_ids?.length).map(group => {
-      const variable_ids = [...new Set(group.variable_ids.map(id => state.clusterOf.get(id) || id))].sort();
+      const variable_ids = canonicalIds(group.variable_ids);
       for (const id of variable_ids) {
         const owner = owners.get(id);
         if (owner && owner !== group.group_id) throw new Error(`Canonical variable ${id} belongs to both ${owner} and ${group.group_id}.`);
@@ -43,7 +65,7 @@ export function createGroupingSetController({ state, elements, publicationContro
         ...(sourceGroups.get(group.group_id) || {}),
         // Split provenance is needed to reopen a private draft after reload.
         ...(group.provenance?.operation === "split_categories"
-          ? projectOps.withoutGroupReviewStatus(group) : {}),
+          ? splitDefinition(group) : {}),
         group_id: group.group_id, label: group.label || "", notes: group.notes || "",
         ...(group.description !== undefined ? { description: group.description } : {}),
         source: group.source || "project_export",

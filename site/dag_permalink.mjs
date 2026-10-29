@@ -2,6 +2,7 @@ export const PERMALINK_VERSION = "1";
 
 const booleanFields = {
   conf: "showConfoundersOnly", coll: "showCollidersOnly", excl: "showExclusionViolations", exog: "showExogeneity",
+  sparse: "excludeSparseEdges",
   bottle: "excludeBottleneckedConfounders",
   paths: "hideIrrelevantConfounderLinks", vl: "showVariableLabels", gl: "showGroupLabels",
   excl_links: "showAllExclusionLinks",
@@ -36,6 +37,7 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state,
     instrument: state.project.instrument_group_id || "",
     mode: state.workflowMode, vlayout: state.variableLayoutSource,
     path: String(state.confounderMaxPathLength),
+    min_papers: String(state.minimumEdgePapers ?? 2),
     exclusion_path: String(state.exclusionMaxPathLength ?? 2),
     selected_group: state.activeGroupId || "", selected_variable: state.selectedVariableId || "",
     selected_edge: state.selectedEdgeId || "", sort: state.groupListSort || "",
@@ -60,7 +62,7 @@ export function applyPermalink(params, state) {
   const dv = resolveGroup(params.get("dv"));
   const partialSetup = params.get("mode") === "setup" && (!iv || !dv);
   if ((!iv || !dv || iv === dv) && !partialSetup) {
-    throw new Error("Permalink IV or DV is absent from the referenced schema.");
+    throw new Error("Permalink Ind var or Dep var is absent from the referenced schema.");
   }
   state.project.iv_group_id = iv || "";
   state.project.dv_group_id = dv || "";
@@ -84,6 +86,9 @@ export function applyPermalink(params, state) {
   state.variableLayoutSource = params.get("vlayout") || state.variableLayoutSource;
   state.selectedUoa = null;
   state.uoaFilterEnabled = false;
+  state.excludeSparseEdges = params.get("sparse") === "1";
+  const minPapers = Math.trunc(Number(params.get("min_papers")));
+  state.minimumEdgePapers = Number.isSafeInteger(minPapers) && minPapers >= 1 ? minPapers : 2;
   state.confounderMaxPathLength = Math.max(1, Math.min(99, Number(params.get("path")) || 1));
   state.exclusionMaxPathLength = Math.max(2, Math.min(99,
     Number(params.get("exclusion_path")) || (state.project.instrument_group_id ? Number(params.get("path")) : 0) || 2));

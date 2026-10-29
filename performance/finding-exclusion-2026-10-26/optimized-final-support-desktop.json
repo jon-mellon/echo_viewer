@@ -1,0 +1,107 @@
+{
+  "scenario": "final-support",
+  "dataTransport": "Playwright proxy (localhost CORS)",
+  "cpuThrottle": 1,
+  "url": "http://127.0.0.1:8795/",
+  "runs": [
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "open finding exclusion",
+          "ms": 49.80000019073486,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "exclude final support to edge removal",
+          "ms": 191.5,
+          "longestTaskMs": 113,
+          "rows": 2
+        },
+        {
+          "name": "restore final support to edge return",
+          "ms": 147.09999990463257,
+          "longestTaskMs": 85,
+          "rows": 2
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-aesthetic-evaluation",
+      "findingId": "r8e4930302d2b7964bdeeacb0",
+      "unsupportedEdgeRemoved": true,
+      "supportedEdgeRestored": true
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "open finding exclusion",
+          "ms": 47.5,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "exclude final support to edge removal",
+          "ms": 192.7999997138977,
+          "longestTaskMs": 112,
+          "rows": 2
+        },
+        {
+          "name": "restore final support to edge return",
+          "ms": 148.19999980926514,
+          "longestTaskMs": 89,
+          "rows": 2
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-aesthetic-evaluation",
+      "findingId": "r8e4930302d2b7964bdeeacb0",
+      "unsupportedEdgeRemoved": true,
+      "supportedEdgeRestored": true
+    },
+    {
+      "groups": 111,
+      "members": 97818,
+      "hydratedVariables": 0,
+      "errors": [],
+      "timings": [
+        {
+          "name": "open finding exclusion",
+          "ms": 50.30000019073486,
+          "longestTaskMs": 0,
+          "rows": 3
+        },
+        {
+          "name": "exclude final support to edge removal",
+          "ms": 159.80000019073486,
+          "longestTaskMs": 108,
+          "rows": 2
+        },
+        {
+          "name": "restore final support to edge return",
+          "ms": 160.2000002861023,
+          "longestTaskMs": 84,
+          "rows": 2
+        }
+      ],
+      "snapshot": {
+        "snapshot_id": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b"
+      },
+      "edgeId": "category-academic-achievement__category-aesthetic-evaluation",
+      "findingId": "r8e4930302d2b7964bdeeacb0",
+      "unsupportedEdgeRemoved": true,
+      "supportedEdgeRestored": true
+    }
+  ]
+}

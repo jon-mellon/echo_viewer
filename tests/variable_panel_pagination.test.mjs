@@ -44,6 +44,7 @@ test("Variables panel shows ten per page and remembers expanded definitions", as
     const controller = createDagSetupGroupController({ state, elements,
       groupById: id => state.project.groups.find(group => group.group_id === id) });
 
+    state.componentGroupIds ||= new Set(state.project.groups.map(group => group.group_id));
     controller.renderVariablePanel();
     assert.equal(elements.variablePanelCount.textContent, "23");
     assert.equal(elements.variablePanelList.findAll("details").length, 10);
@@ -68,6 +69,14 @@ test("Variables panel shows ten per page and remembers expanded definitions", as
     controller.renderVariablePanel();
     assert.equal(elements.variablePanelList.findAll("details").length, 2);
     assert.equal(elements.variablePanelPagination.hidden, true);
+    state.componentGroupIds = new Set(["g1"]);
+    controller.renderVariablePanel();
+    assert.equal(elements.variablePanelCount.textContent, "1");
+    assert.match(elements.variablePanelList.textContent, /Variable 01/);
+    assert.doesNotMatch(elements.variablePanelList.textContent, /Variable 02/);
+    state.componentGroupIds.add("g2");
+    controller.renderVariablePanel();
+    assert.equal(elements.variablePanelCount.textContent, "2");
     await new Promise(resolve => setImmediate(resolve));
   } finally {
     globalThis.document = previousDocument;
@@ -100,6 +109,7 @@ test("expanded Variables row loads concepts in pages and keeps the definition vi
       excludeConcept: (...args) => exclusions.push(args),
     });
 
+    state.componentGroupIds = new Set(groups.map(group => group.group_id));
     controller.renderVariablePanel();
     const row = elements.variablePanelList.findAll("details")[1];
     assert.match(row.textContent, /Existing definition/);
@@ -143,12 +153,39 @@ test("Variables list opens the shared split editor for editable groups", () => {
       startEditSplit: id => opened.push(id),
     });
 
+    state.componentGroupIds = new Set(groups.map(group => group.group_id));
     controller.renderVariablePanel();
     const rows = elements.variablePanelList.findAll("details");
     assert.equal(rows[0].findAll("button").length, 0);
     assert.equal(rows[1].findAll("button")[0].textContent, "Edit split");
     rows[1].findAll("button")[0].click();
     assert.deepEqual(opened, ["split"]);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("a saved split outside the graph is shown on its page and remains accessible", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName) };
+  try {
+    const groups = Array.from({ length: 21 }, (_, index) => ({
+      group_id: `g${index}`, label: `Variable ${String(index).padStart(2, "0")}`, variable_ids: [`v${index}`],
+    }));
+    const state = { interfaceMode: "dag2", project: { groups, iv_group_id: "g0", dv_group_id: "g1" },
+      componentGroupIds: new Set(groups.slice(0, 20).map(group => group.group_id)),
+      pendingVariablePanelGroupId: "g20" };
+    const elements = { variablePanel: new Element("section"), variablePanelCount: new Element("span"),
+      variablePanelList: new Element("div"), variablePanelPagination: new Element("div") };
+    const controller = createDagSetupGroupController({ state, elements,
+      groupById: id => groups.find(group => group.group_id === id), canEditSplit: group => group.group_id === "g20" });
+    controller.renderVariablePanel();
+    assert.equal(elements.variablePanelCount.textContent, "21");
+    assert.match(elements.variablePanelPagination.textContent, /21–21 of 21/);
+    assert.equal(elements.variablePanelList.findAll("details")[0].dataset.groupId, "g20");
+    elements.variablePanelPagination.findAll("button")[0].click();
+    assert.match(elements.variablePanelPagination.textContent, /11–20 of 21/);
+    assert.equal(state.pendingVariablePanelGroupId, null);
   } finally {
     globalThis.document = previousDocument;
   }

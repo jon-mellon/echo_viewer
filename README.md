@@ -173,3 +173,37 @@ source and target files.
 
 The suite uses synthetic browser sessions only. It does not collect viewer
 analytics or retain user activity.
+
+### Selection and concept exclusion profile
+
+Run `npm run profile:selection-concept` to profile DV and instrument selection,
+opening a variable, and excluding a concept against a published schema. It records
+visible feedback and settled graph times separately, captures long tasks and CPU
+profiles, and checks that anchor selection reuses aggregated links. Set
+`PROFILE_DEVICE=mobile` for a 4× CPU-throttled mobile viewport, `PROFILE_RUNS` to
+change the run count, and `PROFILE_OUTPUT` to choose the output directory. The
+default output is `/private/tmp/echo-selection-concept-profile`.
+
+### Diagnostic view switching profile
+
+`npm run profile:diagnostics` profiles the current source against the published
+100k staging schema at a 390 × 844 mobile viewport with 4× CPU throttling. It
+opens the mobile Map tab and measures cold and repeated switches between
+exclusion restriction and exogeneity, plus bottleneck, path-link and all-visible-link controls.
+The unit regression covers all graph filter controls, including the confounder,
+collider, unfiltered and path-length controls hidden while an instrument is selected. Each step waits for the graph and two paint frames,
+checks rendered evidence against the filtered graph, and rejects project
+recompilation, membership changes or raw evidence loading during view switches.
+Three fresh browser contexts run by default. Each interaction must finish within
+500 ms with no main-thread task over 100 ms (desktop: 250 ms / 75 ms).
+
+Use `PROFILE_DEVICE=desktop` for desktop, `PROFILE_RUNS=1` for a quick check,
+`PROFILE_SITE_DIR=dist/site` for a built release, or `PROFILE_URL=<published-url>`
+for other anchors and schemas. Local application assets are served by Playwright
+on the chosen origin; remote evidence remains real. `PROFILE_REMOTE=1` measures
+the deployed assets instead. URLs containing `local_schema` are rejected because
+those drafts exist only in their original browser. `PROFILE_OUTPUT` changes the
+output directory; `PROFILE_DISABLE_BUDGETS=1` records a diagnostic run without
+timing gates. CPU profiles, timing summaries, and failure screenshots are saved
+under `profile-results-diagnostics-mobile/` (desktop: `profile-results-diagnostics/`).
+The PR/scheduled profiling workflow and staging and production deployments run this check.

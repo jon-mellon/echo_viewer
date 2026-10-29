@@ -36,7 +36,7 @@ function stableValue(value) {
   return value;
 }
 
-function stableJson(value) {
+export function stableJson(value) {
   return JSON.stringify(stableValue(value), null, 2) + "\n";
 }
 

@@ -8,6 +8,56 @@ import { createDagProjectController } from "../site/dag_project_controller.mjs";
 import { dag2AnchorPickerIsActive } from "../site/dag_setup_group_controller.mjs";
 import { createDagGroupEditorController } from "../site/dag_group_editor_controller.mjs";
 import { createGroupingSetController } from "../site/grouping_set_controller.mjs";
+import { createDagShellController } from "../site/dag_shell_controller.mjs";
+import { createToolbarPresenter, diagnosticViewTitle } from "../site/toolbar_presenter.mjs";
+import { createRenderCoordinator } from "../site/render_coordinator.mjs";
+
+test("graph-only filters update controls without recomputing assignment coverage", () => {
+  const calls = [];
+  const view = new Proxy({}, { get: (_, key) => key === "renderMapToolbarToggles"
+    ? options => calls.push(options) : () => {} });
+  createRenderCoordinator(view).updateDagFilters();
+  assert.deepEqual(calls, [{ includeCoverage: false }]);
+});
+
+test("assignment coverage skips memberships until variables are loaded and preserves overlap and UOA counts", () => {
+  let variables = [];
+  let membershipReads = 0;
+  const state = { project: { groups: [
+    { get variable_ids() { membershipReads++; return ["a", "b"]; } },
+    { variable_ids: ["a", "c"] },
+  ] }, uoaFilterEnabled: true, selectedUoa: "person" };
+  const presenter = createToolbarPresenter({ state, elements: {}, groupById: () => null,
+    visibleVariables: () => variables, uoaMatches: (a, b) => a === b,
+    clusterRep: id => id === "b" ? "a" : id, rejectedVariableIdSet: () => new Set(["z"]) });
+  assert.deepEqual(presenter.assignmentCoverage(), { assigned: 0, unassigned: 0, total: 0, plottedNodes: 0, rejected: 1, uoaFiltered: true });
+  assert.equal(membershipReads, 0);
+  variables = [{ variable_id: "a", uoa: "person" }, { variable_id: "b", uoa: "person" },
+    { variable_id: "c", uoa: "country" }, { variable_id: "d", uoa: "person" }];
+  assert.deepEqual(presenter.assignmentCoverage(), { assigned: 2, unassigned: 1, total: 3, plottedNodes: 2, rejected: 1, uoaFiltered: true });
+});
+
+test("fullscreen resizes the existing graph and only fits the variable map when shown", () => {
+  const original = { document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame, setTimeout: globalThis.setTimeout };
+  const calls = [];
+  const button = () => ({ classList: { toggle() {} }, setAttribute() {}, textContent: "" });
+  globalThis.document = { body: { classList: { toggle() {} } } };
+  globalThis.requestAnimationFrame = callback => callback();
+  globalThis.setTimeout = callback => { callback(); return 0; };
+  try {
+    const controller = createDagShellController({ state: { fullscreenPanel: null },
+      elements: { fullscreenVariableMap: button(), fullscreenDag: button() },
+      resizeMap: () => calls.push("resize-map"), fitMap: () => calls.push("fit-map"),
+      renderDag: () => calls.push("rebuild"),
+      getNetwork: () => ({ setSize: (...size) => calls.push(size), fit: () => calls.push("fit-dag") }),
+    });
+    controller.setFullscreen("dag");
+    controller.setFullscreen(null);
+    assert.deepEqual(calls, [["100%", "100%"], "fit-dag", ["100%", "100%"], "fit-dag"]);
+    controller.setFullscreen("variable-map");
+    assert.deepEqual(calls.slice(4), ["resize-map", "fit-map", ["100%", "100%"], "fit-dag"]);
+  } finally { Object.assign(globalThis, original); }
+});
 
 function memoryStorage() {
   const values = new Map();
@@ -66,7 +116,7 @@ test("a permalink keeps its restored anchors while published memberships hydrate
   assert.equal(dag2AnchorPickerIsActive(state, "iv", groupById), true);
 });
 
-test("DAG2 advances after the second anchor is selected", () => {
+test("DAG2 asks for an instrument after the second anchor", () => {
   const state = {
     interfaceMode: "dag2", workflowMode: "setup", phase: "select_dv", changingAnchorSide: null,
     project: {
@@ -89,8 +139,8 @@ test("DAG2 advances after the second anchor is selected", () => {
   controller.assignGroupAsAnchor("dv", "dv");
 
   assert.equal(state.project.dv_group_id, "dv");
-  assert.equal(state.phase, "build");
-  assert.equal(advances, 1);
+  assert.equal(state.phase, "select_instrument");
+  assert.equal(advances, 0);
 });
 
 test("untouched published schema does not gain an empty hidden-variable field", () => {
@@ -113,6 +163,14 @@ test("untouched published schema does not gain an empty hidden-variable field", 
     applyProjectOperation() {}, normalizeProjectDuplicateAssignments() {}, groupById() {}, nowIso: () => "",
   });
   assert.deepEqual(controller.workingSchema(), schema);
+  // Cached canonical memberships must still observe in-place restoration,
+  // replacement without a length change, and a rebuilt duplicate index.
+  state.project.groups[0].variable_ids.push("v2");
+  assert.deepEqual(controller.workingSchema().groups[0].variable_ids, ["v1", "v2"]);
+  state.project.groups[0].variable_ids[1] = "v3";
+  assert.deepEqual(controller.workingSchema().groups[0].variable_ids, ["v1", "v3"]);
+  state.clusterOf = new Map([["v3", "v1"]]);
+  assert.deepEqual(controller.workingSchema().groups[0].variable_ids, ["v1"]);
 });
 
 test("project controller preserves live group identity and owns history transitions", () => {
@@ -286,4 +344,59 @@ test("inspector controller resolves selected edges without owning graph state", 
   state.project = { links: [{ edge_id: "e1" }] }; state.selectedEdgeId = "e1";
   const controller = createDagInspectorController({ state, elements: {} });
   assert.equal(controller.selectedEdge(), state.project.links[0]);
+});
+
+test("promoting a split to an anchor leaves its publishable definition unchanged", () => {
+  const group = { group_id: "split", label: "Split", variable_ids: ["v1"],
+    type: null, updated_at: "before", provenance: { operation: "split_categories", sources: ["source"] } };
+  const state = { data: { grouping_sets: [] }, clusterOf: new Map(),
+    project: { active_grouping_set_id: "schema", groups: [group] } };
+  const controller = createGroupingSetController({ state, elements: {},
+    rejectedVariableEntries: () => [], rejectedVariableIdSet: () => new Set() });
+  const before = controller.workingSchema();
+  group.type = "iv"; group.updated_at = "after";
+  assert.deepEqual(controller.workingSchema(), before);
+  assert.deepEqual(before.groups[0].provenance, group.provenance);
+});
+
+test("anchor history composes with membership history and survives serialization", () => {
+  const state = createDagAppState();
+  state.data = { generated_at: "fixture", default_grouping_set_id: "none", grouping_sets: [] };
+  let invalidations = 0;
+  const controller = createDagProjectController({ state, storage: memoryStorage(), storagePrefix: "anchor-test",
+    nowIso: () => "now", invalidateMapCaches: () => invalidations++, renderAll() {}, renderUndoRedo() {}, renderActionHistory() {} });
+  controller.initialize();
+  state.project.groups = [{ group_id: "a", variable_ids: ["v1"] }, { group_id: "b", variable_ids: ["v2"] }];
+  const before = controller.snapshot("anchors");
+  state.project.iv_group_id = "a"; state.project.groups[0].type = "iv";
+  controller.record("Choose IV", before, "anchors");
+  const beforeMembership = controller.snapshot();
+  state.project.groups[0].variable_ids = ["v1", "v3"];
+  controller.record("Add member", beforeMembership);
+  // Persisted history uses the same opaque string contract as older entries.
+  state.undoHistory = JSON.parse(JSON.stringify(state.undoHistory));
+  controller.undo();
+  assert.deepEqual(state.project.groups[0].variable_ids, ["v1"]);
+  const members = state.project.groups[0].variable_ids;
+  const afterMembershipUndo = invalidations;
+  controller.undo();
+  assert.equal(state.project.iv_group_id, "g_iv");
+  assert.equal(state.project.groups[0].variable_ids, members);
+  assert.equal(invalidations, afterMembershipUndo);
+  controller.redo();
+  assert.equal(state.project.iv_group_id, "a");
+  assert.equal(state.project.groups[0].variable_ids, members);
+  controller.redo();
+  assert.deepEqual(state.project.groups[0].variable_ids, ["v1", "v3"]);
+});
+
+
+test("diagram heading follows the active diagnostic view", () => {
+  for (const [flag, title] of [["showConfoundersOnly", "Confounders"],
+    ["showCollidersOnly", "Colliders"], ["showExogeneity", "Exogeneity"],
+    ["showExclusionViolations", "Exclusion restriction"]]) {
+    assert.equal(diagnosticViewTitle({ [flag]: true }, true), title);
+    assert.equal(diagnosticViewTitle({ [flag]: true }, false), "Unfiltered");
+  }
+  assert.equal(diagnosticViewTitle({}, true), "Unfiltered");
 });

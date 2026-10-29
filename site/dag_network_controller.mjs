@@ -49,6 +49,12 @@ function visOptionSignature(params = {}) {
 // by empty canvas even when there is room to display them larger.
 export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: Number.MAX_VALUE };
 
+export function isDagDisplayGroup(group) {
+  return group?.type !== "other"
+    && group?.group_id !== "other"
+    && String(group?.label || "").trim().toLowerCase() !== "other";
+}
+
 export function isDagFullyVisible(network, boxes, viewport) {
   if (!network || !boxes.length || !viewport.clientWidth || !viewport.clientHeight) return false;
   let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
@@ -131,15 +137,7 @@ function visNetworkOptions(p = {}) {
 }
 
 function groupMapCentroid(group) {
-  const points = (group.variable_ids || [])
-    .map((id) => state.variableById.get(clusterRep(id)))
-    .filter(Boolean)
-    .map((variable) => ({ x: Number(variable.map_x || 0), y: Number(variable.map_y || 0) }));
-  if (!points.length) return { x: 0, y: 0 };
-  return {
-    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
-    y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
-  };
+  return dagDisplay.groupMapCentroid(group, state.variableById, clusterRep);
 }
 
 function dagStudyArrowCorridor({ ivId, dvId, positions, boxes, fontSize = 12 }) {
@@ -177,7 +175,8 @@ function refreshEdgeSelection({ redraw = true } = {}) {
     state.selectedEdgeId, state.project?.links || [], edgeVisualData);
   _renderedSelectedEdgeId = state.selectedEdgeId;
   if (updates.length) _visEdges.update(updates);
-  if (updates.length && redraw) _visNetwork?.redraw();
+  // DataSet updates already request a frame from vis. A synchronous redraw here
+  // duplicates that paint inside the selection event.
 }
 
 function routedDagData(groups, links, layout) {
@@ -215,7 +214,8 @@ function routedDagDataFromRoutes(groups, routes, layout) {
 
 function dagVisibleGroups() {
   const groups = dagGroups();
-  return groups.filter((group) => state.componentGroupIds.has(group.group_id));
+  return groups.filter((group) => state.componentGroupIds.has(group.group_id)
+    && isDagDisplayGroup(group));
 }
 
 function drawConfounderPathLanes(context) {
@@ -237,17 +237,18 @@ function drawConfounderPathLanes(context) {
   });
 }
 
-function clearConfounderPathHover() {
+function clearConfounderPathHover({ redraw = true } = {}) {
+  const hadLanes = _dagPathLaneSegments.length > 0;
   _dagPathLaneSegments = [];
   _dagHoveredConfounderId = null;
   if (!_dagHoverBaseline || !_visNodes || !_visEdges) {
-    _visNetwork?.redraw();
+    if (redraw && hadLanes) _visNetwork?.redraw();
     return;
   }
   _visNodes.update(_dagHoverBaseline.nodes);
   _visEdges.update(_dagHoverBaseline.edges);
   _dagHoverBaseline = null;
-  _visNetwork?.redraw();
+  if (redraw) _visNetwork?.redraw();
 }
 
 function clearLogicalDagEdgeHover(segmentId = null) {
@@ -344,13 +345,31 @@ function highlightConfounderPaths(groupId) {
 
 let _dagRenderWorker = null;
 let _dagRenderRequest = 0;
+let _dagApplyingRequest = null;
 let _dagRenderedPromise = Promise.resolve();
+const _dagGeometryCache = new Map();
 
-function renderDag({ reuseGeometry = false } = {}) {
+function rememberGeometry(key, geometry) {
+  _dagGeometryCache.delete(key);
+  _dagGeometryCache.set(key, geometry);
+  if (_dagGeometryCache.size > 8) _dagGeometryCache.delete(_dagGeometryCache.keys().next().value);
+}
+
+async function renderDag({ reuseGeometry = false } = {}) {
+  // Data loading and filtering continue during setup, but there is no graph to
+  // lay out until both study variables have been chosen.
+  const hasAnchor = id => {
+    const group = state.project?.groups?.find(item => item.group_id === id);
+    return Boolean(group?.variable_ids?.length
+      || (state.publishedSchemaHydrating && Number(group?.member_count) > 0));
+  };
+  if (state.interfaceMode === "dag2"
+    && (!hasAnchor(state.project?.iv_group_id) || !hasAnchor(state.project?.dv_group_id)
+      || (state.phase === "select_instrument" && !state.changingAnchorSide))) return;
   let resolveRendered;
   _dagRenderedPromise = new Promise(resolve => { resolveRendered = resolve; });
   clearLogicalDagEdgeHover();
-  clearConfounderPathHover();
+  clearConfounderPathHover({ redraw: false });
   const groups = dagVisibleGroups();
 
   // A worker render can take long enough for the previous diagnostic graph to
@@ -363,8 +382,9 @@ function renderDag({ reuseGeometry = false } = {}) {
     els.dagNetwork.style.visibility = "hidden";
   }
 
-  const links = state.visibleLinks.filter((link) => !link.is_target_relation);
-  if (reuseGeometry && !_dagRenderWorker && _visNetwork) {
+  const links = state.visibleLinks.filter((link) => !link.is_target_relation
+    && nextGroupIds.has(link.group_a) && nextGroupIds.has(link.group_b));
+  if (reuseGeometry && !_dagRenderWorker && _dagApplyingRequest === null && _visNetwork) {
     const reused = reuseDagGeometry(_dagGeometry, groups, links);
     if (reused) {
       applyReusedDagRender(groups, reused.layout, reused.routes);
@@ -376,8 +396,9 @@ function renderDag({ reuseGeometry = false } = {}) {
   // Layout and obstacle-aware routing are pure but CPU intensive. Keep them off
   // the UI thread so the map and controls can paint immediately during startup.
   const input = {
-    groups,
-    links,
+    groups: groups.map(({ group_id, label }) => ({ group_id, label })),
+    links: links.map(({ edge_id, group_a, group_b, direction_type }) =>
+      ({ edge_id, group_a, group_b, direction_type })),
     centroids: groups.map(group => [group.group_id, groupMapCentroid(group)]),
     ivId: state.project?.iv_group_id,
     dvId: state.project?.dv_group_id,
@@ -395,19 +416,50 @@ function renderDag({ reuseGeometry = false } = {}) {
         ? `colliders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
         : "all",
   };
+  // Filter names do not affect geometry; the actual nodes, topology, anchors,
+  // centroids and viewport do. Cache those inputs without large memberships or
+  // evidence arrays, and always rebind routes to the current evidence objects.
+  const geometryKey = JSON.stringify({ ...input, viewSignature: undefined });
+  const cached = _dagGeometryCache.get(geometryKey);
+  if (cached) {
+    const requestId = ++_dagRenderRequest;
+    _dagRenderWorker?.terminate();
+    _dagRenderWorker = null;
+    rememberGeometry(geometryKey, cached);
+    _dagGeometry = cached;
+    const reused = reuseDagGeometry(cached, groups, links);
+    // Applying cached geometry can be substantial, and this branch runs in
+    // the filter's input handler. Let that handler finish before updating vis.
+    _dagApplyingRequest = requestId;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    if (_dagApplyingRequest === requestId) _dagApplyingRequest = null;
+    if (requestId !== _dagRenderRequest) {
+      resolveRendered();
+      return;
+    }
+    await applyDagRender(groups, reused.layout, reused.routes);
+    resolveRendered();
+    return;
+  }
+  async function acceptGeometry(layout, routes) {
+    const linksById = new Map(links.map(link => [link.edge_id, link]));
+    const currentRoutes = routes.map(route => ({ ...route, link: linksById.get(route.link.edge_id) }));
+    _dagGeometry = { groupIds: groups.map(group => group.group_id), layout, routes: currentRoutes };
+    rememberGeometry(geometryKey, _dagGeometry);
+    await applyDagRender(groups, layout, currentRoutes);
+  }
   const requestId = ++_dagRenderRequest;
   _dagRenderWorker?.terminate();
 
   if (typeof Worker === "undefined") {
     const { layout, routes } = computeDagRender(input);
-    _dagGeometry = { groupIds: groups.map(group => group.group_id), layout, routes };
-    applyDagRender(groups, layout, routes);
+    await acceptGeometry(layout, routes);
     resolveRendered();
     return;
   }
   const worker = new Worker(new URL("./dag_layout_worker.mjs", import.meta.url), { type: "module" });
   _dagRenderWorker = worker;
-  worker.addEventListener("message", (event) => {
+  worker.addEventListener("message", async (event) => {
     if (event.data.requestId !== _dagRenderRequest) return;
     const timingEnd = performance.now();
     for (const [phase, duration] of Object.entries(event.data.timings || {})) {
@@ -420,25 +472,33 @@ function renderDag({ reuseGeometry = false } = {}) {
     };
     worker.terminate();
     if (_dagRenderWorker === worker) _dagRenderWorker = null;
-    _dagGeometry = { groupIds: groups.map(group => group.group_id), layout, routes: event.data.routes };
-    applyDagRender(groups, layout, event.data.routes);
+    await acceptGeometry(layout, event.data.routes);
     resolveRendered();
   });
-  worker.addEventListener("error", () => {
+  worker.addEventListener("error", async () => {
     if (requestId !== _dagRenderRequest) return;
     worker.terminate();
     if (_dagRenderWorker === worker) _dagRenderWorker = null;
     const { layout, routes } = computeDagRender(input);
-    _dagGeometry = { groupIds: groups.map(group => group.group_id), layout, routes };
-    applyDagRender(groups, layout, routes);
+    await acceptGeometry(layout, routes);
     resolveRendered();
   }, { once: true });
   worker.postMessage({ requestId, input });
 }
 
-function applyDagRender(groups, layout, routes) {
-  _dagBoundsCache = null;
+async function applyDagRender(groups, layout, routes) {
+  const requestId = _dagRenderRequest;
   const { nodeData, edgeData, edgeSegments } = routedDagDataFromRoutes(groups, routes, layout);
+  const largeUpdate = nodeData.length + edgeData.length > 300;
+  if (largeUpdate) {
+    // Route conversion and network installation are separate large stages.
+    // Give input a turn between them, and discard a superseded installation.
+    _dagApplyingRequest = requestId;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    if (_dagApplyingRequest === requestId) _dagApplyingRequest = null;
+    if (requestId !== _dagRenderRequest) return;
+  }
+  _dagBoundsCache = null;
   const previousNodeData = _dagNodeDataById;
   _dagNodeDataById = new Map(nodeData.map(node => [node.id, node]));
   edgeData.push(...studyDesignEdgeData(groups, state.project));
@@ -469,16 +529,40 @@ function applyDagRender(groups, layout, routes) {
       prevNodeIds.size !== nextNodeIds.size ||
       [...nextNodeIds].some((id) => !prevNodeIds.has(id));
 
-    const changedNodes = nodeData.filter(node =>
+    const maximumNodes = Math.max(prevNodeIds.size, nodeData.length);
+    // A large count change guarantees that most nodes are added or removed.
+    // Avoid serializing every route bend merely to rediscover that fact.
+    const replaceMostNodes = nodeSetChanged && maximumNodes > 500
+      && Math.abs(prevNodeIds.size - nodeData.length) > maximumNodes / 2;
+    const changedNodes = replaceMostNodes ? [] : nodeData.filter(node =>
       JSON.stringify(node) !== JSON.stringify(previousNodeData.get(node.id)));
-    if (changedNodes.length) _visNodes.update(changedNodes);
     const dropNodes = [...prevNodeIds].filter((id) => !nextNodeIds.has(id));
-    if (dropNodes.length) _visNodes.remove(dropNodes);
-
-    const nextEdgeIds = new Set(edgeData.map((e) => e.id));
-    _visEdges.update(edgeData);
-    const dropEdges = _visEdges.getIds().filter((id) => !nextEdgeIds.has(id));
-    if (dropEdges.length) _visEdges.remove(dropEdges);
+    if (replaceMostNodes || (nodeSetChanged && maximumNodes > 500
+      && changedNodes.length + dropNodes.length > maximumNodes / 2)) {
+      // A large filter transition replaces most route bends. Bind the complete
+      // data once rather than repeatedly rebuilding adjacency as nodes and edges
+      // are updated and removed. Preserve the Network instance and its handlers.
+      _visNodes = new visApi.DataSet(nodeData);
+      _visEdges = new visApi.DataSet(edgeData);
+      _visNetwork.setData({ nodes: _visNodes, edges: _visEdges });
+    } else {
+      if (changedNodes.length) _visNodes.update(changedNodes);
+      if (dropNodes.length) _visNodes.remove(dropNodes);
+      if (largeUpdate) {
+        // Updating route nodes and installing their edges can each be costly.
+        // Keep the partial network hidden and let the browser handle input
+        // before adding edges; a newer render supersedes this one.
+        els.dagNetwork.style.visibility = "hidden";
+        _dagApplyingRequest = requestId;
+        await new Promise(resolve => setTimeout(resolve, 0));
+        if (_dagApplyingRequest === requestId) _dagApplyingRequest = null;
+        if (requestId !== _dagRenderRequest) return;
+      }
+      const nextEdgeIds = new Set(edgeData.map((e) => e.id));
+      _visEdges.update(edgeData);
+      const dropEdges = _visEdges.getIds().filter((id) => !nextEdgeIds.has(id));
+      if (dropEdges.length) _visEdges.remove(dropEdges);
+    }
 
     const optionSignature = visOptionSignature(layout.params);
     if (optionSignature !== _visOptionSignature) {
@@ -533,14 +617,21 @@ function applyReusedDagRender(groups, layout, routes) {
   }
   if (changedNodes.length) _visNodes.update(changedNodes);
   _renderedSelectedEdgeId = state.selectedEdgeId;
-  _visNetwork.redraw();
+  els.dagNetwork.style.visibility = "";
+  // DataSet additions/removals/updates schedule their own coalesced paint.
 }
 
 function dagBounds() {
   if (_dagBoundsCache) return _dagBoundsCache;
   const ids = _visNodes?.getIds() || [];
   if (!ids.length || !_visNetwork) return null;
-  const all = ids.map(id => ({ id, box: _visNetwork.getBoundingBox(id) }));
+  const all = ids.map(id => {
+    // Invisible routing points have fixed coordinates; their empty text labels
+    // need not be measured by vis merely to establish graph bounds.
+    const point = String(id).startsWith("__route__") ? _dagNodeDataById.get(id) : null;
+    return { id, box: point ? { left: point.x - 0.1, right: point.x + 0.1,
+      top: point.y - 0.1, bottom: point.y + 0.1 } : _visNetwork.getBoundingBox(id) };
+  }).filter(({ box }) => [box.left, box.right, box.top, box.bottom].every(Number.isFinite));
   const boxes = all.map(item => item.box);
   const groupBoxes = all.filter(item => Boolean(groupById(item.id))).map(item => item.box);
   const contentBounds = groupBoxes.length ? {
@@ -561,6 +652,20 @@ function minimumDagScale() {
   const height = Math.max(...boxes.map(b => b.bottom)) - Math.min(...boxes.map(b => b.top));
   return 0.8 * Math.min(Math.max(1, els.dagNetwork.clientWidth - 68) / Math.max(1, width),
     Math.max(1, els.dagNetwork.clientHeight - 68) / Math.max(1, height), 1);
+}
+
+function fitDag() {
+  const boxes = dagBounds()?.boxes;
+  const width = els.dagNetwork.clientWidth, height = els.dagNetwork.clientHeight;
+  if (!_visNetwork || !boxes?.length || !width || !height) return;
+  const left = Math.min(...boxes.map(box => box.left));
+  const right = Math.max(...boxes.map(box => box.right));
+  const top = Math.min(...boxes.map(box => box.top));
+  const bottom = Math.max(...boxes.map(box => box.bottom));
+  const padding = 16;
+  const scale = Math.min(Math.max(1, width - 2 * padding) / Math.max(1, right - left),
+    Math.max(1, height - 2 * padding) / Math.max(1, bottom - top));
+  _visNetwork.moveTo({ position: { x: (left + right) / 2, y: (top + bottom) / 2 }, scale, animation: false });
 }
 
 let detachDagInteractions = null;
@@ -597,7 +702,7 @@ function attachDagNetworkHandlers(network) {
       }
       Object.assign(state, workflow.transition(state, { type: "review-group", groupId: id }));
       setMapMode("select");
-      renderAll();
+      renderAll({ rebuild: false, refreshView: true });
     },
     zoomToPoint(position) {
       network.moveTo({ position, scale: network.getScale() * 1.3 });
@@ -628,7 +733,7 @@ function edgeHoverText(link) {
     getPathLaneSegments: () => _dagPathLaneSegments,
     zoomIn: () => _visNetwork?.moveTo({ scale: _visNetwork.getScale() * 1.3 }),
     zoomOut: () => _visNetwork?.moveTo({ scale: Math.max(minimumDagScale(), _visNetwork.getScale() / 1.3) }),
-    fit: () => _visNetwork?.fit(DAG_FIT_OPTIONS),
+    fit: fitDag,
     redraw: () => _visNetwork?.redraw(),
   };
 }

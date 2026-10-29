@@ -139,3 +139,23 @@ test("MCP exposes the local workflow and a single final publication tool", () =>
   assert.ok(names.includes("echo_set_finding_decision"));
   assert.equal(names.filter(name => name === "echo_publish").length, 1);
 });
+
+test("the catch-all category is never returned as a confounder or graph node", async () => {
+  const session = await fixture();
+  session.schema.groups = [
+    { group_id: "iv", label: "IV", variable_ids: ["i"] },
+    { group_id: "dv", label: "DV", variable_ids: ["d"] },
+    { group_id: "source", label: "Source", variable_ids: ["s1"] },
+    { group_id: "category-other", label: "Other", variable_ids: ["s2"] },
+  ];
+  await session.setAnchors({ ivId: "iv", dvId: "dv" });
+  session.evidence.rawLinks = async () => [
+    { raw_causal_link_id: "a", source_variable_id: "s1", target_variable_id: "i", paper_id: "p", table_id: "t" },
+    { raw_causal_link_id: "b", source_variable_id: "s1", target_variable_id: "d", paper_id: "p", table_id: "t" },
+    { raw_causal_link_id: "c", source_variable_id: "s2", target_variable_id: "i", paper_id: "p", table_id: "t" },
+    { raw_causal_link_id: "e", source_variable_id: "s2", target_variable_id: "d", paper_id: "p", table_id: "t" }];
+  const graph = await session.graph({ showConfoundersOnly: true });
+  assert.deepEqual(graph.view.confounders.confounderIds, ["source"]);
+  assert.ok(graph.dag.nodes.every(node => node.group_id !== "category-other"));
+  assert.ok(graph.dag.edges.every(edge => edge.group_a !== "category-other" && edge.group_b !== "category-other"));
+});

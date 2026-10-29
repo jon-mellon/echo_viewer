@@ -61,3 +61,13 @@ test("manifest relations reject SQL fragments and malformed file records", () =>
   assert.throws(() => manifestFileEntries([]), /files must be an object/);
   assert.throws(() => manifestFileEntries({ records: {} }), /nonempty file URL/);
 });
+
+test("publication record signatures resolve independently of the deployment default", async () => {
+  const { evidenceManifestUrl } = await import("../site/dag_data_config.mjs");
+  const location = new URL("https://echo.epistemicinfra.org/");
+  const old = "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0";
+  const fresh = "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b";
+  assert.ok(evidenceManifestUrl(location, "5887939bf4e5d3619070a522f3ae11eee3f377c584bb8b2b3f77593c2b2248d4").includes(old));
+  assert.ok(evidenceManifestUrl(location, "11a8ec4f4868185d15dceae798d7617387eb9216c51a8f5acff4e84282b09acd").includes(fresh));
+  assert.ok(evidenceManifestUrl(new URL(`${location}?data_version=${old}`), fresh).includes(old));
+});

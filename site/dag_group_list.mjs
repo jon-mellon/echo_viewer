@@ -21,8 +21,8 @@ export function buildGroupListModel(project, { candidateQueue, sort, activeGroup
       variableCount: group.variable_ids.length,
       isActive: group.group_id === activeGroupId,
       roleLabels: (queueMap.get(group.group_id)?.roles || []).slice(0, 2).map(role => roleLabels[role] || role),
-      anchorLabel: group.group_id === project.iv_group_id ? "IV"
-        : group.group_id === project.dv_group_id ? "DV"
+      anchorLabel: group.group_id === project.iv_group_id ? "Ind var"
+        : group.group_id === project.dv_group_id ? "Dep var"
           : group.group_id === project.instrument_group_id ? "Instrument" : "",
     })),
   };

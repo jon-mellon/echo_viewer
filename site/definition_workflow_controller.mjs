@@ -5,12 +5,12 @@ import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
 import { browsePublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
-  invalidateMapCaches, renderAll, drawMap = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
+  invalidateMapCaches, renderAll, drawMap = () => {}, renderAssignmentCoverage = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
   visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails = async () => {}, hydrateNeighbors = async () => {},
   prewarmEvidence = async () => {}, commitSchema = async () => {},
-  onCommitFailureRestored = () => {} }) {
+  onCommitFailureRestored = () => {}, onInstrumentReady = () => {} }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
   let lastBatch = null;
@@ -80,6 +80,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     // Definition steps change selection and map contents, not the project DAG.
     // The DAG is hidden until cancel/save, where a full render is performed.
     renderAll({ rebuild: false });
+    renderAssignmentCoverage();
     jevAssist.render();
     if (redrawMap) drawMap();
   };
@@ -164,7 +165,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.selectedVariableId = null;
     invalidateMapCaches();
     setMapMode("select");
-    renderAll();
+    renderAll({ rebuild: false, refreshView: true });
   }
 
   function definitionSources() {
@@ -175,7 +176,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   async function continueDefinition() {
     const draft = state.definitionDraft;
     const sources = definitionSources();
-    if (!draft || !state.definitionMethod || !sources.length) return;
+    if (!draft || draft.details_loading || !state.definitionMethod || !sources.length) return;
     lastBatch = null;
     const revision = ++hydrationRevision;
     draft.source_snapshot = sources.map(group => ({ group_id: group.group_id, label: group.label,
@@ -186,7 +187,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.reviewed_variable_ids = [];
     draft.residual_labels = Object.fromEntries(sources.map(group =>
       [group.group_id, `Other: ${group.label || group.group_id}`]));
-    draft.step = "partition";
+    draft.details_loading = true;
     state.selectedVariableIds.clear();
     presenter.setContinueLoading();
     try {
@@ -194,13 +195,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         || hydrateVariableDetails(source.variable_ids)));
     } catch (error) {
       if (revision === hydrationRevision && state.definitionDraft === draft) {
-        draft.step = "sources";
+        draft.details_loading = false;
         renderDefinition();
         presenter.showLoadError(error);
       }
       return;
     }
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
+    draft.details_loading = false;
+    draft.step = "partition";
     invalidateMapCaches();
     setMapMode("select");
     renderDraft();
@@ -338,7 +341,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.new_label = clean(draft.new_label);
     draft.new_description = clean(draft.new_description || "");
     if ([...draft.new_description].length < 20) {
-      showSaveError(new Error("Write a description of at least 20 characters."));
+      showSaveError(new Error("Group definition must be at least 20 characters. Please add more detail."));
+      els.definitionNewDescription.setAttribute("aria-invalid", "true");
+      els.definitionNewDescription.focus();
       return;
     }
     draft.residual_labels = Object.fromEntries(Object.entries(draft.residual_labels)
@@ -375,8 +380,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       state.selectedVariableIds.clear();
       state.activeGroupId = null;
       state.focusedGroupId = newGroupId;
-      state.phase = "build";
-      state.workflowMode = "group_review";
+      if (draft.role === "candidate") state.pendingVariablePanelGroupId = newGroupId;
+      const initialAnchor = draft.mode !== "edit" && !state.changingAnchorSide;
+      state.phase = initialAnchor && draft.role === "iv" ? "select_dv"
+        : initialAnchor && draft.role === "dv" ? "select_instrument" : "build";
+      state.workflowMode = state.phase === "build" ? "group_review" : "setup";
       state.changingAnchorSide = null;
       invalidateMapCaches();
       addToUndoHistory(draft.mode === "edit" ? `Updated split "${draft.new_label}"`
@@ -384,6 +392,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
           : `Defined "${draft.new_label}" as ${draft.role.toUpperCase()}`, before);
       setMapMode("select");
       renderAll();
+      if (draft.role === "instrument") onInstrumentReady();
     } catch (error) {
       state.compiledDagRevision = (state.compiledDagRevision || 0) + 1;
       state.compiledDag = previousCompiledDag;
@@ -468,6 +477,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     });
     els.definitionNewDescription.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_description = els.definitionNewDescription.value;
+      presenter.clearDescriptionValidation();
       persistProjectLocally();
     });
     els.definitionSave.addEventListener("click", saveDefinition);

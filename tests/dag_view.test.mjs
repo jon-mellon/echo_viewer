@@ -137,3 +137,52 @@ test("exogeneity view finds common ancestors of the instrument and outcome", () 
     toIv: ["common", "via", "z"], toDv: ["common", "dv"],
   });
 });
+
+test("sparse edge filtering counts distinct present papers before finding paths", () => {
+  const evidence = new Map([
+    ["a", { paper_id: "p1" }], ["b", { paper_id: "p1" }],
+    ["c", { paper_id: "p2", causal_link_existence: "absent" }],
+    ["d", { paper_id: "p2", causal_link_existence: "present" }],
+  ]);
+  const supportedLinks = [
+    link("c_iv", "c", "iv", "A_TO_B", { a_to_b_raw_link_ids: ["a", "b", "c"] }),
+    link("c_dv", "c", "dv", "A_TO_B", { a_to_b_raw_link_ids: ["a"], b_to_a_raw_link_ids: ["d"] }),
+  ];
+  const options = { groups, links: supportedLinks, ivId: "iv", dvId: "dv", rawLinksById: evidence };
+  assert.equal(deriveDagView(options).visibleLinks.length, 2);
+  const filtered = deriveDagView({ ...options, excludeSparseEdges: true });
+  assert.deepEqual(filtered.visibleLinks.map(item => item.edge_id), ["c_dv"]);
+  assert.equal(filtered.confounders.confounderIds.size, 0);
+  assert.equal(deriveDagView({ ...options, excludeSparseEdges: true, minimumEdgePapers: 1 }).visibleLinks.length, 2);
+  assert.equal(deriveDagView({ ...options, excludeSparseEdges: true, minimumEdgePapers: 3 }).visibleLinks.length, 0);
+});
+
+
+test("compact paper support matches full evidence without populating the detail cache", () => {
+  const rawLinksById = new Map([
+    ["a", { paper_id: "p1", source_variable_id: "v1" }],
+    ["b", { paper_id: "p1", causal_link_existence: "present" }],
+    ["c", { paper_id: "p2", causal_link_existence: "absent" }],
+    ["d", { paper_id: "p2", causal_link_existence: "uncertain" }],
+    ["e", { paper_id: "p2", causal_link_existence: "present" }],
+  ]);
+  const edgeSupportById = new Map([...rawLinksById].map(([id, row]) =>
+    [id, { paper_id: row.paper_id, causal_link_existence: row.causal_link_existence }]));
+  const edges = [
+    link("sparse", "c", "iv", "A_TO_B", { a_to_b_raw_link_ids: ["a", "b", "c", "d"] }),
+    link("supported", "c", "dv", "A_TO_B", { a_to_b_raw_link_ids: ["a"], b_to_a_raw_link_ids: ["e"] }),
+  ];
+  const full = deriveDagView({ groups, links: edges, rawLinksById, excludeSparseEdges: true });
+  const details = new Map();
+  const compact = deriveDagView({ groups, links: edges, rawLinksById: details,
+    edgeSupportById, excludeSparseEdges: true });
+  assert.deepEqual(compact.visibleLinks, full.visibleLinks);
+  assert.deepEqual(compact.visibleLinks.map(edge => edge.edge_id), ["supported"]);
+  assert.equal(details.size, 0);
+  // Newly edited evidence can already be in the full cache, before another
+  // compact scan is needed. Both caches participate in the same paper count.
+  edgeSupportById.delete("e");
+  details.set("e", rawLinksById.get("e"));
+  assert.deepEqual(deriveDagView({ groups, links: edges, rawLinksById: details,
+    edgeSupportById, excludeSparseEdges: true }).visibleLinks, full.visibleLinks);
+});

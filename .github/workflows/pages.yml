@@ -45,6 +45,8 @@ jobs:
         run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink npm run profile
       - name: Enforce mobile permalink performance budgets
         run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile npm run profile
+      - name: Enforce mobile diagnostic switching budgets
+        run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -54,6 +56,7 @@ jobs:
             profile-results-mobile/
             profile-results-permalink/
             profile-results-permalink-mobile/
+            profile-results-diagnostics-mobile/
           if-no-files-found: ignore
           retention-days: 1
       - name: Configure GitHub Pages

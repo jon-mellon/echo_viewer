@@ -5,6 +5,21 @@ export const DEFAULT_VARIABLE_COLOR = "#76847b";
 
 export function variableVisualStatus(variableId, groups, activeGroupId) {
   const group = (groups || []).find((candidate) => candidate.variable_ids?.includes(variableId));
+  return groupVisualStatus(group, activeGroupId);
+}
+
+/** The first group listing each variable, matching variableVisualStatus's lookup order. */
+export function firstGroupByVariable(groups, requestedIds = null) {
+  const owners = new Map();
+  for (const group of groups || []) {
+    for (const id of group.variable_ids || []) {
+      if ((!requestedIds || requestedIds.has(id)) && !owners.has(id)) owners.set(id, group);
+    }
+  }
+  return owners;
+}
+
+function groupVisualStatus(group, activeGroupId) {
   if (!group) return "unassigned";
   if (group.group_id === activeGroupId) return "active";
   if (group.type === "iv") return "iv";
@@ -54,8 +69,12 @@ export function computePaletteAssignment(groups, variables, palette) {
   // variable coordinates. Preserve the deterministic group-id fallback until
   // coordinates exist instead of assigning every group palette slot zero.
   if (!worldById.size) return new Map();
-  const radii = eligible.map((group) => {
-    const points = group.variable_ids.map((id) => worldById.get(id)).filter(Boolean);
+  const pointsByGroup = eligible.map((group) => group.variable_ids.map((id) => worldById.get(id)).filter(Boolean));
+  const bounds = pointsByGroup.map((points) => points.reduce((box, point) => ({
+    x0: Math.min(box.x0, point.x), x1: Math.max(box.x1, point.x),
+    y0: Math.min(box.y0, point.y), y1: Math.max(box.y1, point.y),
+  }), { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity }));
+  const radii = pointsByGroup.map((points) => {
     if (!points.length) return 0;
     const cx = points.reduce((sum, point) => sum + point.x, 0) / points.length;
     const cy = points.reduce((sum, point) => sum + point.y, 0) / points.length;
@@ -64,10 +83,15 @@ export function computePaletteAssignment(groups, variables, palette) {
 
   const adjacency = Array.from({ length: eligible.length }, () => new Array(eligible.length).fill(false));
   for (let i = 0; i < eligible.length; i += 1) {
-    const pointsI = eligible[i].variable_ids.map((id) => worldById.get(id)).filter(Boolean);
+    const pointsI = pointsByGroup[i];
     for (let j = i + 1; j < eligible.length; j += 1) {
-      const pointsJ = eligible[j].variable_ids.map((id) => worldById.get(id)).filter(Boolean);
+      const pointsJ = pointsByGroup[j];
       const threshold = (radii[i] + radii[j]) * 1.4;
+      // Bounding boxes can only be closer than their members, so a gap at
+      // least the threshold rules the pair out without comparing points.
+      const gapX = Math.max(0, bounds[i].x0 - bounds[j].x1, bounds[j].x0 - bounds[i].x1);
+      const gapY = Math.max(0, bounds[i].y0 - bounds[j].y1, bounds[j].y0 - bounds[i].y1);
+      if (!(Math.hypot(gapX, gapY) < threshold)) continue;
       let minDistance = Infinity;
       outer: for (const pointI of pointsI) {
         for (const pointJ of pointsJ) {
@@ -215,10 +239,15 @@ export function importantMapVariables({
 
 export function buildMapPointModels({ variables, groups, activeGroupId, selectedVariableId, selectedVariableIds, hoveredVariableId, clusterRep, worldToScreen, transform, width, height, uoaFilterEnabled, selectedUoa, uoaMatches, variableColorForStatus }) {
   const points = [];
+  // Index memberships once, and only when some point is on screen.
+  let owners = null;
   for (const variable of variables) {
     const screen = worldToScreen(variable.map_x, variable.map_y, transform);
     if (screen.x < -24 || screen.x > width + 24 || screen.y < -24 || screen.y > height + 24) continue;
-    const status = variableVisualStatus(variable.variable_id, groups, activeGroupId);
+    // The lazy variable map often has only one group's coordinates. Index
+    // those hydrated points rather than allocating entries for all 98k members.
+    owners ??= firstGroupByVariable(groups, new Set(variables.map(point => point.variable_id)));
+    const status = groupVisualStatus(owners.get(variable.variable_id), activeGroupId);
     const selected = clusterRep(selectedVariableId || "") === variable.variable_id || selectedVariableIds.has(variable.variable_id);
     const hovered = clusterRep(hoveredVariableId || "") === variable.variable_id;
     const uoaMatch = !uoaFilterEnabled || !selectedUoa || uoaMatches(variable.uoa, selectedUoa);

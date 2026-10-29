@@ -14,7 +14,7 @@ export function createUoaPresenter({ state, elements, visibleVariables, matches,
     const chip = (part, count, disabled, combined = false) => h("button", {
       className: `uoa-chip${combined ? " uoa-chip-combined" : ""}${state.selectedUoa === part ? " active" : ""}`,
       type: "button", dataset: { uoa: part }, disabled,
-      title: disabled ? `The selected IV and DV do not both contain ${combined ? "person-level variables" : "this unit of analysis"}` : "",
+      title: disabled ? `The selected Ind var and Dep var do not both contain ${combined ? "person-level variables" : "this unit of analysis"}` : "",
     }, combined ? "person (all)" : part, h("span", { className: "uoa-count", textContent: count }));
     replaceChildren(elements.uoaChips,
       personCount > 0 ? chip(PERSON_UOA_SENTINEL, personCount, !supportedByAnchors(PERSON_UOA_SENTINEL), true) : null,

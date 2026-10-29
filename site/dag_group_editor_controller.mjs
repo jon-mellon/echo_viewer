@@ -15,7 +15,7 @@ export function createDagGroupEditorController({
   beginEditor = () => {},
 }) {
 function notifyWhenAnchorsReady() {
-  if (state.interfaceMode !== "dag2") return;
+  if (state.interfaceMode !== "dag2" || state.phase === "select_instrument") return;
   const iv = groupById(state.project?.iv_group_id);
   const dv = groupById(state.project?.dv_group_id);
   if (iv?.variable_ids?.length && dv?.variable_ids?.length) onAnchorsReady();
@@ -71,16 +71,17 @@ function assignGroupAsAnchor(side, sourceGroupId) {
     notifyWhenAnchorsReady();
     return;
   }
-  const before = takeSnapshot();
+  const before = takeSnapshot("anchors");
   const variableIds = (source.variable_ids || []).slice();
   const label = clean(source.label) || (side === "dv" ? "Dependent variable" : "Independent variable");
   if (!promoteGroupToAnchor(side, sourceGroupId)) return;
   Object.assign(state, workflow.transition(state, { type: "anchor-selected", side, groupId: sourceGroupId }));
   setMapMode("select");
   addDecision(`group_promoted_to_${side}`, { source_group_id: sourceGroupId, target_group_id: sourceGroupId });
-  addToUndoHistory(`Use "${label}" as ${side.toUpperCase()}`, before);
+  addToUndoHistory(`Use "${label}" as ${side.toUpperCase()}`, before, "anchors");
   fitMap(variableIds);
-  renderAll();
+  // Anchor roles do not change group membership or aggregated evidence links.
+  renderAll({ reuseLinks: true, reuseDagGeometry: true });
   notifyWhenAnchorsReady();
 }
 
@@ -128,7 +129,7 @@ function createCustomGroup() {
 function closeGroupEditor() {
   Object.assign(state, workflow.transition(state, { type: "close-editor" }));
   setMapMode("select");
-  renderAll();
+  renderAll({ rebuild: false, refreshView: true });
 }
 
 // ─── Group editor (right panel) ───────────────────────────────────────────────
@@ -175,7 +176,7 @@ function renderGroupEditor() {
 }
 
 // In-editor search to add any variable (its whole duplicate cluster) to the open group.
-// Available for every group — including IV/DV, which is how "Change IV/DV" lets a user
+// Available for every group — including Ind var/Dep var, which is how "Change Ind var/Dep var" lets a user
 // swap the anchor variable without restarting Setup.
 function renderGroupSeedSearch() {
   if (!els.groupSeedInput) return;

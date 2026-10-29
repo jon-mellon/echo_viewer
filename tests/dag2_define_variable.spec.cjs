@@ -24,7 +24,8 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await page.locator("#definitionChangeMethod").click();
   await page.locator("#definitionChooseManual").click();
   await expect(page.locator("body")).not.toHaveClass(/defining-variable/);
-  await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
+  // Initial setup uses the full viewport until both anchors are selected.
+  await expect(page.locator("#dagWorkspaceSection")).toBeHidden();
 
   const usable = page.locator("#definitionSourceList input[data-source-id]");
   await expect(usable.nth(1)).toBeVisible();
@@ -59,7 +60,10 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await expect(page.locator("#definitionReviewVariables .definition-review-variable")).toHaveCount(1);
 
   await page.locator("#definitionNewLabel").fill("Browser test construct");
+  await page.locator("#definitionNewDescription").evaluate(element => element.setAttribute("aria-invalid", "true"));
   await page.locator("#definitionNewDescription").fill("A browser test construct with defined source members.");
+  await expect(page.locator("#definitionNewDescription")).not.toHaveAttribute("aria-invalid");
+  await expect(page.locator("#definitionValidation")).toHaveText("Enter at least 20 characters for the group definition.");
   const residualInputs = page.locator("#definitionResidualLabels input[data-residual-id]");
   await expect(residualInputs).toHaveCount(2);
   await residualInputs.nth(0).fill("Browser residual one");
@@ -182,6 +186,7 @@ test("a new variable can be defined through the mobile controls", async ({ page 
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
   await page.locator('.mobile-panel-tab[data-mobile-panel="controls"]').click();
   await page.locator("#variableDefineNew").click();
   await expect(page.locator("#definitionTitle")).toBeInViewport();

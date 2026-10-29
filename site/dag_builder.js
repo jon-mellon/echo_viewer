@@ -47,9 +47,9 @@ const ROLE_LABELS = {
   possible_confounder: "Confounder candidate",
   possible_mediator: "Mediator candidate",
   possible_common_consequence_or_collider: "Common consequence",
-  other_possible_cause_of_dv: "Other cause of DV",
-  other_possible_cause_of_iv: "Other cause of IV",
-  near_iv_dv_map_region: "Near IV/DV region",
+  other_possible_cause_of_dv: "Other cause of Dep var",
+  other_possible_cause_of_iv: "Other cause of Ind var",
+  near_iv_dv_map_region: "Near Ind var/Dep var region",
 };
 
 const GROUP_COLORS = {
@@ -59,10 +59,10 @@ const GROUP_COLORS = {
   active: "#b83b5e",
 };
 
-// Distinct colors for groups (IV and DV use GROUP_COLORS above).
+// Distinct colors for groups (Ind var and Dep var use GROUP_COLORS above).
 const GROUP_PALETTE = [
   "#0f766e", "#9f1239", "#1d4ed8", "#b45309", "#4d7c0f",
-  "#7c3aed", "#be123c", "#0369a1", "#92400e", "#047857",
+  "#176b80", "#be123c", "#0369a1", "#92400e", "#047857",
   "#4338ca", "#c2410c", "#166534", "#a21caf", "#7e22ce",
   "#b91c1c", "#1e40af", "#a16207", "#065f46", "#6d28d9",
   "#0ea5e9", "#ca8a04", "#15803d", "#db2777",
@@ -135,7 +135,7 @@ function initElements() {
     "definitionManualReview", "definitionValidation", "definitionReviewBack", "definitionSave",
     "workflowHint", "dagStatusBadge",
     "variablePanel", "variableDefineNew", "variablePanelDisclosure", "variablePanelCount", "variablePanelList", "variablePanelPagination",
-    "anchorBar", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn",
+    "anchorBar", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn", "dag2HistoryStatus", "historyStatus",
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",
     // Grouping schema
@@ -147,7 +147,7 @@ function initElements() {
     // Map
     "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts", "definitionMapPreviewStatus",
     "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
+    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleSparseEdges", "minimumEdgePapers", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
@@ -162,7 +162,7 @@ function initElements() {
     "groupSeedInput", "groupSeedResults",
     "includedVariables", "neighborSuggestions",
     // Right: DAG workspace
-    "dagWorkspaceSection", "dagNetwork", "confounderConfig", "confounderDisclosure", "confounderSummary", "confounderStatusList",
+    "dagWorkspaceSection", "dagNetwork", "dagViewTitle", "diagnosticOverlapKey", "confounderConfig", "confounderDisclosure", "confounderSummary", "confounderStatusList",
     "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
@@ -359,8 +359,8 @@ function restoreProjectLocally() {
 
 // ─── Undo / Redo ──────────────────────────────────────────────────────────────
 
-function takeSnapshot() {
-  return projectController.snapshot();
+function takeSnapshot(kind) {
+  return projectController.snapshot(kind);
 }
 
 function applySnapshot(serialized) {
@@ -388,11 +388,21 @@ function renderUndoRedo() {
   els.undoBtn.title = last ? `Undo: ${last}` : "Nothing to undo";
   els.redoBtn.title = state.undoPointer < state.undoHistory.length - 1
     ? `Redo: ${state.undoHistory[state.undoPointer + 1]?.description}` : "Nothing to redo";
+  const next = state.undoPointer < state.undoHistory.length - 1
+    ? state.undoHistory[state.undoPointer + 1]?.description : null;
+  const status = [last && `Undo: ${last}`, next && `Redo: ${next}`].filter(Boolean).join(" · ") || "No edits to undo or redo";
+  for (const element of [els.historyStatus, els.dag2HistoryStatus]) {
+    if (element) element.textContent = status;
+  }
+  els.undoBtn.setAttribute("aria-label", els.undoBtn.title);
+  els.redoBtn.setAttribute("aria-label", els.redoBtn.title);
   if (els.dag2UndoBtn) {
     els.dag2UndoBtn.disabled = els.undoBtn.disabled;
     els.dag2UndoBtn.title = els.undoBtn.title;
     els.dag2RedoBtn.disabled = els.redoBtn.disabled;
     els.dag2RedoBtn.title = els.redoBtn.title;
+    els.dag2UndoBtn.setAttribute("aria-label", els.undoBtn.title);
+    els.dag2RedoBtn.setAttribute("aria-label", els.redoBtn.title);
   }
 }
 
@@ -452,20 +462,22 @@ const renderCoordinator = createRenderCoordinator({
 function renderAll(options) {
   renderCoordinator.renderAll(options);
   persistentViewer.viewerChanged();
-  // Enrich references opportunistically while the user works. Export actions
-  // await the same de-duplicated, rate-limited requests before downloading.
-  exportController.warmBibliography();
 }
 
 function rebuildProject(options) {
   renderCoordinator.rebuildProject(options);
 }
 
+function updateDagFilters() {
+  renderCoordinator.updateDagFilters();
+  persistentViewer.viewerChanged();
+}
+
 function rebuildLinkDecision() {
   renderCoordinator.rebuildLinkDecision();
 }
 
-function renderMapToolbarToggles() { return toolbarController.render(); }
+function renderMapToolbarToggles(options) { return toolbarController.render(options); }
 
 function assignmentCoverage() { return toolbarController.assignmentCoverage(); }
 
@@ -587,7 +599,14 @@ function assignGroupAsInstrument(groupId) {
   }));
   setMapMode("select");
   if (group) fitMap(group.variable_ids);
-  renderAll();
+  // Instrument selection changes the view, but not group membership or link
+  // aggregation. Keep the existing project graph and candidate queue.
+  renderAll({ rebuild: false });
+  updateDagFilters();
+  renderMapModeControls();
+  renderUndoRedo();
+  drawMap();
+  shellController.showMobilePanel("dag");
 }
 
 
@@ -598,7 +617,7 @@ function toggleAnchorSearchMode(side) {
   state.searchMatches[side] = [];
   const input = side === "dv" ? els.dvInput : els.ivInput;
   input.value = "";
-  renderAll();
+  renderAll({ rebuild: false, refreshView: true });
   setTimeout(() => input.focus(), 0);
 }
 
@@ -619,7 +638,7 @@ function installDefinitionHandlers() { return definitionWorkflowController.insta
 
 // ─── Search ───────────────────────────────────────────────────────────────────
 
-function renderSearch(side) {
+function renderSearch(side, { renderPicker = true } = {}) {
   const input = side === "iv" ? els.ivInput : els.dvInput;
   const container = side === "iv" ? els.ivResults : els.dvResults;
   const query = input.value.trim();
@@ -628,7 +647,7 @@ function renderSearch(side) {
   if (state.anchorSearchMode[side] !== "new") {
     state.searchMatches[side] = [];
     container.replaceChildren();
-    renderSetupGroupPicker(side);
+    if (renderPicker) renderSetupGroupPicker(side);
     return;
   }
   if (query && state.variableSearchStatus !== "ready") {
@@ -688,12 +707,9 @@ function searchVisibleVariables(query, limit = 20) {
   }, limit);
 }
 
+const anchorGroupSearchIndex = new searchModel.AnchorGroupSearchIndex();
 function searchAnchorGroups(project, side, query, variableById, limit = 12) {
-  const catalogMatches = query && state.variableSearchStatus === "ready"
-    ? variableSearchCatalog.searchVariables(query, variableSearchCatalog.records.length)
-    : [];
-  const searchRecordById = new Map(catalogMatches.map(record => [record.variable_id, record]));
-  return searchModel.searchAnchorGroups(project, side, query, variableById, limit, searchRecordById);
+  return anchorGroupSearchIndex.search(project, side, query, variableById, state.variableSearchStatus === "ready" ? variableSearchCatalog : null, limit);
 }
 
 async function loadVariableSearchCatalog() {
@@ -701,7 +717,10 @@ async function loadVariableSearchCatalog() {
   state.variableSearchStatus = "loading";
   state.variableSearchError = null;
   try {
-    await variableSearchCatalog.load();
+    await variableSearchCatalog.loadSnapshot(state.data.snapshot.snapshot_id, {
+      loadRecords: () => dagDataSource.loadVariableSearchRecords(),
+    });
+    await anchorGroupSearchIndex.prepare(state.project.groups, variableSearchCatalog);
     state.variableSearchStatus = "ready";
   } catch (error) {
     state.variableSearchStatus = "error";
@@ -710,6 +729,7 @@ async function loadVariableSearchCatalog() {
   }
   renderSearch("iv");
   renderSearch("dv");
+  renderSetupGroupPicker("instrument");
 }
 
 function groupedVariableIds(excludeGroupId = null) {
@@ -803,6 +823,25 @@ function applyProjectOperation(next) {
     return false;
   }
   const oldProject = state.project;
+  const linkDecisionOnly = oldProject && next.groups === oldProject.groups
+    && Object.keys(next).length === Object.keys(oldProject).length
+    && Object.keys(next).every(key => key === "link_decisions" || next[key] === oldProject[key]);
+  if (linkDecisionOnly) {
+    // Display decisions are applied by aggregateGroupLinks. Evidence ownership
+    // and compiled occurrence counts are unchanged, so do not rescan members.
+    projectController.applyOperation(next, { preserveMembership: true });
+    return true;
+  }
+  const findingOnly = oldProject && next.groups === oldProject.groups
+    && Object.keys(next).length === Object.keys(oldProject).length
+    && Object.keys(next).every(key => key === "finding_decisions" || next[key] === oldProject[key]);
+  if (projectOps.isAnchorOnlyChange(oldProject, next)) {
+    // Compiled evidence nodes/edges do not contain anchor roles. Candidates and
+    // anchor-dependent visibility are refreshed by the following render pass.
+    projectController.applyOperation(next, { preserveMembership: true });
+    publicationController?.workingCopyChanged?.();
+    return true;
+  }
   const anchorChanged = oldProject && ["iv_group_id", "dv_group_id", "instrument_group_id"]
     .some(key => oldProject[key] !== next[key]);
   const structural = project => JSON.stringify({
@@ -812,13 +851,15 @@ function applyProjectOperation(next) {
     decisions: project?.link_decisions || {},
     findings: project?.finding_decisions || {},
   });
-  const schemaChanged = oldProject && structural(oldProject) !== structural(next);
+  const schemaChanged = findingOnly || (oldProject && structural(oldProject) !== structural(next));
   const asSchema = project => ({ finding_decisions: project?.finding_decisions || {},
     groups: (project?.groups || []).map(group => ({
     group_id: group.group_id, label: group.label || "", variable_ids: [...(group.variable_ids || [])],
     ...(Number.isFinite(group.similarity_coherence) ? { similarity_coherence: group.similarity_coherence } : {}),
   })) });
-  const oldSchema = asSchema(oldProject);
+  const oldSchema = findingOnly
+    ? { groups: oldProject.groups, finding_decisions: oldProject.finding_decisions || {} }
+    : asSchema(oldProject);
   projectController.applyOperation(next);
   if (schemaChanged || anchorChanged) publicationController?.workingCopyChanged?.();
   if (schemaChanged && !state.activeGroupId && !state.definitionDraft && !schemaBatchDepth
@@ -832,11 +873,16 @@ function applyProjectOperation(next) {
     });
   }
   if (state.compiledDagValid && state.compiledDag && oldProject) {
-    const newSchema = asSchema(next);
+    const newSchema = findingOnly
+      ? { groups: oldSchema.groups, finding_decisions: next.finding_decisions || {} }
+      : asSchema(next);
     const owner = schema => new Map(schema.groups.flatMap(group => group.variable_ids.map(id => [id, group.group_id])));
-    const before = owner(oldSchema), after = owner(newSchema);
-    const changedIds = [...new Set([...before.keys(), ...after.keys()])]
-      .filter(id => before.get(id) !== after.get(id));
+    const changedIds = (() => {
+      if (findingOnly) return [];
+      const before = owner(oldSchema), after = owner(newSchema);
+      return [...new Set([...before.keys(), ...after.keys()])]
+        .filter(id => before.get(id) !== after.get(id));
+    })();
     const changedRawIds = [...new Set([...Object.keys(oldSchema.finding_decisions),
       ...Object.keys(newSchema.finding_decisions)])].filter(id =>
       (oldSchema.finding_decisions[id]?.display_status === "excluded")
@@ -857,11 +903,14 @@ function applyProjectOperation(next) {
       const batchedIds = [...state.compiledUpdateChangedIds];
       const batchedRawIds = [...state.compiledUpdateChangedRawIds];
       const batchBaseSchema = state.compiledUpdateBaseSchema;
+      const cachedRawLinks = batchedRawIds.map(id => state.rawLinksById.get(id)).filter(Boolean);
+      const missingRawIds = batchedRawIds.filter(id => !state.rawLinksById.has(id));
       const updatePromise = Promise.all([
         batchedIds.length ? dagDataSource.loadIncidentRawLinks(batchedIds) : [],
-        batchedRawIds.length ? dagDataSource.loadRawLinksByIds(batchedRawIds) : [],
+        missingRawIds.length ? dagDataSource.loadRawLinksByIds(missingRawIds) : [],
       ]).then(parts => {
-        const incidentRawLinks = [...new Map(parts.flat().map(link => [link.raw_causal_link_id, link])).values()];
+        const incidentRawLinks = [...new Map([...cachedRawLinks, ...parts.flat()]
+          .map(link => [link.raw_causal_link_id, link])).values()];
         if (state.compiledDagRevision !== revision) return;
         for (const link of incidentRawLinks) {
           if (!state.rawLinksById.has(link.raw_causal_link_id)) state.rawLinks.push(link);
@@ -877,7 +926,8 @@ function applyProjectOperation(next) {
         state.compiledUpdateChangedIds = null;
         state.compiledUpdateChangedRawIds = null;
         state.compiledDagUpdating = false;
-        renderAll();
+        if (batchedIds.length) renderAll();
+        else rebuildLinkDecision();
       }).catch(error => {
         if (state.compiledDagRevision !== revision) return;
         state.compiledDagUpdating = false;
@@ -961,7 +1011,7 @@ async function hydrateVariableDetails(variableIds, { skipNeighbors = false } = {
   const requested = [...new Set(variableIds || [])];
   const missing = requested.filter(id => !state.variableById.has(id));
   if (missing.length) {
-    const variablesPromise = dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource);
+    const variablesPromise = dagDataSource.loadVariableMetadata(missing, state.variableLayoutSource, { mapOnly: skipNeighbors });
     const neighborsPromise = skipNeighbors ? null : dagDataSource.loadNeighbors(missing);
     const [variables, neighbors] = skipNeighbors
       ? [await variablesPromise, null]
@@ -1192,7 +1242,31 @@ function hasAnyMapping(sourceIds, targetIds) {
   return rawLinksBetween(sourceIds, targetIds).length > 0;
 }
 
+let sparseEdgeEvidencePromise = null;
 function computeVisibleLinks() {
+  const missingSparseEvidence = state.excludeSparseEdges
+    ? [...new Set((state.project?.links || []).flatMap(link =>
+      [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))]
+      .filter(id => !state.edgeSupportById.has(id) && !state.rawLinksById.has(id)) : [];
+  if (missingSparseEvidence.length && !sparseEdgeEvidencePromise) {
+    const supportCache = state.edgeSupportById;
+    sparseEdgeEvidencePromise = dagDataSource.loadRawLinkSupportByIds(missingSparseEvidence).then(rows => {
+      if (state.edgeSupportById !== supportCache) return;
+      const returned = new Set(rows.map(row => row.raw_causal_link_id));
+      if (missingSparseEvidence.some(id => !returned.has(id))) {
+        throw new Error("Some sparse edge evidence is unavailable in this snapshot");
+      }
+      for (const row of rows) state.edgeSupportById.set(row.raw_causal_link_id, row);
+    }).catch(error => {
+      if (state.edgeSupportById === supportCache) {
+        state.excludeSparseEdges = false;
+        console.error("Could not load sparse edge evidence", error);
+      }
+    }).finally(() => {
+      sparseEdgeEvidencePromise = null;
+      updateDagFilters();
+    });
+  }
   const instrumentId = state.project.instrument_group_id;
   if (instrumentId && (instrumentId === state.project.iv_group_id
     || instrumentId === state.project.dv_group_id
@@ -1217,6 +1291,10 @@ function computeVisibleLinks() {
     maxPathLength: state.confounderMaxPathLength,
     exclusionMaxPathLength: state.exclusionMaxPathLength,
     excludeBottlenecked: state.excludeBottleneckedConfounders,
+    excludeSparseEdges: state.excludeSparseEdges && !missingSparseEvidence.length,
+    minimumEdgePapers: state.minimumEdgePapers,
+    edgeSupportById: state.edgeSupportById,
+    rawLinksById: state.rawLinksById,
     filterByCausalRelevance: false,
     showConfoundersOnly: state.showConfoundersOnly,
     showCollidersOnly: state.showCollidersOnly,
@@ -1314,7 +1392,7 @@ async function showExcludedFindings() {
         if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
         addDecision("finding_restored", { raw_causal_link_id: id });
         addToUndoHistory("Restored finding", before, "finding-decision");
-        renderAll();
+        rebuildLinkDecision();
         persistFindingDecision();
         if (Object.keys(state.project.finding_decisions || {}).length) void showExcludedFindings();
         else { els.edgeInspector.hidden = true; els.closeEvidencePane.hidden = true; }
@@ -1344,6 +1422,8 @@ function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 let pendingEdgeEvidencePromise = null;
 
 function renderSelectedEdgePanels() {
+  if (!state.selectedEdgeId && !state.selectedEvidenceGroupId && !els.edgeInspector.hidden
+    && els.edgeInspector.classList.contains("excluded-links-list")) return;
   inspectorController.renderEdge();
   inspectorController.renderProvenance();
 }
@@ -1358,7 +1438,10 @@ function excludeGroupConcept(groupId, variableId, label) {
   if (applyProjectOperation(next) === false) return;
   addDecision("concept_excluded", { group_id: groupId, variable_id: variableId });
   addToUndoHistory(`Excluded concept from "${group.label || groupId}"`, before);
-  renderAll();
+  // The incremental evidence update will rebuild the graph when its incident
+  // links arrive. Update the visible selection now instead of rebuilding twice.
+  if (state.compiledDagUpdating) renderAll({ rebuild: false, refreshView: true });
+  else renderAll();
   if (state.activeGroupId && !persistentViewer.editorOpen) {
     void persistentViewer.commitDecision().then(() =>
       publicationController.workingCopyChanged()).catch(error =>
@@ -1367,10 +1450,16 @@ function excludeGroupConcept(groupId, variableId, label) {
 }
 
 function renderSelectedEdge() {
+  if (!state.selectedEdgeId && !state.selectedEvidenceGroupId && !els.edgeInspector.hidden
+    && els.edgeInspector.classList.contains("excluded-links-list")) return;
   if (!state.selectedEdgeId && state.selectedEvidenceGroupId && inspectorController.renderGroupDefinition()) return;
-  const selected = (state.project?.links || []).find(edge => edge.edge_id === state.selectedEdgeId);
-  const owners = new Map((state.project?.groups || []).flatMap(group =>
-    (group.variable_ids || []).map(id => [id, group.group_id])));
+  const selected = inspectorController.selectedEdge();
+  const owners = new Map();
+  if (selected && Object.keys(state.project.finding_decisions || {}).length) {
+    for (const group of state.project.groups) {
+      for (const id of group.variable_ids || []) owners.set(id, group.group_id);
+    }
+  }
   const rawIds = [...new Set([...(selected?.a_to_b_raw_link_ids || []), ...(selected?.b_to_a_raw_link_ids || []),
     ...(selected ? Object.keys(state.project.finding_decisions || {}) : [])])];
   const missing = rawIds.filter(id => !state.rawLinksById.has(id));
@@ -1388,7 +1477,16 @@ function renderSelectedEdge() {
   if ((missing.length || missingVariables.length) && !pendingEdgeEvidencePromise) {
     const loadingEdgeId = state.selectedEdgeId;
     state.pendingEdgeEvidence = true;
-    const load = (missing.length ? dagDataSource.loadRawLinksByIds(missing) : Promise.resolve([])).then(async links => {
+    const loadSources = async () => {
+      if (!missing.length) return [];
+      const panel = await dagDataSource.loadPanelEvidence(rawIds);
+      if (!panel) return dagDataSource.loadRawLinksByIds(missing);
+      for (const variable of panel.variables) {
+        if (!state.variableById.has(variable.variable_id)) state.variableById.set(variable.variable_id, variable);
+      }
+      return panel.links;
+    };
+    const load = loadSources().then(async links => {
       for (const link of links) state.rawLinksById.set(link.raw_causal_link_id, link);
       // Show paper and study rows immediately; labels can arrive separately.
       renderSelectedEdgePanels();
@@ -1415,6 +1513,8 @@ function renderSelectedEdge() {
 
 function dismissEvidencePane() {
   inspectorController.clearPendingExclude();
+  els.provenancePanel.scrollLeft = 0;
+  els.closeEvidencePane.closest(".dag-ws-footer").scrollLeft = 0;
   state.selectedEdgeId = null;
   state.selectedEvidenceGroupId = null;
   state.comparisonVariableIds = [];
@@ -1524,7 +1624,7 @@ function isDrawMode(mode = state.map.mode) {
   return mapViewController.isDrawMode(mode);
 }
 
-// During DV/IV selection the user can draw a boundary before picking a seed; the
+// During Dep var/Ind var selection the user can draw a boundary before picking a seed; the
 // enclosed variables become the seed set and open the target group directly.
 function isSeedSelectionPhase() {
   return mapViewController.isSeedSelectionPhase();
@@ -1636,7 +1736,7 @@ const toolbarController = createToolbarController({
 });
 
 const definitionWorkflowController = createDefinitionWorkflowController({
-  state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll, drawMap,
+  state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll, drawMap, renderAssignmentCoverage,
   setMapMode, fitMap, groupById, persistProjectLocally, visibleVariables,
   searchVariables: searchVisibleVariables,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
@@ -1648,8 +1748,10 @@ const definitionWorkflowController = createDefinitionWorkflowController({
     publicationController.workingCopyChanged();
   },
   onCommitFailureRestored: () => persistentViewer.clearSaveFailure(),
+  onInstrumentReady: () => shellController.showMobilePanel("dag"),
   prewarmEvidence: async () => {
-    await dagDataSource.ensureEvidenceConnection();
+    if (await dagDataSource.prewarmVariableMap(state.variableLayoutSource)) return;
+    await dagDataSource.ensureEvidenceConnection({ variableIds: [], prewarmMapFiles: true });
     // DuckDB fetches the remote layout metadata when it creates this view.
     // Do that while the source picker is open instead of after Continue.
     await dagDataSource.ensureVariableLayouts();
@@ -1771,6 +1873,10 @@ const exportController = createDagExportController({
       maxPathLength: state.confounderMaxPathLength,
       exclusionMaxPathLength: state.exclusionMaxPathLength,
       excludeBottlenecked: state.excludeBottleneckedConfounders,
+      excludeSparseEdges: state.excludeSparseEdges,
+      minimumEdgePapers: state.minimumEdgePapers,
+      edgeSupportById: state.edgeSupportById,
+      rawLinksById: state.rawLinksById,
       showConfoundersOnly: state.showConfoundersOnly,
       showCollidersOnly: state.showCollidersOnly,
       showExclusionViolations: state.showExclusionViolations,
@@ -1863,11 +1969,10 @@ const projectBootstrap = createProjectBootstrap({
     persistentViewer.start();
     void definitionWorkflowController.resumeAfterOAuth();
     void publicationController.refreshPublicationState();
-    if (!state.project?.links?.some(link => (link.a_to_b_raw_link_ids?.length || 0)
-      + (link.b_to_a_raw_link_ids?.length || 0) > 0)) return;
-    const prewarm = () => { void dagDataSource.ensureEvidenceConnection().catch(() => {}); };
-    if ("requestIdleCallback" in window) requestIdleCallback(prewarm, { timeout: 3000 });
-    else setTimeout(prewarm, 0);
+    // Compiled-DAG browsing and catalog search need no raw evidence engine.
+    // Definitions, evidence details, and exports start it on explicit intent;
+    // speculative startup used to deliver a large lookup conversion during
+    // the user's first search/anchor selection.
   },
 });
 
@@ -1886,7 +1991,7 @@ const eventController = createDagEventController({
   setWorkflowMode, renderGroupList, closeGroupEditor, discardGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
-  saveProjectLocally, applyActiveGroupingSet, rebuildProject, exportGroupingFolder,
+  saveProjectLocally, applyActiveGroupingSet, rebuildProject, updateDagFilters, exportGroupingFolder,
   copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
   canvasHeight, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber, setMapMode,
   undo, redo, renderActionHistory, renderDag, setFullscreenPanel,

@@ -18,8 +18,8 @@ test("anchors stay pinned; relevance, alphabetical order and ties remain stable"
   assert.equal(model.countText, "5 groups");
   assert.deepEqual(model.rows[2], { groupId: "z", label: "Zulu", variableCount: 2,
     isActive: true, roleLabels: ["Known role", "unknown"], anchorLabel: "" });
-  assert.equal(model.rows[0].anchorLabel, "DV");
-  assert.equal(model.rows[1].anchorLabel, "IV");
+  assert.equal(model.rows[0].anchorLabel, "Dep var");
+  assert.equal(model.rows[1].anchorLabel, "Ind var");
   assert.equal(model.rows[3].variableCount, 0);
   assert.deepEqual(buildGroupListModel(project, { ...options, sort: "alpha" }).rows.map(r => r.groupId),
     ["dv", "iv", "tie1", "tie2", "z"]);

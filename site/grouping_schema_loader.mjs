@@ -137,7 +137,12 @@ export async function loadGroupingSchemaStructure(baseUrl, fetchImpl = fetch) {
     const wanted = [...new Set(groupIds)].filter(groupId => groups.has(groupId) && !loadedGroups.has(groupId));
     const membershipRows = await mapWithConcurrency(wanted, 16, async groupId => {
       const relative = manifest.group_membership_files[groupId];
-      return { groupId, rows: parseTsv(await fetchText(new URL(relative, base), fetchImpl), relative) };
+      const reference = manifest.group_membership_references?.[groupId];
+      const url = new URL(reference || relative, base);
+      if (reference && (url.origin !== base.origin || !url.pathname.startsWith("/storage/v1/object/public/published-schemas/"))) {
+        throw new Error(`Invalid published membership reference for ${groupId}.`);
+      }
+      return { groupId, rows: parseTsv(await fetchText(url, fetchImpl), relative) };
     });
     for (const { groupId, rows } of membershipRows) {
       const variableIds = [];

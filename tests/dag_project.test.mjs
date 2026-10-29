@@ -311,3 +311,41 @@ test('membership conflicts, protected seeds and removal metadata retain their ru
   assert.deepEqual(result.previousGroupIds, ['z', 'c']);
   assert.equal(result.project.groups[0].variable_ids.length, 0);
 });
+
+test('anchor-only updates share evidence membership but never hide schema edits', () => {
+  const project = { ...ops.createProject({ projectId: 'p', groupingSetId: 's' }),
+    groups: [{ group_id: 'a', label: 'A', variable_ids: ['v1'] },
+      { group_id: 'b', label: 'B', variable_ids: ['v2'] }] };
+  const next = ops.promoteAnchor(project, 'iv', 'a', timestamp);
+  assert.equal(ops.isAnchorOnlyChange(project, next), true);
+  assert.equal(next.groups[0].variable_ids, project.groups[0].variable_ids);
+  assert.equal(ops.isAnchorOnlyChange(project, { ...next, groups: next.groups.map((g, i) => i ? g : { ...g, variable_ids: ['v3'] }) }), false);
+  assert.equal(ops.isAnchorOnlyChange(project, { ...next, finding_decisions: { f: { display_status: 'excluded' } } }), false);
+  assert.equal(ops.isAnchorOnlyChange(project, { ...next, groups: next.groups.map((g, i) => i ? g : { ...g, label: 'Changed' }) }), false);
+  assert.equal(ops.isAnchorOnlyChange(project, project), false);
+});
+
+test('compact anchor history restores roles and logs without replacing membership or decisions', () => {
+  const project = { ...ops.createProject({ projectId: 'p', groupingSetId: 's' }),
+    groups: [{ group_id: 'a', label: 'A', variable_ids: Array.from({ length: 10000 }, (_, i) => `v${i}`) },
+      { group_id: 'b', label: 'B', type: null, variable_ids: ['other'] }] };
+  const before = ops.snapshotAnchors(project, 'select_iv');
+  assert.ok(before.length < 1000);
+  let selected = ops.promoteAnchor(project, 'iv', 'a', timestamp);
+  selected = { ...selected, decisions: [{ decision_id: 'd1', type: 'group_promoted_to_iv' }] };
+  const after = ops.snapshotAnchors(selected, 'select_dv');
+  const undo = ops.restoreSnapshot(selected, before);
+  assert.equal(undo.phase, 'select_iv');
+  assert.equal(undo.project.iv_group_id, project.iv_group_id);
+  assert.equal(undo.project.groups[0].variable_ids, project.groups[0].variable_ids);
+  assert.equal(Object.hasOwn(undo.project.groups[0], 'type'), false);
+  assert.equal(Object.hasOwn(undo.project.groups[0], 'updated_at'), false);
+  assert.deepEqual(undo.project.decisions, []);
+  assert.equal(undo.project.link_decisions, selected.link_decisions);
+  const redo = ops.restoreSnapshot(undo.project, after);
+  assert.equal(redo.project.iv_group_id, 'a');
+  assert.equal(redo.project.groups[0].type, 'iv');
+  assert.equal(redo.project.groups[0].updated_at, timestamp);
+  assert.equal(redo.project.groups[0].variable_ids, project.groups[0].variable_ids);
+  assert.deepEqual(redo.project.decisions, selected.decisions);
+});

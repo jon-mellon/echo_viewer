@@ -290,7 +290,7 @@ function applyBrush() {
     state.selectedVariableIds = new Set(selected);
     state.selectedVariableId = picked[picked.length - 1] || state.selectedVariableId;
     invalidateMapCaches();
-    renderAll();
+    renderAll({ rebuild: false, refreshView: true });
     return;
   }
   if (brush.action === "select_vars") {
@@ -300,10 +300,10 @@ function applyBrush() {
     }
     state.selectedVariableIds = new Set(picked);
     state.selectedVariableId = picked[picked.length - 1] || null;
-    renderAll();
+    renderAll({ rebuild: false, refreshView: true });
     return;
   }
-  // Draw-to-seed: no group yet, drawing during DV/IV selection picks the enclosed
+  // Draw-to-seed: no group yet, drawing during Dep var/Ind var selection picks the enclosed
   // variables as the seed set and opens the target group.
   if (!group && isSeedSelectionPhase() && brush.action !== "remove") {
     const side = state.phase === "select_dv" ? "dv" : "iv";
@@ -369,18 +369,55 @@ function variableColor(status) {
 }
 
 let _paletteAssignmentSig = null;
+let _paletteAssignmentShape = null;
 let _paletteAssignment = new Map(); // group_id -> palette index
 
 function invalidateCaches() {
   _globalVoronoiCells = null;
   _paletteAssignmentSig = null;
+  _paletteAssignmentShape = null;
   _paletteAssignment = new Map();
+}
+
+// groupColor() runs once per DAG node and map region, so the full membership
+// signature is too costly to rebuild on every call. When no group or
+// membership array has been replaced, resized or renamed, the assignment
+// still holds; otherwise fall back to comparing the full signature.
+function paletteAssignmentShape(groups) {
+  return groups.map(g => [g, g.group_id, g.variable_ids, g.variable_ids.length]);
+}
+
+function samePaletteAssignmentShape(shape, groups) {
+  return shape?.length === groups.length && shape.every(([group, id, ids, length], index) =>
+    group === groups[index] && id === group.group_id && ids === group.variable_ids && length === ids.length);
+}
+
+// Replaced groups usually keep most membership arrays, or copy them unchanged.
+// Key each array once so the fallback signature is cheap to rebuild and compare.
+const _membershipKeys = new WeakMap();
+
+function membershipKey(ids) {
+  const cached = _membershipKeys.get(ids);
+  if (cached?.length === ids.length) return cached.key;
+  const key = ids.join(",");
+  _membershipKeys.set(ids, { length: ids.length, key });
+  return key;
+}
+
+function paletteAssignmentSig(groups) {
+  return groups.map(g => [g.group_id, membershipKey(g.variable_ids)]);
+}
+
+function samePaletteAssignmentSig(a, b) {
+  return a?.length === b.length && a.every(([id, key], index) => id === b[index][0] && key === b[index][1]);
 }
 
 function computePaletteAssignment() {
   const groups = state.project?.groups || [];
-  const sig = groups.map(g => g.group_id + ":" + g.variable_ids.join(",")).join("|");
-  if (sig === _paletteAssignmentSig) return;
+  if (samePaletteAssignmentShape(_paletteAssignmentShape, groups)) return;
+  _paletteAssignmentShape = paletteAssignmentShape(groups);
+  const sig = paletteAssignmentSig(groups);
+  if (samePaletteAssignmentSig(_paletteAssignmentSig, sig)) return;
   _paletteAssignmentSig = sig;
   _paletteAssignment = mapRenderModel.computePaletteAssignment(groups, state.variables, GROUP_PALETTE);
 }
@@ -645,7 +682,7 @@ function renderMapContextMenu() {
       state.definitionDraft.new_variable_ids = [...selected];
       state.selectedVariableIds = new Set(selected);
       hideMapContextMenu();
-      renderAll();
+      renderAll({ rebuild: false, refreshView: true });
     });
     els.dagMapContextMenu.hidden = false;
     const position = mapInteractions.contextMenuPosition({ ...state.mapContextMenu, rect,

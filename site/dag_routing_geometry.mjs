@@ -125,3 +125,68 @@ export function routeOverlapPenalty(points, occupiedRoutes, preparedSegments = n
   }
   return penalty;
 }
+
+// The overlap rule only penalizes nearly parallel runs. Index undirected segment
+// headings so candidate routes can skip unrelated segments. Contributions are
+// summed in insertion order to retain the reference scorer's floating-point
+// behavior, including ties between candidate routes.
+export class ParallelSegmentIndex {
+  constructor() {
+    this.segments = [];
+    this.buckets = Array.from({ length: 32 }, () => []);
+  }
+
+  bucket(dx, dy) {
+    let angle = Math.atan2(dy, dx) % Math.PI;
+    if (angle < 0) angle += Math.PI;
+    return Math.min(31, Math.floor(angle * 32 / Math.PI));
+  }
+
+  addRoute(points) {
+    const start = this.segments.length;
+    appendOverlapSegments(this.segments, points);
+    for (let id = start; id < this.segments.length; id++) {
+      const segment = this.segments[id];
+      this.buckets[this.bucket(segment.dx, segment.dy)].push(id);
+    }
+  }
+
+  penalty(points, cutoff = Infinity) {
+    let penalty = 0;
+    for (let point = 0; point < points.length - 1; point++) {
+      const a = points[point], b = points[point + 1];
+      const length = Math.hypot(b.x - a.x, b.y - a.y);
+      if (length < 1) continue;
+      const ux = (b.x - a.x) / length, uy = (b.y - a.y) / length;
+      const minX = Math.min(a.x, b.x) - 16, maxX = Math.max(a.x, b.x) + 16;
+      const minY = Math.min(a.y, b.y) - 16, maxY = Math.max(a.y, b.y) + 16;
+      const bucket = this.bucket(b.x - a.x, b.y - a.y);
+      const hits = [];
+      // asin(0.12) is less than two bins. Include both neighboring bins in
+      // either direction, with wraparound for reversed/near-horizontal runs.
+      for (let offset = -2; offset <= 2; offset++) {
+        for (const id of this.buckets[(bucket + offset + 32) % 32]) {
+          const segment = this.segments[id];
+          if (segment.maxX < minX || segment.minX > maxX
+            || segment.maxY < minY || segment.minY > maxY) continue;
+          if (Math.abs(ux * segment.dy - uy * segment.dx) / segment.length > 0.12) continue;
+          const { c, d } = segment;
+          const pc = (c.x - a.x) * ux + (c.y - a.y) * uy;
+          const pd = (d.x - a.x) * ux + (d.y - a.y) * uy;
+          const start = Math.max(0, Math.min(pc, pd));
+          const end = Math.min(length, Math.max(pc, pd));
+          if (end - start <= 18) continue;
+          const denominator = pd - pc;
+          const t = denominator === 0 ? 0 : ((start + end) / 2 - pc) / denominator;
+          const distance = Math.abs((c.x + (d.x - c.x) * t - a.x) * uy
+            - (c.y + (d.y - c.y) * t - a.y) * ux);
+          if (distance < 16) hits.push([id, (end - start) * 40 * (1 - distance / 16)]);
+        }
+      }
+      hits.sort((a, b) => a[0] - b[0]);
+      for (const [, contribution] of hits) penalty += contribution;
+      if (penalty >= cutoff) return penalty;
+    }
+    return penalty;
+  }
+}

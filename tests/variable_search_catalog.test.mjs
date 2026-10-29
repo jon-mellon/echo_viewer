@@ -25,6 +25,17 @@ async function loadedCatalog() {
   return catalog;
 }
 
+test("concept labels reuse the matching snapshot without hydrating detail records", async () => {
+  const catalog = await loadedCatalog();
+  catalog.snapshotId = "snapshot-a";
+  assert.deepEqual(catalog.conceptLabels(["v1", "v2", "v1", "missing"], "snapshot-a"), [
+    { variable_id: "v2", concept_label: "Growth", display_label: "Income growth" },
+    { variable_id: "v1", concept_label: "Household income", display_label: "Income" },
+  ]);
+  assert.equal(catalog.conceptLabels(["v1"], "snapshot-b"), null);
+  assert.equal(new StaticVariableSearchCatalog().conceptLabels(["v1"], "snapshot-a"), null);
+});
+
 test("fresh global catalog searches without hydrated variables", async () => {
   const state = { variables: [], variableById: new Map() };
   const catalog = await loadedCatalog();
@@ -76,4 +87,39 @@ test("browser catalog loader reads gzip responses", async () => {
     return new Response(compressed, { status: 200 });
   });
   assert.equal(catalog.searchVariables("income")[0].variable_id, "v1");
+});
+
+test("snapshot catalogs never silently use another snapshot's records", async () => {
+  const snapshot = "b".repeat(64);
+  const catalog = new StaticVariableSearchCatalog();
+  let fetched = false;
+  await catalog.loadSnapshot(snapshot, {
+    fetchImpl: () => { fetched = true; throw new Error("wrong catalog"); },
+    loadRecords: async () => [{ variable_id: "new-id", display_label: "School attendance", index: 1 }],
+  });
+  assert.equal(fetched, false);
+  assert.equal(catalog.searchVariables("attendance")[0].variable_id, "new-id");
+  catalog.assertCoverage(["new-id"]);
+  assert.throws(() => catalog.assertCoverage(["old-id"]), /does not cover/);
+  await assert.rejects(catalog.loadSnapshot("c".repeat(64)), /across evidence snapshots/);
+});
+
+test("a mislabeled catalog fails instead of showing partial results", async () => {
+  const catalog = new StaticVariableSearchCatalog();
+  catalog.snapshotId = "a".repeat(64);
+  await assert.rejects(catalog.load("/catalog.json", async () => new Response(JSON.stringify({
+    ...payload, evidence_snapshot: "b".repeat(64),
+  }))), /snapshot mismatch/);
+  assert.equal(catalog.status, "error");
+});
+
+test("bundled immutable catalogs declare their snapshot and include all exported variables", async () => {
+  const { SNAPSHOT_SEARCH_CATALOGS } = await import("../site/variable_search_catalog.mjs");
+  const counts = [14284, 97818];
+  for (const [index, [snapshot, path]] of Object.entries(SNAPSHOT_SEARCH_CATALOGS).entries()) {
+    const catalog = JSON.parse(gunzipSync(readFileSync(new URL(`../site${path}`, import.meta.url))));
+    assert.equal(catalog.evidence_snapshot, snapshot);
+    assert.equal(catalog.records.length, counts[index]);
+    assert.equal(new Set(catalog.records.map(row => row[0])).size, counts[index]);
+  }
 });

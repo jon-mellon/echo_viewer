@@ -26,8 +26,8 @@ function visNodeData(group, layoutPoint, layoutParams = {}) {
   const isPathMediator = (state.showConfoundersOnly || state.showCollidersOnly)
     && diagnosticRole === "mediator";
   const isSelected = group.group_id === state.activeGroupId;
-  const color = isConfounder ? "#c62828" : isCollider ? "#7c3aed" : isPathMediator ? "#6b7280" : groupColor(group);
-  const roleTag = isIv ? " (IV)" : isDv ? " (DV)" : "";
+  const color = isConfounder ? "#c62828" : isCollider ? "#801744" : isPathMediator ? "#6b7280" : groupColor(group);
+  const roleTag = isIv ? " (Ind var)" : isDv ? " (Dep var)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
   return {
@@ -42,8 +42,8 @@ function visNodeData(group, layoutPoint, layoutParams = {}) {
     mass: 1 + Math.min(3, Math.sqrt(group.variable_ids.length || 1) / 6),
     color: {
       background: color,
-      border: isSelected ? "#b83b5e" : isConfounder ? "#7f1d1d" : isCollider ? "#4c1d95" : isPathMediator ? "#374151" : "#fbfcfa",
-      highlight: { background: color, border: isConfounder ? "#4c0d0d" : isCollider ? "#2e1065" : isPathMediator ? "#1f2937" : "#b83b5e" },
+      border: isSelected ? "#b83b5e" : isConfounder ? "#7f1d1d" : isCollider ? "#550f2d" : isPathMediator ? "#374151" : "#fbfcfa",
+      highlight: { background: color, border: isConfounder ? "#4c0d0d" : isCollider ? "#380a1e" : isPathMediator ? "#1f2937" : "#b83b5e" },
       hover: { background: color, border: "#ffffff" },
     },
     shape: (isIv || isDv) ? "ellipse" : "box",
@@ -54,7 +54,7 @@ function visNodeData(group, layoutPoint, layoutParams = {}) {
       : isConfounder
         ? { enabled: true, color: "rgba(198,40,40,0.34)", size: 11, x: 0, y: 2 }
         : isCollider
-          ? { enabled: true, color: "rgba(124,58,237,0.34)", size: 11, x: 0, y: 2 }
+          ? { enabled: true, color: "rgba(128,23,68,0.34)", size: 11, x: 0, y: 2 }
         : isPathMediator
           ? { enabled: true, color: "rgba(55,65,81,0.28)", size: 9, x: 0, y: 2 }
       : { enabled: true, color: "rgba(25, 38, 34, 0.14)", size: 7, x: 0, y: 2 },

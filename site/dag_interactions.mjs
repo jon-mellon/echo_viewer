@@ -1,3 +1,5 @@
+import { attachGraphTouchGuard } from "./graph_touch.mjs";
+
 export function constrainViewPosition(position, scale, contentBounds, viewport, minimumVisible = 32) {
   if (!contentBounds || !Number.isFinite(scale) || scale <= 0) return { ...position };
   const width = Math.max(0, Number(viewport?.width) || 0);
@@ -34,6 +36,7 @@ export function constrainViewPosition(position, scale, contentBounds, viewport, 
 
 // Network event ownership; callbacks read current viewer state at event time.
 export function attachDagInteractions(network, element, actions) {
+  const detachTouchGuard = attachGraphTouchGuard(element);
   let constrainingViewport = false;
   let lastTouchAt = -Infinity;
   let tappedCandidateId = null;
@@ -184,6 +187,7 @@ export function attachDagInteractions(network, element, actions) {
   element.addEventListener("pointerdown", rememberTouchPointer);
   element.addEventListener("mouseleave", leave);
   return () => {
+    detachTouchGuard();
     for (const [name, handler] of Object.entries(handlers)) network.off(name, handler);
     element.removeEventListener("touchstart", rememberTouch);
     element.removeEventListener("touchend", onTouchEnd);

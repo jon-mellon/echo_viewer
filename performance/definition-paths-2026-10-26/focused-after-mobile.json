@@ -1,0 +1,248 @@
+{
+  "mobile": true,
+  "runs": [
+    {
+      "snapshot": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b",
+      "members": 97818,
+      "timings": [
+        {
+          "name": "cold definition source",
+          "ms": 2191.7999997138977,
+          "longestTaskMs": 217,
+          "measures": [
+            {
+              "name": "echo:evidence:variables",
+              "ms": 1622.4000000953674
+            },
+            {
+              "name": "echo:evidence:engine",
+              "ms": 299.19999980926514
+            },
+            {
+              "name": "echo:evidence:lookup",
+              "ms": 0
+            },
+            {
+              "name": "echo:evidence:validation",
+              "ms": 392
+            },
+            {
+              "name": "echo:evidence:variable-layouts-metadata",
+              "ms": 0
+            },
+            {
+              "name": "echo:evidence:variable-layouts-view",
+              "ms": 213.30000019073486
+            },
+            {
+              "name": "echo:evidence:variable-layouts",
+              "ms": 0
+            },
+            {
+              "name": "echo:evidence:variables-query",
+              "ms": 629
+            }
+          ],
+          "nodes": 111,
+          "edges": 2818
+        },
+        {
+          "name": "path length 2",
+          "ms": 1264.5,
+          "longestTaskMs": 430,
+          "measures": [
+            {
+              "name": "echo:dag:routing",
+              "ms": 472.2999997138977
+            },
+            {
+              "name": "echo:dag:layout",
+              "ms": 72.89999961853027
+            }
+          ],
+          "nodes": 104,
+          "edges": 2603
+        },
+        {
+          "name": "path length 1",
+          "ms": 210.5,
+          "longestTaskMs": 116,
+          "measures": [],
+          "nodes": 13,
+          "edges": 76
+        },
+        {
+          "name": "path length 2",
+          "ms": 738.7000002861023,
+          "longestTaskMs": 533,
+          "measures": [],
+          "nodes": 104,
+          "edges": 2603
+        }
+      ],
+      "errors": []
+    },
+    {
+      "snapshot": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b",
+      "members": 97818,
+      "timings": [
+        {
+          "name": "cold definition source",
+          "ms": 2271,
+          "longestTaskMs": 206,
+          "measures": [
+            {
+              "name": "echo:evidence:engine",
+              "ms": 272.2000002861023
+            },
+            {
+              "name": "echo:evidence:variables",
+              "ms": 1700.6999998092651
+            },
+            {
+              "name": "echo:evidence:lookup",
+              "ms": 0
+            },
+            {
+              "name": "echo:evidence:validation",
+              "ms": 391.09999990463257
+            },
+            {
+              "name": "echo:evidence:variable-layouts-metadata",
+              "ms": 0
+            },
+            {
+              "name": "echo:evidence:variable-layouts-view",
+              "ms": 336.59999990463257
+            },
+            {
+              "name": "echo:evidence:variable-layouts",
+              "ms": 0
+            },
+            {
+              "name": "echo:evidence:variables-query",
+              "ms": 679.5999999046326
+            }
+          ],
+          "nodes": 111,
+          "edges": 2818
+        },
+        {
+          "name": "path length 2",
+          "ms": 1272.5,
+          "longestTaskMs": 431,
+          "measures": [
+            {
+              "name": "echo:dag:routing",
+              "ms": 496
+            },
+            {
+              "name": "echo:dag:layout",
+              "ms": 72.19999980926514
+            }
+          ],
+          "nodes": 104,
+          "edges": 2603
+        },
+        {
+          "name": "path length 1",
+          "ms": 212.89999961853027,
+          "longestTaskMs": 117,
+          "measures": [],
+          "nodes": 13,
+          "edges": 76
+        },
+        {
+          "name": "path length 2",
+          "ms": 717.6999998092651,
+          "longestTaskMs": 526,
+          "measures": [],
+          "nodes": 104,
+          "edges": 2603
+        }
+      ],
+      "errors": []
+    },
+    {
+      "snapshot": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b",
+      "members": 97818,
+      "timings": [
+        {
+          "name": "cold definition source",
+          "ms": 2619.2000002861023,
+          "longestTaskMs": 209,
+          "measures": [
+            {
+              "name": "echo:evidence:variables",
+              "ms": 2043.0999999046326
+            },
+            {
+              "name": "echo:evidence:engine",
+              "ms": 267.2000002861023
+            },
+            {
+              "name": "echo:evidence:lookup",
+              "ms": 0.09999990463256836
+            },
+            {
+              "name": "echo:evidence:validation",
+              "ms": 616.9000000953674
+            },
+            {
+              "name": "echo:evidence:variable-layouts-metadata",
+              "ms": 0
+            },
+            {
+              "name": "echo:evidence:variable-layouts-view",
+              "ms": 259.09999990463257
+            },
+            {
+              "name": "echo:evidence:variable-layouts",
+              "ms": 0
+            },
+            {
+              "name": "echo:evidence:variables-query",
+              "ms": 693.1999998092651
+            }
+          ],
+          "nodes": 111,
+          "edges": 2818
+        },
+        {
+          "name": "path length 2",
+          "ms": 1264.6000003814697,
+          "longestTaskMs": 437,
+          "measures": [
+            {
+              "name": "echo:dag:routing",
+              "ms": 479.5
+            },
+            {
+              "name": "echo:dag:layout",
+              "ms": 72.80000019073486
+            }
+          ],
+          "nodes": 104,
+          "edges": 2603
+        },
+        {
+          "name": "path length 1",
+          "ms": 212.09999990463257,
+          "longestTaskMs": 116,
+          "measures": [],
+          "nodes": 13,
+          "edges": 76
+        },
+        {
+          "name": "path length 2",
+          "ms": 763.3000001907349,
+          "longestTaskMs": 531,
+          "measures": [],
+          "nodes": 104,
+          "edges": 2603
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

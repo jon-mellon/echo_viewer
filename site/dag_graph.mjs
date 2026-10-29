@@ -91,6 +91,12 @@ export function filterGraphByConfounders(graph, options) {
   const outgoing = directedOutgoing(graph, traversableLink);
 
   function pathWithout(startId, targetId, blockedIds, maxDepth) {
+    // The common one-edge diagnostic does not need a breadth-first search or
+    // its per-node queue, parent map and visited set.
+    if (maxDepth === 1) {
+      return startId !== targetId && !blockedIds.includes(targetId)
+        && outgoing.get(startId)?.has(targetId) ? [startId, targetId] : null;
+    }
     const seen = new Set([startId, ...blockedIds]);
     const parent = new Map();
     const queue = [{ nodeId: startId, depth: 0 }];
