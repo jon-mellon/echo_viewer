@@ -186,6 +186,7 @@ test("a new variable can be defined through the mobile controls", async ({ page 
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
   await page.locator('.mobile-panel-tab[data-mobile-panel="controls"]').click();
   await page.locator("#variableDefineNew").click();
   await expect(page.locator("#definitionTitle")).toBeInViewport();

@@ -9,10 +9,29 @@ async function ready(page) {
     && !window.__dagBuilderState?.publishedSchemaHydrating);
 }
 
+async function completeSetup(page) {
+  const anchors = await page.evaluate(() => {
+    const state = window.__dagBuilderState;
+    const link = state.project.links.find(item => (item.a_to_b_raw_link_ids?.length || item.b_to_a_raw_link_ids?.length)
+      && state.project.groups.some(group => group.group_id === item.group_a && group.variable_ids?.length)
+      && state.project.groups.some(group => group.group_id === item.group_b && group.variable_ids?.length));
+    return link ? [link.group_a, link.group_b] : state.project.groups
+      .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id);
+  });
+  expect(anchors).toHaveLength(2);
+  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
+  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await expect(page.locator('#instrumentGroupPicker button[data-select-none]')).toBeVisible();
+  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await expect(page.locator('body')).not.toHaveClass(/initial-setup/);
+  return anchors;
+}
+
 test("privacy policy opens without resetting the viewer", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);
   await ready(page);
+  await completeSetup(page);
   await page.evaluate(() => { window.__privacyViewerState = window.__dagBuilderState; });
 
   const [policy] = await Promise.all([
@@ -35,6 +54,7 @@ test("selecting evidence in full screen returns to the standard layout", async (
   expect(anchors).toHaveLength(2);
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
 
   await page.locator("#fullscreenDag").click();
   await expect(page.locator("#fullscreenDag")).toHaveAttribute("aria-pressed", "true");
@@ -158,7 +178,7 @@ test("variable search catalog starts loading when anchor search gets focus", asy
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const catalogRequests = [];
   page.on("request", request => {
-    if (request.url().includes("variable-search-catalog.json")) catalogRequests.push(request.url());
+    if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
   });
   await page.goto(viewer);
   await ready(page);
@@ -200,6 +220,7 @@ test("exclusion reason survives an evidence inspector refresh", async ({ page })
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);
   await ready(page);
+  await completeSetup(page);
   const edgeId = await page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
     await whenDagRendered();
@@ -224,11 +245,14 @@ test("exclusion reason survives an evidence inspector refresh", async ({ page })
 test("edge evidence renders provenance without loading map layouts", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const parquetRequests = [];
+  const catalogRequests = [];
   page.on("request", request => {
     if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
+    if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
   });
   await page.goto(viewer);
   await ready(page);
+  await completeSetup(page);
   const edgeId = await page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
     await whenDagRendered();
@@ -240,14 +264,16 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
   });
   expect(edgeId).toBeTruthy();
   await expect(page.locator("#provenancePanel tbody tr").first()).toBeVisible();
+  await expect(page.locator("#provenancePanel .concept-loading")).toHaveCount(0);
   expect(parquetRequests.some(url => url.endsWith("/variable_layouts.parquet"))).toBe(false);
-  expect(parquetRequests.some(url => url.includes("/variables/shard-"))).toBe(true);
+  expect(catalogRequests).toHaveLength(1);
 });
 
 test("evidence keeps available fields visible while concept labels load", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(viewer);
   await ready(page);
+  await completeSetup(page);
   const edgeId = await page.evaluate(async () => {
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
@@ -279,6 +305,7 @@ test("evidence replaces the desktop sidebar and closing it restores navigation",
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(viewer);
   await ready(page);
+  await completeSetup(page);
   const pane = page.locator(".dag-ws-footer");
   await expect(page.locator(".panel-header")).toBeVisible();
   await expect(pane).toBeHidden();
@@ -305,6 +332,7 @@ test("Map tab returns from mobile evidence to the DAG", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(viewer);
   await ready(page);
+  await completeSetup(page);
   await page.locator('button[data-mobile-panel="dag"]').click();
   await page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
@@ -337,6 +365,7 @@ test("mobile evidence tables reopen at their left edge", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(viewer);
   await ready(page);
+  await completeSetup(page);
   await page.locator('button[data-mobile-panel="dag"]').click();
   const openEvidence = () => page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
@@ -433,6 +462,7 @@ test("project export can be imported with its anchors intact", async ({ page }) 
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
   await page.locator("#exportToggleBtn").click();
   const downloadPromise = page.waitForEvent("download");
   await page.locator("#exportProject").click();
@@ -457,11 +487,12 @@ test("Share view copies the selected public permalink", async ({ page, context }
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
   await page.locator("#copyPermalink").click();
+  await expect(page.locator("#copyPermalink")).toContainText("Copied");
   const copied = new URL(await page.evaluate(() => navigator.clipboard.readText()));
   expect(copied.searchParams.get("iv")).toBe(anchors[0]);
   expect(copied.searchParams.get("dv")).toBe(anchors[1]);
-  await expect(page.locator("#copyPermalink")).toContainText("Copied");
 });
 
 test("mobile map controls accept taps and sharing falls back when clipboard access fails", async ({ browser }) => {
@@ -477,6 +508,7 @@ test("mobile map controls accept taps and sharing falls back when clipboard acce
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
   await page.locator('[data-mobile-panel="dag"]').last().tap();
   const fit = page.locator("#dagSvgFit");
   await fit.scrollIntoViewIfNeeded();
@@ -529,6 +561,7 @@ test("bibliography, Markdown, and LaTeX export controls produce downloads", asyn
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
   await page.locator("#exportToggleBtn").click();
   for (const [button, filename] of [
     ["#exportBib", "references.bib"],

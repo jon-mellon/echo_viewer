@@ -4,6 +4,16 @@ const snapshot = "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f
 const publication = "c221423a-9470-4c82-8a3d-8bcf4a01ef7c";
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
+async function completeSetup(page) {
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  expect(anchors).toHaveLength(2);
+  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
+  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await expect(page.locator('body')).not.toHaveClass(/initial-setup/);
+}
+
 for (const corrupt of [false, true]) {
   test(`mobile evidence source loading, corrupt bundle=${corrupt}`, async ({ page, context, browserName }) => {
     test.setTimeout(90000);
@@ -15,6 +25,7 @@ for (const corrupt of [false, true]) {
     await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}`);
     await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
       && document.getElementById("startupLoading")?.hidden);
+    await completeSetup(page);
     await page.locator('button[data-mobile-panel="dag"]').click();
     if (!corrupt && browserName === "chromium") {
       const cdp = await context.newCDPSession(page);
@@ -94,10 +105,7 @@ test("a newer path filter supersedes a dense graph while installation is pending
   await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}`);
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
     && window.__dagBuilderState?.project && document.getElementById("startupLoading")?.hidden);
-  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
-    .filter(group => group.variable_ids.length).slice(0, 2).map(group => group.group_id));
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await completeSetup(page);
   await page.locator('button[data-mobile-panel="dag"]').click();
   const settled = () => page.evaluate(async () => (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).whenDagRendered());
   await settled();
