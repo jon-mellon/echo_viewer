@@ -6,11 +6,12 @@ import { join, resolve, dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "../site/supabase_config.mjs";
-import { DEFAULT_SCHEMA_PUBLICATION_ID, PRODUCTION_EVIDENCE_MANIFEST,
+import { PRODUCTION_EVIDENCE_MANIFEST,
   PRODUCTION_EVIDENCE_SNAPSHOT_BASE, evidenceSnapshotIdFromManifestUrl } from "../site/dag_data_config.mjs";
+import { AGENT_DEFAULT_PUBLICATION_ID, agentDataSelection } from "./default_data.mjs";
 import { browserV2ManifestLayout, validateBrowserV2EvidenceBinding } from "../site/dag_manifest.mjs";
 import { loadGroupingSchemaFolder } from "../site/grouping_schema_loader.mjs";
-import { canonicalFolderHash } from "../site/grouping_schema_writer.mjs";
+import { canonicalFolderHash, stableJson } from "../site/grouping_schema_writer.mjs";
 import { validateCompiledArtifact } from "../site/compiled_dag.mjs";
 import { validateGroupingSchema } from "../site/data_validation.mjs";
 import { pairKey } from "../site/dag_link_aggregation.mjs";
@@ -57,8 +58,42 @@ function publicClient() {
   });
 }
 
-export async function clonePublication({ publicationId = DEFAULT_SCHEMA_PUBLICATION_ID,
-  home = agentHome(), snapshotId = "", onProgress = () => {} } = {}) {
+// Materialize transport references as a canonical, self-contained local folder.
+export async function downloadSchemaFolder(baseUrl, manifest, publicationDir, expectedHash, fetchImpl = fetch) {
+  const references = manifest.group_membership_references || {};
+  const memberships = manifest.group_membership_files || {};
+  for (const groupId of Object.keys(references)) {
+    if (!memberships[groupId]) throw new Error(`Missing membership path for ${groupId}.`);
+  }
+  const referenceByPath = new Map();
+  for (const [groupId, reference] of Object.entries(references)) {
+    const url = new URL(reference, baseUrl);
+    if (url.origin !== new URL(baseUrl).origin || !url.pathname.startsWith("/storage/v1/object/public/published-schemas/")) {
+      throw new Error(`Invalid published membership reference for ${groupId}.`);
+    }
+    referenceByPath.set(memberships[groupId], url.href);
+  }
+  const logicalManifest = { ...manifest };
+  delete logicalManifest.group_membership_references;
+  const schemaFiles = new Map([["manifest.json", Buffer.from(stableJson(logicalManifest))]]);
+  const paths = [manifest.schema_file, manifest.groups_file, ...Object.values(memberships), manifest.rejected_file].filter(Boolean);
+  await eachLimited([...new Set(paths)], 4, async relative => {
+    safePath(publicationDir, relative);
+    const response = await fetchPublishedFile(referenceByPath.get(relative) || new URL(relative, baseUrl).href, undefined, fetchImpl);
+    if (!response.ok) throw new Error(`Could not download publication file ${relative}.`);
+    schemaFiles.set(relative, Buffer.from(await response.arrayBuffer()));
+  });
+  if (await canonicalFolderHash(schemaFiles) !== expectedHash) throw new Error("Published schema hash mismatch.");
+  await eachLimited([...schemaFiles], 4, async ([relative, bytes]) => {
+    const path = safePath(publicationDir, relative);
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, bytes);
+  });
+}
+
+export async function clonePublication(options = {}) {
+  const { home = agentHome(), onProgress = () => {} } = options;
+  const { publicationId, snapshotId } = agentDataSelection(options);
   if (!ID.test(publicationId)) throw new Error("Invalid publication ID.");
   const client = publicClient();
   const publication = await lookupPublishedSchema(publicationId, client);
@@ -98,9 +133,8 @@ export async function clonePublication({ publicationId = DEFAULT_SCHEMA_PUBLICAT
   const schemaManifestResponse = await fetchPublishedFile(publicUrl("manifest.json"), undefined, fetch);
   if (!schemaManifestResponse.ok) throw new Error("Could not download publication manifest.");
   const schemaManifest = JSON.parse(await schemaManifestResponse.text());
-  const paths = ["manifest.json", schemaManifest.schema_file, schemaManifest.groups_file,
-    ...Object.values(schemaManifest.group_membership_files || {}), schemaManifest.rejected_file,
-    publication.compiled_manifest_path].filter(Boolean);
+  await downloadSchemaFolder(baseUrl, schemaManifest, publicationDir, publication.content_hash);
+  const paths = [publication.compiled_manifest_path].filter(Boolean);
   const compiledManifestResponse = await fetchPublishedFile(publicUrl(publication.compiled_manifest_path), undefined, fetch);
   if (!compiledManifestResponse.ok) throw new Error("Could not download compiled manifest.");
   const compiledManifestBytes = Buffer.from(await compiledManifestResponse.arrayBuffer());
@@ -109,7 +143,6 @@ export async function clonePublication({ publicationId = DEFAULT_SCHEMA_PUBLICAT
   }
   const compiledManifest = JSON.parse(compiledManifestBytes.toString("utf8"));
   paths.push(compiledManifest.artifacts?.dag?.path);
-  const schemaFiles = new Map();
   await eachLimited([...new Set(paths.filter(Boolean))], 4, async relative => {
     const response = await fetchPublishedFile(publicUrl(relative), undefined, fetch);
     if (!response.ok) throw new Error(`Could not download publication file ${relative}.`);
@@ -117,9 +150,7 @@ export async function clonePublication({ publicationId = DEFAULT_SCHEMA_PUBLICAT
     const path = safePath(publicationDir, relative);
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, bytes);
-    if (!relative.startsWith("compiled/")) schemaFiles.set(relative, bytes);
   });
-  if (await canonicalFolderHash(schemaFiles) !== publication.content_hash) throw new Error("Published schema hash mismatch.");
   const localFetch = async url => {
     try { return new Response(await readFile(new URL(url)), { status: 200 }); }
     catch { return new Response("Missing local schema file", { status: 404 }); }
@@ -131,7 +162,7 @@ export async function clonePublication({ publicationId = DEFAULT_SCHEMA_PUBLICAT
   return { publication, schema, compiledDag, snapshotId: selectedId, snapshotDir, publicationDir };
 }
 
-export async function openLocalPublication(publicationId = DEFAULT_SCHEMA_PUBLICATION_ID, home = agentHome()) {
+export async function openLocalPublication(publicationId = AGENT_DEFAULT_PUBLICATION_ID, home = agentHome()) {
   if (!ID.test(publicationId)) throw new Error("Invalid publication ID.");
   const publicationDir = join(home, "publications", publicationId);
   const { publication, snapshotId } = JSON.parse(await readFile(join(publicationDir, "publication.json"), "utf8"));
