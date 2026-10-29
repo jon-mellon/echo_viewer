@@ -1,6 +1,6 @@
 /**
  * The data the agent uses when nothing is chosen: the combined 100k + socsci publication and snapshot that the
- * Echo UI defaults to (see DEFAULT_DATA_PUBLICATION and DEFAULT_DATA_SNAPSHOT in deploy-staging.yml).
+ * Echo UI defaults to (see site/dag_data_config.mjs).
  * Override with ECHO_AGENT_PUBLICATION and ECHO_AGENT_SNAPSHOT.
  */
 export const AGENT_DEFAULT_PUBLICATION_ID = process.env.ECHO_AGENT_PUBLICATION || "0d7bdf95-3f02-4e72-8629-e6d456434ad5";

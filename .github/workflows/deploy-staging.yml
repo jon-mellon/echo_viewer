@@ -34,9 +34,6 @@ jobs:
 
       - name: Build Echo
         run: npm run build:site
-        env:
-          DEFAULT_DATA_PUBLICATION: 0d7bdf95-3f02-4e72-8629-e6d456434ad5
-          DEFAULT_DATA_SNAPSHOT: 8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849
 
       - name: Install profiling browser
         run: npx playwright install --with-deps chromium
