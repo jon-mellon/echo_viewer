@@ -107,7 +107,13 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionTitle.textContent = draft.mode === "edit" ? "Edit split"
       : draft.role === "candidate" ? "Define new variable" : `Define new ${draft.role.toUpperCase()}`;
     els.definitionMethodStep.hidden = draft.step !== "sources" || Boolean(state.definitionMethod);
-    els.definitionSourcesStep.hidden = draft.step !== "sources" || !state.definitionMethod;
+    const aiSetup = state.definitionMethod === "jev" && !state.definitionAiReady;
+    els.definitionAiSetupStep.hidden = draft.step !== "sources" || !aiSetup;
+    els.definitionSourcesStep.hidden = draft.step !== "sources" || !state.definitionMethod || aiSetup;
+    const setupHost = draft.step === "sources" ? els.definitionAiSetupHost : els.definitionJevPanel;
+    if (els.definitionAiSetup.parentElement !== setupHost) setupHost.prepend(els.definitionAiSetup);
+    els.definitionAiWork.hidden = aiSetup;
+    els.definitionAiResults.hidden = aiSetup;
     els.definitionChosenMethod.textContent = state.definitionMethod === "manual" ? "Sort manually"
       : state.definitionMethod === "browse" ? "Browse user splits" : "Classify with AI";
     els.definitionPartitionStep.hidden = draft.step !== "partition";

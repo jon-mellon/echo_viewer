@@ -44,7 +44,7 @@ async function keySettingsUrl(key) {
 }
 
 export function createDefinitionJevAssist({ elements: els, getDraft, getVariable, onApply,
-  onPreviewChange = () => {}, persistDraft }) {
+  onPreviewChange = () => {}, onConnectionChange = () => {}, getReturnUrl = () => location.href, persistDraft }) {
   let key = null;
   let keyInfo = null;
   let pricing = null;
@@ -385,6 +385,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   async function checkKey(signal) {
     if (!key) return false;
     keyInfo = null;
+    onConnectionChange(false);
     render();
     const body = await openRouterJson("/api/v1/key", key, { signal });
     keyInfo = body.data;
@@ -399,6 +400,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     if (signal?.aborted) return false;
     message = problem || `Connected. This key has a $${keyInfo.limit} non-resetting cap and $${Number(keyInfo.limit_remaining).toFixed(2)} remaining.`;
     render();
+    onConnectionChange(!problem);
     return !problem;
   }
 
@@ -411,7 +413,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     sessionStorage.setItem(OAUTH_DRAFT_KEY, JSON.stringify(getDraft()));
     persistDraft();
     const url = new URL("https://openrouter.ai/auth");
-    const callback = new URL(location.href);
+    const callback = new URL(getReturnUrl());
     callback.searchParams.delete("code");
     callback.searchParams.delete("state");
     // Keep the exact viewer URL locally as a fallback. OpenRouter normally
@@ -466,6 +468,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       key = null;
       message = `Could not connect OpenRouter: ${error.message}`;
       render();
+      onConnectionChange(false);
     }
   }
 
@@ -623,6 +626,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     });
     els.definitionAiDisconnect.addEventListener("click", () => {
       key = null; keyInfo = null; pricing = null;
+      onConnectionChange(false);
       message = "Disconnected from OpenRouter in this tab. You can revoke the key in OpenRouter.";
       clearPreview({ keepCheckpoint: true });
     });
