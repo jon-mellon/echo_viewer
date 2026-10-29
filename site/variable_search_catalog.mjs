@@ -14,6 +14,15 @@ export function variableSearchPayload(variables, snapshotId) {
       normalize(v.display_label || v.concept_label), normalize(v.concept_label), Number(v.index)]) };
 }
 
+async function variableSearchPayloadInBatches(variables, snapshotId) {
+  const records = [];
+  for (let start = 0; start < variables.length; start += 1000) {
+    records.push(...variableSearchPayload(variables.slice(start, start + 1000), snapshotId).records);
+    if (start + 1000 < variables.length) await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  return { format: "echo-variable-search-v1", evidence_snapshot: snapshotId, records };
+}
+
 const normalize = value => String(value ?? "").trim().toLowerCase();
 
 export async function readSearchCatalogPayload(url, fetchImpl = globalThis.fetch) {
@@ -64,7 +73,7 @@ export class StaticVariableSearchCatalog {
     const staticAvailable = url && typeof DecompressionStream === "function";
     const loadPayload = staticAvailable
       ? (typeof Worker === "function" && fetchImpl === globalThis.fetch ? onRecords => loadCatalogInWorker(url, snapshotId, onRecords) : null)
-      : async () => variableSearchPayload(await loadRecords(), snapshotId);
+      : async () => variableSearchPayloadInBatches(await loadRecords(), snapshotId);
     return this.load(staticAvailable ? url : "", fetchImpl, loadPayload);
   }
 

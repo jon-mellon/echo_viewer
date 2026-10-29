@@ -153,8 +153,16 @@ export class ParquetManifestDagDataSource {
     const canonical = this.canonicalEvidenceRelationUrl("variable_occurrences");
     const urls = canonical ? [canonical] : this.browserUrls(this.browserLayout.variables);
     const quoted = urls.map(url => `'${url.replaceAll("'", "''")}'`).join(",");
-    return queryRows(this.connection, `SELECT variable_id, display_label, concept_label,
+    const result = await this.connection.query(`SELECT variable_id, display_label, concept_label,
       raw_variable_text, paper_id, uoa, index FROM read_parquet([${quoted}]) ORDER BY index`);
+    const rows = [];
+    // Arrow materialization of a large snapshot can monopolize the UI thread.
+    // Yield between record batches while preserving the query's stable order.
+    for (const batch of result.batches) {
+      rows.push(...plainRows(batch));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    return rows;
   }
 
   async loadVariableMetadata(variableIds, layoutSource = "", { mapOnly = false } = {}) {
