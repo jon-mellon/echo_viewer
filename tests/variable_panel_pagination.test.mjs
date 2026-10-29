@@ -164,3 +164,29 @@ test("Variables list opens the shared split editor for editable groups", () => {
     globalThis.document = previousDocument;
   }
 });
+
+test("a saved split outside the graph is shown on its page and remains accessible", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName) };
+  try {
+    const groups = Array.from({ length: 21 }, (_, index) => ({
+      group_id: `g${index}`, label: `Variable ${String(index).padStart(2, "0")}`, variable_ids: [`v${index}`],
+    }));
+    const state = { interfaceMode: "dag2", project: { groups, iv_group_id: "g0", dv_group_id: "g1" },
+      componentGroupIds: new Set(groups.slice(0, 20).map(group => group.group_id)),
+      pendingVariablePanelGroupId: "g20" };
+    const elements = { variablePanel: new Element("section"), variablePanelCount: new Element("span"),
+      variablePanelList: new Element("div"), variablePanelPagination: new Element("div") };
+    const controller = createDagSetupGroupController({ state, elements,
+      groupById: id => groups.find(group => group.group_id === id), canEditSplit: group => group.group_id === "g20" });
+    controller.renderVariablePanel();
+    assert.equal(elements.variablePanelCount.textContent, "21");
+    assert.match(elements.variablePanelPagination.textContent, /21–21 of 21/);
+    assert.equal(elements.variablePanelList.findAll("details")[0].dataset.groupId, "g20");
+    elements.variablePanelPagination.findAll("button")[0].click();
+    assert.match(elements.variablePanelPagination.textContent, /11–20 of 21/);
+    assert.equal(state.pendingVariablePanelGroupId, null);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});

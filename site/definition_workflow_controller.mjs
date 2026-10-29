@@ -380,6 +380,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       state.selectedVariableIds.clear();
       state.activeGroupId = null;
       state.focusedGroupId = newGroupId;
+      if (draft.role === "candidate") state.pendingVariablePanelGroupId = newGroupId;
       const initialAnchor = draft.mode !== "edit" && !state.changingAnchorSide;
       state.phase = initialAnchor && draft.role === "iv" ? "select_dv"
         : initialAnchor && draft.role === "dv" ? "select_instrument" : "build";

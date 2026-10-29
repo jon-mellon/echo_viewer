@@ -225,7 +225,7 @@ export function createDagSetupGroupController({
     elements.variablePanel.hidden = !show;
     if (!show) return;
     const groups = (project?.groups || []).filter(group =>
-      state.componentGroupIds?.has(group.group_id) && isDagDisplayGroup(group))
+      (state.componentGroupIds?.has(group.group_id) || canEditSplit(group)) && isDagDisplayGroup(group))
       .sort((a, b) => (a.label || a.group_id).localeCompare(b.label || b.group_id));
     elements.variablePanelCount.textContent = String(groups.length);
     for (const detail of elements.variablePanelList.querySelectorAll("details[data-group-id]")) {
@@ -233,6 +233,11 @@ export function createDagSetupGroupController({
       else expandedVariableIds.delete(detail.dataset.groupId);
     }
     variablePage = Math.min(variablePage, Math.max(0, Math.ceil(groups.length / variablePageSize) - 1));
+    if (state.pendingVariablePanelGroupId) {
+      const index = groups.findIndex(group => group.group_id === state.pendingVariablePanelGroupId);
+      if (index >= 0) variablePage = Math.floor(index / variablePageSize);
+      state.pendingVariablePanelGroupId = null;
+    }
     const start = variablePage * variablePageSize;
     const scrollTop = elements.variablePanelList.scrollTop;
     conceptHosts.clear();
