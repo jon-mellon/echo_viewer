@@ -24,7 +24,8 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await page.locator("#definitionChangeMethod").click();
   await page.locator("#definitionChooseManual").click();
   await expect(page.locator("body")).not.toHaveClass(/defining-variable/);
-  await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
+  // Initial setup uses the full viewport until both anchors are selected.
+  await expect(page.locator("#dagWorkspaceSection")).toBeHidden();
 
   const usable = page.locator("#definitionSourceList input[data-source-id]");
   await expect(usable.nth(1)).toBeVisible();
