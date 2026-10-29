@@ -131,3 +131,32 @@ test("a newer path filter supersedes a dense graph while installation is pending
   expect(state.length).toBe(1);
   expect(state.actual).toEqual(state.expected);
 });
+
+test("a reason being typed survives the inspector rebuilding as sources arrive", async ({ page }) => {
+  test.setTimeout(90000);
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}`);
+  await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
+    && window.__dagBuilderState?.project && document.getElementById("startupLoading")?.hidden);
+  await completeSetup(page);
+  await page.locator('button[data-mobile-panel="dag"]').click();
+  const edgeId = await page.evaluate(async () => {
+    const { whenDagRendered, renderedDagEdgeIds } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    await whenDagRendered();
+    return renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__");
+  });
+  expect(edgeId).toBeTruthy();
+  await page.evaluate(async id => { (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).inspectDagEdge(id); }, edgeId);
+  await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
+  await page.keyboard.type("Selection on ");
+  // The same rebuild that follows a source or label load: it replaces the panel while the box has focus.
+  await page.evaluate(async id => { (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).inspectDagEdge(id); }, edgeId);
+  await page.keyboard.type("an unobserved trait");
+  const box = page.locator("#excludeReasonInput");
+  await expect(box).toHaveValue("Selection on an unobserved trait");
+  await expect(box).toBeFocused();
+  await page.locator("#excludeConfirmBtn").click();
+  await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
+  expect(await page.evaluate(id => window.__dagBuilderState.project.link_decisions[id].exclude_reason, edgeId))
+    .toBe("Selection on an unobserved trait");
+});
