@@ -42,9 +42,16 @@ function candidateContext(project, { variables, similarityEdgeMap, linkLookup })
   }
   const iv = project.groups.find(g => g.group_id === project.iv_group_id);
   const dv = project.groups.find(g => g.group_id === project.dv_group_id);
+  // All proximity comparisons within this calculation use the same group
+  // memberships and variable positions. Compute each centroid only once.
+  const centroids = new Map();
+  const groupCentroid = group => {
+    if (!centroids.has(group)) centroids.set(group, centroid(group.variable_ids, variables));
+    return centroids.get(group);
+  };
   const groupSites = project.groups
     .filter(group => group.variable_ids?.length)
-    .map(group => ({ id: group.group_id, ...centroid(group.variable_ids, variables) }));
+    .map(group => ({ id: group.group_id, ...groupCentroid(group) }));
   const groupCells = computeVoronoiCells(groupSites);
   const targetOwners = new Set([iv, dv]
     .filter(Boolean)
@@ -68,8 +75,8 @@ function candidateContext(project, { variables, similarityEdgeMap, linkLookup })
     },
     groupCoherence: ids => groupCoherence(ids, similarityEdgeMap),
     groupProximity: (g, x, y) => Math.min(
-      distance(centroid(g.variable_ids, variables), centroid(x.variable_ids, variables)),
-      distance(centroid(g.variable_ids, variables), centroid(y.variable_ids, variables))),
+      distance(groupCentroid(g), groupCentroid(x)),
+      distance(groupCentroid(g), groupCentroid(y))),
     isNearTarget: group => nearTargetGroupIds.has(group.group_id),
   };
 }
