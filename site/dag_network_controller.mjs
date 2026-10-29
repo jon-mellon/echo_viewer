@@ -355,7 +355,7 @@ function rememberGeometry(key, geometry) {
   if (_dagGeometryCache.size > 8) _dagGeometryCache.delete(_dagGeometryCache.keys().next().value);
 }
 
-async function renderDag({ reuseGeometry = false } = {}) {
+async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } = {}) {
   // Data loading and filtering continue during setup, but there is no graph to
   // lay out until both study variables have been chosen.
   const hasAnchor = id => {
@@ -385,7 +385,7 @@ async function renderDag({ reuseGeometry = false } = {}) {
   const links = state.visibleLinks.filter((link) => !link.is_target_relation
     && nextGroupIds.has(link.group_a) && nextGroupIds.has(link.group_b));
   if (reuseGeometry && !_dagRenderWorker && _dagApplyingRequest === null && _visNetwork) {
-    const reused = reuseDagGeometry(_dagGeometry, groups, links);
+    const reused = reuseDagGeometry(_dagGeometry, groups, links, { allowRemovedGroups });
     if (reused) {
       applyReusedDagRender(groups, reused.layout, reused.routes);
       resolveRendered();
@@ -594,6 +594,21 @@ function applyReusedDagRender(groups, layout, routes) {
   if (removeNodeIds.length) _visNodes.remove(removeNodeIds);
   for (const id of removeNodeIds) _dagNodeDataById.delete(id);
   for (const [id] of removed) _dagEdgeSegments.delete(id);
+
+  // A group that stopped qualifying is hidden; one that qualifies again returns at its old position.
+  const wantedGroupIds = new Set(groups.map(group => group.group_id));
+  const goneGroupIds = (_visNodes.getIds() || []).filter(id => !String(id).startsWith("__route__") && !wantedGroupIds.has(id));
+  if (goneGroupIds.length) {
+    _visNodes.remove(goneGroupIds);
+    for (const id of goneGroupIds) _dagNodeDataById.delete(id);
+  }
+  const shownGroupIds = new Set(_visNodes.getIds());
+  const returning = groups.filter(group => !shownGroupIds.has(group.group_id))
+    .map(group => visNodeData(group, layout.positions.get(group.group_id), layout.params));
+  if (returning.length) {
+    _visNodes.add(returning);
+    for (const node of returning) _dagNodeDataById.set(node.id, node);
+  }
 
   const rendered = new Set(_dagEdgeSegments.values());
   const additions = routes.filter(route => !rendered.has(route.link.edge_id));

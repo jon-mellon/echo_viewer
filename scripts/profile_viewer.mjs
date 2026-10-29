@@ -32,7 +32,6 @@ const scenarioBudgets = {
   "select DV": 1000,
   "DAG layout: auto": 750,
   "DAG zoom": 500,
-  "unfiltered view": 1000,
   "exclude edge promptly": 750,
   "settle graph after exclusion": 300,
   "restore edge": 750,
@@ -401,13 +400,14 @@ try {
     await page.locator("#dagSvgZoomIn").click();
   });
   await page.locator(".filter-dropdown > summary").click();
-  await measure("unfiltered view", async () => {
-    await page.locator("#showUnfiltered").click();
-  });
   const edgeId = await page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
     await whenDagRendered();
-    return renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__");
+    // A causally relevant edge: one that links a confounder to the exposure or the outcome. Excluding it can remove
+    // the confounder from the view, which is the case where the graph must stay put instead of being laid out again.
+    const { iv_group_id: iv, dv_group_id: dv } = window.__dagBuilderState.project;
+    const edges = renderedDagEdgeIds().filter(id => id !== "__study_design_iv_to_dv__");
+    return edges.find(id => { const ends = id.split("__"); return ends.includes(iv) !== ends.includes(dv) && !ends.includes("__study_design_iv_to_dv__"); }) || edges[0];
   });
   if (!edgeId) throw new Error("No evidence edge is visible to test Exclude");
   await page.evaluate(async id => {
@@ -473,8 +473,8 @@ try {
   await waitForGraph();
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   for (const [name, id, stateKey] of [
-    ["confounders filter", "toggleConfoundersOnly", "showConfoundersOnly"],
     ["colliders filter", "toggleCollidersOnly", "showCollidersOnly"],
+    ["confounders filter", "toggleConfoundersOnly", "showConfoundersOnly"],
     ["bottleneck filter", "toggleBottleneckedConfounders", "excludeBottleneckedConfounders"],
     ["path links filter", "toggleIrrelevantConfounderLinks", "hideIrrelevantConfounderLinks"],
   ]) {
@@ -554,7 +554,6 @@ try {
       "close variable definition": 299.52,
       "select IV": 249.6,
       "select DV": 249.6,
-      "unfiltered view": 249.6,
       "exclude edge promptly": 436.8,
       "restore edge": 400,
       "exclude edge": 299.52,

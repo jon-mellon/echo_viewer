@@ -28,7 +28,7 @@ test('diagnostic controls update the view without rebuilding or saving the proje
     }).installHandlers();
     for (const [id, event] of [
       ['toggleExclusionViolations', 'click'], ['toggleExogeneity', 'click'],
-      ['showUnfiltered', 'click'], ['toggleConfoundersOnly', 'click'],
+      ['toggleConfoundersOnly', 'click'],
       ['toggleCollidersOnly', 'click'], ['confounderPathLength', 'input'],
       ['toggleSparseEdges', 'click'], ['minimumEdgePapers', 'input'],
       ['toggleBottleneckedConfounders', 'click'], ['toggleIrrelevantConfounderLinks', 'click'],

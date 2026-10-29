@@ -105,6 +105,10 @@ export function applyPermalink(params, state) {
   if (state.showConfoundersOnly && state.showCollidersOnly) {
     state.showCollidersOnly = false;
   }
+  // There is no unfiltered view: a link that asks for no filter opens the confounders view.
+  if (!state.showConfoundersOnly && !state.showCollidersOnly && !state.showExclusionViolations && !state.showExogeneity) {
+    state.showConfoundersOnly = true;
+  }
   state.activeGroupId = resolveGroup(params.get("selected_group")) || null;
   state.selectedVariableId = params.get("selected_variable") || null;
   state.selectedEdgeId = params.get("selected_edge") || null;

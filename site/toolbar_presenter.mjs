@@ -1,12 +1,12 @@
 import { h, replaceChildren } from "./dom_builder.mjs";
 
 export function diagnosticViewTitle(state, anchorsReady) {
-  if (!anchorsReady) return "Unfiltered";
+  if (!anchorsReady) return "Working map";
   if (state.showExclusionViolations) return "Exclusion restriction";
   if (state.showExogeneity) return "Exogeneity";
   if (state.showConfoundersOnly) return "Confounders";
   if (state.showCollidersOnly) return "Colliders";
-  return "Unfiltered";
+  return "Confounders";
 }
 
 export function createToolbarPresenter({ state, elements, groupById, visibleVariables,
@@ -54,8 +54,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     elements.variableLayoutSelect.hidden = layoutSources.length < 2;
     if (includeCoverage) renderAssignmentCoverage();
     for (const [element, active] of [[elements.toggleVariableLabels, state.showVariableLabels],
-      [elements.toggleGroupLabels, state.showGroupLabels],
-      [elements.showUnfiltered, !state.showConfoundersOnly && !state.showCollidersOnly && !state.showExclusionViolations && !state.showExogeneity]]) {
+      [elements.toggleGroupLabels, state.showGroupLabels]]) {
       element.classList.toggle("active", active);
       element.setAttribute("aria-pressed", active ? "true" : "false");
     }
@@ -81,7 +80,6 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
       && state.project.instrument_group_id !== state.project.dv_group_id;
     elements.toggleConfoundersOnly.hidden = instrumentReady;
     elements.toggleCollidersOnly.hidden = instrumentReady;
-    elements.showUnfiltered.hidden = instrumentReady;
     elements.toggleExclusionViolations.hidden = !instrumentReady;
     elements.toggleExclusionViolations.disabled = !instrumentReady;
     elements.toggleExogeneity.hidden = !instrumentReady;

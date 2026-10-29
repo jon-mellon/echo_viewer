@@ -136,13 +136,6 @@ function installHandlers() {
     renderMapToolbarToggles();
     drawMap();
   });
-  els.showUnfiltered.addEventListener("click", () => {
-    state.showExclusionViolations = false;
-    state.showExogeneity = false;
-    state.showConfoundersOnly = false;
-    state.showCollidersOnly = false;
-    updateDagFilters();
-  });
   els.toggleConfoundersOnly.addEventListener("click", () => {
     state.showExclusionViolations = false;
     state.showExogeneity = false;

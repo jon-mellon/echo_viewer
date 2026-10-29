@@ -55,10 +55,10 @@ test("legacy layout links open with auto layout", () => {
   assert.equal(state.showCollidersOnly, false);
 });
 
-test("older causal links use one of the three available views", () => {
+test("older links that asked for no filter open the confounders view", () => {
   const state = { project: structuredClone(project), seeds: { iv: new Set(), dv: new Set() } };
   applyPermalink(new URLSearchParams("p=1&iv=cause&dv=outcome&causal=1&conf=0&coll=0"), state);
-  assert.equal(state.showConfoundersOnly, false);
+  assert.equal(state.showConfoundersOnly, true);
   assert.equal(state.showCollidersOnly, false);
 });
 
