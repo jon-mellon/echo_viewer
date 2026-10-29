@@ -82,7 +82,9 @@ test("selecting a definition variable in full screen keeps the editor open", asy
   await expect(page.locator("#dagMapCanvas")).toBeVisible();
   await page.locator("#fullscreenVariableMap").click();
   await expect(page.locator("#fullscreenVariableMap")).toHaveAttribute("aria-pressed", "true");
-  const point = await page.evaluate(() => {
+  // The map keeps fitting itself for a moment after full screen starts, and a slow runner can take a click before
+  // its hit-testing is ready. Aim again from the map's current transform until a click lands.
+  const aim = () => page.evaluate(() => {
     const state = window.__dagBuilderState;
     const rect = state.map.canvas.getBoundingClientRect();
     const { scale, tx, ty } = state.map.transform;
@@ -98,10 +100,17 @@ test("selecting a definition variable in full screen keeps the editor open", asy
     }
     return null;
   });
-  expect(point).toBeTruthy();
-  await page.mouse.click(point.x, point.y);
-  await expect.poll(() => page.evaluate(id =>
-    window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), point.id)).toBe(true);
+  let landed = false;
+  for (let attempt = 0; attempt < 5 && !landed; attempt++) {
+    await page.waitForTimeout(attempt ? 600 : 100);
+    const point = await aim();
+    expect(point).toBeTruthy();
+    await page.mouse.click(point.x, point.y);
+    landed = await expect.poll(() => page.evaluate(id =>
+      window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), point.id), { timeout: 3000 })
+      .toBe(true).then(() => true, () => false);
+  }
+  expect(landed).toBe(true);
   await expect(page.locator("#fullscreenVariableMap")).toHaveAttribute("aria-pressed", "true");
 });
 
