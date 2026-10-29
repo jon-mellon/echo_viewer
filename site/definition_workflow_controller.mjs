@@ -493,6 +493,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       }) : null;
     const draft = oauthDraft || state.definitionDraft || checkpointDraft;
     if (!draft || !["sources", "partition"].includes(draft.step) || !Array.isArray(draft.eligible_variable_ids)) return;
+    // A source-step draft is resumed here only when it belongs to the OAuth
+    // handoff. Startup may otherwise race with a newly opened manual draft.
+    if (draft.step === "sources" && !oauthDraft) return;
     state.definitionMethod = "jev";
     if (!draft.source_snapshot?.every(snap => {
       const current = groupById(snap.group_id);
