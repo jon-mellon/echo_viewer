@@ -415,6 +415,9 @@ try {
     if (!isDagEdgeRendered(id)) throw new Error("Chosen evidence edge is not rendered");
     inspectDagEdge(id);
   }, edgeId);
+  // Measure the exclusion itself, not a panel still rebuilding as the edge's sources and labels arrive.
+  await page.waitForFunction(() => !window.__dagBuilderState.pendingEdgeEvidence
+    && !document.querySelector("#edgeInspector .edge-sources-loading"));
   await measure("exclude edge promptly", async () => {
     await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
     await page.locator("#excludeReasonInput").fill("Profiling exclusion responsiveness");
@@ -472,9 +475,14 @@ try {
   // outside the following filter measurements.
   await waitForGraph();
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  // The confounders view is the default, so start from the colliders view: each filter below is then a real switch
+  // and the path length that follows is measured in the colliders view, as it always has been.
+  await page.locator("#toggleCollidersOnly").click();
+  await page.waitForFunction(() => window.__dagBuilderState.showCollidersOnly);
+  await waitForGraph();
   for (const [name, id, stateKey] of [
-    ["colliders filter", "toggleCollidersOnly", "showCollidersOnly"],
     ["confounders filter", "toggleConfoundersOnly", "showConfoundersOnly"],
+    ["colliders filter", "toggleCollidersOnly", "showCollidersOnly"],
     ["bottleneck filter", "toggleBottleneckedConfounders", "excludeBottleneckedConfounders"],
     ["path links filter", "toggleIrrelevantConfounderLinks", "hideIrrelevantConfounderLinks"],
   ]) {

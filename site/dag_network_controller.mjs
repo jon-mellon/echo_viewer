@@ -82,6 +82,7 @@ let _visNodes = null;
 let _visEdges = null;
 let _dagLayoutSignature = "";
 let _visOptionSignature = "";
+const DAG_INSTALL_SLICE = 1000;
 let _dagGeometry = null;
 let _dagBoundsCache = null;
 let _dagEdgeSegments = new Map();
@@ -542,9 +543,26 @@ async function applyDagRender(groups, layout, routes) {
       // A large filter transition replaces most route bends. Bind the complete
       // data once rather than repeatedly rebuilding adjacency as nodes and edges
       // are updated and removed. Preserve the Network instance and its handlers.
-      _visNodes = new visApi.DataSet(nodeData);
-      _visEdges = new visApi.DataSet(edgeData);
+      // Install it in slices with a turn for input between them: one bind of thousands of route bends and edges is a
+      // single task of a second or more on a phone.
+      els.dagNetwork.style.visibility = "hidden";
+      _visNodes = new visApi.DataSet();
+      _visEdges = new visApi.DataSet();
       _visNetwork.setData({ nodes: _visNodes, edges: _visEdges });
+      _dagApplyingRequest = requestId;
+      for (const [dataSet, rows] of [[_visNodes, nodeData], [_visEdges, edgeData]]) {
+        for (let at = 0; at < rows.length; at += DAG_INSTALL_SLICE) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+          if (requestId !== _dagRenderRequest) {
+            if (_dagApplyingRequest === requestId) _dagApplyingRequest = null;
+            // The network holds a partial install: forget what it holds so the next render rewrites all of it.
+            _dagNodeDataById = new Map();
+            return;
+          }
+          dataSet.add(rows.slice(at, at + DAG_INSTALL_SLICE));
+        }
+      }
+      if (_dagApplyingRequest === requestId) _dagApplyingRequest = null;
     } else {
       if (changedNodes.length) _visNodes.update(changedNodes);
       if (dropNodes.length) _visNodes.remove(dropNodes);
