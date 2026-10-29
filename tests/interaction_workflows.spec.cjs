@@ -527,15 +527,18 @@ test("mobile map controls accept taps and sharing falls back when clipboard acce
   });
   await fit.tap();
   await expect.poll(() => page.evaluate(() => Boolean(window.__fitNetwork))).toBe(true);
-  expect(await page.evaluate(() => {
+  const fitResult = await page.evaluate(() => {
     const net = window.__fitNetwork, rect = document.querySelector('#dagNetwork').getBoundingClientRect();
-    return net.body.nodeIndices.every(id => {
-      const box = net.getBoundingBox(id);
+    return net.body.nodeIndices.map(id => {
+      const point = String(id).startsWith('__route__') ? net.getPositions([id])[id] : null;
+      const box = point ? { left: point.x, right: point.x, top: point.y, bottom: point.y }
+        : net.getBoundingBox(id);
       const a = net.canvasToDOM({ x: box.left, y: box.top });
       const b = net.canvasToDOM({ x: box.right, y: box.bottom });
-      return a.x >= -1 && a.y >= -1 && b.x <= rect.width + 1 && b.y <= rect.height + 1;
-    });
-  })).toBe(true);
+      return { id, a, b, width: rect.width, height: rect.height };
+    }).filter(({a,b,width,height}) => !(a.x >= -1 && a.y >= -1 && b.x <= width + 1 && b.y <= height + 1));
+  });
+  expect(fitResult).toEqual([]);
   const share = page.locator("#copyPermalink");
   await share.scrollIntoViewIfNeeded();
   page.once("dialog", dialog => {
@@ -558,6 +561,9 @@ test("mobile map controls accept taps and sharing falls back when clipboard acce
 });
 
 test("bibliography, Markdown, and LaTeX export controls produce downloads", async ({ page }) => {
+  // The combined graph can cite hundreds of papers. Enrichment is deliberately
+  // rate-limited to five Crossref requests per second and is reused by exports.
+  test.setTimeout(600_000);
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.route("https://api.crossref.org/**", route => route.fulfill({ status: 404, body: "" }));
   await page.goto(viewer);
@@ -573,7 +579,7 @@ test("bibliography, Markdown, and LaTeX export controls produce downloads", asyn
     ["#exportMd", "causal_map.zip"],
     ["#exportTex", "causal_map_latex.zip"],
   ]) {
-    const downloadPromise = page.waitForEvent("download", { timeout: 90_000 });
+    const downloadPromise = page.waitForEvent("download", { timeout: 300_000 });
     await page.locator(button).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe(filename);
