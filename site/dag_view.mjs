@@ -15,6 +15,11 @@ export function excludedForConnectivity(link) {
   return link.display_status === "excluded" && !link.is_target_relation;
 }
 
+// Diagnostic results depend on the graph and path settings, not the selected
+// view. Reuse them when switching views, while checking the graph contents so
+// in-place project edits cannot leave stale results behind.
+let diagnosticCache;
+
 export function deriveDagView({
   groups = [],
   links = [],
@@ -53,18 +58,28 @@ export function deriveDagView({
     excludeBottlenecked,
     traversableLink,
   };
-  const confounderGraph = filterGraphByConfounders(fullGraph, diagnosticOptions);
-  const colliderGraph = filterGraphByColliders(fullGraph, diagnosticOptions);
-  const exclusionGraph = filterGraphByExclusionViolations(fullGraph, {
-    instrumentId, ivId, dvId, maxPathLength: exclusionMaxPathLength, traversableLink,
-  });
-  const exogeneityGraph = filterGraphByConfounders(fullGraph, {
-    ...diagnosticOptions, ivId: instrumentId,
-  });
-  if (instrumentId && fullGraph.nodeIds.has(instrumentId) && fullGraph.nodeIds.has(ivId)) {
-    exogeneityGraph.nodeIds.add(ivId);
-    exogeneityGraph.metadata.pathIds.add(ivId);
+  const cacheKey = !excludeSparseEdges && JSON.stringify([
+    [...fullGraph.nodeIds], retainedLinks, ivId, dvId, instrumentId,
+    maxPathLength, exclusionMaxPathLength, excludeBottlenecked,
+  ]);
+  let diagnostics = cacheKey && diagnosticCache?.key === cacheKey ? diagnosticCache.value : null;
+  if (!diagnostics) {
+    const confounderGraph = filterGraphByConfounders(fullGraph, diagnosticOptions);
+    const colliderGraph = filterGraphByColliders(fullGraph, diagnosticOptions);
+    const exclusionGraph = filterGraphByExclusionViolations(fullGraph, {
+      instrumentId, ivId, dvId, maxPathLength: exclusionMaxPathLength, traversableLink,
+    });
+    const exogeneityGraph = filterGraphByConfounders(fullGraph, {
+      ...diagnosticOptions, ivId: instrumentId,
+    });
+    if (instrumentId && fullGraph.nodeIds.has(instrumentId) && fullGraph.nodeIds.has(ivId)) {
+      exogeneityGraph.nodeIds.add(ivId);
+      exogeneityGraph.metadata.pathIds.add(ivId);
+    }
+    diagnostics = { confounderGraph, colliderGraph, exclusionGraph, exogeneityGraph };
+    diagnosticCache = cacheKey ? { key: cacheKey, value: diagnostics } : null;
   }
+  const { confounderGraph, colliderGraph, exclusionGraph, exogeneityGraph } = diagnostics;
   const canFilterFromIv = filterByCausalRelevance && fullGraph.nodeIds.has(ivId);
   const anchorsReady = fullGraph.nodeIds.has(ivId) && fullGraph.nodeIds.has(dvId) && ivId !== dvId;
 
@@ -97,9 +112,9 @@ export function deriveDagView({
     filterByCausalRelevance: canFilterFromIv,
     componentGroupIds,
     visibleLinks: visibleGraph.links,
-    confounders: confounderGraph.metadata,
-    colliders: colliderGraph.metadata,
-    exclusionViolations: exclusionGraph.metadata,
-    exogeneity: exogeneityGraph.metadata,
+    confounders: structuredClone(confounderGraph.metadata),
+    colliders: structuredClone(colliderGraph.metadata),
+    exclusionViolations: structuredClone(exclusionGraph.metadata),
+    exogeneity: structuredClone(exogeneityGraph.metadata),
   };
 }
