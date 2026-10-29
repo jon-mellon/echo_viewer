@@ -416,6 +416,9 @@ export function createDagSetupGroupController({
   }
 
   function renderGroupList() {
+    // DAG2 always hides the legacy group list; avoid rebuilding its DOM on
+    // every diagnostic filter change. A mode change renders it again.
+    if (state.interfaceMode === "dag2") return;
     const model = groupListModel.buildGroupListModel(dagProjectView ? dagProjectView() : state.project, { candidateQueue: state.candidateQueue,
       sort: state.groupListSort, activeGroupId: state.activeGroupId, roleLabels });
     if (elements.groupListCount) elements.groupListCount.textContent = model.countText;
