@@ -172,6 +172,37 @@ test("Variables list definition and split editing are reachable on desktop and m
   await page.locator("#definitionCancel").click();
 });
 
+test("OpenRouter returns to the variable picker with the current anchors", async ({ page }) => {
+  await page.route("https://openrouter.ai/auth?**", async route => {
+    const auth = new URL(route.request().url());
+    const callback = new URL(auth.searchParams.get("callback_url"));
+    callback.searchParams.set("code", "test-code");
+    callback.searchParams.set("state", auth.searchParams.get("state"));
+    await route.fulfill({ status: 302, headers: { location: callback.href } });
+  });
+  await page.route("https://openrouter.ai/api/**", async route => {
+    const headers = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "authorization, content-type" };
+    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    const url = route.request().url();
+    const body = url.endsWith("/auth/keys") ? { key: "sk-or-test" }
+      : url.endsWith("/v1/key") ? { data: { limit: 5, limit_reset: null, limit_remaining: 5 } }
+        : { data: { pricing: { prompt: "0.000000042", completion: "0", request: "0" } } };
+    await route.fulfill({ headers, contentType: "application/json", body: JSON.stringify(body) });
+  });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20 && window.__dagBuilderState?.publishedSchemaHydrated);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
+  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator("#variableDefineNew").click();
+  await page.locator("#definitionChooseJev").click();
+  await page.locator("#definitionAiConnect").click();
+  await expect(page.locator("#definitionSourcesStep")).toBeVisible();
+  await expect(page.locator("#definitionTitle")).toHaveText("Define new variable");
+  expect(await page.evaluate(() => [window.__dagBuilderState.definitionDraft.role, window.__dagBuilderState.project.iv_group_id, window.__dagBuilderState.project.dv_group_id])).toEqual(["candidate", ...anchors]);
+});
+
 test("a new variable can be defined through the mobile controls", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await page.addInitScript(() => {
@@ -368,19 +399,21 @@ for (const device of [
         && window.__dagBuilderState?.publishedSchemaHydrated);
       await page.locator("#ivGroupPicker [data-define-side=iv]").click();
       await page.locator("#definitionChooseJev").click();
+      await expect(page.locator("#definitionAiSetupStep")).toBeVisible();
+      await expect(page.locator("#definitionSourcesStep")).toBeHidden();
+      await page.locator("#definitionAiConnect").click();
+      await expect(page.locator("#definitionAiSetupStep")).toBeVisible();
+      await expect(page.locator("#definitionAiStatus")).toContainText("Lower its limit to $5");
+      await expect(page.locator("#definitionSourcesStep")).toBeHidden();
+      limit = 5;
+      await page.locator("#definitionAiRecheck").click();
+      await expect(page.locator("#definitionSourcesStep")).toBeVisible();
       await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
       await page.locator("#definitionContinue").click();
       await expect(page.locator("#definitionPartitionStep")).toBeVisible();
       await expect(page.locator("#definitionJevPanel")).toBeVisible();
       await expect(page.locator("#definitionManualPanel")).toBeHidden();
       await page.locator("#definitionAiDescription").fill("School based measures of academic achievement");
-      await page.locator("#definitionAiConnect").click();
-      await expect(page.locator("#definitionPartitionStep")).toBeVisible();
-      await expect(page.locator("#definitionAiDescription")).toHaveValue("School based measures of academic achievement");
-      await expect(page.locator("#definitionAiStatus")).toContainText("Lower its limit to $5");
-      await expect(page.locator("#definitionAiRun")).toBeDisabled();
-      limit = 5;
-      await page.locator("#definitionAiRecheck").click();
       await expect(page.locator("#definitionAiRun")).toBeEnabled();
       await expect(page.locator("#definitionAiCost")).toContainText("Estimated test (24): $");
       await expect(page.locator("#definitionAiCost")).toContainText("estimated remaining full run");
@@ -539,11 +572,12 @@ test("Jev test and full split resume saved batches after failure and reload", as
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();
     await page.locator("#definitionChooseJev").click();
+    await page.locator("#definitionAiConnect").click();
+    await expect(page.locator("#definitionSourcesStep")).toBeVisible();
     await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
     await page.locator("#definitionContinue").click();
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
     await page.locator("#definitionAiDescription").fill("School and college academic achievement");
-    await page.locator("#definitionAiConnect").click();
     await expect(page.locator("#definitionAiRun")).toBeEnabled();
     await page.locator("#definitionAiRun").click();
     await expect(page.locator("#definitionAiStatus")).toContainText("Test paused");
@@ -551,8 +585,8 @@ test("Jev test and full split resume saved batches after failure and reload", as
     const failedTestBatch = requestedBatches[1];
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
-    await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/24 saved)");
     await page.locator("#definitionAiConnect").click();
+    await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/24 saved)");
     await expect(page.locator("#definitionAiRun")).toBeEnabled();
     await page.locator("#definitionAiRun").click();
     await expect(page.locator("#definitionAiFullRun")).toBeVisible();
@@ -575,9 +609,8 @@ test("Jev test and full split resume saved batches after failure and reload", as
     expect(decisions).toBe(5);
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
-    await expect(page.locator("#definitionAiFullRun")).toContainText("Resume full split (16/");
-    await expect(page.locator("#definitionAiRun")).toBeDisabled();
     await page.locator("#definitionAiConnect").click();
+    await expect(page.locator("#definitionAiFullRun")).toContainText("Resume full split (16/");
     await expect(page.locator("#definitionAiFullRun")).toBeEnabled();
     await page.locator("#definitionAiFullRun").click();
     await expect(page.locator("#definitionAiApply")).toBeVisible();
@@ -641,10 +674,11 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();
     await page.locator("#definitionChooseJev").click();
+    await page.locator("#definitionAiConnect").click();
+    await expect(page.locator("#definitionSourcesStep")).toBeVisible();
     await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
     await page.locator("#definitionContinue").click();
     await page.locator("#definitionAiDescription").fill("School and college academic achievement");
-    await page.locator("#definitionAiConnect").click();
     await expect(page.locator("#definitionAiRun")).toBeEnabled();
     await page.locator("#definitionAiRun").click();
     await expect(page.locator("#definitionAiStatus")).toContainText("requesting variables 1–16 of 24");

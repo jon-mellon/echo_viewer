@@ -5,7 +5,7 @@ import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
 import { browsePublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
-  invalidateMapCaches, renderAll, drawMap = () => {}, renderAssignmentCoverage = () => {}, setMapMode, fitMap, groupById, persistProjectLocally,
+  invalidateMapCaches, renderAll, drawMap = () => {}, renderAssignmentCoverage = () => {}, setMapMode, fitMap, groupById, persistProjectLocally, getReturnUrl = () => location.href,
   visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails = async () => {}, hydrateNeighbors = async () => {},
@@ -426,6 +426,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     els.definitionChooseManual.addEventListener("click", () => chooseInitialMethod("manual"));
     els.definitionChooseBrowse.addEventListener("click", () => chooseInitialMethod("browse"));
     els.definitionChangeMethod.addEventListener("click", () => chooseInitialMethod(null));
+    els.definitionAiChangeMethod.addEventListener("click", () => chooseInitialMethod(null));
     const chooseMethod = method => {
       if (state.definitionDraft?.step !== "partition" || state.definitionMethod === method) return;
       state.definitionMethod = method;
@@ -491,7 +492,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         return null;
       }) : null;
     const draft = oauthDraft || state.definitionDraft || checkpointDraft;
-    if (!draft || draft.step !== "partition" || !Array.isArray(draft.eligible_variable_ids)) return;
+    if (!draft || !["sources", "partition"].includes(draft.step) || !Array.isArray(draft.eligible_variable_ids)) return;
     state.definitionMethod = "jev";
     if (!draft.source_snapshot?.every(snap => {
       const current = groupById(snap.group_id);
@@ -501,6 +502,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       state.definitionDraft = draft;
       state.selectedVariableIds = new Set(draft.new_variable_ids || []);
     }
+    if (draft.step === "sources") { renderDraft(); return; }
     try { await hydrateVariableDetails(draft.eligible_variable_ids); }
     catch (error) { console.warn("Could not reload all split variable details.", error); }
     invalidateMapCaches();
@@ -524,8 +526,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   const jevAssist = createDefinitionJevAssist({ elements: els,
     getDraft: () => state.definitionDraft,
     getVariable: id => clusterDisplayVariable(id) || state.variableById.get(id),
-    persistDraft: persistProjectLocally,
-    renderDraft,
+    persistDraft: persistProjectLocally, getReturnUrl,
+    onConnectionChange: ready => { state.definitionAiReady = ready; if (state.project && state.definitionDraft) renderDraft(); },
     onPreviewChange: (ids, mode) => {
       state.definitionAiPreviewIds = ids ? new Set(ids) : null;
       presenter.setJevPreviewStatus(ids, mode);

@@ -119,7 +119,7 @@ function initElements() {
     "instrumentInput", "instrumentDefineNew", "instrumentGroupPicker",
     "schemaChoice", "loadSchema", "skipSchema",
     "definitionBlock", "definitionTitle", "definitionCancel", "definitionMethodStep", "definitionChooseManual", "definitionChooseJev", "definitionChooseBrowse",
-    "definitionSourcesStep", "definitionChosenMethod", "definitionChangeMethod",
+    "definitionAiSetupStep", "definitionAiSetupHost", "definitionAiChangeMethod", "definitionAiSetup", "definitionAiWork", "definitionAiResults", "definitionSourcesStep", "definitionChosenMethod", "definitionChangeMethod",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults",
     "definitionPartitionStep", "definitionMethodJev", "definitionMethodManual", "definitionLoadStatus", "definitionJevPanel", "definitionManualPanel",
     "definitionCounts", "definitionTermChips", "definitionTermSummary",
@@ -1738,7 +1738,7 @@ const toolbarController = createToolbarController({
 
 const definitionWorkflowController = createDefinitionWorkflowController({
   state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll, drawMap, renderAssignmentCoverage,
-  setMapMode, fitMap, groupById, persistProjectLocally, visibleVariables,
+  setMapMode, fitMap, groupById, persistProjectLocally, getReturnUrl: () => persistentViewer.currentUrl() || location.href, visibleVariables,
   searchVariables: searchVisibleVariables,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
   takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
