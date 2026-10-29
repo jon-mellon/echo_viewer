@@ -6,6 +6,29 @@ import * as candidates from "../site/dag_candidates.mjs";
 import { centroid, distance, worldToScreen } from "../site/map_geometry.mjs";
 import { rawLinksBetween, pairKey, linkKey } from "../site/dag_link_aggregation.mjs";
 
+test("candidate centroids are reused within a calculation and refreshed after edits", () => {
+  const variables = new Map([
+    ["a", { map_x: 0, map_y: 0 }], ["b", { map_x: 10, map_y: 0 }],
+    ["c", { map_x: 2, map_y: 0 }],
+  ]);
+  let reads = 0;
+  const lookup = { get(id) { reads++; return variables.get(id); } };
+  const project = { iv_group_id: "iv", dv_group_id: "dv", groups: [
+    { group_id: "iv", label: "IV", variable_ids: ["a"] },
+    { group_id: "dv", label: "DV", variable_ids: ["b"] },
+    { group_id: "c", label: "C", variable_ids: ["c"] },
+  ] };
+  const inputs = { variables: lookup, similarityEdgeMap: new Map(),
+    linkLookup: new Map([[linkKey("c", "a"), [1]], [linkKey("c", "b"), [1]]]) };
+  const first = candidates.buildCandidateQueue(project, inputs);
+  assert.equal(reads, 3);
+  assert.equal(first[0].proximity, 2);
+  variables.get("c").map_x = 4;
+  const next = candidates.buildCandidateQueue(project, inputs);
+  assert.equal(next[0].proximity, 4);
+  assert.equal(reads, 6);
+});
+
 test("causal candidate roles retain legacy behavior while spatial roles are scale invariant", () => {
   const variables = Array.from({ length: 100 }, (_, i) => ({
     variable_id: "v" + i, map_x: i * 0.02, map_y: i % 3 * 0.02,

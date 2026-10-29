@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDagAppState } from "../site/dag_app_state.mjs";
+import { createDagAppState, ensureDiagnosticFilter } from "../site/dag_app_state.mjs";
 import { createDagExportController, referenceEnrichmentRequests } from "../site/dag_export_controller.mjs";
 import { buildBibText, METHOD_DOI } from "../site/dag_exports.mjs";
 import { createDagInspectorController } from "../site/dag_inspector_controller.mjs";
@@ -396,7 +396,20 @@ test("diagram heading follows the active diagnostic view", () => {
     ["showCollidersOnly", "Colliders"], ["showExogeneity", "Exogeneity"],
     ["showExclusionViolations", "Exclusion restriction"]]) {
     assert.equal(diagnosticViewTitle({ [flag]: true }, true), title);
-    assert.equal(diagnosticViewTitle({ [flag]: true }, false), "Unfiltered");
+    assert.equal(diagnosticViewTitle({ [flag]: true }, false), "Working map");
   }
-  assert.equal(diagnosticViewTitle({}, true), "Unfiltered");
+  assert.equal(diagnosticViewTitle({}, true), "Confounders");
+});
+
+test("there is no unfiltered diagram: an empty filter state becomes the confounders view", () => {
+  const state = createDagAppState("dag2");
+  Object.assign(state, { showConfoundersOnly: false, showCollidersOnly: false, showExclusionViolations: false, showExogeneity: false });
+  assert.equal(ensureDiagnosticFilter(state), true);
+  assert.equal(state.showConfoundersOnly, true);
+  assert.equal(diagnosticViewTitle(state, true), "Confounders");
+  for (const flag of ["showCollidersOnly", "showExclusionViolations", "showExogeneity"]) {
+    Object.assign(state, { showConfoundersOnly: false, showCollidersOnly: false, showExclusionViolations: false, showExogeneity: false, [flag]: true });
+    assert.equal(ensureDiagnosticFilter(state), false, `${flag} is already a diagnostic view`);
+    assert.equal(state.showConfoundersOnly, false);
+  }
 });

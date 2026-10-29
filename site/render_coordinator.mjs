@@ -26,7 +26,7 @@ export function createRenderCoordinator(view) {
     view.renderVariablePanel?.();
     view.renderConfounderStatuses?.();
     view.renderMapToolbarToggles();
-    view.renderDag({ reuseGeometry: true });
+    view.renderDag({ reuseGeometry: true, allowRemovedGroups: true });
     view.renderSelectedEdge();
     view.renderExportStatus();
     view.renderUndoRedo();

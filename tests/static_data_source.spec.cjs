@@ -107,7 +107,8 @@ for (const route of ["/"]) {
     page.on("request", request => {
       if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
     });
-    await page.goto(`${base}${route}`, { waitUntil: "domcontentloaded" });
+    // This test exercises the legacy contiguous-ID snapshot and its v1 fixtures.
+    await page.goto(`${base}${route}?schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=${snapshotId}`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
       && document.getElementById("startupLoading")?.hidden, null,
       { timeout: 78000 });

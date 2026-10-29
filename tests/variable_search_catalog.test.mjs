@@ -25,6 +25,20 @@ async function loadedCatalog() {
   return catalog;
 }
 
+test("fallback catalog yields during large builds and preserves search order", async () => {
+  const variables = Array.from({ length: 2500 }, (_, index) => ({
+    variable_id: `v${index}`, display_label: `Item ${index}`, index,
+  }));
+  let yielded = false;
+  const catalog = new StaticVariableSearchCatalog();
+  const loading = catalog.loadSnapshot("uncatalogued-snapshot", { loadRecords: async () => variables });
+  setTimeout(() => { yielded = true; }, 0);
+  await loading;
+  assert.equal(yielded, true);
+  assert.equal(catalog.records.length, variables.length);
+  assert.deepEqual(catalog.searchVariables("Item 2499").map(row => row.variable_id), ["v2499"]);
+});
+
 test("concept labels reuse the matching snapshot without hydrating detail records", async () => {
   const catalog = await loadedCatalog();
   catalog.snapshotId = "snapshot-a";

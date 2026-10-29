@@ -416,12 +416,11 @@
         <!-- DAG workspace — shown when no group is open -->
         <section id="dagWorkspaceSection" class="panel-section dag-workspace">
           <div class="dag-ws-header section-title">
-            <h2 id="dagViewTitle">Unfiltered</h2>
+            <h2 id="dagViewTitle">Working map</h2>
             <div class="dag-ws-controls">
               <details class="filter-dropdown">
                 <summary class="toolbar-button">Filters</summary>
                 <div class="filter-dropdown-panel" aria-label="Diagram filters">
-              <button id="showUnfiltered" class="toolbar-button" type="button" aria-pressed="false" title="Show all groups without a confounder or collider filter">Unfiltered</button>
               <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that could point into both; bidirectional edges count in either direction">Confounders</button>
               <button id="toggleCollidersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that both could point into; bidirectional edges count in either direction">Colliders</button>
               <button id="toggleExclusionViolations" class="toolbar-button" type="button" aria-pressed="false" hidden>Exclusion restriction violations</button>

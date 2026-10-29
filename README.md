@@ -191,7 +191,7 @@ default output is `/private/tmp/echo-selection-concept-profile`.
 opens the mobile Map tab and measures cold and repeated switches between
 exclusion restriction and exogeneity, plus bottleneck, path-link and all-visible-link controls.
 The unit regression covers all graph filter controls, including the confounder,
-collider, unfiltered and path-length controls hidden while an instrument is selected. Each step waits for the graph and two paint frames,
+collider and path-length controls hidden while an instrument is selected. Each step waits for the graph and two paint frames,
 checks rendered evidence against the filtered graph, and rejects project
 recompilation, membership changes or raw evidence loading during view switches.
 Three fresh browser contexts run by default. Each interaction must finish within

@@ -59,9 +59,11 @@ export function computeDagRender(input, onPhase = () => {}) {
 
 // A link decision only changes which already routed edges are shown. Keep the
 // existing node positions and route segments so Exclude/Restore does not recompute
-// the entire graph. An added edge or changed group set needs a full render.
-export function reuseDagGeometry(geometry, groups, links) {
-  if (!geometry || geometry.groupIds.length !== groups.length
+// the entire graph. An added edge or a group that was not laid out needs a full render. In a diagnostic view an
+// exclusion can also drop a group (a confounder that no longer qualifies): with allowRemovedGroups the groups that
+// remain keep their positions and the others are simply hidden, as a removed edge is.
+export function reuseDagGeometry(geometry, groups, links, { allowRemovedGroups = false } = {}) {
+  if (!geometry || (allowRemovedGroups ? groups.length > geometry.groupIds.length : geometry.groupIds.length !== groups.length)
       || groups.some(group => !geometry.groupIds.includes(group.group_id))) return null;
   const routesById = new Map(geometry.routes.map(route => [route.link.edge_id, route]));
   const routes = [];

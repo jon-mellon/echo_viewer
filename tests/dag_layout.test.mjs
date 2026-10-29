@@ -174,3 +174,15 @@ test('dense wide DAG fills both axes after perimeter routing', () => {
   const aspect = (Math.max(...xs) - Math.min(...xs)) / (Math.max(...ys) - Math.min(...ys));
   assert.ok(Math.min(aspect / (width / height), (width / height) / aspect) > 0.9);
 });
+
+test('a link decision that drops a group keeps the rest of the geometry', () => {
+  const geometry = { groupIds: ['a', 'b', 'c'], layout: { positions: new Map() },
+    routes: [{ link: { edge_id: 'ab', group_a: 'a', group_b: 'b', direction_type: 'forward' }, points: [] },
+      { link: { edge_id: 'bc', group_a: 'b', group_b: 'c', direction_type: 'forward' }, points: [] }] };
+  const kept = [{ group_id: 'a' }, { group_id: 'b' }];
+  const links = [{ edge_id: 'ab', group_a: 'a', group_b: 'b', direction_type: 'forward' }];
+  assert.equal(reuseDagGeometry(geometry, kept, links), null, 'a changed group set needs a full render by default');
+  assert.deepEqual(reuseDagGeometry(geometry, kept, links, { allowRemovedGroups: true }).routes.map(route => route.link.edge_id), ['ab']);
+  assert.equal(reuseDagGeometry(geometry, [...kept, { group_id: 'z' }], links, { allowRemovedGroups: true }), null,
+    'a group that was never laid out still needs a full render');
+});

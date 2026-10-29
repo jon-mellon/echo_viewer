@@ -87,9 +87,7 @@ try {
     }
     await rendered();
     await page.locator('.filter-dropdown > summary').click();
-    await page.locator('#showUnfiltered').click();
-    await rendered();
-    for (const id of ['toggleConfoundersOnly', 'toggleCollidersOnly', 'toggleBottleneckedConfounders', 'toggleIrrelevantConfounderLinks']) {
+    for (const id of ['toggleCollidersOnly', 'toggleConfoundersOnly', 'toggleBottleneckedConfounders', 'toggleIrrelevantConfounderLinks']) {
       await page.locator(`#${id}`).click();
       await rendered();
     }

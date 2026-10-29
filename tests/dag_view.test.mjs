@@ -14,6 +14,16 @@ const links = [
   link("excluded", "iv", "z", "A_TO_B", { display_status: "excluded" }),
 ];
 
+test("cached diagnostics respond to in-place graph edits and isolate returned metadata", () => {
+  const mutableLinks = structuredClone(links);
+  const options = { groups, links: mutableLinks, ivId: "iv", dvId: "dv" };
+  const first = deriveDagView(options);
+  first.confounders.confounderIds.clear();
+  assert.equal(deriveDagView(options).confounders.confounderIds.has("c"), true);
+  mutableLinks[0].display_status = "excluded";
+  assert.equal(deriveDagView(options).confounders.confounderIds.has("c"), false);
+});
+
 test("derived view combines causal, confounder and collider projections without mutation", () => {
   const before = structuredClone({ groups, links });
   const view = deriveDagView({

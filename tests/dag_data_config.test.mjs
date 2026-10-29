@@ -7,7 +7,9 @@ import {
 } from "../site/dag_data_config.mjs";
 
 test("the grouping schema defaults to the described Supabase publication", () => {
-  assert.equal(DEFAULT_SCHEMA_PUBLICATION_ID, "f22dab8b-d9a7-4047-a775-0216b31c79fc");
+  assert.equal(DEFAULT_SCHEMA_PUBLICATION_ID, "0d7bdf95-3f02-4e72-8629-e6d456434ad5");
+  assert.equal(evidenceSnapshotIdFromManifestUrl(evidenceManifestUrl({ href: "https://viewer.example/" })),
+    "8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849");
   assert.equal(schemaPublicationId({ href: "http://localhost:8767/" }), DEFAULT_SCHEMA_PUBLICATION_ID);
   assert.equal(groupingSchemaUrl({ href: "http://localhost:8767/" }), "");
 });

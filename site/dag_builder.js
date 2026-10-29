@@ -14,7 +14,7 @@ import * as inspector from "/dag_inspector.mjs";
 import * as searchModel from "/dag_search.mjs";
 import * as workflow from "/dag_workflow.mjs";
 import * as visibility from "/variable_visibility.mjs";
-import { createDagAppState } from "/dag_app_state.mjs";
+import { createDagAppState, ensureDiagnosticFilter } from "/dag_app_state.mjs";
 import { createDagProjectController } from "/dag_project_controller.mjs";
 import { createDagInspectorController, STUDY_DESIGN_EDGE_ID } from "/dag_inspector_controller.mjs";
 import { createDagShellController } from "/dag_shell_controller.mjs";
@@ -147,7 +147,7 @@ function initElements() {
     // Map
     "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts", "definitionMapPreviewStatus",
     "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "showUnfiltered", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleSparseEdges", "minimumEdgePapers", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
+    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleSparseEdges", "minimumEdgePapers", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     "selectionCount",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
@@ -1244,6 +1244,7 @@ function hasAnyMapping(sourceIds, targetIds) {
 
 let sparseEdgeEvidencePromise = null;
 function computeVisibleLinks() {
+  ensureDiagnosticFilter(state);
   const missingSparseEvidence = state.excludeSparseEdges
     ? [...new Set((state.project?.links || []).flatMap(link =>
       [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))]

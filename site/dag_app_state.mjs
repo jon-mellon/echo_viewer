@@ -2,6 +2,15 @@
 
 /** @typedef {import("./app_contracts.mjs").DagAppState} DagAppState */
 
+// There is no unfiltered diagram: when no diagnostic view is on, the confounders view is. Every rebuild path normalizes
+// through this, so the heading, toolbar and graph always describe the same view.
+/** @param {Record<string, any>} state */
+export function ensureDiagnosticFilter(state) {
+  if (state.showConfoundersOnly || state.showCollidersOnly || state.showExclusionViolations || state.showExogeneity) return false;
+  state.showConfoundersOnly = true;
+  return true;
+}
+
 export function createDagAppState(interfaceMode = "classic") {
   return /** @type {DagAppState} */ ({
     interfaceMode,

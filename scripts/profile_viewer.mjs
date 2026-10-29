@@ -32,7 +32,6 @@ const scenarioBudgets = {
   "select DV": 1000,
   "DAG layout: auto": 750,
   "DAG zoom": 500,
-  "unfiltered view": 1000,
   "exclude edge promptly": 750,
   "settle graph after exclusion": 300,
   "restore edge": 750,
@@ -401,13 +400,14 @@ try {
     await page.locator("#dagSvgZoomIn").click();
   });
   await page.locator(".filter-dropdown > summary").click();
-  await measure("unfiltered view", async () => {
-    await page.locator("#showUnfiltered").click();
-  });
   const edgeId = await page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
     await whenDagRendered();
-    return renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__");
+    // A causally relevant edge: one that links a confounder to the exposure or the outcome. Excluding it can remove
+    // the confounder from the view, which is the case where the graph must stay put instead of being laid out again.
+    const { iv_group_id: iv, dv_group_id: dv } = window.__dagBuilderState.project;
+    const edges = renderedDagEdgeIds().filter(id => id !== "__study_design_iv_to_dv__");
+    return edges.find(id => { const ends = id.split("__"); return ends.includes(iv) !== ends.includes(dv) && !ends.includes("__study_design_iv_to_dv__"); }) || edges[0];
   });
   if (!edgeId) throw new Error("No evidence edge is visible to test Exclude");
   await page.evaluate(async id => {
@@ -415,6 +415,9 @@ try {
     if (!isDagEdgeRendered(id)) throw new Error("Chosen evidence edge is not rendered");
     inspectDagEdge(id);
   }, edgeId);
+  // Measure the exclusion itself, not a panel still rebuilding as the edge's sources and labels arrive.
+  await page.waitForFunction(() => !window.__dagBuilderState.pendingEdgeEvidence
+    && !document.querySelector("#edgeInspector .edge-sources-loading"));
   await measure("exclude edge promptly", async () => {
     await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
     await page.locator("#excludeReasonInput").fill("Profiling exclusion responsiveness");
@@ -472,6 +475,11 @@ try {
   // outside the following filter measurements.
   await waitForGraph();
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  // The confounders view is the default, so start from the colliders view: each filter below is then a real switch
+  // and the path length that follows is measured in the colliders view, as it always has been.
+  await page.locator("#toggleCollidersOnly").click();
+  await page.waitForFunction(() => window.__dagBuilderState.showCollidersOnly);
+  await waitForGraph();
   for (const [name, id, stateKey] of [
     ["confounders filter", "toggleConfoundersOnly", "showConfoundersOnly"],
     ["colliders filter", "toggleCollidersOnly", "showCollidersOnly"],
@@ -554,7 +562,6 @@ try {
       "close variable definition": 299.52,
       "select IV": 249.6,
       "select DV": 249.6,
-      "unfiltered view": 249.6,
       "exclude edge promptly": 436.8,
       "restore edge": 400,
       "exclude edge": 299.52,

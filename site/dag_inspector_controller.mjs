@@ -274,6 +274,12 @@ export function createDagInspectorController({
     }
     const model = inspector.edgeInspector(link, state.project, diagnosticView());
     if (pendingExclude && pendingExclude.edgeId !== link.edge_id) clearPendingExclude();
+    // Sources and labels arrive while someone may be typing a reason, and each arrival rebuilds this panel. Carry the
+    // typed text, focus and caret across the rebuild, or the keystrokes still in flight land on a box that is gone.
+    const typing = elements.edgeInspector.querySelector?.("#excludeReasonInput");
+    const keepFocus = Boolean(pendingExclude && typing && globalThis.document?.activeElement === typing);
+    const caret = keepFocus ? [typing.selectionStart, typing.selectionEnd] : null;
+    if (pendingExclude && typing) pendingExclude.reason = typing.value;
     const sourcesLoading = edgeSourcesLoading(link);
     elements.edgeInspector.className = "edge-inspector";
     elements.edgeInspector.hidden = false;
@@ -301,6 +307,10 @@ export function createDagInspectorController({
     const row = elements.edgeInspector.querySelector("#excludeReasonRow");
     const input = elements.edgeInspector.querySelector("#excludeReasonInput");
     input.addEventListener("input", () => { if (pendingExclude) pendingExclude.reason = input.value; });
+    if (keepFocus) {
+      input.focus();
+      if (caret?.[0] != null) input.setSelectionRange(caret[0], caret[1]);
+    }
     elements.edgeInspector.querySelector("#excludeConfirmBtn")?.addEventListener("click", () => {
       const reason = input.value.trim();
       if (!reason) { input.focus(); input.classList.add("input-error"); return; }
