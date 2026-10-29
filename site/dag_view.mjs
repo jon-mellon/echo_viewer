@@ -59,7 +59,9 @@ export function deriveDagView({
     traversableLink,
   };
   const cacheKey = !excludeSparseEdges && JSON.stringify([
-    [...fullGraph.nodeIds], retainedLinks, ivId, dvId, instrumentId,
+    [...fullGraph.nodeIds], retainedLinks.map(link => [link.group_a, link.group_b,
+      link.direction_type, link.display_status, Boolean(link.is_target_relation)]),
+    ivId, dvId, instrumentId,
     maxPathLength, exclusionMaxPathLength, excludeBottlenecked,
   ]);
   let diagnostics = cacheKey && diagnosticCache?.key === cacheKey ? diagnosticCache.value : null;
