@@ -289,8 +289,13 @@ test("mobile spatial editor adds and removes a variable with a tap", async ({ br
     const allFirstId = await allFirstRow.getAttribute('data-term-variable-id');
     await allFirstRow.locator('button[data-side="leftover"]').tap();
     await expect.poll(() => page.evaluate(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), allFirstId)).toBe(false);
+    const pageLabel = await page.locator('#definitionTermPage').innerText();
+    const pageCount = Number(pageLabel.match(/^1 of (\d+)$/)?.[1]);
+    expect(pageCount).toBeGreaterThan(1);
     await page.locator('#definitionTermNext').tap();
-    await expect(page.locator('#definitionTermPage')).toHaveText('2 of 16');
+    await expect(page.locator('#definitionTermPage')).toHaveText(`2 of ${pageCount}`);
+    await expect(page.locator('#definitionTermItems .definition-sort-row').first())
+      .not.toHaveAttribute('data-term-variable-id', allFirstId);
     if (await page.locator('#definitionSelectedVariables .definition-selected-variable').count()) {
       await page.locator('#definitionSelectedVariables .definition-selected-variable').first().tap();
     }
