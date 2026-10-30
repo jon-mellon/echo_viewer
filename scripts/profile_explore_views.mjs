@@ -18,10 +18,13 @@ if (!remote) url.pathname = '/';
 const runs = Number(process.env.PROFILE_RUNS || 2);
 if (!Number.isSafeInteger(runs) || runs < 1) throw new Error('PROFILE_RUNS must be a positive integer');
 // Mobile runs at 4x CPU slowdown.
-// Local runs, with the graph redrawn each time, took at most 250 ms (phone at 4x
-// CPU slowdown) and 150 ms (desktop) per interaction; the budgets leave room
-// for slower CI runners.
-const budgets = { firstResultsMs: mobile ? 20000 : 10000, firstEvidenceMs: mobile ? 16000 : 8000,
+// Set from measurements. Counting papers no longer waits on any download (the
+// counts are in the aggregated DAG), so the first results take about as long as
+// any other step. GitHub's runners are about 3x slower than a developer machine
+// and vary run to run (switching views took up to 702 ms wall and 243 ms longest
+// task there before the render was lightened). The budgets leave room for that
+// variance while catching a real regression.
+const budgets = { firstResultsMs: mobile ? 5000 : 3000, firstEvidenceMs: mobile ? 16000 : 8000,
   interactionMs: mobile ? 800 : 500, longestTaskMs: mobile ? 150 : 100 };
 const report = { url: url.href, mobile, cpuThrottle: mobile ? 4 : 1, source: remote ? 'remote deployment' : root, budgets, runs: [] };
 await mkdir(output, { recursive: true });
@@ -83,7 +86,7 @@ try {
     }
     // Optional: simulate time spent choosing, during which paper support loads.
     if (Number(process.env.PROFILE_PICK_DELAY_MS) > 0) await page.waitForTimeout(Number(process.env.PROFILE_PICK_DELAY_MS));
-    await measure('choose Dep var (cold, includes paper support)', async () => {
+    await measure('choose Dep var (first results)', async () => {
       await page.locator('#focusGroupPicker button[data-group-id="category-mental-health"]').click();
       await page.locator('.explore-row').first().waitFor({ timeout: 90000 });
     }, { budget: budgets.firstResultsMs });

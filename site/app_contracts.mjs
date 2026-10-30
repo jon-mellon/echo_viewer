@@ -86,8 +86,8 @@
  * @property {"A_TO_B" | "B_TO_A" | "BIDIRECTIONAL" | "NO_MAPPING_LINK"} direction_type
  * @property {string[]} a_to_b_raw_link_ids
  * @property {string[]} b_to_a_raw_link_ids
- * @property {string[]} a_to_b_paper_table_keys
- * @property {string[]} b_to_a_paper_table_keys
+ * @property {string[]} [a_to_b_paper_table_keys] absent on edges a local edit touched
+ * @property {string[]} [b_to_a_paper_table_keys]
  * @property {string} display_status
  * @property {LinkDecision | null} user_decision
  */

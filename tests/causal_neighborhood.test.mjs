@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { causalNeighborhood, directedHops, directionalPaperCounter } from "../site/causal_neighborhood.mjs";
+import { causalNeighborhood, directedHops, directionalPaperCounter, linksNeedingExactCounts } from "../site/causal_neighborhood.mjs";
 import { computeFocusLayout } from "../site/dag_layout.mjs";
 
 const keys = n => Array.from({ length: n }, (_, i) => `p${i}`);
@@ -53,7 +53,7 @@ test("excluded links, self links and a missing focus contribute nothing", () => 
   assert.equal(directedHops([link("a", "b", "BIDIRECTIONAL", 2, 1)], 2).length, 1);
 });
 
-test("support records count distinct papers with present findings in each direction", () => {
+test("papers come from the DAG's own keys, and only edges without keys are counted from findings", () => {
   const support = new Map([
     ["r1", { paper_id: "P1", causal_link_existence: "present" }],
     ["r2", { paper_id: "P1", causal_link_existence: "present" }],
@@ -61,13 +61,18 @@ test("support records count distinct papers with present findings in each direct
     ["r4", { paper_id: "P3", causal_link_existence: "present" }],
   ]);
   const edge = { ...link("a", "b", "BIDIRECTIONAL"), a_to_b_raw_link_ids: ["r1", "r2", "r3"], b_to_a_raw_link_ids: ["r4"],
-    a_to_b_paper_table_keys: ["P1::t1", "P1::t2", "P2::t1"] };
-  const counted = directionalPaperCounter(support);
-  // Two tables from one paper count once; the null finding does not count.
-  assert.equal(counted(edge, true), 1);
-  assert.equal(counted(edge, false), 1);
-  // Without support records, paper IDs from the compiled keys are the fallback.
+    a_to_b_paper_table_keys: ["P1::t1", "P1::t2", "P2::t1"], b_to_a_paper_table_keys: ["P3::t1"] };
+  // Distinct papers among the keys, per direction; nothing is counted, so support is not consulted.
   assert.equal(directionalPaperCounter()(edge, true), 2);
+  assert.equal(directionalPaperCounter(support)(edge, true), 2);
+  assert.equal(directionalPaperCounter()(edge, false), 1);
+  assert.equal(linksNeedingExactCounts([edge]).length, 0);
+  // An edge an edit touched has no keys: it is counted exactly (one paper, null finding ignored), or 0 without records.
+  const { a_to_b_paper_table_keys, b_to_a_paper_table_keys, ...touched } = edge;
+  assert.deepEqual(linksNeedingExactCounts([edge, touched]), [touched]);
+  assert.equal(directionalPaperCounter(support)(touched, true), 1);
+  assert.equal(directionalPaperCounter(support)(touched, false), 1);
+  assert.equal(directionalPaperCounter()(touched, true), 0);
   // The IV-DV relation stays traversable even when excluded, as in the diagrams.
   const target = link("a", "b", "A_TO_B", 3, 0, { display_status: "excluded", is_target_relation: true });
   assert.equal(directedHops([target], 1).length, 1);

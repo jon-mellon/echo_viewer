@@ -7,19 +7,25 @@ import { excludedForConnectivity, presentPaperIds } from "./dag_view.mjs";
 export const MAX_NEIGHBORHOOD_DEPTH = 4;
 
 /**
- * Distinct papers with a present finding in one direction of a link, from the
- * per-finding support records the sparse-edge filter also uses. Without those
- * records, paper IDs from the compiled paper/table keys are an upper bound.
+ * Papers behind one direction of a link. The aggregated DAG already carries
+ * them per direction (distinct papers among its paper/table keys), so nothing
+ * is counted. An edge that a local edit touched carries no keys, because they
+ * cannot be kept in step with its findings; those are counted exactly from
+ * per-finding support records, when given.
  */
 export function directionalPaperCounter(edgeSupportById = null, rawLinksById = edgeSupportById) {
   return (link, forward) => {
-    if (edgeSupportById) {
-      return presentPaperIds(forward ? link.a_to_b_raw_link_ids : link.b_to_a_raw_link_ids,
-        edgeSupportById, rawLinksById).size;
-    }
     const keys = forward ? link.a_to_b_paper_table_keys : link.b_to_a_paper_table_keys;
-    return new Set((keys || []).map(key => String(key).split("::")[0])).size;
+    if (Array.isArray(keys)) return new Set(keys.map(key => String(key).split("::")[0])).size;
+    if (!edgeSupportById) return 0;
+    return presentPaperIds(forward ? link.a_to_b_raw_link_ids : link.b_to_a_raw_link_ids,
+      edgeSupportById, rawLinksById).size;
   };
+}
+
+/** Links whose paper keys an edit dropped; only these need per-finding records. */
+export function linksNeedingExactCounts(links = []) {
+  return links.filter(link => !Array.isArray(link.a_to_b_paper_table_keys) || !Array.isArray(link.b_to_a_paper_table_keys));
 }
 
 /** Directed hops `from → to` with their paper support. */
