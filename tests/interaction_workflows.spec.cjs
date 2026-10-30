@@ -183,7 +183,7 @@ test("definition navigation returns through both Back steps and Cancel", async (
   await page.locator("#definitionCancel").click();
 });
 
-test("variable search catalog starts loading when anchor search gets focus", async ({ page }) => {
+test("variable search catalog preloads once and serves anchor search", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const catalogRequests = [];
   page.on("request", request => {
@@ -191,7 +191,8 @@ test("variable search catalog starts loading when anchor search gets focus", asy
   });
   await page.goto(viewer);
   await ready(page);
-  expect(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("idle");
+  // Setup preloads the catalog; focusing search must reuse it, not fetch it again.
+  expect(["loading", "ready"]).toContain(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus));
   await page.locator("#ivInput").focus();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("ready");
   const hasStaticCatalog = await page.evaluate(async () => {
