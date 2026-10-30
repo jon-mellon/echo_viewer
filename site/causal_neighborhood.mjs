@@ -45,18 +45,22 @@ export function directedHops(links = [], minPapers = 1, papersFor = directionalP
  * within `depth` directed hops. Each result keeps its shortest distance and,
  * among the shortest paths, the one whose weakest hop has the most papers.
  * `path` runs in causal order, ending (causes) or starting (consequences) at
- * the focus.
+ * the focus; `pathEdgeIds` names the link behind each hop in the same order,
+ * and `edgeId` is the link joining the variable to its neighbour toward the
+ * focus, which is the evidence for why it belongs in the list.
+ * `isNode` lets callers leave out groups that are not drawn (such as "other").
  */
 export function causalNeighborhood({ links = [], focusId, direction = "causes", depth = 1, minPapers = 2,
-  papersFor = directionalPaperCounter() } = {}) {
+  papersFor = directionalPaperCounter(), isNode = () => true } = {}) {
   if (!focusId) return [];
   const limit = Math.max(1, Math.min(MAX_NEIGHBORHOOD_DEPTH, Math.trunc(depth) || 1));
   const towardFocus = new Map();
   for (const hop of directedHops(links, Math.max(1, Math.trunc(minPapers) || 1), papersFor)) {
+    if (!isNode(hop.from) || !isNode(hop.to)) continue;
     // Causes walk backwards from the focus; consequences walk forwards.
     const [near, far] = direction === "causes" ? [hop.to, hop.from] : [hop.from, hop.to];
     if (!towardFocus.has(near)) towardFocus.set(near, []);
-    towardFocus.get(near).push({ node: far, papers: hop.papers });
+    towardFocus.get(near).push({ node: far, papers: hop.papers, edgeId: hop.edgeId });
   }
   const distance = new Map([[focusId, 0]]);
   const best = new Map([[focusId, { strength: Infinity, next: null, papers: Infinity }]]);
@@ -65,13 +69,13 @@ export function causalNeighborhood({ links = [], focusId, direction = "causes", 
     const reached = new Map();
     for (const near of frontier) {
       const nearStrength = best.get(near).strength;
-      for (const { node, papers } of towardFocus.get(near) || []) {
+      for (const { node, papers, edgeId } of towardFocus.get(near) || []) {
         if (distance.has(node) && distance.get(node) < level) continue;
         const strength = Math.min(nearStrength, papers);
         const current = reached.get(node);
         if (!current || strength > current.strength
           || (strength === current.strength && String(near) < String(current.next))) {
-          reached.set(node, { strength, next: near, papers });
+          reached.set(node, { strength, next: near, papers, edgeId });
         }
       }
     }
@@ -84,14 +88,16 @@ export function causalNeighborhood({ links = [], focusId, direction = "causes", 
   const results = [];
   for (const [node, level] of distance) {
     if (node === focusId) continue;
-    const chain = [node];
+    const chain = [node], edgeIds = [];
     for (let cursor = node; cursor !== focusId;) {
+      edgeIds.push(best.get(cursor).edgeId);
       cursor = best.get(cursor).next;
       chain.push(cursor);
     }
+    const causal = direction === "causes";
     results.push({ groupId: node, distance: level, papers: best.get(node).papers,
-      weakestPapers: best.get(node).strength,
-      path: direction === "causes" ? chain : chain.reverse() });
+      weakestPapers: best.get(node).strength, edgeId: edgeIds[0],
+      path: causal ? chain : chain.reverse(), pathEdgeIds: causal ? edgeIds : edgeIds.reverse() });
   }
   return results.sort((a, b) => a.distance - b.distance || b.weakestPapers - a.weakestPapers
     || b.papers - a.papers || String(a.groupId).localeCompare(String(b.groupId)));

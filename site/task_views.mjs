@@ -2,8 +2,10 @@ import { h, replaceChildren } from "./dom_builder.mjs";
 import { causalNeighborhood, MAX_NEIGHBORHOOD_DEPTH } from "./causal_neighborhood.mjs";
 
 const TASK_CLASSES = { identify: "task-identify", causes: "task-causes", consequences: "task-consequences" };
-const MIN_PAPER_CHOICES = [1, 2, 3, 5, 10];
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+const EXPLORE_NAV_LABELS = { controls: "List", dag: "Graph" };
+const IDENTIFY_DEFAULTS = { confounderMaxPathLength: 1, excludeSparseEdges: false, minimumEdgePapers: 2 };
+const clampDepth = value => Math.max(1, Math.min(MAX_NEIGHBORHOOD_DEPTH, Math.trunc(Number(value)) || 1));
 
 /** A fresh project on the same published schema and evidence, opening at the start page. */
 export function freshProjectUrl(href) {
@@ -15,26 +17,65 @@ export function freshProjectUrl(href) {
   return fresh.href;
 }
 
+/**
+ * The graph for a neighborhood: the variables found plus the focus, and one
+ * link per hop on the chosen routes. Links are the project's own (so evidence
+ * and selection work as in Identify) with their direction narrowed to the hop
+ * that qualified, so an arrow never contradicts the list.
+ */
+export function neighborhoodGraph({ rows, focusId, links, direction = "causes" }) {
+  const byId = new Map(links.map(link => [link.edge_id, link]));
+  const groupIds = new Set(focusId ? [focusId] : []);
+  const hops = new Map();
+  for (const row of rows) {
+    for (const id of row.path) groupIds.add(id);
+    row.pathEdgeIds.forEach((edgeId, index) => {
+      // Edge IDs follow causal order: path[index] is the cause, path[index + 1] the effect.
+      hops.set(edgeId, { from: row.path[index], to: row.path[index + 1] });
+    });
+  }
+  const visible = [];
+  for (const [edgeId, { from, to }] of hops) {
+    const link = byId.get(edgeId);
+    if (link) visible.push({ ...link, direction_type: link.group_a === from ? "A_TO_B" : "B_TO_A" });
+  }
+  // Layout hints: the variables by distance, and each one's neighbour toward the focus.
+  const layout = focusId ? {
+    id: focusId,
+    order: rows.map(row => row.groupId),
+    distance: rows.map(row => [row.groupId, row.distance]),
+    parent: rows.map(row => [row.groupId, direction === "causes" ? row.path[1] : row.path[row.path.length - 2]]),
+  } : null;
+  return { groupIds, links: visible, layout };
+}
+
 // The start page, the task bar, the causes and consequences views, and Reset.
-// Identification keeps using the existing workspace underneath; these views
-// only cover it, so switching tasks never discards its state.
+// Causes and consequences share the Identify workspace: the list and controls
+// replace the left panel, and the graph and the evidence for a clicked link use
+// the same network and evidence pane Identify uses.
 export function createTaskViews({ state, searchGroups, searchStatus = () => "ready", onChange = () => {},
   paperSupport = () => ({ status: "ready", papersFor: undefined }), loadPaperSupport = () => {},
-  flushUrl = async () => {}, openWindow = (url) => window.open(url, "_blank", "noopener"),
+  isDisplayGroup = () => true, onExploreChange = () => {}, onTaskChange = () => {},
+  onFocusPicking = () => {}, onPickerInput = () => {}, openEvidence = () => {}, flushUrl = async () => {}, openWindow = (url) => window.open(url, "_blank", "noopener"),
   navigate = (url) => window.location.assign(url) }) {
   const el = id => document.getElementById(id);
   const els = {
     bar: el("taskBar"), reset: el("taskReset"), landing: el("taskLanding"), explore: el("exploreView"),
-    title: el("exploreTitle"), chosen: el("exploreChosen"), focusLabel: el("exploreFocusLabel"),
-    change: el("exploreChange"), picker: el("explorePicker"), search: el("exploreSearch"),
-    pickerList: el("explorePickerList"), pickerCancel: el("explorePickerCancel"),
-    depth: el("exploreDepth"), minPapers: el("exploreMinPapers"), summary: el("exploreSummary"),
-    results: el("exploreResults"), dialog: el("resetDialog"),
+    resultsBlock: el("exploreResultsBlock"), summary: el("exploreSummary"), hint: el("exploreHint"),
+    results: el("exploreResults"), dialog: el("resetDialog"), graphHint: el("exploreGraphHint"),
+    graphTitle: el("dagViewTitle"), focusInput: el("focusInput"), pickerCancel: el("focusPickerCancel"),
+    pathLabel: el("confounderPathLengthLabel"), pathInput: el("confounderPathLength"),
   };
   // Whether the user asked to change the focus; not part of the saved view.
   const changing = { causes: false, consequences: false };
+  // The evidence open in each task, so switching tasks keeps what you were reading.
+  const selections = { identify: null, causes: null, consequences: null };
+  // Identify's own filter settings while an explore view uses the same controls.
+  let identifySettings = null;
+  let settingsTask = null;
   // Paper counts per link direction, reused until the links or support change.
   let countCache = { key: null, counts: new Map() };
+  let hoodCache = { key: null, value: null };
 
   const exploring = () => state.task === "causes" || state.task === "consequences";
   const view = () => state.explore[state.task];
@@ -42,45 +83,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   const groupFor = id => groups().find(group => group.group_id === id);
   const labelFor = id => groupFor(id)?.label || id;
   const focusId = () => (groupFor(view().focusId) ? view().focusId : null);
-
-  function setTask(task) {
-    if (state.task === task) return;
-    state.task = task;
-    render();
-    onChange();
-  }
-
-  function updateView(patch) {
-    Object.assign(view(), patch);
-    renderExplore();
-    onChange();
-  }
-
-  function chooseFocus(groupId) {
-    changing[state.task] = false;
-    els.search.value = "";
-    updateView({ focusId: groupId });
-  }
-
-  function renderPicker() {
-    const query = els.search.value.trim();
-    const hydrated = groups().some(group => group.variable_ids?.length);
-    const available = groups().filter(group => !hydrated || group.variable_ids?.length);
-    const matches = query ? searchGroups(available, query, 200)
-      : [...available].sort((a, b) => labelFor(a.group_id).localeCompare(labelFor(b.group_id)))
-        .map(group => ({ group, variableMatch: "" }));
-    const status = searchStatus();
-    const note = query && status !== "ready" ? h("p", { className: "small-note", textContent: status === "error"
-      ? "Variable search could not be loaded; only variable names are searched."
-      : "Loading variable search… variable names match for now." }) : null;
-    replaceChildren(els.pickerList, note, matches.length ? matches.map(({ group, variableMatch }) =>
-      h("button", { type: "button", className: "explore-pick", dataset: { groupId: group.group_id },
-        onclick: () => chooseFocus(group.group_id) },
-      h("strong", { textContent: labelFor(group.group_id) }),
-      group.variable_ids?.length ? h("span", { textContent: plural(group.variable_ids.length, "constituent variable") }) : null,
-      variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched: ${variableMatch}` }) : null))
-      : h("p", { className: "small-note", textContent: "No variables match this search." }));
-  }
 
   function cachedCounter(support) {
     const links = state.project?.links || [];
@@ -96,26 +98,126 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     };
   }
 
+  /**
+   * The list rows and graph for the current view, shared by the list and the
+   * graph and reused until the links, support or settings change.
+   */
+  function neighborhood() {
+    const focus = exploring() ? focusId() : null;
+    if (!focus) return { status: "none", rows: [], graph: { groupIds: new Set(), links: [], layout: null } };
+    const support = paperSupport();
+    if (support.status === "loading") return { status: "loading", rows: [], graph: { groupIds: new Set(), links: [], layout: null } };
+    const { depth, minPapers } = settings();
+    const links = state.project?.links || [];
+    const key = [state.task, focus, depth, minPapers, links, links.length, groups(), support.status, support.cacheKey,
+      support.cacheKey?.size];
+    if (hoodCache.key && key.every((part, index) => part === hoodCache.key[index])) return hoodCache.value;
+    const hidden = new Set(groups().filter(group => !isDisplayGroup(group)).map(group => group.group_id));
+    const rows = causalNeighborhood({ links, focusId: focus, direction: state.task, depth, minPapers,
+      papersFor: support.papersFor && cachedCounter(support), isNode: id => !hidden.has(id) });
+    const value = { status: support.status, rows, graph: neighborhoodGraph({ rows, focusId: focus, links, direction: state.task }) };
+    hoodCache = { key, value };
+    return value;
+  }
+
+  const focusMeta = () => state.task === "causes" ? { side: "dv", tag: "Dep var" } : { side: "iv", tag: "Ind var" };
+
+  /** What the shared anchor bar and picker need to show for the one variable. */
+  function focus() {
+    if (!exploring()) return { active: false };
+    const id = focusId();
+    return { active: true, ...focusMeta(), groupId: id, label: id ? labelFor(id) : "", picking: !id || changing[state.task] };
+  }
+
+  function searchFocusGroups(query) {
+    const hydrated = groups().some(group => group.variable_ids?.length);
+    const available = groups().filter(group => (!hydrated || group.variable_ids?.length) && isDisplayGroup(group));
+    return query ? searchGroups(available, query, Infinity)
+      : available.map(group => ({ group, variableMatch: "" }));
+  }
+
+  // The existing Filters controls carry each view's distance and minimum papers
+  // (Max path, Exclude sparse edges, Min papers); this keeps them per task.
+  const sharedFromView = slot => ({ confounderMaxPathLength: clampDepth(slot.depth),
+    excludeSparseEdges: slot.minPapers > 1, minimumEdgePapers: Math.max(2, slot.minPapers) });
+  function settings() {
+    if (state.confounderMaxPathLength !== clampDepth(state.confounderMaxPathLength)) {
+      state.confounderMaxPathLength = clampDepth(state.confounderMaxPathLength);
+    }
+    const minPapers = state.excludeSparseEdges ? Math.max(1, Math.trunc(Number(state.minimumEdgePapers)) || 2) : 1;
+    const current = { depth: state.confounderMaxPathLength, minPapers };
+    // Mirror into the saved view so permalinks and the other tasks see it.
+    Object.assign(view(), current);
+    return current;
+  }
+  function adoptViewSettings() {
+    settingsTask = state.task;
+    Object.assign(state, sharedFromView(view()));
+  }
+
+  /** Remember each task's open evidence and filter settings, then restore the new task's. */
+  function swapTask(previous, next) {
+    if (previous === "identify") {
+      identifySettings = { confounderMaxPathLength: state.confounderMaxPathLength,
+        excludeSparseEdges: state.excludeSparseEdges, minimumEdgePapers: state.minimumEdgePapers };
+    } else if (previous) settings();
+    selections[previous || "identify"] = state.selectedEdgeId || null;
+    state.selectedEdgeId = (next && selections[next]) || null;
+    state.selectedEvidenceGroupId = null;
+    state.task = next;
+    if (next === "identify") Object.assign(state, identifySettings || (previous ? IDENTIFY_DEFAULTS : {}));
+    else adoptViewSettings();
+  }
+
+  function setTask(task) {
+    if (state.task === task) return;
+    const previous = state.task;
+    swapTask(previous, task);
+    changing.causes = false;
+    changing.consequences = false;
+    onTaskChange({ previous, task });
+    render();
+    onChange();
+  }
+
+  function chooseFocus(groupId) {
+    changing[state.task] = false;
+    els.focusInput.value = "";
+    if (groupId !== view().focusId) {
+      view().focusId = groupId;
+      // The open evidence belongs to the old neighborhood.
+      state.selectedEdgeId = null;
+    }
+    onExploreChange();
+    onChange();
+  }
+
+  function changeFocus() {
+    changing[state.task] = true;
+    onFocusPicking();
+    els.focusInput.focus();
+  }
+
   function renderResults(focus) {
     const causes = state.task === "causes";
-    const { depth, minPapers } = view();
-    const support = paperSupport();
-    if (support.status === "loading") {
+    const { depth, minPapers } = settings();
+    const { status, rows } = neighborhood();
+    if (status === "loading") {
       // The same per-finding records the sparse-edge filter uses; loaded once.
       loadPaperSupport();
       els.summary.textContent = "Counting the papers that support each link…";
+      els.hint.hidden = true;
       replaceChildren(els.results);
       return;
     }
-    const rows = causalNeighborhood({ links: state.project?.links || [], focusId: focus,
-      direction: state.task, depth, minPapers, papersFor: support.papersFor && cachedCounter(support) });
     const focusLabel = labelFor(focus);
     const within = `within ${plural(depth, "step")}, counting links supported by at least ${plural(minPapers, "paper")}`;
-    const caveat = support.status === "failed"
+    const caveat = status === "failed"
       ? " Finding details could not load, so paper counts may include tables and null findings." : "";
     els.summary.textContent = (rows.length
       ? `${plural(rows.length, "variable")} ${causes ? (rows.length === 1 ? "causes" : "cause") : (rows.length === 1 ? "is caused by" : "are caused by")} ${focusLabel} ${within}.`
       : `No variables ${causes ? "cause" : "are caused by"} ${focusLabel} ${within}. Try a greater distance or fewer papers per link.`) + caveat;
+    els.hint.hidden = !rows.length;
     const byDistance = new Map();
     for (const row of rows) {
       if (!byDistance.has(row.distance)) byDistance.set(row.distance, []);
@@ -127,36 +229,51 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
           : `${distance} steps away` }),
         h("ol", { className: "explore-list" }, items.map(item => {
           const between = item.path.slice(1, -1).map(labelFor);
-          return h("li", { className: "explore-row", dataset: { groupId: item.groupId, distance: String(distance) } },
-            h("button", { type: "button", className: "explore-row-label", textContent: labelFor(item.groupId),
-              title: `Show ${causes ? "causes" : "consequences"} of ${labelFor(item.groupId)}`,
-              onclick: () => chooseFocus(item.groupId) }),
-            h("span", { className: "explore-row-papers", textContent: distance === 1
-              ? plural(item.papers, "paper") : `weakest link: ${plural(item.weakestPapers, "paper")}` }),
-            between.length ? h("span", { className: "explore-row-path", textContent: `via ${between.join(" → ")}` }) : null);
+          const toward = causes ? item.path[1] : item.path[item.path.length - 2];
+          return h("li", { className: "explore-row", dataset: { groupId: item.groupId, distance: String(distance),
+            edgeId: item.edgeId } },
+          h("button", { type: "button", className: "explore-row-open",
+            attrs: { "aria-pressed": String(state.selectedEdgeId === item.edgeId) },
+            title: `See the evidence that ${causes ? `${labelFor(item.groupId)} causes ${labelFor(toward)}`
+              : `${labelFor(toward)} causes ${labelFor(item.groupId)}`}`,
+            onclick: () => openEvidence(item.edgeId) },
+          h("span", { className: "explore-row-label", textContent: labelFor(item.groupId) }),
+          h("span", { className: "explore-row-papers", textContent: distance === 1
+            ? plural(item.papers, "paper") : `weakest link: ${plural(item.weakestPapers, "paper")}` }),
+          between.length ? h("span", { className: "explore-row-path", textContent: `via ${between.join(" → ")}` }) : null),
+          h("button", { type: "button", className: "text-button explore-row-refocus",
+            textContent: `Explore ${causes ? "its causes" : "its consequences"}`,
+            attrs: { "aria-label": `Explore ${causes ? "causes" : "consequences"} of ${labelFor(item.groupId)}` },
+            onclick: () => chooseFocus(item.groupId) }));
         })))));
+  }
+
+  /** Cheaply mark the row whose evidence is open, without rebuilding the list. */
+  function refreshSelection() {
+    if (!exploring()) return;
+    for (const button of els.results.querySelectorAll(".explore-row-open")) {
+      const selected = button.closest(".explore-row").dataset.edgeId === state.selectedEdgeId;
+      button.setAttribute("aria-pressed", String(selected));
+    }
   }
 
   function renderExplore() {
     const causes = state.task === "causes";
-    els.title.textContent = causes ? "Causes of a variable" : "Consequences of a variable";
-    const focus = focusId();
-    const picking = !focus || changing[state.task];
-    els.chosen.hidden = picking;
-    els.picker.hidden = !picking;
-    els.pickerCancel.hidden = !focus;
-    els.focusLabel.textContent = focus ? labelFor(focus) : "";
-    els.search.placeholder = `Search for the variable whose ${causes ? "causes" : "consequences"} you want`;
-    for (const button of els.depth.querySelectorAll("button[data-depth]")) {
-      button.setAttribute("aria-pressed", String(Number(button.dataset.depth) === view().depth));
+    const { groupId, picking } = focus();
+    els.resultsBlock.hidden = !groupId || picking;
+    if (groupId && !picking) renderResults(groupId);
+    els.hint.textContent = "Select a variable to see the evidence behind its link, or select a link in the graph.";
+    els.graphHint.hidden = Boolean(groupId);
+    els.graphHint.textContent = `Choose a variable to see its ${causes ? "causes" : "consequences"} as a graph.`;
+    if (els.graphTitle) {
+      els.graphTitle.textContent = groupId ? `${causes ? "Causes of" : "Consequences of"} ${labelFor(groupId)}` : "Working map";
     }
-    els.minPapers.value = String(view().minPapers);
-    if (picking) renderPicker();
-    if (focus) renderResults(focus);
-    else {
-      els.summary.textContent = `Choose a variable to see its ${causes ? "causes" : "consequences"}.`;
-      replaceChildren(els.results);
-    }
+    // The filters keep their usual controls; here "Max path" is how many causal steps to follow.
+    els.pathLabel.textContent = "Distance";
+    els.pathInput.max = String(MAX_NEIGHBORHOOD_DEPTH);
+    els.pathInput.setAttribute("aria-label", "Distance in causal steps");
+    els.pathInput.title = `How many causal steps from the variable to follow (1 to ${MAX_NEIGHBORHOOD_DEPTH}).`;
+    els.pathInput.value = String(state.confounderMaxPathLength);
   }
 
   function render() {
@@ -170,6 +287,18 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     els.reset.hidden = !task;
     els.landing.hidden = Boolean(task);
     els.explore.hidden = !exploring();
+    els.graphHint.hidden = true;
+    if (!exploring()) {
+      els.pathLabel.textContent = "Max path";
+      els.pathInput.max = "99";
+      els.pathInput.setAttribute("aria-label", "Maximum confounder path length");
+    } else if (settingsTask !== state.task) adoptViewSettings();
+    // On a phone the same panel tabs switch between the list and the graph.
+    for (const tab of document.querySelectorAll(".mobile-panel-nav [data-mobile-panel]")) {
+      const panel = tab.dataset.mobilePanel;
+      tab.dataset.identifyLabel ||= tab.textContent;
+      tab.textContent = exploring() && EXPLORE_NAV_LABELS[panel] ? EXPLORE_NAV_LABELS[panel] : tab.dataset.identifyLabel;
+    }
     if (exploring()) {
       // Start loading paper support while the user is still choosing a variable.
       if (paperSupport().status === "loading") loadPaperSupport();
@@ -181,24 +310,11 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     for (const button of document.querySelectorAll("#taskBar button[data-task], #taskLanding button[data-task]")) {
       button.addEventListener("click", () => setTask(button.dataset.task));
     }
-    replaceChildren(els.depth, h("span", { className: "explore-control-label", textContent: "Distance" }),
-      Array.from({ length: MAX_NEIGHBORHOOD_DEPTH }, (_, index) => h("button", {
-        type: "button", className: "toolbar-button", dataset: { depth: String(index + 1) },
-        textContent: String(index + 1), attrs: { "aria-pressed": "false", "aria-label": `Distance ${index + 1}` },
-        onclick: () => updateView({ depth: index + 1 }) })));
-    replaceChildren(els.minPapers, MIN_PAPER_CHOICES.map(value =>
-      h("option", { value: String(value), textContent: String(value) })));
-    els.minPapers.addEventListener("change", () => updateView({ minPapers: Number(els.minPapers.value) }));
-    els.search.addEventListener("input", renderPicker);
-    els.change.addEventListener("click", () => {
-      changing[state.task] = true;
-      renderExplore();
-      els.search.focus();
-    });
+    els.focusInput.addEventListener("input", () => onPickerInput());
     els.pickerCancel.addEventListener("click", () => {
       changing[state.task] = false;
-      els.search.value = "";
-      renderExplore();
+      els.focusInput.value = "";
+      onFocusPicking();
     });
     els.reset.addEventListener("click", () => els.dialog.showModal());
     el("resetContinue").addEventListener("click", () => els.dialog.close());
@@ -213,5 +329,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     });
   }
 
-  return { install, render, setTask, freshProjectUrl };
+  return { install, render, setTask, refreshSelection, neighborhood, exploring, focus, searchFocusGroups,
+    chooseFocus, changeFocus, freshProjectUrl };
 }

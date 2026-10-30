@@ -228,6 +228,71 @@ function prepareDagNodeGeometry(groups, params) {
   return { width, height, halfW, halfH, hashes, hubDamping };
 }
 
+/**
+ * One variable in the middle, the variables around it by distance. `focus` is
+ * `{ id, order, distance: [[id, steps]], parent: [[id, next toward the focus]] }`.
+ * Each distance gets its own columns on each side; a first-ring variable takes
+ * the side with room and farther ones stay on their parent's side, so routes
+ * run outward from the centre without crossing it.
+ */
+export function computeFocusLayout({ groups, links = [], width: containerW, height: containerH, focus,
+  viewSignature = "all" }) {
+  const n = groups.length;
+  const present = new Set(groups.map(group => group.group_id));
+  const distanceOf = new Map(focus.distance), parentOf = new Map(focus.parent);
+  const fontSize = n > 42 ? 11 : n > 30 ? 12 : 13;
+  const params = {
+    fontSize, vMargin: n > 34 ? 6 : 8, hMargin: n > 34 ? 10 : 13, nodeMaxWidth: n > 30 ? 185 : 170,
+    edgeWidth: n > 34 ? 1.1 : 1.25, rowGap: 72, columnGap: 230,
+  };
+  const { rowGap, columnGap } = params;
+  const capacity = Math.max(6, Math.floor(((containerH || 720) * 0.92) / rowGap));
+  const positions = new Map([[focus.id, { x: 0, y: 0, column: 0, row: 0 }]]);
+  const sideOf = new Map([[focus.id, 0]]);
+  const rings = new Map();
+  for (const id of focus.order) {
+    if (!present.has(id) || id === focus.id) continue;
+    const distance = distanceOf.get(id) || 1;
+    if (!rings.has(distance)) rings.set(distance, []);
+    rings.get(distance).push(id);
+  }
+  let outwardColumns = 0, maxRows = 1, firstRing = 0;
+  for (const distance of [...rings.keys()].sort((a, b) => a - b)) {
+    const sides = { [-1]: [], [1]: [] };
+    for (const id of rings.get(distance)) {
+      const parentSide = sideOf.get(parentOf.get(id));
+      // First-ring variables alternate, strongest first, so both sides stay balanced.
+      const side = distance === 1 || !parentSide ? (firstRing++ % 2 ? 1 : -1) : parentSide;
+      sideOf.set(id, side);
+      sides[side].push(id);
+    }
+    const yOf = id => positions.get(parentOf.get(id))?.y ?? 0;
+    for (const side of [-1, 1]) if (distance > 1) sides[side].sort((a, b) => yOf(a) - yOf(b));
+    // Both sides use the same number of columns so the picture stays symmetric.
+    const columns = Math.max(1, Math.ceil(Math.max(sides[-1].length, sides[1].length) / capacity));
+    for (const side of [-1, 1]) {
+      const list = sides[side], chunk = Math.ceil(list.length / columns) || 1;
+      for (let column = 0; column < columns; column++) {
+        const items = list.slice(column * chunk, (column + 1) * chunk);
+        maxRows = Math.max(maxRows, items.length);
+        items.forEach((id, row) => positions.set(id, {
+          x: side * (outwardColumns + column + 1) * columnGap,
+          y: (row - (items.length - 1) / 2) * rowGap,
+          column: side * (outwardColumns + column + 1), row,
+        }));
+      }
+    }
+    outwardColumns += columns;
+  }
+  return {
+    positions, boxes: dagNodeBoxes(groups, { positions, params }), params,
+    signature: ["focus", focus.id, n, links.length, Math.round(containerW || 0), Math.round(containerH || 0),
+      viewSignature].join(":"),
+    graphWidth: Math.max((2 * outwardColumns) * columnGap + params.nodeMaxWidth + 80, (containerW || 900) * 0.92),
+    graphHeight: Math.max((maxRows + 1) * rowGap, (containerH || 720) * 0.92),
+  };
+}
+
 function computeDagLayoutUncached({
   groups,
   links,
@@ -239,7 +304,11 @@ function computeDagLayoutUncached({
   width: containerW,
   height: containerH,
   viewSignature = "all",
+  focus = null,
 }) {
+  if (focus?.id && groups.some(group => group.group_id === focus.id)) {
+    return computeFocusLayout({ groups, links, width: containerW, height: containerH, focus, viewSignature });
+  }
   const n = groups.length;
   const edges = layoutDirectedEdges(groups, links);
   const scores = softCausalRanks(groups, edges);
@@ -1601,6 +1670,7 @@ export function computeDagLayout(args) {
     cache.dvId === args.dvId &&
     cache.instrumentId === args.instrumentId &&
     cache.mode === mode &&
+    cache.focus === (args.focus ?? null) &&
     cache.width === width &&
     cache.height === height &&
     cache.viewSignature === viewSignature
@@ -1621,6 +1691,7 @@ export function computeDagLayout(args) {
     dvId: args.dvId,
     instrumentId: args.instrumentId,
     mode,
+    focus: args.focus ?? null,
     width,
     height,
     viewSignature,

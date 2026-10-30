@@ -3067,18 +3067,16 @@ h2 {
   background: var(--bg);
 }
 .task-view[hidden] { display: none; }
-.dag-body.task-home .mobile-panel-nav,
-.dag-body.task-causes .mobile-panel-nav,
-.dag-body.task-consequences .mobile-panel-nav { display: none !important; }
+.dag-body.task-home .mobile-panel-nav { display: none !important; }
 .dag-body.focus-variable-map .task-bar,
 .dag-body.focus-dag .task-bar { display: none; }
 
-.task-landing-inner, .explore-inner {
+.task-landing-inner {
   width: min(760px, 100%);
   margin: 0 auto;
   padding: 40px 16px 64px;
 }
-.task-landing-inner h1, .explore-inner h1 { margin: 0 0 20px; font-size: 26px; }
+.task-landing-inner h1 { margin: 0 0 20px; font-size: 26px; }
 .task-choices { display: grid; gap: 12px; }
 .task-choice {
   display: grid;
@@ -3095,73 +3093,83 @@ h2 {
 .task-choice span { color: var(--muted); line-height: 1.45; }
 .task-choice:hover, .task-choice:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px #e6f2ee; }
 
-.explore-chosen {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.explore-chosen[hidden], .explore-picker[hidden] { display: none; }
-.explore-chosen strong { font-size: 18px; }
-.explore-picker { margin-bottom: 16px; }
-.explore-picker-list {
-  display: grid;
-  gap: 6px;
-  max-height: 45vh;
-  margin-top: 8px;
-  overflow-y: auto;
-}
-.explore-pick {
-  display: grid;
-  gap: 2px;
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--ink);
-  text-align: left;
-  cursor: pointer;
-}
-.explore-pick span { color: var(--muted); font-size: 13px; }
-.explore-pick:hover, .explore-pick:focus-visible { border-color: var(--accent); }
-.explore-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 24px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-.explore-depth { display: flex; align-items: center; gap: 6px; }
-.explore-depth button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
-.explore-min-papers { display: flex; align-items: center; gap: 8px; }
-.explore-control-label { color: var(--muted); font-size: 13px; font-weight: 650; }
 .explore-summary { margin: 16px 0; color: var(--ink); line-height: 1.45; }
 .explore-group h2 { margin: 20px 0 8px; font-size: 15px; }
 .explore-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .explore-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 12px;
-  padding: 9px 12px;
+  align-items: center;
+  gap: 2px 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
 }
-.explore-row-label {
-  padding: 0;
+.explore-row-open {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  padding: 9px 12px;
   border: 0;
+  border-radius: 8px;
   background: none;
   color: var(--ink);
-  font-weight: 700;
   text-align: left;
   cursor: pointer;
 }
-.explore-row-label:hover, .explore-row-label:focus-visible { color: var(--accent); text-decoration: underline; }
+.explore-row-open:hover, .explore-row-open:focus-visible { background: #eef6f3; }
+.explore-row-open[aria-pressed="true"] { background: #e6f2ee; box-shadow: inset 3px 0 0 var(--accent); }
+.explore-row-label { font-weight: 700; overflow-wrap: anywhere; }
 .explore-row-papers { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .explore-row-path { grid-column: 1 / -1; color: var(--muted); font-size: 13px; }
+.explore-row { grid-template-columns: minmax(0, 1fr); }
+.explore-row-refocus {
+  justify-self: end;
+  margin: -4px 10px 6px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+/* With a mouse the extra action appears on hover, focus or when the row is open; touch always shows it. */
+@media (hover: hover) {
+  .explore-row-refocus { display: none; }
+  .explore-row:hover .explore-row-refocus,
+  .explore-row:focus-within .explore-row-refocus,
+  .explore-row:has(.explore-row-open[aria-pressed="true"]) .explore-row-refocus { display: block; }
+}
+.explore-view[hidden], .explore-results-block[hidden] { display: none; }
+.explore-graph-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+  pointer-events: none;
+}
+.explore-graph-hint[hidden] { display: none; }
+.dag-network-wrapper { position: relative; }
+
+/* Causes and consequences are the Identify workspace with one variable: the
+   same shell, anchor bar, Filters and evidence pane. Only Identify's own setup
+   and diagnostic controls are left out. */
+.dag-body.task-causes .dag-left-panel > #setupSection,
+.dag-body.task-consequences .dag-left-panel > #setupSection,
+.dag-body.task-causes .dag-left-panel > #variablePanel,
+.dag-body.task-consequences .dag-left-panel > #variablePanel,
+.dag-body.task-causes .dag-left-panel > #confounderConfig,
+.dag-body.task-consequences .dag-left-panel > #confounderConfig,
+.dag-body.task-causes #toggleConfoundersOnly, .dag-body.task-consequences #toggleConfoundersOnly,
+.dag-body.task-causes #toggleCollidersOnly, .dag-body.task-consequences #toggleCollidersOnly,
+.dag-body.task-causes #toggleExclusionViolations, .dag-body.task-consequences #toggleExclusionViolations,
+.dag-body.task-causes #toggleExogeneity, .dag-body.task-consequences #toggleExogeneity,
+.dag-body.task-causes #toggleBottleneckedConfounders, .dag-body.task-consequences #toggleBottleneckedConfounders,
+.dag-body.task-causes #toggleIrrelevantConfounderLinks, .dag-body.task-consequences #toggleIrrelevantConfounderLinks,
+.dag-body.task-causes #toggleAllExclusionLinks, .dag-body.task-consequences #toggleAllExclusionLinks,
+.dag-body.task-causes #diagnosticOverlapKey, .dag-body.task-consequences #diagnosticOverlapKey { display: none !important; }
+.dag-body.task-causes .mobile-variable-tab, .dag-body.task-consequences .mobile-variable-tab { display: none; }
 
 .reset-dialog-actions { display: grid; gap: 8px; margin-top: 18px; }
 .reset-dialog-actions button { width: 100%; }
@@ -3174,8 +3182,8 @@ h2 {
   .task-tab-short { display: inline; }
   .task-tabs { gap: 2px; scrollbar-width: none; }
   .task-tab { padding: 7px 7px; font-size: 14px; }
-  .task-landing-inner, .explore-inner { padding: 24px 16px 48px; }
-  .task-landing-inner h1, .explore-inner h1 { font-size: 22px; }
+  .task-landing-inner { padding: 24px 16px 48px; }
+  .task-landing-inner h1 { font-size: 22px; }
 }
 /* Identification keeps its own panel heading, so the bar need not repeat the name there. */
-.dag-body.task-identify .task-bar-brand { display: none; }
+.dag-body.task-identify .task-bar-brand, .dag-body.task-causes .task-bar-brand, .dag-body.task-consequences .task-bar-brand { display: none; }

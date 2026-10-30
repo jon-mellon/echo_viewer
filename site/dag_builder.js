@@ -23,7 +23,7 @@ import { createDagMapUiController } from "/dag_map_ui_controller.mjs";
 import { createDagSetupGroupController } from "/dag_setup_group_controller.mjs";
 import { createDagGroupEditorController } from "/dag_group_editor_controller.mjs";
 import { deriveDagView, excludedForConnectivity } from "/dag_view.mjs";
-import { createDagNetworkController } from "/dag_network_controller.mjs?v=compiled-first-v2";
+import { createDagNetworkController, isDagDisplayGroup } from "/dag_network_controller.mjs?v=compiled-first-v2";
 import { createDagEventController } from "/dag_event_controller.mjs";
 import { createUoaController } from "/uoa_controller.mjs";
 import { createToolbarController } from "/toolbar_controller.mjs";
@@ -164,6 +164,7 @@ function initElements() {
     "groupSeedInput", "groupSeedResults",
     "includedVariables", "neighborSuggestions",
     // Right: DAG workspace
+    "focusSearchBlock", "focusInput", "focusInputLabel", "focusGroupPicker", "focusPickerCancel",
     "dagWorkspaceSection", "dagNetwork", "dagViewTitle", "diagnosticOverlapKey", "confounderConfig", "confounderDisclosure", "confounderSummary", "confounderStatusList",
     "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
@@ -473,6 +474,7 @@ function rebuildProject(options) {
 
 function updateDagFilters() {
   renderCoordinator.updateDagFilters();
+  taskViews.render();
   persistentViewer.viewerChanged();
 }
 
@@ -499,6 +501,7 @@ function renderAnchorBar() {
 }
 
 function changeAnchor(side) {
+  if (taskViews.exploring()) { taskViews.changeFocus(); return; }
   const gid = side === "dv" ? state.project?.dv_group_id
     : side === "instrument" ? state.project?.instrument_group_id : state.project?.iv_group_id;
   const group = groupById(gid);
@@ -758,6 +761,7 @@ async function startVariableSearchCatalogLoad() {
   renderSearch("iv");
   renderSearch("dv");
   renderSetupGroupPicker("instrument");
+  setupGroupController.renderFocusPicker();
   if (state.definitionDraft?.step === "sources") renderDefinition();
   taskViews.render();
 }
@@ -1123,8 +1127,11 @@ const persistentViewer = createPersistentViewer({
   getSchema: currentWorkingGroupingSchema,
   getViewport: () => {
     const network = dagNetworkController.getNetwork();
-    state.dagViewport = network
-      ? { scale: network.getScale(), position: network.getViewPosition() } : null;
+    // An empty or unsized graph reports a meaningless scale; saving it would
+    // make a reopened link zoom to nothing.
+    const scale = network?.getScale();
+    state.dagViewport = network && Number.isFinite(scale) && scale > 0 && scale < 1e4
+      ? { scale, position: network.getViewPosition() } : null;
   },
   status: message => {
     if (els.localSaveStatus) els.localSaveStatus.textContent = message;
@@ -1138,6 +1145,14 @@ const persistentViewer = createPersistentViewer({
 const taskViews = createTaskViews({
   state, searchGroups: searchExploreGroups, searchStatus: () => state.variableSearchStatus,
   paperSupport: linkPaperSupport, loadPaperSupport: () => void loadLinkSupport(),
+  isDisplayGroup: isDagDisplayGroup,
+  // A new variable redraws the chrome (anchor bar, picker) and the graph.
+  onExploreChange: () => renderAll({ reuseLinks: true }),
+  onFocusPicking: () => renderAll({ rebuild: false }),
+  onPickerInput: () => setupGroupController.renderFocusPicker(),
+  // Each task shows its own graph, so rebuild it from the project's links.
+  onTaskChange: () => { dismissEvidenceForTask(); renderAll({ reuseLinks: true }); },
+  openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
   onChange: () => persistentViewer.viewerChanged(), flushUrl: () => persistentViewer.flushUrl(),
 });
 taskViews.install();
@@ -1311,7 +1326,9 @@ function loadLinkSupport() {
     return false;
   }).finally(() => {
     linkSupportPromise = null;
-    taskViews.render();
+    // The graph of an explore view waits on these counts, so redraw it now.
+    if (taskViews.exploring()) updateDagFilters();
+    else taskViews.render();
   });
   return linkSupportPromise;
 }
@@ -1331,7 +1348,26 @@ function linkPaperSupport() {
     cacheKey: state.edgeSupportById };
 }
 
+// Causes and consequences draw one variable's neighborhood through the same
+// graph and evidence pane as Identify; the diagnostics belong to Identify.
+function computeExploreLinks() {
+  const { graph } = taskViews.neighborhood();
+  state.componentGroupIds = graph.groupIds;
+  state.visibleLinks = graph.links;
+  state.exploreLayout = graph.layout;
+  for (const key of ["confounderGroupIds", "confounderPathGroupIds", "bottleneckedConfounderIds",
+    "colliderGroupIds", "colliderPathGroupIds", "bottleneckedColliderIds", "exclusionViolationIds",
+    "exclusionPathIds", "exclusionLinkPairKeys", "exogeneityGroupIds", "exogeneityPathGroupIds",
+    "exogeneityLinkPairKeys", "bottleneckedExogeneityIds", "confounderLinkPairKeys", "colliderLinkPairKeys"]) {
+    state[key] = new Set();
+  }
+  for (const key of ["confounderPathsByGroup", "colliderPathsByGroup", "exclusionPathsByGroup", "exogeneityPathsByGroup"]) {
+    state[key] = new Map();
+  }
+}
+
 function computeVisibleLinks() {
+  if (taskViews.exploring()) { computeExploreLinks(); return; }
   ensureDiagnosticFilter(state);
   const missingSparseEvidence = state.excludeSparseEdges ? missingLinkSupportIds() : [];
   if (missingSparseEvidence.length && !sparseWaitingForSupport) {
@@ -1489,7 +1525,13 @@ function highlightConfounderPaths(id) { return dagNetworkController.highlightCon
 function clearConfounderPathHover() { return dagNetworkController.clearConfounderPathHover(); }
 function clearLogicalDagEdgeHover() { return dagNetworkController.clearLogicalDagEdgeHover(); }
 function renderDag(options) { return dagNetworkController.renderDag(options); }
-function refreshDagEdgeSelection(options) { return dagNetworkController.refreshEdgeSelection(options); }
+function refreshDagEdgeSelection(options) {
+  const refreshed = dagNetworkController.refreshEdgeSelection(options);
+  taskViews.refreshSelection();
+  // The open link is part of the permalink, however it was selected.
+  persistentViewer.viewerChanged();
+  return refreshed;
+}
 function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 
 // ─── Edge inspector + provenance ──────────────────────────────────────────────
@@ -1584,6 +1626,19 @@ function renderSelectedEdge() {
     pendingEdgeEvidencePromise = load;
   }
   renderSelectedEdgePanels();
+}
+
+// The open evidence is per task; clear what the old task showed so the pane
+// matches the new task's selection (restored by the task views).
+function dismissEvidenceForTask() {
+  inspectorController.clearPendingExclude();
+  state.selectedVariableIds.clear();
+  state.comparisonVariableIds = [];
+  if (!state.selectedEdgeId) {
+    els.edgeInspector.hidden = true;
+    els.provenancePanel.hidden = true;
+    els.closeEvidencePane.hidden = true;
+  }
 }
 
 function dismissEvidencePane() {
@@ -1883,6 +1938,8 @@ const setupGroupController = createDagSetupGroupController({
   roleLabels: ROLE_LABELS, dagProjectView, startDefinition, startEditSplit,
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
   searchAnchorGroups, beginEditor: () => persistentViewer.beginEditor(),
+  exploreFocus: () => taskViews.focus(), searchFocusGroups: query => taskViews.searchFocusGroups(query),
+  onChooseFocus: groupId => taskViews.chooseFocus(groupId),
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
   excludeConcept: excludeGroupConcept,

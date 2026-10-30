@@ -55,31 +55,6 @@
         </div>
       </div>
     </section>
-    <section id="exploreView" class="task-view explore-view" aria-labelledby="exploreTitle" hidden>
-      <div class="explore-inner">
-        <h1 id="exploreTitle">Causes of a variable</h1>
-        <div id="exploreChosen" class="explore-chosen" hidden>
-          <span class="dag-label">Variable</span>
-          <strong id="exploreFocusLabel"></strong>
-          <button id="exploreChange" class="text-button" type="button">Change</button>
-        </div>
-        <div id="explorePicker" class="explore-picker">
-          <div class="anchor-source-header">
-            <label class="dag-label" for="exploreSearch">Search existing variables</label>
-            <button id="explorePickerCancel" class="text-button" type="button" hidden>Cancel</button>
-          </div>
-          <input id="exploreSearch" class="search-input" type="search" placeholder="Search for a variable" autocomplete="off">
-          <div id="explorePickerList" class="explore-picker-list"></div>
-        </div>
-        <div class="explore-controls">
-          <div id="exploreDepth" class="explore-depth" role="group" aria-label="Distance in causal steps"></div>
-          <label class="explore-min-papers" for="exploreMinPapers"><span class="explore-control-label">Min papers per link</span>
-            <select id="exploreMinPapers" class="select-input-sm"></select></label>
-        </div>
-        <p id="exploreSummary" class="explore-summary" aria-live="polite"></p>
-        <div id="exploreResults" class="explore-results"></div>
-      </div>
-    </section>
     <dialog id="resetDialog" class="publication-dialog reset-dialog" aria-labelledby="resetDialogTitle">
       <h2 id="resetDialogTitle">Reset this project?</h2>
       <p>Resetting clears the variables chosen in all three views and returns to the start page. The current project is kept in Previous Sessions in this browser.</p>
@@ -165,6 +140,22 @@
             <span class="history-help">Undo and redo cover project edits and exclude/restore decisions, not display filters.</span>
           </div>
         </div>
+
+        <section id="exploreView" class="panel-section explore-view" aria-label="Causes or consequences of a variable" hidden>
+          <div id="focusSearchBlock" class="search-block">
+            <div class="anchor-source-header">
+              <label id="focusInputLabel" class="dag-label" for="focusInput">Search existing groups</label>
+              <button id="focusPickerCancel" class="text-button" type="button" hidden>Cancel</button>
+            </div>
+            <input id="focusInput" class="search-input" type="search" placeholder="Search group or constituent variable" autocomplete="off">
+            <div id="focusGroupPicker" class="setup-group-picker" hidden></div>
+          </div>
+          <div id="exploreResultsBlock" class="explore-results-block" hidden>
+            <p id="exploreSummary" class="explore-summary" aria-live="polite"></p>
+            <p id="exploreHint" class="small-note explore-hint" hidden></p>
+            <div id="exploreResults" class="explore-results"></div>
+          </div>
+        </section>
 
         <!-- SETUP mode: Ind var/Dep var selection and schema choice -->
         <section id="setupSection" class="panel-section">
@@ -495,7 +486,7 @@
               <button id="toggleExclusionViolations" class="toolbar-button" type="button" aria-pressed="false" hidden>Exclusion restriction violations</button>
               <button id="toggleExogeneity" class="toolbar-button" type="button" aria-pressed="false" hidden>Exogeneity</button>
               <label class="path-length-control" for="confounderPathLength" title="Maximum number of directed edges allowed on each path from a confounder to the Ind var and Dep var">
-                <span>Max path</span>
+                <span id="confounderPathLengthLabel">Max path</span>
                 <input id="confounderPathLength" class="path-length-input" type="number" min="1" max="99" step="1" value="1" inputmode="numeric" aria-label="Maximum confounder path length">
               </label>
               <button id="toggleSparseEdges" class="toolbar-button" type="button" aria-pressed="false" title="Hide edges supported by fewer than the minimum number of distinct papers">Exclude sparse edges</button>
@@ -519,6 +510,7 @@
           </div>
           <div class="dag-network-wrapper">
             <div id="dagNetwork" class="dag-network"></div>
+            <p id="exploreGraphHint" class="explore-graph-hint" hidden></p>
             <div id="diagnosticOverlapKey" class="diagnostic-overlap-key" hidden></div>
           </div>
           <div class="dag-ws-footer">
