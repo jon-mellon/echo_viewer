@@ -3,7 +3,7 @@ const { test, expect } = require("playwright/test");
 test("the local schema database upgrade preserves saved schemas and sessions", async ({ page }) => {
   await page.route("http://127.0.0.1:8767/", route =>
     route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Storage upgrade</title>" }));
-  await page.goto("http://127.0.0.1:8767/?task=identify");
+  await page.goto("http://127.0.0.1:8767/");
   const result = await page.evaluate(async () => {
     const old = await new Promise((resolve, reject) => {
       const request = indexedDB.open("echo-local-schemas", 1);
@@ -44,7 +44,7 @@ test("the local schema database upgrade preserves saved schemas and sessions", a
 test("a blocked database upgrade recovers after the old tab closes its connection", async ({ page }) => {
   await page.route("http://127.0.0.1:8767/", route =>
     route.fulfill({ contentType: "text/html", body: "<!doctype html><title>Storage recovery</title>" }));
-  await page.goto("http://127.0.0.1:8767/?task=identify");
+  await page.goto("http://127.0.0.1:8767/");
   const result = await page.evaluate(async () => {
     const old = await new Promise((resolve, reject) => {
       const request = indexedDB.open("echo-local-schemas", 1);
@@ -70,7 +70,7 @@ test("a blocked database upgrade recovers after the old tab closes its connectio
 
 test("the root starts fresh and Previous Sessions restores a committed local schema", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto("http://127.0.0.1:8767/?new=1&task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?new=1", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
     && document.getElementById("startupLoading")?.hidden);
   const { localUrl, movedVariable, targetGroup, decidedEdge } = await page.evaluate(async () => {
@@ -126,7 +126,7 @@ test("the root starts fresh and Previous Sessions restores a committed local sch
   await freshPage.goto(localUrl, { waitUntil: "domcontentloaded" });
   await expect(freshPage.getByRole("heading", { name: "Local schema unavailable" })).toBeVisible();
   await freshContext.close();
-  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.getElementById("startupLoading")?.hidden);
   expect(new URL(page.url()).searchParams.get("local_schema")).toBeNull();
   await page.getByRole("button", { name: "Previous Sessions" }).click();
@@ -138,7 +138,7 @@ test("the root starts fresh and Previous Sessions restores a committed local sch
 
 test("stale editor revisions fail without losing the in-memory draft", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto("http://127.0.0.1:8767/?new=1&task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?new=1", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.data?.publication_source
     && window.__dagBuilderState?.publishedSchemaHydrated
     && document.getElementById("startupLoading")?.hidden);
@@ -188,7 +188,7 @@ test("stale editor revisions fail without losing the in-memory draft", async ({ 
 
 test("an older write cannot replace a newer URL for the same previous session", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto("http://127.0.0.1:8767/?new=1&task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?new=1", { waitUntil: "domcontentloaded" });
   const result = await page.evaluate(async () => {
     const { mirrorSessionUrl, listPreviousSessions } = await import("/local_schema_store.mjs");
     const id = crypto.randomUUID();
@@ -202,7 +202,7 @@ test("an older write cannot replace a newer URL for the same previous session", 
 
 test("importing a local draft creates an independent schema ID", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto("http://127.0.0.1:8767/?new=1&task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?new=1", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.data?.publication_source
     && window.__dagBuilderState?.publishedSchemaHydrated
     && document.getElementById("startupLoading")?.hidden);
@@ -231,7 +231,7 @@ test("importing a local draft creates an independent schema ID", async ({ page }
 
 test("the default published compiled graph contains no private exclusion reason", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto("http://127.0.0.1:8767/?new=1&task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?new=1", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.data?.compiled_dag);
   const leaked = await page.evaluate(() => window.__dagBuilderState.data.compiled_dag.edges
     .filter(edge => edge.exclude_reason != null || edge.user_decision?.exclude_reason != null).length);

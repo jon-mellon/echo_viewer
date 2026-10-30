@@ -313,26 +313,8 @@ export class ParquetManifestDagDataSource {
     const columns = await queryRows(this.connection, `DESCRIBE SELECT * FROM ${relation}`);
     const claim = columns.some(column => column.column_name === "causal_link_existence")
       ? "causal_link_existence" : "NULL::VARCHAR AS causal_link_existence";
-    // Read the three columns directly, yielding between slices: building a
-    // full row object per finding blocked the page for most of a second on
-    // phones, and these records serve every group link at once.
-    const table = await this.connection.query(`SELECT raw_causal_link_id, paper_id,
-      ${claim} FROM ${relation}`);
-    const ids = table.getChild("raw_causal_link_id"), papers = table.getChild("paper_id");
-    const claims = table.getChild("causal_link_existence");
-    const rows = [];
-    let sliceStart = performance.now();
-    for (let index = 0; index < table.numRows; index++) {
-      const id = ids.get(index);
-      if (requested.has(id)) {
-        rows.push({ raw_causal_link_id: id, paper_id: papers.get(index), causal_link_existence: claims.get(index) });
-      }
-      if ((index & 1023) === 1023 && performance.now() - sliceStart > 8) {
-        await new Promise(resolve => setTimeout(resolve, 0));
-        sliceStart = performance.now();
-      }
-    }
-    return rows;
+    return (await queryRows(this.connection, `SELECT raw_causal_link_id, paper_id,
+      ${claim} FROM ${relation}`)).filter(row => requested.has(row.raw_causal_link_id));
   }
 
   async loadRawLinkEndpointsByIds(rawLinkIds) {

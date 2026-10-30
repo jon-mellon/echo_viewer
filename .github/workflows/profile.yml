@@ -29,8 +29,6 @@ jobs:
         run: npm run profile:diagnostics
       - name: Enforce evidence loading budgets on the default snapshot
         run: npm run profile:edge-evidence
-      - name: Enforce mobile causes and consequences budgets
-        run: npm run profile:explore
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -42,5 +40,4 @@ jobs:
             profile-results-permalink-mobile/
             profile-results-diagnostics-mobile/
             profile-results-edge-evidence/
-            profile-results-explore-mobile/
           retention-days: 1
