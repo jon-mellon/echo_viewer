@@ -44,6 +44,9 @@ jobs:
       - name: Enforce evidence loading budgets on the default snapshot
         run: PROFILE_SITE_DIR=dist/site npm run profile:edge-evidence
 
+      - name: Enforce mobile causes and consequences budgets
+        run: PROFILE_SITE_DIR=dist/site npm run profile:explore
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -51,6 +54,7 @@ jobs:
           path: |
             profile-results-diagnostics-mobile/
             profile-results-edge-evidence/
+            profile-results-explore-mobile/
           if-no-files-found: ignore
           retention-days: 1
 

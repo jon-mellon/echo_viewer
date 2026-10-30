@@ -1,6 +1,6 @@
 import { dagDataSource } from "./dag_data_source.mjs?v=browser-v2";
 import { schemaPublicationId } from "./dag_data_config.mjs";
-import { applyPermalink, permalinkInput } from "./dag_permalink.mjs";
+import { applyPermalink, permalinkInput, TASKS } from "./dag_permalink.mjs";
 import { createProjectBootstrapPresenter } from "./project_bootstrap_presenter.mjs";
 import { loadLocalSchema } from "./local_schema_store.mjs";
 import { incrementCompiledDag } from "./compiled_dag.mjs";
@@ -11,7 +11,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
   resizeMap, initializeProject, loadLatestSchemaGroups,
   normalizeProjectDuplicateAssignments, publicationController, renderAll,
   constrainMapTransform, drawMap, fitMap, dagNetworkController, buildDuplicateClusters,
-  linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {},
+  linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {}, onPreloadsDone = () => {},
   onLocalSchemaLoaded = () => {} }) {
   const presenter = createProjectBootstrapPresenter({});
   const setStartupStage = message => presenter.setStartupStage(message);
@@ -25,6 +25,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     installDefinitionHandlers();
     resizeMap();
     const requested = new URL(window.location.href);
+    // A plain ?task= link opens that task directly; permalinks carry their own.
+    const requestedTask = requested.searchParams.get("task");
     if (requested.searchParams.has("new")) {
       history.replaceState(null, "", "/");
     } else if (requested.pathname === "/" && !requested.search && !requested.hash) {
@@ -110,7 +112,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     if (permalink) {
       applyPermalink(permalink, state);
       if (state.project.iv_group_id && state.project.dv_group_id) state.phase = "build";
-    }
+    } else if (TASKS.includes(requestedTask)) state.task = requestedTask;
     if (state.data.publication_source && !state.project.publication) {
       state.project.publication = {
         ...state.data.publication_source,
@@ -149,12 +151,19 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     // instantiation and snapshot validation, over a second). Start it once the
     // schema work is done, in idle time, unless the snapshot has evidence bundles
     // (which never need it) or the user asked to save data.
-    const prewarmEvidenceEngine = () => {
-      if (globalThis.navigator?.connection?.saveData || dagDataSource.hasEvidencePanelBundles()) return;
-      const start = () => void dagDataSource.ensureEvidenceConnection({ variableIds: [] }).catch(() => {});
+    const prewarmEvidenceEngine = () => new Promise(resolve => {
+      if (globalThis.navigator?.connection?.saveData || dagDataSource.hasEvidencePanelBundles()) { resolve(); return; }
+      const start = () => void dagDataSource.ensureEvidenceConnection({ variableIds: [] }).catch(() => {}).finally(resolve);
       if (typeof globalThis.requestIdleCallback === "function") globalThis.requestIdleCallback(start, { timeout: 5000 });
       else setTimeout(start, 1000);
-    };
+    });
+    // Later preloads wait for the search catalog and query engine, so they
+    // never compete with them for bandwidth or the main thread.
+    const preload = catalog => void Promise.allSettled([catalog, prewarmEvidenceEngine()]).then(() => onPreloadsDone());
+    // A fresh project carries placeholder anchor IDs, so check for real groups.
+    const anchored = side => (state.project.groups || []).some(group => group.group_id === state.project[`${side}_group_id`]);
+    const catalogIfSettingUp = () => (!anchored("iv") || !anchored("dv")
+      ? loadVariableSearchCatalog() : Promise.resolve());
     // Keep membership loading ahead of the search index; start warming the
     // catalog after hydration so subsequent searches are ready during setup.
     if (state.data.load_published_schema) {
@@ -187,23 +196,23 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.publishedMembershipReadyGroups = new Set(schema.groups.map(group => group.group_id));
         state.publishedSchemaLoadFailed = false;
         await applyLoadedSchema(schema, true);
-        if (!state.project.iv_group_id || !state.project.dv_group_id) void loadVariableSearchCatalog();
+        const catalog = catalogIfSettingUp();
         publicationController.setSchemaReady?.(true);
         void publicationController.refreshPublicationState?.();
         onReady();
-        prewarmEvidenceEngine();
+        preload(catalog);
       }).catch(error => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.publishedSchemaHydrating = false;
         state.publishedSchemaLoadFailed = true;
         publicationController.setSchemaLoadFailed?.();
         console.error("Could not finish loading the published schema.", error);
-        prewarmEvidenceEngine();
+        preload(Promise.resolve());
       });
     } else {
-      if (!state.project.iv_group_id || !state.project.dv_group_id) void loadVariableSearchCatalog();
+      const catalog = catalogIfSettingUp();
       onReady();
-      prewarmEvidenceEngine();
+      preload(catalog);
     }
   }
 

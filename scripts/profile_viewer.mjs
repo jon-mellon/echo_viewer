@@ -6,7 +6,8 @@ import { join } from "node:path";
 
 const permalink = process.env.PROFILE_SCENARIO === "permalink";
 const permalinkUrl = new URL(process.env.PROFILE_PERMALINK_URL || "https://echo.epistemicinfra.org/?p=1&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0&iv=category-academic-achievement&dv=category-income&mode=group_review&path=1&selected_edge=category-academic-achievement__category-personality&sort=relevance&mz=1&mx=0&my=0&dz=0.8894702419882274&dx=-114.12353515625004&dy=1.749999999999995&causal=0&conf=1&coll=0&bottle=1&paths=1&vl=1&gl=1&schema=7f397168-bc90-4a84-94a9-cfbeac700152");
-const localUrl = new URL("http://127.0.0.1:8767/");
+// Without a permalink the viewer opens its start page; profile the identification task.
+const localUrl = new URL("http://127.0.0.1:8767/?task=identify");
 if (permalink) localUrl.search = permalinkUrl.search;
 const url = process.env.PROFILE_URL || localUrl.href;
 const mobile = process.env.PROFILE_DEVICE === "mobile";

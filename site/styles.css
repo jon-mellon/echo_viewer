@@ -652,6 +652,7 @@ h2 {
 }
 
 .dag-body {
+  --app-top: 48px;
   overflow: hidden;
   background: #eef1ed;
 }
@@ -661,7 +662,8 @@ h2 {
   grid-template-columns: var(--left-w, 370px) 5px minmax(430px, 1fr) 5px var(--right-w, 440px);
   grid-template-rows: 1fr;
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh - var(--app-top, 0px));
+  margin-top: var(--app-top, 0px);
 }
 
 .mobile-panel-nav {
@@ -684,7 +686,7 @@ h2 {
 
 .dag-left-panel {
   min-width: 0;
-  height: 100vh;
+  height: calc(100vh - var(--app-top, 0px));
   overflow-y: auto;
   background: var(--panel);
   grid-column: 1;
@@ -694,7 +696,7 @@ h2 {
 
 .dag-right-panel {
   min-width: 0;
-  height: 100vh;
+  height: calc(100vh - var(--app-top, 0px));
   background: var(--panel);
   grid-column: 5;
   grid-row: 1;
@@ -2544,7 +2546,7 @@ h2 {
 
   .dag-shell {
     display: block;
-    height: calc(100dvh - var(--mobile-nav-height) - env(safe-area-inset-bottom));
+    height: calc(100dvh - var(--mobile-nav-height) - env(safe-area-inset-bottom) - var(--app-top, 0px));
     min-height: 0;
     overflow: hidden;
   }
@@ -2703,14 +2705,14 @@ h2 {
 @media (min-width: 841px) and (max-width: 1120px) {
   .dag2-mode .dag-shell {
     grid-template-rows: 1fr;
-    height: 100vh;
+    height: calc(100vh - var(--app-top, 0px));
     overflow: hidden;
   }
 
   .dag2-mode .dag-left-panel,
   .dag2-mode .dag-right-panel {
     grid-row: 1;
-    height: 100vh;
+    height: calc(100vh - var(--app-top, 0px));
     border-top: 0;
   }
 }
@@ -2749,7 +2751,7 @@ h2 {
 
   .dag2-mode .dag-shell {
     display: block;
-    height: calc(100dvh - var(--mobile-nav-height) - env(safe-area-inset-bottom));
+    height: calc(100dvh - var(--mobile-nav-height) - env(safe-area-inset-bottom) - var(--app-top, 0px));
     overflow: hidden;
   }
 
@@ -2987,7 +2989,7 @@ h2 {
 /* Give the initial variable selection the whole viewport. */
 .dag2-mode.initial-setup:not(.defining-variable) .dag-shell {
   display: block;
-  height: 100dvh;
+  height: calc(100dvh - var(--app-top, 0px));
 }
 .dag2-mode.initial-setup:not(.defining-variable) .dag-left-panel {
   width: 100%;
@@ -3024,3 +3026,156 @@ h2 {
   border-radius: 8px;
   background: var(--panel);
 }
+
+/* Task bar, start page, and the causes and consequences views. */
+.task-bar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--app-top);
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.task-bar[hidden] { display: none; }
+.task-bar-brand { font-weight: 800; letter-spacing: 0.02em; }
+.task-tabs { display: flex; gap: 4px; min-width: 0; overflow-x: auto; }
+.task-tab {
+  flex: none;
+  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 650;
+  cursor: pointer;
+}
+.task-tab:hover { color: var(--ink); background: #eef1ed; }
+.task-tab[aria-pressed="true"] { border-color: var(--accent); background: #e6f2ee; color: var(--accent); }
+.task-tab-short { display: none; }
+.task-reset { margin-left: auto; flex: none; }
+.task-reset[hidden] { display: none; }
+
+.task-view {
+  position: fixed;
+  inset: var(--app-top) 0 0 0;
+  z-index: 90;
+  overflow-y: auto;
+  background: var(--bg);
+}
+.task-view[hidden] { display: none; }
+.dag-body.task-home .mobile-panel-nav,
+.dag-body.task-causes .mobile-panel-nav,
+.dag-body.task-consequences .mobile-panel-nav { display: none !important; }
+.dag-body.focus-variable-map .task-bar,
+.dag-body.focus-dag .task-bar { display: none; }
+
+.task-landing-inner, .explore-inner {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 40px 16px 64px;
+}
+.task-landing-inner h1, .explore-inner h1 { margin: 0 0 20px; font-size: 26px; }
+.task-choices { display: grid; gap: 12px; }
+.task-choice {
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.task-choice strong { font-size: 17px; }
+.task-choice span { color: var(--muted); line-height: 1.45; }
+.task-choice:hover, .task-choice:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px #e6f2ee; }
+
+.explore-chosen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.explore-chosen[hidden], .explore-picker[hidden] { display: none; }
+.explore-chosen strong { font-size: 18px; }
+.explore-picker { margin-bottom: 16px; }
+.explore-picker-list {
+  display: grid;
+  gap: 6px;
+  max-height: 45vh;
+  margin-top: 8px;
+  overflow-y: auto;
+}
+.explore-pick {
+  display: grid;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.explore-pick span { color: var(--muted); font-size: 13px; }
+.explore-pick:hover, .explore-pick:focus-visible { border-color: var(--accent); }
+.explore-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.explore-depth { display: flex; align-items: center; gap: 6px; }
+.explore-depth button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: #fff; }
+.explore-min-papers { display: flex; align-items: center; gap: 8px; }
+.explore-control-label { color: var(--muted); font-size: 13px; font-weight: 650; }
+.explore-summary { margin: 16px 0; color: var(--ink); line-height: 1.45; }
+.explore-group h2 { margin: 20px 0 8px; font-size: 15px; }
+.explore-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.explore-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.explore-row-label {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.explore-row-label:hover, .explore-row-label:focus-visible { color: var(--accent); text-decoration: underline; }
+.explore-row-papers { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.explore-row-path { grid-column: 1 / -1; color: var(--muted); font-size: 13px; }
+
+.reset-dialog-actions { display: grid; gap: 8px; margin-top: 18px; }
+.reset-dialog-actions button { width: 100%; }
+.reset-here { border-color: #b42318; color: #b42318; }
+
+@media (max-width: 840px) {
+  .dag-body { --app-top: 52px; }
+  .task-bar { gap: 8px; padding: 0 8px; }
+  .task-bar-brand, .task-tab-long { display: none; }
+  .task-tab-short { display: inline; }
+  .task-tabs { gap: 2px; scrollbar-width: none; }
+  .task-tab { padding: 7px 7px; font-size: 14px; }
+  .task-landing-inner, .explore-inner { padding: 24px 16px 48px; }
+  .task-landing-inner h1, .explore-inner h1 { font-size: 22px; }
+}
+/* Identification keeps its own panel heading, so the bar need not repeat the name there. */
+.dag-body.task-identify .task-bar-brand { display: none; }

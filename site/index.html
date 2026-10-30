@@ -27,6 +27,68 @@
         </div>
       </div>
     </div>
+    <header id="taskBar" class="task-bar" hidden>
+      <span class="task-bar-brand">ECHO</span>
+      <nav class="task-tabs" aria-label="Choose what to do">
+        <button class="task-tab" type="button" data-task="identify" aria-pressed="false"><span class="task-tab-long">Identify an estimate</span><span class="task-tab-short">Identify</span></button>
+        <button class="task-tab" type="button" data-task="causes" aria-pressed="false"><span class="task-tab-long">Causes of a variable</span><span class="task-tab-short">Causes</span></button>
+        <button class="task-tab" type="button" data-task="consequences" aria-pressed="false"><span class="task-tab-long">Consequences of a variable</span><span class="task-tab-short">Consequences</span></button>
+      </nav>
+      <button id="taskReset" class="toolbar-button task-reset" type="button" hidden>Reset</button>
+    </header>
+    <section id="taskLanding" class="task-view task-landing" aria-labelledby="taskLandingTitle" hidden>
+      <div class="task-landing-inner">
+        <h1 id="taskLandingTitle">What do you want to do?</h1>
+        <div class="task-choices">
+          <button class="task-choice" type="button" data-task="identify">
+            <strong>Help causally identify an estimate</strong>
+            <span>Find confounders, colliders, and exclusion restriction violations from the literature.</span>
+          </button>
+          <button class="task-choice" type="button" data-task="causes">
+            <strong>Find causes of a variable</strong>
+            <span>See the variables that the literature links as causes of a variable, directly or through others.</span>
+          </button>
+          <button class="task-choice" type="button" data-task="consequences">
+            <strong>Find consequences of a variable</strong>
+            <span>See the variables that the literature links as effects of a variable, directly or through others.</span>
+          </button>
+        </div>
+      </div>
+    </section>
+    <section id="exploreView" class="task-view explore-view" aria-labelledby="exploreTitle" hidden>
+      <div class="explore-inner">
+        <h1 id="exploreTitle">Causes of a variable</h1>
+        <div id="exploreChosen" class="explore-chosen" hidden>
+          <span class="dag-label">Variable</span>
+          <strong id="exploreFocusLabel"></strong>
+          <button id="exploreChange" class="text-button" type="button">Change</button>
+        </div>
+        <div id="explorePicker" class="explore-picker">
+          <div class="anchor-source-header">
+            <label class="dag-label" for="exploreSearch">Search existing variables</label>
+            <button id="explorePickerCancel" class="text-button" type="button" hidden>Cancel</button>
+          </div>
+          <input id="exploreSearch" class="search-input" type="search" placeholder="Search for a variable" autocomplete="off">
+          <div id="explorePickerList" class="explore-picker-list"></div>
+        </div>
+        <div class="explore-controls">
+          <div id="exploreDepth" class="explore-depth" role="group" aria-label="Distance in causal steps"></div>
+          <label class="explore-min-papers" for="exploreMinPapers"><span class="explore-control-label">Min papers per link</span>
+            <select id="exploreMinPapers" class="select-input-sm"></select></label>
+        </div>
+        <p id="exploreSummary" class="explore-summary" aria-live="polite"></p>
+        <div id="exploreResults" class="explore-results"></div>
+      </div>
+    </section>
+    <dialog id="resetDialog" class="publication-dialog reset-dialog" aria-labelledby="resetDialogTitle">
+      <h2 id="resetDialogTitle">Reset this project?</h2>
+      <p>Resetting clears the variables chosen in all three views and returns to the start page. The current project is kept in Previous Sessions in this browser.</p>
+      <div class="reset-dialog-actions">
+        <button id="resetContinue" class="primary-button" type="button" autofocus>Continue working on this project</button>
+        <button id="resetNewTab" class="toolbar-button" type="button">Open new project in a new tab</button>
+        <button id="resetHere" class="toolbar-button reset-here" type="button">Reset in current tab</button>
+      </div>
+    </dialog>
     <main class="dag-shell">
 
       <!-- LEFT PANEL: Navigation + mode-specific content -->

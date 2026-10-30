@@ -1,7 +1,7 @@
 const { test, expect } = require("playwright/test");
 const { readFile } = require("node:fs/promises");
 
-const viewer = "http://127.0.0.1:8767/";
+const viewer = "http://127.0.0.1:8767/?task=identify";
 
 async function ready(page) {
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
@@ -38,7 +38,7 @@ test("privacy policy opens without resetting the viewer", async ({ page }) => {
     page.waitForEvent("popup"),
     page.locator(".legal-link").click(),
   ]);
-  await expect(policy).toHaveURL(`${viewer}privacy.html`);
+  await expect(policy).toHaveURL(new URL("privacy.html", viewer).href);
   await expect(policy.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
   expect(await page.evaluate(() => window.__dagBuilderState === window.__privacyViewerState)).toBe(true);
   await policy.close();
@@ -264,7 +264,7 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
     if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
   });
   // This checks the precomputed search-catalog path available for this snapshot.
-  await page.goto(`${viewer}?schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
+  await page.goto(`${viewer}&schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
   await ready(page);
   await completeSetup(page);
   const edgeId = await page.evaluate(async () => {

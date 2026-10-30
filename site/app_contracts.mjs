@@ -148,7 +148,16 @@
  * @property {Set<string>} selectedVariableIds
  * @property {Set<string> | null} [definitionAiPreviewIds]
  * @property {"jev" | "manual" | null} [definitionMethod]
+ * @property {"identify" | "causes" | "consequences" | null} [task]
+ * @property {Record<"causes" | "consequences", ExploreView>} [explore]
  * @property {Record<string, unknown>} map
+ */
+
+/**
+ * @typedef {object} ExploreView
+ * @property {string | null} focusId
+ * @property {number} depth
+ * @property {number} minPapers
  */
 
 export const GROUPING_FORMAT_VERSION = "groupings-v3";
