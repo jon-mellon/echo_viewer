@@ -42,6 +42,13 @@ try {
     });
     const cdp = await context.newCDPSession(page);
     if (mobile) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    // Optional slow network for the data requests, e.g. PROFILE_NETWORK_LATENCY_MS=100 PROFILE_NETWORK_KBPS=2500.
+    if (process.env.PROFILE_NETWORK_LATENCY_MS || process.env.PROFILE_NETWORK_KBPS) {
+      const kbps = Number(process.env.PROFILE_NETWORK_KBPS || 0);
+      await cdp.send('Network.enable');
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: Number(process.env.PROFILE_NETWORK_LATENCY_MS || 0),
+        downloadThroughput: kbps ? kbps * 1024 : -1, uploadThroughput: kbps ? kbps * 1024 : -1 });
+    }
     page.setDefaultTimeout(60000);
     await page.goto(url.href);
     await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100

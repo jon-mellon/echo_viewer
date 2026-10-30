@@ -107,6 +107,8 @@ test("the start page leads to causes and consequences views that behave like Ide
   await first.locator(".explore-row-refocus").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.explore.causes.focusId)).toBe(target);
 
+  // The address carries the new variable before we reload, or the reload would restore the old one.
+  await expect.poll(() => new URL(page.url()).searchParams.get("causes_of")).toBe(target);
   await expect.poll(() => new URL(page.url()).searchParams.get("effects_of")).toBe("category-income-earnings");
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("#exploreView")).toBeVisible();
@@ -224,6 +226,11 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
 });
 
 test("the start page preloads the search catalog, then paper support", async ({ page }) => {
+  // Counting papers scans every finding; that must be one verified download, not many range requests.
+  const findings = [];
+  page.on("request", request => {
+    if (/\/causal_link_occurrences\.parquet/.test(request.url())) findings.push({ range: request.headers().range || null });
+  });
   await open(page);
   await expect(page.locator("#taskLanding")).toBeVisible();
   // Nothing has opened a task or a search, yet both arrive in the background.
@@ -234,4 +241,5 @@ test("the start page preloads the search catalog, then paper support", async ({ 
   await pick(page, "category-sleep").click();
   // No "Counting the papers…" wait once support is preloaded.
   await expect(page.locator(".explore-row").first()).toBeVisible({ timeout: 1000 });
+  expect(findings).toEqual([{ range: null }]);
 });

@@ -99,6 +99,33 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   }
 
   /**
+   * Count the papers behind every link ahead of the first pick, a slice at a
+   * time so the page stays responsive. The counts are cached for neighborhood().
+   */
+  let warming = false;
+  async function warmCounts() {
+    const support = paperSupport();
+    if (warming || support.status !== "ready" || !support.papersFor) return;
+    warming = true;
+    try {
+      const links = state.project?.links || [];
+      const counter = cachedCounter(support);
+      let sliceStart = performance.now();
+      for (let index = 0; index < links.length; index++) {
+        counter(links[index], true);
+        counter(links[index], false);
+        if ((index & 63) === 63 && performance.now() - sliceStart > 8) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+          sliceStart = performance.now();
+          if (state.project?.links !== links) return;
+        }
+      }
+    } finally {
+      warming = false;
+    }
+  }
+
+  /**
    * The list rows and graph for the current view, shared by the list and the
    * graph and reused until the links, support or settings change.
    */
@@ -329,6 +356,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     });
   }
 
-  return { install, render, setTask, refreshSelection, neighborhood, exploring, focus, searchFocusGroups,
+  return { install, render, setTask, refreshSelection, neighborhood, warmCounts, exploring, focus, searchFocusGroups,
     chooseFocus, changeFocus, freshProjectUrl };
 }

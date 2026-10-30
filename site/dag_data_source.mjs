@@ -15,6 +15,8 @@ import { variableIncidentCatalog } from "./variable_incident_catalog.mjs";
 // round trip for each shard. The canonical snapshot is cheaper for wide groups.
 const CANONICAL_READ_SHARD_THRESHOLD = 8;
 const RAW_LINK_QUERY_BATCH_SIZE = 2048;
+// The findings file is read in full to count papers per link; a local copy beats many remote range requests.
+const FINDINGS_SCAN_MAX_MIB = 16;
 // This immutable evidence build's lookup has exactly one row for each index
 // 1..14284, with shard_id = floor((variable_index - 1) / 256). The fallback
 // below still reads the lookup for every other build.
@@ -104,6 +106,7 @@ export class ParquetManifestDagDataSource {
       worker,
     );
     await database.instantiate(mainModule);
+    this.database = database;
     this.connection = await database.connect();
     this.neighborConnection = await database.connect();
     performance.measure("echo:evidence:engine", { start: engineStart, end: performance.now() });
@@ -301,11 +304,15 @@ export class ParquetManifestDagDataSource {
 
   async loadRawLinkSupportByIds(rawLinkIds) {
     if (!rawLinkIds?.length) return [];
+    // If the engine has not started yet, its startup downloads the findings in parallel.
+    this.prewarmRawLinks = true;
+    this.prewarmFindingsScan = true;
     await this.ensureEvidenceConnection({ variableIds: [] });
     const canonicalUrl = this.canonicalEvidenceRelationUrl("causal_link_occurrences");
     if (!canonicalUrl) await this.ensureBrowserRelation("causal_link_occurrences");
+    else await this.ensureLocalFindings();
     const relation = canonicalUrl
-      ? `read_parquet('${canonicalUrl.replaceAll("'", "''")}')`
+      ? `read_parquet('${this.parquetFile(canonicalUrl).replaceAll("'", "''")}')`
       : "causal_link_occurrences";
     // One scan of three columns avoids repeatedly scanning full evidence rows
     // for a map-wide filter. Keep these partial records out of the detail cache.
@@ -518,21 +525,46 @@ export class ParquetManifestDagDataSource {
         url: this.canonicalEvidenceRelationUrl(kind),
         integrity: this.manifest.identity?.legacy_relation_integrity?.[kind] })),
     ];
-    return Promise.all(plans.map(async ({ kind, url, integrity }) => {
-      if (!url || !Number.isInteger(integrity?.bytes) || integrity.bytes < 1
-        || integrity.bytes > (kind === "causal_link_occurrences" ? 8 : 4) * 1024 * 1024
-        || !/^[0-9a-f]{64}$/i.test(integrity.sha256 || "")) return null;
-      try {
-        const response = await fetch(url, { cache: "force-cache" });
-        if (!response.ok) return null;
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        if (bytes.byteLength !== integrity.bytes) return null;
-        const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
-          .map(value => value.toString(16).padStart(2, "0")).join("");
-        if (hash !== integrity.sha256.toLowerCase()) return null;
-        return { url, bytes, name: `echo-map-${this.manifest.evidence_snapshot}-${kind}.parquet` };
-      } catch { return null; }
-    }));
+    return Promise.all(plans.map(plan => this.downloadVerified({ ...plan,
+      maxMiB: plan.kind === "causal_link_occurrences" ? (this.prewarmFindingsScan ? FINDINGS_SCAN_MAX_MIB : 8) : 4 })));
+  }
+
+  /** Download an immutable file and check its size and SHA-256; null means use remote SQL instead. */
+  async downloadVerified({ kind, url, integrity, maxMiB }) {
+    if (!url || !Number.isInteger(integrity?.bytes) || integrity.bytes < 1
+      || integrity.bytes > maxMiB * 1024 * 1024
+      || !/^[0-9a-f]{64}$/i.test(integrity.sha256 || "")) return null;
+    try {
+      const response = await fetch(url, { cache: "force-cache" });
+      if (!response.ok) return null;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength !== integrity.bytes) return null;
+      const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+        .map(value => value.toString(16).padStart(2, "0")).join("");
+      if (hash !== integrity.sha256.toLowerCase()) return null;
+      return { url, bytes, name: `echo-map-${this.manifest.evidence_snapshot}-${kind}.parquet` };
+    } catch { return null; }
+  }
+
+  /**
+   * Scanning every finding through remote Parquet means many small range
+   * requests, each slow on a slow connection. Download the canonical findings
+   * once, verified, and hand them to the engine so the scan reads memory. If the
+   * engine started before this was requested the file is registered here;
+   * oversized or failed downloads keep the remote path.
+   */
+  async ensureLocalFindings() {
+    const url = this.canonicalEvidenceRelationUrl("causal_link_occurrences");
+    if (!url || this.localParquetFiles?.has(url) || !this.database) return;
+    this.localFindingsLoad ||= (async () => {
+      const file = await this.downloadVerified({ kind: "causal_link_occurrences", url, maxMiB: FINDINGS_SCAN_MAX_MIB,
+        integrity: this.manifest.identity?.legacy_relation_integrity?.causal_link_occurrences });
+      if (!file) return;
+      await this.database.registerFileBuffer(file.name, file.bytes);
+      this.localParquetFiles ||= new Map();
+      this.localParquetFiles.set(file.url, file.name);
+    })().catch(() => {}).finally(() => { this.localFindingsLoad = null; });
+    await this.localFindingsLoad;
   }
 
   canonicalEvidenceRelationUrl(relation) {

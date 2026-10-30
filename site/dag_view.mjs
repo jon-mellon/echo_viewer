@@ -13,10 +13,15 @@ import {
 
 /** Distinct papers with a present finding among these raw links. */
 export function presentPaperIds(rawLinkIds, edgeSupportById, rawLinksById = edgeSupportById) {
-  return new Set((rawLinkIds || []).flatMap(id => {
+  const papers = new Set();
+  // A plain loop, and the claim is only checked for a paper not yet counted:
+  // this runs over every finding in the dataset, so allocation per finding showed.
+  for (const id of rawLinkIds || []) {
     const evidence = edgeSupportById.get(id) || rawLinksById.get(id);
-    return evidence?.paper_id && isPresentLink(evidence) ? [evidence.paper_id] : [];
-  }));
+    const paper = evidence?.paper_id;
+    if (paper && !papers.has(paper) && isPresentLink(evidence)) papers.add(paper);
+  }
+  return papers;
 }
 
 export function excludedForConnectivity(link) {
