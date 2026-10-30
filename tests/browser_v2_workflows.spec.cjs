@@ -25,7 +25,7 @@ test("incident links use the canonical snapshot and retain both edge directions"
   page.on("request", request => {
     if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
   });
-  await page.goto("http://127.0.0.1:8767/?schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0&task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag);
   // This frozen snapshot has v1..v14284, with 256 variables per shard. Use
   // identifiers across 40 shards so this retrieval test does not depend on
@@ -62,7 +62,7 @@ test("incident links use the canonical snapshot and retain both edge directions"
 
 test("browser-v2 supports group detail, auto layout, fullscreen and project export", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
     && window.__dagBuilderState?.publishedSchemaHydrated
     && !window.__dagBuilderState?.publishedSchemaHydrating

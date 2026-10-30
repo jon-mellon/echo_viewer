@@ -1,4 +1,10 @@
+import { MAX_NEIGHBORHOOD_DEPTH } from "./causal_neighborhood.mjs";
+
 export const PERMALINK_VERSION = "1";
+export const TASKS = ["identify", "causes", "consequences"];
+// Each explore view's URL keys: focus group, depth and minimum papers per link.
+const exploreKeys = { causes: ["causes_of", "causes_depth", "causes_min_papers"],
+  consequences: ["effects_of", "effects_depth", "effects_min_papers"] };
 
 const booleanFields = {
   conf: "showConfoundersOnly", coll: "showCollidersOnly", excl: "showExclusionViolations", exog: "showExogeneity",
@@ -48,16 +54,42 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state,
     dy: String(state.dagViewport?.position?.y ?? ""),
   };
   for (const [parameter, field] of Object.entries(booleanFields)) values[parameter] = state[field] ? "1" : "0";
+  // "home" marks the start page, so a reload there does not open a task.
+  values.task = state.task || "home";
+  for (const [view, [focusKey, depthKey, papersKey]] of Object.entries(exploreKeys)) {
+    const explore = state.explore?.[view];
+    if (!explore?.focusId) continue;
+    values[focusKey] = explore.focusId;
+    values[depthKey] = String(explore.depth);
+    values[papersKey] = String(explore.minPapers);
+  }
   for (const [key, value] of Object.entries(values)) if (value !== "") url.searchParams.set(key, value);
   if (publishedSchemaId) url.searchParams.set("schema", publishedSchemaId);
   if (localSchemaId) url.searchParams.set("local_schema", localSchemaId);
   return url.href;
 }
 
+/** Restore the task and explore views; links made before tasks existed open identification. */
+export function applyTaskPermalink(params, state, resolveGroup) {
+  const task = params.get("task");
+  state.task = !params.has("task") ? "identify" : TASKS.includes(task) ? task : null;
+  for (const [view, [focusKey, depthKey, papersKey]] of Object.entries(exploreKeys)) {
+    const depth = Math.trunc(Number(params.get(depthKey)));
+    const papers = Math.trunc(Number(params.get(papersKey)));
+    state.explore[view] = {
+      focusId: resolveGroup(params.get(focusKey)) || null,
+      depth: depth >= 1 && depth <= MAX_NEIGHBORHOOD_DEPTH ? depth : 1,
+      minPapers: Number.isSafeInteger(papers) && papers >= 1 ? papers : 2,
+    };
+  }
+}
+
 export function applyPermalink(params, state) {
   if (!params) return false;
   const groups = state.project.groups || [];
   const resolveGroup = id => groups.find(group => group.group_id === id || group.source_group_id === id)?.group_id;
+  state.explore ||= { causes: {}, consequences: {} };
+  applyTaskPermalink(params, state, resolveGroup);
   const iv = resolveGroup(params.get("iv"));
   const dv = resolveGroup(params.get("dv"));
   const partialSetup = params.get("mode") === "setup" && (!iv || !dv);
