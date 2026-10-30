@@ -472,6 +472,12 @@ function rebuildProject(options) {
   renderCoordinator.rebuildProject(options);
 }
 
+function renderExploreFocus() {
+  renderAnchorBar();
+  setupGroupController.renderFocusPicker();
+  updateDagFilters();
+}
+
 function updateDagFilters() {
   renderCoordinator.updateDagFilters();
   taskViews.render();
@@ -1146,12 +1152,18 @@ const taskViews = createTaskViews({
   state, searchGroups: searchExploreGroups, searchStatus: () => state.variableSearchStatus,
   paperSupport: linkPaperSupport, loadPaperSupport: () => void loadLinkSupport(),
   isDisplayGroup: isDagDisplayGroup,
-  // A new variable redraws the chrome (anchor bar, picker) and the graph.
-  onExploreChange: () => renderAll({ reuseLinks: true }),
-  onFocusPicking: () => renderAll({ rebuild: false }),
+  // A new variable updates the anchor bar, picker and graph, like a distance change,
+  // instead of re-rendering all of Identify's setup.
+  onExploreChange: () => renderExploreFocus(),
+  onFocusPicking: () => { renderAnchorBar(); setupGroupController.renderFocusPicker(); taskViews.render(); },
   onPickerInput: () => setupGroupController.renderFocusPicker(),
   // Each task shows its own graph, so rebuild it from the project's links.
-  onTaskChange: () => { dismissEvidenceForTask(); renderAll({ reuseLinks: true }); },
+  // Between causes and consequences only the anchor bar, picker and graph change.
+  onTaskChange: ({ previous, task }) => {
+    dismissEvidenceForTask();
+    const bothExplore = [previous, task].every(name => name === "causes" || name === "consequences");
+    if (bothExplore) renderExploreFocus(); else renderAll({ reuseLinks: true });
+  },
   openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
   onChange: () => persistentViewer.viewerChanged(), flushUrl: () => persistentViewer.flushUrl(),
 });
@@ -1204,6 +1216,8 @@ function createDensityCandidateGroup() {
 // ─── Candidate queue ──────────────────────────────────────────────────────────
 
 function buildCandidateQueue() {
+  // Only Identify's setup uses the queue; it is rebuilt when switching back.
+  if (taskViews.exploring()) return;
   state.candidateQueue = candidates.buildCandidateQueue(state.project, candidateInputs());
 }
 
@@ -1329,6 +1343,7 @@ function loadLinkSupport() {
     // The graph of an explore view waits on these counts, so redraw it now.
     if (taskViews.exploring()) updateDagFilters();
     else taskViews.render();
+    void taskViews.warmCounts();
   });
   return linkSupportPromise;
 }
@@ -1814,6 +1829,8 @@ function scheduleSettledMapDraw(delayMs = 100) {
 }
 
 function drawMap(options) {
+  // The variable map is not shown in the causes and consequences views.
+  if (taskViews.exploring()) return undefined;
   const result = mapUiController.drawMap(options);
   persistentViewer.viewerChanged(true);
   return result;
@@ -2102,7 +2119,7 @@ const projectBootstrap = createProjectBootstrap({
   onPreloadsDone: () => {
     if (globalThis.navigator?.connection?.saveData) return;
     if (state.task && state.task !== "causes" && state.task !== "consequences") return;
-    const start = () => void loadLinkSupport();
+    const start = () => void loadLinkSupport().then(() => taskViews.warmCounts());
     if (typeof globalThis.requestIdleCallback === "function") globalThis.requestIdleCallback(start, { timeout: 5000 });
     else setTimeout(start, 1000);
   },
