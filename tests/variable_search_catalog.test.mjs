@@ -129,11 +129,16 @@ test("a mislabeled catalog fails instead of showing partial results", async () =
 
 test("bundled immutable catalogs declare their snapshot and include all exported variables", async () => {
   const { SNAPSHOT_SEARCH_CATALOGS } = await import("../site/variable_search_catalog.mjs");
-  const counts = [14284, 97818];
-  for (const [index, [snapshot, path]] of Object.entries(SNAPSHOT_SEARCH_CATALOGS).entries()) {
+  const counts = {
+    "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0": 14284,
+    "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b": 97818,
+    "8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849": 142976,
+  };
+  for (const [snapshot, path] of Object.entries(SNAPSHOT_SEARCH_CATALOGS)) {
+    assert.ok(counts[snapshot], `Add the exported variable count for ${snapshot}`);
     const catalog = JSON.parse(gunzipSync(readFileSync(new URL(`../site${path}`, import.meta.url))));
     assert.equal(catalog.evidence_snapshot, snapshot);
-    assert.equal(catalog.records.length, counts[index]);
-    assert.equal(new Set(catalog.records.map(row => row[0])).size, counts[index]);
+    assert.equal(catalog.records.length, counts[snapshot]);
+    assert.equal(new Set(catalog.records.map(row => row[0])).size, counts[snapshot]);
   }
 });
