@@ -27,6 +27,8 @@ jobs:
       - run: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile npm run profile
       - name: Enforce mobile diagnostic switching budgets
         run: npm run profile:diagnostics
+      - name: Enforce evidence loading budgets on the default snapshot
+        run: npm run profile:edge-evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -37,4 +39,5 @@ jobs:
             profile-results-permalink/
             profile-results-permalink-mobile/
             profile-results-diagnostics-mobile/
+            profile-results-edge-evidence/
           retention-days: 1

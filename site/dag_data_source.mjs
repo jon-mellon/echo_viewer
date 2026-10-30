@@ -285,6 +285,11 @@ export class ParquetManifestDagDataSource {
     return rows;
   }
 
+  // Snapshots with precomputed bundles open evidence without the query engine.
+  hasEvidencePanelBundles() {
+    return Boolean(evidencePanelCatalog.bindings[evidenceSnapshotIdFromManifestUrl(this.manifestUrl)]);
+  }
+
   async loadPanelEvidence(rawLinkIds) {
     try {
       return await evidencePanelCatalog.load(evidenceSnapshotIdFromManifestUrl(this.manifestUrl), rawLinkIds);

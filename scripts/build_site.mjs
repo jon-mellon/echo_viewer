@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,6 +37,18 @@ function stagingDataConfig(source) {
   return config;
 }
 
+// A default snapshot without its search catalog loads every evidence panel from
+// remote Parquet (10-70 s). Refuse to build such a site; see
+// scripts/register_snapshot_assets.mjs.
+export async function assertDefaultSnapshotAssets(source, config) {
+  const snapshot = config?.match(/PRODUCTION_EVIDENCE_MANIFEST =\s*"[^"]*\/layouts\/browser-v2\/([0-9a-f]{64})\/manifest\.json"/)?.[1];
+  if (!snapshot) return;
+  const catalog = join(source, "search-catalogs", `${snapshot}.json.gz`);
+  if (!(await stat(catalog).catch(() => null))?.isFile()) {
+    throw new Error(`Default evidence snapshot ${snapshot} has no search catalog. Run: node scripts/register_snapshot_assets.mjs ${snapshot}`);
+  }
+}
+
 export async function buildSite(source, destination) {
   const files = await filesIn(source);
   const hash = createHash("sha256");
@@ -44,6 +56,8 @@ export async function buildSite(source, destination) {
   const configuredConfig = hasDataOverride
     ? stagingDataConfig(await readFile(join(source, "dag_data_config.mjs"), "utf8"))
     : null;
+  await assertDefaultSnapshotAssets(source, configuredConfig
+    || await readFile(join(source, "dag_data_config.mjs"), "utf8").catch(() => null));
   for (const file of files) {
     hash.update(relative(source, file));
     const content = relative(source, file) === "dag_data_config.mjs" && configuredConfig

@@ -41,11 +41,16 @@ jobs:
       - name: Enforce mobile diagnostic switching budgets
         run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
 
+      - name: Enforce evidence loading budgets on the default snapshot
+        run: PROFILE_SITE_DIR=dist/site npm run profile:edge-evidence
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: staging-diagnostic-profile
-          path: profile-results-diagnostics-mobile/
+          path: |
+            profile-results-diagnostics-mobile/
+            profile-results-edge-evidence/
           if-no-files-found: ignore
           retention-days: 1
 
