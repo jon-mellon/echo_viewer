@@ -1,0 +1,31 @@
+name: Main accepts staging only
+
+# Pull requests into main must come from this repository's staging branch.
+# Add "Pull request comes from staging" as a required status check on main so
+# the merge button stays blocked for every other source. The job fails with an
+# error (it is never skipped): a skipped required check counts as passing.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  source-branch:
+    name: Pull request comes from staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require staging as the source branch
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+        run: |
+          if [ "$HEAD_REPO" != "$BASE_REPO" ] || [ "$HEAD_REF" != "staging" ]; then
+            echo "::error title=Wrong source branch::main only accepts pull requests from the staging branch of $BASE_REPO. This one is from $HEAD_REPO:$HEAD_REF. Merge it into staging first."
+            exit 1
+          fi
+          echo "Source is $HEAD_REPO:$HEAD_REF."
