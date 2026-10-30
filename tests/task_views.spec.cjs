@@ -37,7 +37,11 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
   await expect(page.locator("#anchorDvLabel").locator("xpath=ancestor::div[contains(@class,'anchor-row')]")).toBeVisible();
   await expect(page.locator("#anchorIvLabel").locator("xpath=ancestor::div[contains(@class,'anchor-row')]")).toBeHidden();
-  await expect(page.locator("#exploreSummary")).toContainText("cause sleep within 1 step");
+  // The list stands on its own: no summary sentence, hint line or per-row extra action.
+  await expect(page.locator("#exploreSummary")).toBeHidden();
+  await expect(page.locator("#exploreHint")).toHaveCount(0);
+  await expect(page.locator(".explore-row-refocus")).toHaveCount(0);
+  await expect(page.locator(".explore-row button")).toHaveCount(await page.locator(".explore-row").count());
   const direct = await page.locator('.explore-row[data-distance="1"]').count();
   expect(direct).toBeGreaterThan(0);
   await expect(page.locator('.explore-row[data-distance="2"]')).toHaveCount(0);
@@ -82,7 +86,8 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(pick(page, "category-income-earnings")).toHaveText("Use as Ind var");
   await pick(page, "category-income-earnings").click();
   await expect(page.locator("#anchorIvLabel")).toHaveText("income/earnings");
-  await expect(page.locator("#exploreSummary")).toContainText("are caused by income/earnings within 1 step");
+  await expect(page.locator(".explore-row").first()).toBeVisible();
+  await expect(page.locator("#exploreSummary")).toBeHidden();
   await expect(page.locator("#confounderPathLength")).toHaveValue("1");
   await page.locator("#taskBar .task-tab[data-task=identify]").click();
   await expect(page.locator("#exploreView")).toBeHidden();
@@ -100,11 +105,11 @@ test("the start page leads to causes and consequences views that behave like Ide
   await page.locator("#focusPickerCancel").click();
   await expect(page.locator("#exploreResultsBlock")).toBeVisible();
 
-  // Exploring a result's own causes is an explicit, labelled action.
-  const first = page.locator(".explore-row").first();
-  const target = await first.getAttribute("data-group-id");
-  await first.hover();
-  await first.locator(".explore-row-refocus").click();
+  // Choosing a different variable is done the usual way: Change, then the picker.
+  const target = "category-age";
+  await page.locator("#changeDv").click();
+  await pick(page, target).click();
+  await expect(page.locator("#anchorDvLabel")).toHaveText("age");
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.explore.causes.focusId)).toBe(target);
 
   // The address carries the new variable before we reload, or the reload would restore the old one.
@@ -112,7 +117,8 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect.poll(() => new URL(page.url()).searchParams.get("effects_of")).toBe("category-income-earnings");
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("#exploreView")).toBeVisible();
-  await expect(page.locator("#exploreSummary")).toContainText("within 2 steps, counting links supported by at least 10 papers");
+  await expect(page.locator("#confounderPathLength")).toHaveValue("2");
+  await expect(page.locator("#minimumEdgePapers")).toHaveValue("10");
   expect(await page.evaluate(() => window.__dagBuilderState.explore.causes.focusId)).toBe(target);
   await page.locator("#taskBar .task-tab[data-task=consequences]").click();
   await expect(page.locator("#anchorIvLabel")).toHaveText("income/earnings");
@@ -242,4 +248,19 @@ test("the start page preloads the search catalog, then paper support", async ({ 
   // No "Counting the papers…" wait once support is preloaded.
   await expect(page.locator(".explore-row").first()).toBeVisible({ timeout: 1000 });
   expect(findings).toEqual([{ range: null }]);
+});
+
+test("a notice appears only when there is nothing to list, and goes away with results", async ({ page }) => {
+  await open(page, `${viewer}?task=causes`);
+  await pick(page, "category-sleep").click();
+  await expect(page.locator(".explore-row").first()).toBeVisible();
+  await expect(page.locator("#exploreSummary")).toBeHidden();
+  await page.locator(".filter-dropdown > summary").click();
+  await page.locator("#minimumEdgePapers").fill("99999");
+  await expect(page.locator(".explore-row")).toHaveCount(0);
+  await expect(page.locator("#exploreSummary")).toBeVisible();
+  await expect(page.locator("#exploreSummary")).toContainText("Nothing causes sleep at this distance and paper count");
+  await page.locator("#minimumEdgePapers").fill("2");
+  await expect(page.locator(".explore-row").first()).toBeVisible();
+  await expect(page.locator("#exploreSummary")).toBeHidden();
 });

@@ -61,7 +61,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   const el = id => document.getElementById(id);
   const els = {
     bar: el("taskBar"), reset: el("taskReset"), landing: el("taskLanding"), explore: el("exploreView"),
-    resultsBlock: el("exploreResultsBlock"), summary: el("exploreSummary"), hint: el("exploreHint"),
+    resultsBlock: el("exploreResultsBlock"), summary: el("exploreSummary"),
     results: el("exploreResults"), dialog: el("resetDialog"), graphHint: el("exploreGraphHint"),
     graphTitle: el("dagViewTitle"), focusInput: el("focusInput"), pickerCancel: el("focusPickerCancel"),
     pathLabel: el("confounderPathLengthLabel"), pathInput: el("confounderPathLength"),
@@ -227,24 +227,18 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
 
   function renderResults(focus) {
     const causes = state.task === "causes";
-    const { depth, minPapers } = settings();
     const { status, rows } = neighborhood();
+    // A notice appears only when there is something to say; otherwise the list stands on its own.
+    const notice = text => { els.summary.textContent = text; els.summary.hidden = !text; };
     if (status === "loading") {
       // The same per-finding records the sparse-edge filter uses; loaded once.
       loadPaperSupport();
-      els.summary.textContent = "Counting the papers that support each link…";
-      els.hint.hidden = true;
+      notice("Counting the papers that support each link…");
       replaceChildren(els.results);
       return;
     }
-    const focusLabel = labelFor(focus);
-    const within = `within ${plural(depth, "step")}, counting links supported by at least ${plural(minPapers, "paper")}`;
-    const caveat = status === "failed"
-      ? " Finding details could not load, so paper counts may include tables and null findings." : "";
-    els.summary.textContent = (rows.length
-      ? `${plural(rows.length, "variable")} ${causes ? (rows.length === 1 ? "causes" : "cause") : (rows.length === 1 ? "is caused by" : "are caused by")} ${focusLabel} ${within}.`
-      : `No variables ${causes ? "cause" : "are caused by"} ${focusLabel} ${within}. Try a greater distance or fewer papers per link.`) + caveat;
-    els.hint.hidden = !rows.length;
+    notice(!rows.length ? `Nothing ${causes ? "causes" : "is caused by"} ${labelFor(focus)} at this distance and paper count. Try a greater distance or fewer papers.`
+      : status === "failed" ? "Finding details could not load, so paper counts may include tables and null findings." : "");
     const byDistance = new Map();
     for (const row of rows) {
       if (!byDistance.has(row.distance)) byDistance.set(row.distance, []);
@@ -267,11 +261,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
           h("span", { className: "explore-row-label", textContent: labelFor(item.groupId) }),
           h("span", { className: "explore-row-papers", textContent: distance === 1
             ? plural(item.papers, "paper") : `weakest link: ${plural(item.weakestPapers, "paper")}` }),
-          between.length ? h("span", { className: "explore-row-path", textContent: `via ${between.join(" → ")}` }) : null),
-          h("button", { type: "button", className: "text-button explore-row-refocus",
-            textContent: `Explore ${causes ? "its causes" : "its consequences"}`,
-            attrs: { "aria-label": `Explore ${causes ? "causes" : "consequences"} of ${labelFor(item.groupId)}` },
-            onclick: () => chooseFocus(item.groupId) }));
+          between.length ? h("span", { className: "explore-row-path", textContent: `via ${between.join(" → ")}` }) : null));
         })))));
   }
 
@@ -289,7 +279,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     const { groupId, picking } = focus();
     els.resultsBlock.hidden = !groupId || picking;
     if (groupId && !picking) renderResults(groupId);
-    els.hint.textContent = "Select a variable to see the evidence behind its link, or select a link in the graph.";
     els.graphHint.hidden = Boolean(groupId);
     els.graphHint.textContent = `Choose a variable to see its ${causes ? "causes" : "consequences"} as a graph.`;
     if (els.graphTitle) {
