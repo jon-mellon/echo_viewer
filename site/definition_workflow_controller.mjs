@@ -548,6 +548,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       draft.new_description = description;
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
       state.selectedVariableIds = new Set(ids);
+      // Skip the manual draft; it can still be reached with Back. A split with
+      // no leftover in some source cannot be reviewed, so stay to fix that.
+      if (definitionCanReview()) draft.step = "review";
       invalidateMapCaches();
       persistProjectLocally();
       renderDraft({ redrawMap: true });

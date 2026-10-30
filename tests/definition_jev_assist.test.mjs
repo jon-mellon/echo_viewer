@@ -26,8 +26,8 @@ test("a 30,000-variable run has a bounded spot check from both sides", () => {
 test("a 30,000-variable split can draw its fixed test sample", () => {
   const source = Array.from({ length: 30_000 }, (_, index) => `variable-${index}`);
   const sample = randomSampleIds(source);
-  assert.equal(sample.length, 24);
-  assert.equal(new Set(sample).size, 24);
+  assert.equal(sample.length, 50);
+  assert.equal(new Set(sample).size, 50);
   assert.equal(source.length, 30_000);
   assert.ok(sample.every(id => source.includes(id)));
 });
