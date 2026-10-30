@@ -115,3 +115,25 @@ test("the focus layout puts the variable in the middle and keeps branches on the
     focus: { id: "x", order: many.map(g => g.group_id), distance: many.map(g => [g.group_id, 1]), parent: many.map(g => [g.group_id, "x"]) } });
   assert.ok(new Set([...wide.positions.values()].map(p => p.x)).size > 3);
 });
+
+test("the focus layout follows the screen's shape and keeps its columns balanced", () => {
+  const many = Array.from({ length: 62 }, (_, index) => ({ group_id: `n${index}`, label: `n${index}`, variable_ids: [] }));
+  const groups = [{ group_id: "x", label: "x", variable_ids: [] }, ...many];
+  const focus = { id: "x", order: many.map(g => g.group_id), distance: many.map(g => [g.group_id, 1]), parent: many.map(g => [g.group_id, "x"]) };
+  const shape = (width, height) => {
+    const { positions, graphWidth } = computeFocusLayout({ groups, links: [], width, height, focus });
+    const xs = [...positions.values()].map(p => p.x), ys = [...positions.values()].map(p => p.y);
+    const columns = new Map();
+    for (const [id, p] of positions) if (id !== "x") columns.set(p.x, (columns.get(p.x) || 0) + 1);
+    return { wide: (Math.max(...xs) - Math.min(...xs)) / ((Math.max(...ys) - Math.min(...ys)) || 1),
+      sizes: [...columns.values()], columns: columns.size, graphWidth };
+  };
+  const phone = shape(390, 560), desktop = shape(1000, 700);
+  // A tall screen gets a tall graph and a wide screen a wide one, instead of one shape for both.
+  assert.ok(phone.wide < desktop.wide, `phone ${phone.wide} should be narrower than desktop ${desktop.wide}`);
+  assert.ok(phone.wide < 1.6 && phone.wide > 0.3, `phone shape ${phone.wide}`);
+  assert.ok(desktop.wide < 3.2 && desktop.wide > 0.8, `desktop shape ${desktop.wide}`);
+  assert.ok(phone.columns < desktop.columns);
+  // No runt column: every column holds at least half as many as the fullest.
+  for (const result of [phone, desktop]) assert.ok(Math.min(...result.sizes) * 2 >= Math.max(...result.sizes), JSON.stringify(result.sizes));
+});

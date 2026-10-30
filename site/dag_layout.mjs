@@ -241,12 +241,22 @@ export function computeFocusLayout({ groups, links = [], width: containerW, heig
   const present = new Set(groups.map(group => group.group_id));
   const distanceOf = new Map(focus.distance), parentOf = new Map(focus.parent);
   const fontSize = n > 42 ? 11 : n > 30 ? 12 : 13;
+  // Narrow screens get narrower nodes and columns, so more of the graph fits at a readable size.
+  const narrow = (containerW || 900) < 600;
+  const nodeMaxWidth = narrow ? 128 : n > 30 ? 185 : 170;
   const params = {
-    fontSize, vMargin: n > 34 ? 6 : 8, hMargin: n > 34 ? 10 : 13, nodeMaxWidth: n > 30 ? 185 : 170,
-    edgeWidth: n > 34 ? 1.1 : 1.25, rowGap: 72, columnGap: 230,
+    fontSize, vMargin: n > 34 ? 6 : 8, hMargin: n > 34 ? 10 : 13, nodeMaxWidth,
+    edgeWidth: n > 34 ? 1.1 : 1.25, rowGap: narrow ? 66 : 72, columnGap: narrow ? nodeMaxWidth + 44 : 230,
   };
   const { rowGap, columnGap } = params;
-  const capacity = Math.max(6, Math.floor(((containerH || 720) * 0.92) / rowGap));
+  // Choose the columns so the graph is about as wide as the screen is: a graph
+  // much wider than the screen shrinks to a strip when fitted, much taller than
+  // it shrinks the same way. With N variables over C columns the shape is
+  // (C * columnGap) by (N / C * rowGap), so C = sqrt(aspect * N * rowGap / columnGap).
+  const aspect = (containerW || 900) / (containerH || 720);
+  const sideColumns = Math.max(1, Math.round(Math.sqrt(aspect * focus.order.filter(id => present.has(id) && id !== focus.id).length
+    * rowGap / columnGap) / 2));
+  const capacity = Math.max(4, Math.ceil(focus.order.filter(id => present.has(id) && id !== focus.id).length / 2 / sideColumns));
   const positions = new Map([[focus.id, { x: 0, y: 0, column: 0, row: 0 }]]);
   const sideOf = new Map([[focus.id, 0]]);
   const rings = new Map();
@@ -271,9 +281,11 @@ export function computeFocusLayout({ groups, links = [], width: containerW, heig
     // Both sides use the same number of columns so the picture stays symmetric.
     const columns = Math.max(1, Math.ceil(Math.max(sides[-1].length, sides[1].length) / capacity));
     for (const side of [-1, 1]) {
-      const list = sides[side], chunk = Math.ceil(list.length / columns) || 1;
+      // Balanced columns: never a column of one or two after full ones.
+      const list = sides[side], base = Math.floor(list.length / columns), extra = list.length % columns;
+      let start = 0;
       for (let column = 0; column < columns; column++) {
-        const items = list.slice(column * chunk, (column + 1) * chunk);
+        const items = list.slice(start, start += base + (column < extra ? 1 : 0));
         maxRows = Math.max(maxRows, items.length);
         items.forEach((id, row) => positions.set(id, {
           x: side * (outwardColumns + column + 1) * columnGap,
