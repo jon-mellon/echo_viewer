@@ -6,7 +6,7 @@ export { cappedKeyStatus, randomSampleIds } from "./definition_jev_core.mjs";
 const OAUTH_PENDING_KEY = "echo-openrouter-pkce-v1";
 const OAUTH_DRAFT_KEY = "echo-openrouter-definition-draft-v1";
 const OAUTH_RETURN_URL_KEY = "echo-openrouter-return-url-v1";
-const REVIEW_PAGE_SIZE = 40;
+const REVIEW_PAGE_SIZE = 50;
 const SPOT_CHECK_PER_GROUP = 12;
 
 function reviewRank(id) {
@@ -97,7 +97,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     fullInputTokens = null;
     costCache = null;
     spotRows = [];
-    reviewFilter = "spot";
+    reviewFilter = "all";
     reviewPage = 0;
     if (!keepSample) {
       sampleDraft = null;
@@ -134,13 +134,15 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     return phaseBatches(phase).reduce((count, batch) => count + batch.results.length, 0);
   }
 
-  function savedPhase(ids, phase) {
+  // `base` is where these ids start within the phase's full list, so a second
+  // labeling round keeps distinct, stable batch keys.
+  function savedPhase(ids, phase, base = 0) {
     const batches = new Map(phaseBatches(phase).map(batch => [batch.offset, batch]));
     const results = [];
     let inputTokens = 0;
     let usageComplete = true;
     for (let offset = 0; offset < ids.length; offset += BATCH_SIZE) {
-      const batch = batches.get(offset);
+      const batch = batches.get(base + offset);
       const expected = ids.slice(offset, offset + BATCH_SIZE);
       if (!batch || batch.results.length !== expected.length
         || batch.results.some((item, index) => item.id !== expected[index])) return null;
@@ -151,9 +153,25 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     return { results, inputTokens: usageComplete ? inputTokens : null };
   }
 
+  // The labeled sample grows in rounds of TEST_SIZE; only complete rounds count.
+  function savedRounds(ids) {
+    const results = [];
+    let inputTokens = 0;
+    let usageComplete = true;
+    for (let start = 0; start < ids.length; start += TEST_SIZE) {
+      const round = savedPhase(ids.slice(start, start + TEST_SIZE), "test", start);
+      if (!round) break;
+      results.push(...round.results);
+      if (round.inputTokens === null) usageComplete = false;
+      else inputTokens += round.inputTokens;
+    }
+    return results.length ? { results, inputTokens: usageComplete ? inputTokens : null } : null;
+  }
+
   function restorePreview(draft, description) {
     const sample = checkpoint?.run.sampleIds;
-    if (!Array.isArray(sample) || sample.length !== Math.min(TEST_SIZE, draft.eligible_variable_ids.length)
+    if (!Array.isArray(sample) || sample.length < Math.min(TEST_SIZE, draft.eligible_variable_ids.length)
+      || sample.length > draft.eligible_variable_ids.length
       || new Set(sample).size !== sample.length
       || sample.some(id => !draft.eligible_variable_ids.includes(id))) {
       throw new Error("Saved AI sample does not match these source variables.");
@@ -162,7 +180,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     sampleDraft = draft;
     sampleSignature = eligibleSignature(draft);
     sampleIds = sample;
-    const test = savedPhase(sample, "test");
+    const test = savedRounds(sample);
     if (!test) return;
     testResults = test.results;
     testInputTokens = test.inputTokens;
@@ -174,7 +192,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     fullInputTokens = full?.inputTokens ?? null;
     previewDraft = draft;
     previewMode = full ? "full" : "test";
-    spotRows = full ? spotCheckResults(preview) : [];
+    spotRows = spotCheckResults(preview);
+    reviewFilter = full ? "spot" : "all";
     onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), previewMode);
   }
 
@@ -246,7 +265,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     const uncertain = preview.filter(item => item.confidence < 0.65).length;
     const counts = `${newCount} suggested for new · ${preview.length - newCount} leftover · ${uncertain} lower-score choices.`;
     els.definitionAiSummary.textContent = previewMode === "test"
-      ? `Tested ${preview.length} of ${draft.eligible_variable_ids.length} variables. ${counts} This is a preview; your draft has not changed. Review the choices, then revise the description or run the full split.`
+      ? `Labeled ${preview.length} of ${draft.eligible_variable_ids.length} variables. ${counts} Review the choices, then label more or run the full split. Name and review is available once every variable is labeled.`
       : `${counts} This is a preview; your draft has not changed. Spot check the choices, then use them in your draft. Every choice is included, even those not shown here.`;
   }
 
@@ -305,31 +324,28 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     els.definitionAiCost.textContent = `${testLabel} (${sample.length}): ${formatUsd(testCost)} · ${fullLabel} (${fullCount}): ${formatUsd(fullCost)}. Estimates use current listed model pricing; OpenRouter controls the actual charge.`;
   }
 
+  // New variables first, then leftover; least certain first within each group.
+  const bySide = (a, b) => a.side === b.side ? a.confidence - b.confidence : a.side === "new" ? -1 : 1;
+
   function renderReviewRows(draft) {
-    const full = previewMode === "full";
-    els.definitionAiReviewTools.hidden = !full;
-    let rows = preview;
-    if (full) {
-      els.definitionAiReviewFilter.value = reviewFilter;
-      rows = reviewFilter === "spot" ? spotRows
-        : reviewFilter === "all" ? preview
-          : preview.filter(item => reviewFilter === "uncertain" ? item.confidence < 0.65 : item.side === reviewFilter);
-      if (reviewFilter !== "spot") rows = [...rows].sort((a, b) => a.confidence - b.confidence);
-    } else rows = [...rows].sort((a, b) => a.confidence - b.confidence);
+    els.definitionAiReviewTools.hidden = false;
+    els.definitionAiReviewFilter.value = reviewFilter;
+    const rows = [...(reviewFilter === "spot" ? spotRows
+      : reviewFilter === "all" ? preview
+        : preview.filter(item => reviewFilter === "uncertain" ? item.confidence < 0.65 : item.side === reviewFilter))]
+      .sort(bySide);
     const pageCount = Math.max(1, Math.ceil(rows.length / REVIEW_PAGE_SIZE));
     reviewPage = Math.min(reviewPage, pageCount - 1);
     const start = reviewPage * REVIEW_PAGE_SIZE;
-    const shown = full ? rows.slice(start, start + REVIEW_PAGE_SIZE) : rows;
-    els.definitionAiReviewPage.textContent = full
-      ? `${rows.length ? start + 1 : 0}–${Math.min(start + REVIEW_PAGE_SIZE, rows.length)} of ${rows.length}` : "";
+    const shown = rows.slice(start, start + REVIEW_PAGE_SIZE);
+    els.definitionAiReviewPage.textContent = `${rows.length ? start + 1 : 0}–${Math.min(start + REVIEW_PAGE_SIZE, rows.length)} of ${rows.length}`;
     els.definitionAiReviewPrev.disabled = reviewPage === 0;
     els.definitionAiReviewNext.disabled = reviewPage >= pageCount - 1;
     replaceChildren(els.definitionAiRows, shown.length ? shown.map(item => h("div", { className: "definition-ai-row" },
       h("span", { textContent: `${item.label} · ${Math.round(item.confidence * 100)}% model score` }),
-      !full ? h("span", { className: "definition-ai-side", textContent: item.side === "new" ? "New variable" : "Leftover" })
-        : h("select", { dataset: { variableId: item.id }, attrs: { "aria-label": `Side for ${item.label}` } },
-          h("option", { value: "new", textContent: "New variable", selected: item.side === "new" }),
-          h("option", { value: "leftover", textContent: "Leftover", selected: item.side === "leftover" }))))
+      h("select", { dataset: { variableId: item.id }, attrs: { "aria-label": `Side for ${item.label}` } },
+        h("option", { value: "new", textContent: "New variable", selected: item.side === "new" }),
+        h("option", { value: "leftover", textContent: "Leftover", selected: item.side === "leftover" }))))
       : h("div", { className: "small-note", textContent: "No results in this view. Choose another filter to inspect more." }));
     els.definitionAiRows.querySelectorAll("select[data-variable-id]").forEach(select =>
       select.addEventListener("change", () => {
@@ -376,7 +392,16 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     els.definitionAiFullRun.textContent = activePhase === "full" ? "Stop full run (save progress)" : fullSaved
       ? `Resume full split (${fullSaved}/${Math.max(0, (draft?.eligible_variable_ids?.length || 0) - (sampleIds?.length || 0))} saved)`
       : "Run full split";
+    const eligibleCount = draft?.eligible_variable_ids?.length || 0;
+    const labeled = testResults?.length || 0;
+    const canLabelMore = showPreview && previewMode === "test" && !fullSaved && labeled < eligibleCount;
+    els.definitionAiMore.hidden = !canLabelMore;
+    els.definitionAiMore.disabled = activePhase === "more" ? false : !canRun;
+    els.definitionAiMore.textContent = activePhase === "more" ? "Stop (save progress)"
+      : sampleIds?.length > labeled ? `Resume labeling (${completedCount("test") - labeled}/${sampleIds.length - labeled} saved)`
+        : `Label ${Math.min(TEST_SIZE, eligibleCount - labeled)} more`;
     els.definitionAiApply.hidden = !showPreview || previewMode !== "full";
+    els.definitionAiApply.disabled = busy;
     if (!showPreview) return;
     renderSummary(draft);
     renderReviewRows(draft);
@@ -482,41 +507,42 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     if (!busy) return;
     runRevision += 1;
     activeRequest?.abort("stopped");
-    showProgress(`Stopped. ${completedCount(activePhase)} completed variables are saved in this browser. You can resume this run.`);
+    showProgress(`Stopped. ${completedCount(activePhase === "full" ? "full" : "test")} completed variables are saved in this browser. You can resume this run.`);
   }
 
-  async function classify(ids, description, draft, revision, phase) {
+  async function classify(ids, description, draft, revision, phase, base = 0) {
     const records = recordsFor(ids);
+    const name = phase === "test" ? (base ? "Labeling" : "Test") : "Full";
     const results = [];
     let inputTokens = 0;
     let usageComplete = true;
     for (let offset = 0; offset < records.length; offset += BATCH_SIZE) {
       if (revision !== runRevision || draft !== getDraft()) return null;
       const batch = records.slice(offset, offset + BATCH_SIZE);
-      let saved = phaseBatches(phase).find(item => item.offset === offset);
+      let saved = phaseBatches(phase).find(item => item.offset === base + offset);
       if (saved && (saved.results.length !== batch.length
         || saved.results.some((item, index) => item.id !== batch[index].id))) {
         throw new Error("Saved classification progress does not match these source variables.");
       }
       if (!saved) {
-        showProgress(`${phase === "test" ? "Test" : "Full"} run: requesting variables ${offset + 1}–${Math.min(offset + BATCH_SIZE, records.length)} of ${records.length}…`);
+        showProgress(`${name} run: requesting variables ${offset + 1}–${Math.min(offset + BATCH_SIZE, records.length)} of ${records.length}…`);
         const body = await openRouterJson("/api/alpha/decisions", key, { method: "POST",
           body: JSON.stringify(requestFor(batch, description)), signal: activeRequest.signal });
         if (revision !== runRevision || draft !== getDraft()) return null;
         const rows = jevResults(body, batch);
         const reportedTokens = Number(body.usage?.input_tokens ?? body.usage?.inputTokens);
         const tokens = Number.isFinite(reportedTokens) && reportedTokens >= 0 ? reportedTokens : null;
-        showProgress(`${phase === "test" ? "Test" : "Full"} run: saving variables ${offset + 1}–${Math.min(offset + BATCH_SIZE, records.length)} in this browser…`);
+        showProgress(`${name} run: saving variables ${offset + 1}–${Math.min(offset + BATCH_SIZE, records.length)} in this browser…`);
         const runId = checkpoint.run.id;
-        await saveJevBatch(runId, phase, offset, rows, tokens);
-        saved = { offset, phase, results: rows, inputTokens: tokens };
+        await saveJevBatch(runId, phase, base + offset, rows, tokens);
+        saved = { offset: base + offset, phase, results: rows, inputTokens: tokens };
         if (checkpoint?.run.id === runId) checkpoint.batches.push(saved);
         if (revision !== runRevision || draft !== getDraft()) return null;
       }
       results.push(...saved.results);
       if (saved.inputTokens === null) usageComplete = false;
       else inputTokens += saved.inputTokens;
-      showProgress(`${phase === "test" ? "Test" : "Full"} run: ${Math.min(offset + BATCH_SIZE, records.length)} of ${records.length} variables saved in this browser…`);
+      showProgress(`${name} run: ${Math.min(offset + BATCH_SIZE, records.length)} of ${records.length} variables saved in this browser…`);
     }
     return { results, inputTokens: usageComplete ? inputTokens : null };
   }
@@ -538,7 +564,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     testInputTokens = null;
     fullInputTokens = null;
     spotRows = [];
-    reviewFilter = "spot";
+    reviewFilter = "all";
     reviewPage = 0;
     onPreviewChange(null);
     message = "Checking the key limit…";
@@ -556,10 +582,58 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       preview = outcome.results;
       previewDraft = draft;
       previewMode = "test";
+      spotRows = spotCheckResults(preview);
       onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "test");
-      message = "Test ready. Review the sample, then revise the description or run the full split.";
+      message = "Test ready. Review the sample, then label more or run the full split.";
     } catch (error) {
       if (revision === runRevision) message = `Test paused: ${error.message} Completed batches are saved in this browser. Resume the test when ready.`;
+    } finally {
+      busy = false;
+      activePhase = null;
+      activeRequest = null;
+      render();
+    }
+  }
+
+  // Label the next round of variables and append it to the list. A round that
+  // was interrupted keeps its saved ids, so resuming never relabels a sample.
+  async function runMore() {
+    const draft = getDraft();
+    const description = String(draft?.ai_description || "").trim();
+    if (!draft || draft.step !== "partition" || !key || busy || !testResults?.length || previewMode !== "test"
+      || sampleDraft !== draft || sampleSignature !== eligibleSignature(draft)
+      || testDescription !== description || completedCount("full")
+      || testResults.length >= draft.eligible_variable_ids.length) return;
+    const revision = ++runRevision;
+    busy = true;
+    activePhase = "more";
+    activeRequest = new AbortController();
+    message = "Checking the key limit…";
+    render();
+    try {
+      if (!await checkKey(activeRequest.signal) || revision !== runRevision || draft !== getDraft()) return;
+      showProgress("Preparing local checkpoint…");
+      if (!await ensureCheckpoint(draft, description)
+        || revision !== runRevision || draft !== getDraft()) return;
+      const labeled = testResults.length;
+      if (sampleIds.length <= labeled) {
+        const taken = new Set(sampleIds);
+        sampleIds = [...sampleIds, ...randomSampleIds(draft.eligible_variable_ids.filter(id => !taken.has(id)), TEST_SIZE)];
+        costCache = null;
+        checkpoint.run.sampleIds = sampleIds;
+        await saveJevRun(checkpoint.run);
+        if (revision !== runRevision || draft !== getDraft()) return;
+      }
+      const outcome = await classify(sampleIds.slice(labeled, labeled + TEST_SIZE), description, draft, revision, "test", labeled);
+      if (!outcome || revision !== runRevision || draft !== getDraft()) return;
+      testResults = [...testResults, ...outcome.results];
+      testInputTokens = testInputTokens === null || outcome.inputTokens === null ? null : testInputTokens + outcome.inputTokens;
+      preview = testResults;
+      spotRows = spotCheckResults(preview);
+      onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "test");
+      message = `${testResults.length} of ${draft.eligible_variable_ids.length} variables labeled. Review them, label more, or run the full split.`;
+    } catch (error) {
+      if (revision === runRevision) message = `Labeling paused: ${error.message} Completed batches are saved in this browser. Resume when ready.`;
     } finally {
       busy = false;
       activePhase = null;
@@ -632,21 +706,22 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     });
     els.definitionAiRun.addEventListener("click", () => activePhase === "test" ? stopRun() : void runTest());
     els.definitionAiFullRun.addEventListener("click", () => activePhase === "full" ? stopRun() : void runFull());
+    els.definitionAiMore.addEventListener("click", () => activePhase === "more" ? stopRun() : void runMore());
     els.definitionAiReviewFilter.addEventListener("change", () => {
       reviewFilter = els.definitionAiReviewFilter.value;
       reviewPage = 0;
-      if (previewMode === "full" && previewDraft === getDraft()) renderReviewRows(previewDraft);
+      if (preview && previewDraft === getDraft()) renderReviewRows(previewDraft);
     });
     els.definitionAiReviewPrev.addEventListener("click", () => {
       reviewPage = Math.max(0, reviewPage - 1);
-      if (previewMode === "full" && previewDraft === getDraft()) renderReviewRows(previewDraft);
+      if (preview && previewDraft === getDraft()) renderReviewRows(previewDraft);
     });
     els.definitionAiReviewNext.addEventListener("click", () => {
       reviewPage += 1;
-      if (previewMode === "full" && previewDraft === getDraft()) renderReviewRows(previewDraft);
+      if (preview && previewDraft === getDraft()) renderReviewRows(previewDraft);
     });
     els.definitionAiApply.addEventListener("click", () => {
-      if (!preview || previewMode !== "full" || previewDraft !== getDraft()) return;
+      if (!preview || busy || previewMode !== "full" || previewDraft !== getDraft()) return;
       onApply(preview.filter(item => item.side === "new").map(item => item.id), testDescription);
       clearPreview();
     });

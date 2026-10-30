@@ -1,6 +1,6 @@
 export const JEV_MODEL = "typesafe/jev-1.13";
 export const JEV_BATCH_SIZE = 16;
-export const JEV_TEST_SIZE = 24;
+export const JEV_TEST_SIZE = 50;
 export const JEV_MAX_KEY_LIMIT_USD = 5;
 const REQUEST_TIMEOUT_MS = 60_000;
 

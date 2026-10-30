@@ -415,7 +415,7 @@ for (const device of [
       await expect(page.locator("#definitionManualPanel")).toBeHidden();
       await page.locator("#definitionAiDescription").fill("School based measures of academic achievement");
       await expect(page.locator("#definitionAiRun")).toBeEnabled();
-      await expect(page.locator("#definitionAiCost")).toContainText("Estimated test (24): $");
+      await expect(page.locator("#definitionAiCost")).toContainText("Estimated test (50): $");
       await expect(page.locator("#definitionAiCost")).toContainText("estimated remaining full run");
       async function mapImage() {
         if (device.name === "mobile") await page.locator('.mobile-panel-tab[data-mobile-panel="variables"]').click();
@@ -427,12 +427,12 @@ for (const device of [
       const mapBeforeTest = await mapImage();
       await page.locator("#definitionAiRun").click();
       await expect(page.locator("#definitionAiPreview")).toBeVisible();
-      await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(24);
+      await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(50);
       await expect(page.locator("#definitionAiFullRun")).toBeVisible();
-      await expect(page.locator("#definitionAiCost")).toContainText("Test usage at listed price (24): $0.000084");
+      await expect(page.locator("#definitionAiCost")).toContainText("Test usage at listed price (50): $0.000168");
       await expect(page.locator("#definitionAiCost")).toContainText("calibrated from test");
-      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(24);
-      await expect(page.locator("#definitionMapPreviewStatus")).toContainText("AI sample preview only · 24 suggested for new");
+      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(50);
+      await expect(page.locator("#definitionMapPreviewStatus")).toContainText("AI sample preview only · 50 suggested for new");
       expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
       expect(await mapImage()).not.toEqual(mapBeforeTest);
       await page.locator("#definitionMethodManual").click();
@@ -443,41 +443,39 @@ for (const device of [
       await expect(page.locator("#definitionAiPreview")).toBeVisible();
       await expect(page.locator("#definitionMapPreviewStatus")).toBeVisible();
       await expect(page.locator("#definitionAiApply")).toBeHidden();
-      expect(decisions).toBe(2);
+      expect(decisions).toBe(4);
       const firstSample = batches.flatMap(batch => batch.records);
       await page.locator("#definitionAiDescription").fill("School and college academic achievement");
       await expect(page.locator("#definitionAiPreview")).toBeHidden();
       expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds)).toBeNull();
       await page.locator("#definitionAiRun").click();
       await expect(page.locator("#definitionAiFullRun")).toBeVisible();
-      expect(batches.slice(2).flatMap(batch => batch.records)).toEqual(firstSample);
-      expect(batches.slice(2, 4).every(batch => batch.description === "School and college academic achievement")).toBe(true);
+      expect(batches.slice(4).flatMap(batch => batch.records)).toEqual(firstSample);
+      expect(batches.slice(4, 8).every(batch => batch.description === "School and college academic achievement")).toBe(true);
       const eligibleCount = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids.length);
       await page.locator("#definitionAiFullRun").click();
       await expect(page.locator("#definitionAiReviewTools")).toBeVisible();
       await expect(page.locator("#definitionAiReviewFilter")).toHaveValue("spot");
-      expect(await page.locator("#definitionAiRows .definition-ai-row").count()).toBeLessThanOrEqual(40);
+      expect(await page.locator("#definitionAiRows .definition-ai-row").count()).toBeLessThanOrEqual(50);
       await expect(page.locator("#definitionAiApply")).toBeVisible();
       await expect(page.locator("#definitionAiCost")).toContainText("full run usage at listed price");
       expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(eligibleCount);
       await expect(page.locator("#definitionMapPreviewStatus")).toContainText(`AI full preview only · ${eligibleCount} suggested for new`);
       await page.locator("#definitionAiReviewFilter").selectOption("all");
-      await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(40);
+      await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(50);
       await page.locator("#definitionAiReviewNext").click();
-      await expect(page.locator("#definitionAiReviewPage")).toContainText("41–80");
+      await expect(page.locator("#definitionAiReviewPage")).toContainText("51–100");
       await page.locator("#definitionAiRows select").first().selectOption("leftover");
       expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(eligibleCount - 1);
-      await page.locator("#definitionAiRows select").first().selectOption("new");
-      expect(batches.slice(4).flatMap(batch => batch.records)).toHaveLength(eligibleCount - 24);
+      expect(batches.slice(8).flatMap(batch => batch.records)).toHaveLength(eligibleCount - 50);
       expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
       await page.locator("#definitionAiApply").click();
       expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds)).toBeNull();
       await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
       expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBeGreaterThan(0);
-      await expect(page.locator("#definitionSelectedVariables .definition-selected-variable")).toHaveCount(40);
-      await expect(page.locator('#definitionTermChips button[data-term="all"]')).toHaveAttribute("aria-pressed", "true");
-      await page.locator('#definitionTermItems button[data-side="leftover"]').first().click();
-      await page.locator("#definitionReview").click();
+      // Applying skips the manual draft and lands on Name and review.
+      await expect(page.locator("#definitionReviewStep")).toBeVisible();
+      await expect(page.locator("#definitionPartitionStep")).toBeHidden();
       await expect(page.locator("#definitionNewDescription")).toHaveValue("School and college academic achievement");
       await page.locator("#definitionNewLabel").fill("School and college achievement");
       await page.locator("#definitionSave").click();
@@ -552,7 +550,7 @@ test("Jev test and full split resume saved batches after failure and reload", as
       decisions += 1;
       const body = request.postDataJSON();
       requestedBatches.push(body.state.records);
-      if (decisions === 2 && failTestOnce || decisions === 5 && failFullOnce) {
+      if (decisions === 2 && failTestOnce || decisions === 7 && failFullOnce) {
         if (decisions === 2) failTestOnce = false;
         else failFullOnce = false;
         return route.fulfill({ status: 503, headers, contentType: "application/json",
@@ -581,17 +579,17 @@ test("Jev test and full split resume saved batches after failure and reload", as
     await expect(page.locator("#definitionAiRun")).toBeEnabled();
     await page.locator("#definitionAiRun").click();
     await expect(page.locator("#definitionAiStatus")).toContainText("Test paused");
-    await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/24 saved)");
+    await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/50 saved)");
     const failedTestBatch = requestedBatches[1];
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
     await page.locator("#definitionAiConnect").click();
-    await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/24 saved)");
+    await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/50 saved)");
     await expect(page.locator("#definitionAiRun")).toBeEnabled();
     await page.locator("#definitionAiRun").click();
     await expect(page.locator("#definitionAiFullRun")).toBeVisible();
     expect(requestedBatches[2]).toEqual(failedTestBatch);
-    expect(decisions).toBe(3);
+    expect(decisions).toBe(5);
     await page.locator("#definitionAiFullRun").click();
     await expect(page.locator("#definitionAiStatus")).toContainText("Full run paused");
     await expect(page.locator("#definitionAiFullRun")).toContainText("16/");
@@ -604,9 +602,9 @@ test("Jev test and full split resume saved batches after failure and reload", as
     expect(storage.stores).toContain("jev_runs");
     expect(storage.stores).toContain("jev_batches");
     const eligibleCount = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids.length);
-    await expect(page.locator("#definitionAiCost")).toContainText(`estimated remaining full run, calibrated from test (${eligibleCount - 40})`);
-    const failedBatch = requestedBatches[4];
-    expect(decisions).toBe(5);
+    await expect(page.locator("#definitionAiCost")).toContainText(`estimated remaining full run, calibrated from test (${eligibleCount - 66})`);
+    const failedBatch = requestedBatches[6];
+    expect(decisions).toBe(7);
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
     await page.locator("#definitionAiConnect").click();
@@ -614,8 +612,8 @@ test("Jev test and full split resume saved batches after failure and reload", as
     await expect(page.locator("#definitionAiFullRun")).toBeEnabled();
     await page.locator("#definitionAiFullRun").click();
     await expect(page.locator("#definitionAiApply")).toBeVisible();
-    expect(requestedBatches[5]).toEqual(failedBatch);
-    expect(requestedBatches.slice(5).flat()).not.toContainEqual(requestedBatches[3][0]);
+    expect(requestedBatches[7]).toEqual(failedBatch);
+    expect(requestedBatches.slice(7).flat()).not.toContainEqual(requestedBatches[5][0]);
     await page.locator("#definitionAiDescription").fill("School measures only");
     await expect(page.locator("#definitionAiPreview")).toBeHidden();
     await expect(page.locator("#definitionAiRun")).toContainText("Test split on");
@@ -681,14 +679,14 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
     await page.locator("#definitionAiDescription").fill("School and college academic achievement");
     await expect(page.locator("#definitionAiRun")).toBeEnabled();
     await page.locator("#definitionAiRun").click();
-    await expect(page.locator("#definitionAiStatus")).toContainText("requesting variables 1–16 of 24");
+    await expect(page.locator("#definitionAiStatus")).toContainText("requesting variables 1–16 of 50");
     await expect(page.locator("#definitionAiRun")).toHaveText("Stop test (save progress)");
     await page.locator("#definitionAiRun").click();
     await expect(page.locator("#definitionAiStatus")).toContainText("Stopped.");
-    await expect(page.locator("#definitionAiRun")).toHaveText("Test split on 24 variables");
+    await expect(page.locator("#definitionAiRun")).toHaveText("Test split on 50 variables");
     await page.locator("#definitionAiRun").click();
     await expect(page.locator("#definitionAiFullRun")).toBeVisible();
-    expect(decisions).toBe(3);
+    expect(decisions).toBe(5);
   } finally {
     await context.close();
   }
@@ -755,4 +753,139 @@ test("a published split is reviewed on the map and used without a naming step", 
     .toBe("A published fixture split taken from one source category.");
   expect(groups.find(group => group.group_id === fixture.sourceId)?.label).toBe(fixture.sourceLabel);
   browserErrors.check();
+});
+
+test("definition source search matches constituent variables, not only category names", async ({ page }) => {
+  const fs = require("node:fs"), zlib = require("node:zlib");
+  const { PRODUCTION_EVIDENCE_MANIFEST } = await import("../site/dag_data_config.mjs");
+  const snapshot = PRODUCTION_EVIDENCE_MANIFEST.match(/browser-v2\/([0-9a-f]{64})\//)[1];
+  const catalog = JSON.parse(zlib.gunzipSync(fs.readFileSync(`site/search-catalogs/${snapshot}.json.gz`)));
+  const labelOf = new Map(catalog.records.map(row => [row[0], row[1] || row[2]]));
+  await page.addInitScript(() => {
+    localStorage.clear();
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+  });
+  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+  await page.waitForFunction(() => window.__dagBuilderState.publishedSchemaHydrated && !window.__dagBuilderState.publishedSchemaHydrating);
+  // Pick a variable whose own label is not part of its category's name.
+  const target = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 5)
+    .map(group => ({ id: group.group_id, label: group.label, variableId: group.variable_ids[Math.min(3, group.variable_ids.length - 1)] })));
+  const pick = target.find(item => {
+    const text = labelOf.get(item.variableId);
+    return text && text.length > 12 && !item.label.toLowerCase().includes(text.toLowerCase());
+  });
+  expect(pick, JSON.stringify(target.map(t => [t.label, t.variableId, labelOf.get(t.variableId)]))).toBeTruthy();
+  const query = labelOf.get(pick.variableId);
+  await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+  await page.locator("#definitionChooseManual").click();
+  await page.locator("#definitionSourceSearch").fill(query);
+  const row = page.locator(`#definitionSourceList input[data-source-id="${pick.id}"]`);
+  await expect(row).toHaveCount(1, { timeout: 60000 });
+  await expect(page.locator("#definitionSourceList .setup-group-variable-match").first()).toContainText("Matched:");
+});
+
+test("Label 50 more appends to the list, sorts new first, and Name and review skips the manual draft", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  const batches = [];
+  let failSecondRoundOnce = true;
+  await page.route("https://openrouter.ai/auth?**", async route => {
+    const authUrl = new URL(route.request().url());
+    const callback = new URL(authUrl.searchParams.get("callback_url"));
+    callback.searchParams.set("code", "test-code");
+    callback.searchParams.set("state", authUrl.searchParams.get("state"));
+    await route.fulfill({ status: 302, headers: { location: callback.href } });
+  });
+  await page.route("https://openrouter.ai/api/**", async route => {
+    const request = route.request();
+    const headers = { "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-headers": "authorization, content-type" };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (request.url().endsWith("/auth/keys")) {
+      return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify({ key: "sk-or-test" }) });
+    }
+    if (request.url().endsWith("/v1/key")) {
+      return route.fulfill({ headers, contentType: "application/json",
+        body: JSON.stringify({ data: { limit: 5, limit_reset: null, limit_remaining: 5 } }) });
+    }
+    if (request.url().endsWith("/v1/model/typesafe/jev-1.13")) {
+      return route.fulfill({ headers, contentType: "application/json",
+        body: JSON.stringify({ data: { pricing: { prompt: "0.000000042", completion: "0", request: "0" } } }) });
+    }
+    if (request.url().endsWith("/alpha/decisions")) {
+      const body = request.postDataJSON();
+      batches.push(body.state.records);
+      if (batches.length === 6 && failSecondRoundOnce) {
+        failSecondRoundOnce = false;
+        return route.fulfill({ status: 503, headers, contentType: "application/json",
+          body: JSON.stringify({ error: { message: "Temporary failure" } }) });
+      }
+      // Alternate sides so the list has both new and leftover rows.
+      const answers = Object.fromEntries(Object.keys(body.questions).map((id, index) => [id,
+        { type: "choice", choice: index % 2 ? "leftover" : "new", probabilities: { new: 0.9, leftover: 0.9 } }]));
+      return route.fulfill({ headers, contentType: "application/json",
+        body: JSON.stringify({ answers, usage: { input_tokens: 1000 } }) });
+    }
+    throw new Error(`Unexpected OpenRouter request: ${request.url()}`);
+  });
+  try {
+    await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+      && window.__dagBuilderState?.publishedSchemaHydrated);
+    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionChooseJev").click();
+    await page.locator("#definitionAiConnect").click();
+    await expect(page.locator("#definitionSourcesStep")).toBeVisible();
+    await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
+    await page.locator("#definitionContinue").click();
+    await page.locator("#definitionAiDescription").fill("School and college academic achievement");
+    await page.locator("#definitionAiRun").click();
+    await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(50);
+    await expect(page.locator("#definitionAiMore")).toHaveText("Label 50 more");
+    // Name and review needs every variable labeled, not just the first rounds.
+    await expect(page.locator("#definitionAiApply")).toBeHidden();
+    const firstRound = batches.flat();
+    expect(firstRound).toHaveLength(50);
+
+    // An interrupted round keeps its ids; resuming retries the failed batch.
+    await page.locator("#definitionAiMore").click();
+    await expect(page.locator("#definitionAiStatus")).toContainText("Labeling paused");
+    await expect(page.locator("#definitionAiMore")).toContainText("Resume labeling (16/50 saved)");
+    const failedBatch = batches[5];
+    await page.locator("#definitionAiMore").click();
+    await expect(page.locator("#definitionAiReviewPage")).toContainText("1–50 of 100");
+    expect(batches[6]).toEqual(failedBatch);
+    const secondRound = [...batches.slice(4, 5), ...batches.slice(6)].flat();
+    expect(secondRound).toHaveLength(50);
+    // The second round labels different variables, not a repeat of the first.
+    const firstLabels = new Set(firstRound.map(record => record.label + record.text));
+    expect(secondRound.some(record => firstLabels.has(record.label + record.text))).toBe(false);
+    // New variables are listed ahead of leftover ones across pages.
+    const sides = async () => page.locator("#definitionAiRows select").evaluateAll(selects => selects.map(select => select.value));
+    expect((await sides()).every(side => side === "new")).toBe(true);
+    await page.locator("#definitionAiReviewNext").click();
+    expect((await sides()).every(side => side === "leftover")).toBe(true);
+    expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(50);
+
+    await expect(page.locator("#definitionAiApply")).toBeHidden();
+
+    // Finishing the full split labels the rest, appends nothing twice, and unlocks Name and review.
+    await page.locator("#definitionAiFullRun").click();
+    await expect(page.locator("#definitionAiApply")).toBeVisible({ timeout: 90000 });
+    await expect(page.locator("#definitionAiMore")).toBeHidden();
+    const eligibleCount = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids.length);
+    // Every variable is requested once, plus the one batch that failed and was retried.
+    expect(batches.flat()).toHaveLength(eligibleCount + batches[5].length);
+    await page.locator("#definitionAiApply").click();
+    await expect(page.locator("#definitionReviewStep")).toBeVisible();
+    await expect(page.locator("#definitionPartitionStep")).toBeHidden();
+    expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBeGreaterThan(50);
+    await expect(page.locator("#definitionNewDescription")).toHaveValue("School and college academic achievement");
+  } finally {
+    await context.close();
+  }
 });

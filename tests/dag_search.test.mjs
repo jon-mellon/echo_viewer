@@ -162,3 +162,23 @@ test("group-first search invalidates cached misses after membership or hydrated-
   assert.equal(index.search(project, "iv", "education", hydrated, catalog).length, 0);
   await assert.rejects(index.prepare([{ group_id: "bad", variable_ids: ["missing"] }], catalog), /does not cover/);
 });
+
+test("group search over an arbitrary group list finds constituent variables from the catalog alone", async () => {
+  const { StaticVariableSearchCatalog, variableSearchPayload } = await import("../site/variable_search_catalog.mjs");
+  const variables = [
+    { variable_id: "v1", display_label: "Annual rainfall", index: 1 },
+    { variable_id: "v2", display_label: "Job training", index: 2 },
+  ];
+  const catalog = new StaticVariableSearchCatalog();
+  await catalog.load("/catalog.json", async () => new Response(JSON.stringify(variableSearchPayload(variables, "x"))));
+  const groups = [
+    { group_id: "weather", label: "Weather", variable_ids: ["v1"] },
+    { group_id: "work", label: "Work", variable_ids: ["v2"] },
+  ];
+  const index = new search.AnchorGroupSearchIndex();
+  // Nothing is hydrated, as at startup: only the catalog can match variables.
+  const results = index.searchGroups(groups, groups, "rainfall", new Map(), catalog, 60);
+  assert.deepEqual(results.map(r => [r.group.group_id, r.variableMatch]), [["weather", "Annual rainfall"]]);
+  assert.deepEqual(index.searchGroups(groups, groups, "rainfall", new Map(), null, 60), []);
+  assert.equal(index.searchGroups(groups, groups, "", new Map(), catalog, 60).length, 2);
+});
