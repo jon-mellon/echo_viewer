@@ -18,11 +18,14 @@ if (!remote) url.pathname = '/';
 const runs = Number(process.env.PROFILE_RUNS || 2);
 if (!Number.isSafeInteger(runs) || runs < 1) throw new Error('PROFILE_RUNS must be a positive integer');
 // Mobile runs at 4x CPU slowdown.
-// Local runs, with the graph redrawn each time, took at most 250 ms (phone at 4x
-// CPU slowdown) and 150 ms (desktop) per interaction; the budgets leave room
-// for slower CI runners.
-const budgets = { firstResultsMs: mobile ? 20000 : 10000, firstEvidenceMs: mobile ? 16000 : 8000,
-  interactionMs: mobile ? 800 : 500, longestTaskMs: mobile ? 150 : 100 };
+// Set from measurements. The slowest local run of each step (phone at 4x CPU
+// slowdown) took 250 ms wall and 65 ms longest task; GitHub's runners are about
+// 3x slower and vary run to run, and the slowest CI run so far took 702 ms wall
+// and 243 ms longest task for switching views (12 s for the first results,
+// which includes loading the paper counts). The budgets are about twice the
+// worst CI run, to catch real regressions without failing on runner noise.
+const budgets = { firstResultsMs: mobile ? 30000 : 15000, firstEvidenceMs: mobile ? 16000 : 8000,
+  interactionMs: mobile ? 1500 : 800, longestTaskMs: mobile ? 500 : 300 };
 const report = { url: url.href, mobile, cpuThrottle: mobile ? 4 : 1, source: remote ? 'remote deployment' : root, budgets, runs: [] };
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true });
