@@ -18,9 +18,11 @@ if (!remote) url.pathname = '/';
 const runs = Number(process.env.PROFILE_RUNS || 2);
 if (!Number.isSafeInteger(runs) || runs < 1) throw new Error('PROFILE_RUNS must be a positive integer');
 // Mobile runs at 4x CPU slowdown.
-// Local runs measured about 150 ms (mobile) and 120 ms (desktop) per
-// interaction; the budgets leave room for slower CI runners.
-const budgets = { firstResultsMs: mobile ? 20000 : 10000, interactionMs: mobile ? 500 : 300, longestTaskMs: mobile ? 150 : 100 };
+// Local runs, with the graph redrawn each time, took at most 250 ms (phone at 4x
+// CPU slowdown) and 150 ms (desktop) per interaction; the budgets leave room
+// for slower CI runners.
+const budgets = { firstResultsMs: mobile ? 20000 : 10000, firstEvidenceMs: mobile ? 16000 : 8000,
+  interactionMs: mobile ? 800 : 500, longestTaskMs: mobile ? 150 : 100 };
 const report = { url: url.href, mobile, cpuThrottle: mobile ? 4 : 1, source: remote ? 'remote deployment' : root, budgets, runs: [] };
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true });
@@ -46,19 +48,27 @@ try {
       && document.getElementById('startupLoading')?.hidden && !document.getElementById('exploreView').hidden, null, { timeout: 120000 });
     const result = { errors, timings: [] };
     report.runs.push(result);
-    async function measure(name, action, budget = budgets.interactionMs) {
+    // Each interaction is timed until the list and the graph both show the result.
+    async function measure(name, action, { budget = budgets.interactionMs, ready = null } = {}) {
       const start = await page.evaluate(() => performance.now());
       await action();
-      const timing = await page.evaluate(async ({ start, name }) => {
+      const timing = await page.evaluate(async ({ start, name, ready }) => {
+        const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+        await api.whenDagRendered();
+        if (ready) while (!document.querySelector(ready) && performance.now() - start < 90000) await new Promise(resolve => setTimeout(resolve, 20));
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         window.__exploreTasks.push(...window.__exploreObserver.takeRecords().map(e => ({ start: e.startTime, ms: e.duration })));
         const tasks = window.__exploreTasks.filter(t => t.start >= start);
+        const rows = document.querySelectorAll('.explore-row').length;
+        const edges = api.renderedDagEdgeIds().filter(id => id !== '__study_design_iv_to_dv__').length;
         return { name, ms: performance.now() - start, longestTaskMs: Math.max(0, ...tasks.map(t => t.ms)),
-          rows: document.querySelectorAll('.explore-row').length, summary: document.getElementById('exploreSummary').textContent };
-      }, { start, name });
+          rows, edges, summary: document.getElementById('exploreSummary').textContent };
+      }, { start, name, ready });
       result.timings.push({ ...timing, budget });
       console.log(JSON.stringify({ run: run + 1, ...timing, budget }));
       if (!timing.rows) throw new Error(`No results after ${name}: ${timing.summary}`);
+      // The graph draws exactly the links behind the list, so a stale or empty graph fails here.
+      if (!ready && timing.edges !== timing.rows) throw new Error(`Graph shows ${timing.edges} links for ${timing.rows} listed variables after ${name}`);
       if (process.env.PROFILE_DISABLE_BUDGETS !== '1'
         && (timing.ms > budget || (budget === budgets.interactionMs && timing.longestTaskMs > budgets.longestTaskMs))) {
         throw new Error(`Explore budget exceeded: ${name} took ${Math.round(timing.ms)} ms, longest task ${Math.round(timing.longestTaskMs)} ms`);
@@ -66,20 +76,35 @@ try {
     }
     // Optional: simulate time spent choosing, during which paper support loads.
     if (Number(process.env.PROFILE_PICK_DELAY_MS) > 0) await page.waitForTimeout(Number(process.env.PROFILE_PICK_DELAY_MS));
-    await measure('choose focus (cold, includes paper support)', async () => {
-      await page.locator('.explore-pick[data-group-id="category-mental-health"]').click();
+    await measure('choose Dep var (cold, includes paper support)', async () => {
+      await page.locator('#focusGroupPicker button[data-group-id="category-mental-health"]').click();
       await page.locator('.explore-row').first().waitFor({ timeout: 90000 });
-    }, budgets.firstResultsMs);
+    }, { budget: budgets.firstResultsMs });
+    // On a phone the list and the graph (with its Filters) are separate tabs.
+    const showPanel = async panel => { if (mobile) await page.locator(`.mobile-panel-nav [data-mobile-panel="${panel}"]`).click(); };
+    await showPanel('dag');
+    await page.locator('.filter-dropdown > summary').click();
     for (const depth of [2, 3, 4, 1]) {
-      await measure(`distance ${depth}`, () => page.locator(`#exploreDepth button[data-depth="${depth}"]`).click());
+      await measure(`distance ${depth}`, () => page.locator('#confounderPathLength').fill(String(depth)));
     }
-    await measure('min papers 5', () => page.locator('#exploreMinPapers').selectOption('5'));
+    await measure('min papers 5', () => page.locator('#minimumEdgePapers').fill('5'));
+    await showPanel('controls');
+    await measure('open evidence for a variable (cold)', () => page.locator('.explore-row-open').first().click(),
+      { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude finding "]' });
+    await measure('close evidence', () => page.locator('#closeEvidencePane').click());
+    await showPanel('controls');
     await measure('switch to consequences', async () => {
       await page.locator('#taskBar .task-tab[data-task=consequences]').click();
-      await page.locator('.explore-pick[data-group-id="category-income-earnings"]').click();
+      await page.locator('#focusGroupPicker button[data-group-id="category-income-earnings"]').click();
     });
-    await measure('consequences distance 4', () => page.locator('#exploreDepth button[data-depth="4"]').click());
-    await measure('drill into a result', () => page.locator('.explore-row-label').first().click());
+    await showPanel('dag');
+    await measure('consequences distance 4', () => page.locator('#confounderPathLength').fill('4'));
+    await showPanel('controls');
+    await measure('explore a result', async () => {
+      const first = page.locator('.explore-row').first();
+      await first.hover();
+      await first.locator('.explore-row-refocus').click();
+    });
     if (errors.length) throw new Error(errors.join('; '));
     await context.close(); activePage = null;
   }

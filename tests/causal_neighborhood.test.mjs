@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { causalNeighborhood, directedHops, directionalPaperCounter } from "../site/causal_neighborhood.mjs";
+import { computeFocusLayout } from "../site/dag_layout.mjs";
 
 const keys = n => Array.from({ length: n }, (_, i) => `p${i}`);
 const link = (a, b, direction, forward = 0, backward = 0, extra = {}) => ({
@@ -70,4 +71,47 @@ test("support records count distinct papers with present findings in each direct
   // The IV-DV relation stays traversable even when excluded, as in the diagrams.
   const target = link("a", "b", "A_TO_B", 3, 0, { display_status: "excluded", is_target_relation: true });
   assert.equal(directedHops([target], 1).length, 1);
+});
+
+test("each result names the link behind its hops, and undrawn groups are skipped", () => {
+  const causes = causalNeighborhood({ links, focusId: "x", direction: "causes", depth: 2, minPapers: 1 });
+  const c = causes.find(r => r.groupId === "c");
+  assert.deepEqual(c.path, ["c", "a", "x"]);
+  // The link from c toward the focus is c's own hop; the rest follow in causal order.
+  assert.deepEqual(c.pathEdgeIds, ["a__c", "a__x"]);
+  assert.equal(c.edgeId, "a__c");
+  const effects = causalNeighborhood({ links, focusId: "x", direction: "consequences", depth: 2, minPapers: 1 });
+  const z = effects.find(r => r.groupId === "z");
+  assert.deepEqual(z.path, ["x", "y", "z"]);
+  assert.deepEqual(z.pathEdgeIds, ["x__y", "y__z"]);
+  assert.equal(z.edgeId, "y__z");
+  const withoutA = causalNeighborhood({ links, focusId: "x", direction: "causes", depth: 2, minPapers: 1, isNode: id => id !== "a" });
+  assert.equal(withoutA.some(r => r.groupId === "a"), false);
+  // c is still reached through b, since the route through a is no longer drawn.
+  assert.deepEqual(withoutA.find(r => r.groupId === "c").path, ["c", "b", "x"]);
+});
+
+test("the focus layout puts the variable in the middle and keeps branches on their side", () => {
+  const groups = ["x", "a", "b", "c", "d", "e"].map(group_id => ({ group_id, label: group_id, variable_ids: [] }));
+  // a, b and c reach x directly; d reaches x through a, e through b.
+  const focus = { id: "x", order: ["a", "b", "c", "d", "e"],
+    distance: [["a", 1], ["b", 1], ["c", 1], ["d", 2], ["e", 2]],
+    parent: [["a", "x"], ["b", "x"], ["c", "x"], ["d", "a"], ["e", "b"]] };
+  const { positions } = computeFocusLayout({ groups, links: [], width: 1000, height: 700, focus });
+  assert.deepEqual([positions.get("x").x, positions.get("x").y], [0, 0]);
+  const side = id => Math.sign(positions.get(id).x);
+  // First-ring variables alternate sides, strongest first.
+  assert.deepEqual(["a", "b", "c"].map(side), [-1, 1, -1]);
+  // Farther variables stay on their parent's side and sit further out.
+  assert.equal(side("d"), side("a"));
+  assert.equal(side("e"), side("b"));
+  assert.ok(Math.abs(positions.get("d").x) > Math.abs(positions.get("a").x));
+  assert.ok(Math.abs(positions.get("e").x) > Math.abs(positions.get("b").x));
+  // No other variable shares the focus's column.
+  assert.equal([...positions].filter(([id, p]) => id !== "x" && p.x === 0).length, 0);
+  // A large first ring wraps into more columns instead of one very tall one.
+  const many = Array.from({ length: 60 }, (_, index) => ({ group_id: `n${index}`, label: `n${index}`, variable_ids: [] }));
+  const wide = computeFocusLayout({ groups: [{ group_id: "x", label: "x", variable_ids: [] }, ...many], links: [], width: 1000, height: 700,
+    focus: { id: "x", order: many.map(g => g.group_id), distance: many.map(g => [g.group_id, 1]), parent: many.map(g => [g.group_id, "x"]) } });
+  assert.ok(new Set([...wide.positions.values()].map(p => p.x)).size > 3);
 });

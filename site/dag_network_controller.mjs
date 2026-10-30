@@ -75,6 +75,12 @@ export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
   drawMap, setMapMode, renderAll, selectEdge, selectGroup, onViewportChange = () => {},
 }) {
+  // The causes and consequences views draw a neighborhood of one variable, not
+  // a study design, so there are no IV, DV or instrument anchors to pin or style.
+  const exploring = () => state.task === "causes" || state.task === "consequences";
+  const studyAnchors = () => exploring() ? { ivId: null, dvId: null, instrumentId: null }
+    : { ivId: state.project?.iv_group_id, dvId: state.project?.dv_group_id, instrumentId: state.project?.instrument_group_id };
+  const exploreFocusId = () => exploring() ? state.explore?.[state.task]?.focusId || null : null;
 // ─── DAG visApi.js rendering ─────────────────────────────────────────────────────
 
 let _visNetwork = null;
@@ -147,17 +153,22 @@ function dagStudyArrowCorridor({ ivId, dvId, positions, boxes, fontSize = 12 }) 
 
 
 function visNodeData(group, layoutPoint, layoutParams = {}) {
+  const focusId = exploreFocusId();
+  // The focus is drawn like an anchor (the outcome when exploring causes, the
+  // exposure when exploring consequences); everything else is a plain node.
+  if (exploring()) group = { ...group, type: group.group_id === focusId ? (state.task === "causes" ? "dv" : "iv") : "candidate" };
   return dagDisplay.visNodeData(group, layoutPoint, layoutParams, {
+    focusId,
     showCollidersOnly: state.showCollidersOnly, showConfoundersOnly: state.showConfoundersOnly,
     showExclusionViolations: state.showExclusionViolations,
     showExogeneity: state.showExogeneity,
     exclusionViolationIds: state.exclusionViolationIds,
     exogeneityGroupIds: state.exogeneityGroupIds,
     exogeneityPathGroupIds: state.exogeneityPathGroupIds,
-    instrumentId: state.project?.instrument_group_id,
+    instrumentId: studyAnchors().instrumentId,
     colliderGroupIds: state.colliderGroupIds, colliderPathGroupIds: state.colliderPathGroupIds,
     confounderGroupIds: state.confounderGroupIds, confounderPathGroupIds: state.confounderPathGroupIds,
-    ivId: state.project?.iv_group_id, dvId: state.project?.dv_group_id,
+    ivId: studyAnchors().ivId, dvId: studyAnchors().dvId,
     activeGroupId: state.activeGroupId, groupColor: groupColor(group),
   });
 }
@@ -173,7 +184,7 @@ function refreshEdgeSelection({ redraw = true } = {}) {
   // the click event, especially for routed edges with synthetic bend nodes.
   clearLogicalDagEdgeHover();
   const updates = selectionUpdatesForSegments(_dagEdgeSegments, _renderedSelectedEdgeId,
-    state.selectedEdgeId, state.project?.links || [], edgeVisualData);
+    state.selectedEdgeId, (exploring() ? state.visibleLinks : state.project?.links) || [], edgeVisualData);
   _renderedSelectedEdgeId = state.selectedEdgeId;
   if (updates.length) _visEdges.update(updates);
   // DataSet updates already request a frame from vis. A synchronous redraw here
@@ -183,8 +194,8 @@ function refreshEdgeSelection({ redraw = true } = {}) {
 function routedDagData(groups, links, layout) {
   const boxes = layout.boxes;
   const corridor = dagStudyArrowCorridor({
-    ivId: state.project?.instrument_group_id || state.project?.iv_group_id,
-    dvId: state.project?.dv_group_id,
+    ivId: studyAnchors().instrumentId || studyAnchors().ivId,
+    dvId: studyAnchors().dvId,
     positions: layout.positions,
     boxes,
     fontSize: layout.params.fontSize,
@@ -232,9 +243,9 @@ function drawConfounderPathLanes(context) {
     positions,
     boxes,
     scale,
-    ivId: state.project?.iv_group_id,
-    dvId: state.project?.dv_group_id,
-    instrumentId: state.project?.instrument_group_id,
+    ivId: studyAnchors().ivId,
+    dvId: studyAnchors().dvId,
+    instrumentId: studyAnchors().instrumentId,
   });
 }
 
@@ -331,8 +342,8 @@ function highlightConfounderPaths(groupId) {
     studyDesignEdgeId: STUDY_DESIGN_EDGE_ID,
     instrumentDesignEdgeId: STUDY_INSTRUMENT_EDGE_ID,
     groupId,
-    ivId: state.showExogeneity ? state.project?.instrument_group_id : state.project?.iv_group_id,
-    dvId: state.project?.dv_group_id,
+    ivId: state.showExogeneity ? studyAnchors().instrumentId : studyAnchors().ivId,
+    dvId: studyAnchors().dvId,
     showConfoundersOnly: state.showConfoundersOnly,
     showExogeneity: state.showExogeneity,
     showExclusionViolations: state.showExclusionViolations,
@@ -364,7 +375,7 @@ async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } =
     return Boolean(group?.variable_ids?.length
       || (state.publishedSchemaHydrating && Number(group?.member_count) > 0));
   };
-  if (state.interfaceMode === "dag2"
+  if (state.interfaceMode === "dag2" && !exploring()
     && (!hasAnchor(state.project?.iv_group_id) || !hasAnchor(state.project?.dv_group_id)
       || (state.phase === "select_instrument" && !state.changingAnchorSide))) return;
   let resolveRendered;
@@ -401,13 +412,15 @@ async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } =
     links: links.map(({ edge_id, group_a, group_b, direction_type }) =>
       ({ edge_id, group_a, group_b, direction_type })),
     centroids: groups.map(group => [group.group_id, groupMapCentroid(group)]),
-    ivId: state.project?.iv_group_id,
-    dvId: state.project?.dv_group_id,
-    instrumentId: state.project?.instrument_group_id,
+    ivId: studyAnchors().ivId,
+    dvId: studyAnchors().dvId,
+    instrumentId: studyAnchors().instrumentId,
+    focus: exploring() ? state.exploreLayout || null : null,
     mode: state.dagLayoutMode,
     width: els.dagNetwork.clientWidth || 630,
     height: els.dagNetwork.clientHeight || 700,
-    viewSignature: state.showConfoundersOnly
+    viewSignature: exploring() ? `explore:${state.task}:${exploreFocusId()}`
+      : state.showConfoundersOnly
       ? `confounders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
       : state.showExogeneity
         ? `exogeneity:${state.project?.instrument_group_id}:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`

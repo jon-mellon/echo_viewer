@@ -31,6 +31,8 @@ export function createDagSetupGroupController({
   beginEditor = () => {},
   loadConceptLabels = async () => [], loadVisibleLinkEndpoints = async () => [],
   excludeConcept = () => {},
+  // Causes and consequences reuse the anchor bar and picker for their one variable.
+  exploreFocus = () => ({ active: false }), searchFocusGroups = () => [], onChooseFocus = () => {},
 }) {
   const variablePageSize = 10;
   let variablePage = 0;
@@ -50,7 +52,9 @@ export function createDagSetupGroupController({
     if (state.interfaceMode === "dag2") {
       const iv = groupById(state.project?.iv_group_id);
       const dv = groupById(state.project?.dv_group_id);
-      document.body.classList.toggle("initial-setup", !(anchorHasMembers(state, iv) && anchorHasMembers(state, dv)) || state.phase === "select_instrument" && !state.changingAnchorSide);
+      const exploring = state.task === "causes" || state.task === "consequences";
+      document.body.classList.toggle("initial-setup", !exploring
+        && (!(anchorHasMembers(state, iv) && anchorHasMembers(state, dv)) || state.phase === "select_instrument" && !state.changingAnchorSide));
       elements.setupSection.hidden = anchorHasMembers(state, iv) && anchorHasMembers(state, dv)
         && state.phase !== "select_instrument" && !state.changingAnchorSide && !state.definitionDraft;
       elements.groupListPanel.hidden = true;
@@ -66,6 +70,22 @@ export function createDagSetupGroupController({
 
   function renderAnchorBar() {
     if (!elements.anchorBar) return;
+    const focus = exploreFocus();
+    const anchorRows = [elements.anchorDvLabel, elements.anchorIvLabel].map(node => node.closest(".anchor-row"));
+    if (focus.active) {
+      // One anchor only: Dep var when finding causes, Ind var when finding consequences.
+      elements.anchorBar.hidden = !focus.groupId;
+      anchorRows[0].hidden = focus.side !== "dv";
+      anchorRows[1].hidden = focus.side !== "iv";
+      const label = focus.side === "dv" ? elements.anchorDvLabel : elements.anchorIvLabel;
+      label.textContent = focus.label || "";
+      label.title = focus.label || "";
+      if (elements.editSplitIv) elements.editSplitIv.hidden = true;
+      if (elements.editSplitDv) elements.editSplitDv.hidden = true;
+      if (elements.instrumentRow) elements.instrumentRow.hidden = true;
+      return;
+    }
+    for (const row of anchorRows) row.hidden = false;
     const iv = groupById(state.project?.iv_group_id), dv = groupById(state.project?.dv_group_id);
     const ivSet = anchorHasMembers(state, iv), dvSet = anchorHasMembers(state, dv);
     const show = (state.interfaceMode === "dag2" || state.workflowMode !== "setup") && (ivSet || dvSet);
@@ -420,6 +440,39 @@ export function createDagSetupGroupController({
       startDefinition?.(event.currentTarget.dataset.defineSide));
   }
 
+  function renderFocusPicker() {
+    const container = elements.focusGroupPicker;
+    if (!container) return;
+    const focus = exploreFocus();
+    const picking = Boolean(focus.active && focus.picking);
+    elements.focusSearchBlock.hidden = !picking;
+    if (!picking) { container.hidden = true; container.replaceChildren(); return; }
+    elements.focusPickerCancel.hidden = !focus.groupId;
+    const query = normalized(elements.focusInput.value);
+    const groups = searchFocusGroups(query);
+    container.hidden = false;
+    const rows = groups.map(({ group, variableMatch }) => h("div", { className: "setup-group-picker-row" },
+      h("div", {}, h("strong", { textContent: group.label || group.group_id }),
+        h("span", { textContent: `${group.variable_ids?.length || 0} vars` }),
+        variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched variable: ${truncate(variableMatch, 86)}` }) : null,
+        group.description ? h("details", { className: "setup-group-definition" },
+          h("summary", { textContent: "Definition" }),
+          h("p", { textContent: group.description })) : null),
+      h("button", { className: "action-button", type: "button", dataset: { groupId: group.group_id },
+        textContent: `Use as ${focus.tag}` })));
+    const emptyTitle = query && state.variableSearchStatus === "loading" ? "Loading variable search…"
+      : query && state.publishedSchemaHydrating ? "Loading group memberships…"
+        : query && state.variableSearchStatus === "error" ? "Variable search unavailable" : "No matching existing groups";
+    const title = !groups.length ? emptyTitle
+      : query && state.variableSearchStatus === "loading" ? "Existing groups · variable search loading…"
+        : query && state.variableSearchStatus === "error" ? "Existing groups · variable search unavailable"
+          : "Existing groups";
+    replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: title }),
+      h("div", { className: "setup-group-picker-list" }, ...rows));
+    container.querySelectorAll("button[data-group-id]").forEach(button =>
+      button.addEventListener("click", () => onChooseFocus(button.dataset.groupId)));
+  }
+
   function renderGroupList() {
     // DAG2 always hides the legacy group list; avoid rebuilding its DOM on
     // every diagnostic filter change. A mode change renders it again.
@@ -462,6 +515,7 @@ export function createDagSetupGroupController({
   }
 
   return { renderMode, renderAnchorBar, renderRightPanel, renderVariablePanel, hint, renderStatus, renderSetupPicker,
-    renderSetupPickers() { renderSetupPicker("dv"); renderSetupPicker("iv"); renderSetupPicker("instrument"); },
+    renderSetupPickers() { renderSetupPicker("dv"); renderSetupPicker("iv"); renderSetupPicker("instrument"); renderFocusPicker(); },
+    renderFocusPicker,
     renderGroupList, renderGroupingControls };
 }
