@@ -3123,21 +3123,7 @@ h2 {
 .explore-row-papers { color: var(--muted); font-size: 13px; white-space: nowrap; }
 .explore-row-path { grid-column: 1 / -1; color: var(--muted); font-size: 13px; }
 .explore-row { grid-template-columns: minmax(0, 1fr); }
-.explore-row-refocus {
-  justify-self: end;
-  margin: -4px 10px 6px;
-  padding: 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-/* With a mouse the extra action appears on hover, focus or when the row is open; touch always shows it. */
-@media (hover: hover) {
-  .explore-row-refocus { display: none; }
-  .explore-row:hover .explore-row-refocus,
-  .explore-row:focus-within .explore-row-refocus,
-  .explore-row:has(.explore-row-open[aria-pressed="true"]) .explore-row-refocus { display: block; }
-}
-.explore-view[hidden], .explore-results-block[hidden] { display: none; }
+.explore-view[hidden], .explore-results-block[hidden], .explore-summary[hidden] { display: none; }
 .explore-graph-hint {
   position: absolute;
   inset: 0;

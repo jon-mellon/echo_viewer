@@ -107,10 +107,9 @@ try {
     await showPanel('dag');
     await measure('consequences distance 4', () => page.locator('#confounderPathLength').fill('4'));
     await showPanel('controls');
-    await measure('explore a result', async () => {
-      const first = page.locator('.explore-row').first();
-      await first.hover();
-      await first.locator('.explore-row-refocus').click();
+    await measure('change the variable', async () => {
+      await page.locator('#changeIv').click();
+      await page.locator('#focusGroupPicker button[data-group-id="category-age"]').click();
     });
     if (errors.length) throw new Error(errors.join('; '));
     await context.close(); activePage = null;
