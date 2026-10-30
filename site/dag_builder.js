@@ -2102,5 +2102,5 @@ init().catch((error) => {
     h("main", { className: "panel-section" }, h("h1", { textContent: missing ? "Local schema unavailable" : "Echo could not open this view" }),
       h("p", { textContent: error?.message || error }),
       missing ? h("label", { textContent: "Import draft" }, input) : null,
-      missing ? h("a", { href: "/?new=1", textContent: "Start new view" }) : null));
+      missing ? h("a", { href: "?new=1", textContent: "Start new view" }) : null));
 });

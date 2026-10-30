@@ -28,7 +28,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     // A plain ?task= link opens that task directly; permalinks carry their own.
     const requestedTask = requested.searchParams.get("task");
     if (requested.searchParams.has("new")) {
-      history.replaceState(null, "", "/");
+      history.replaceState(null, "", requested.pathname);
     } else if (requested.pathname === "/" && !requested.search && !requested.hash) {
       history.replaceState(null, "", requested.href);
     }
@@ -116,14 +116,14 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     if (state.data.publication_source && !state.project.publication) {
       state.project.publication = {
         ...state.data.publication_source,
-        permalink: new URL(`/?schema=${state.data.publication_source.publication_id}`, window.location.origin).href,
+        permalink: new URL(`?schema=${state.data.publication_source.publication_id}`, new URL(window.location.pathname, window.location.origin)).href,
       };
     }
     if (localRecord?.lastPublishedId) {
       state.project.publication = {
         publication_id: localRecord.lastPublishedId,
         content_hash: localRecord.lastPublishedHash,
-        permalink: new URL(`/?schema=${localRecord.lastPublishedId}`, window.location.origin).href,
+        permalink: new URL(`?schema=${localRecord.lastPublishedId}`, new URL(window.location.pathname, window.location.origin)).href,
       };
     }
     if (state.interfaceMode === "dag2") publicationController.initialize();
