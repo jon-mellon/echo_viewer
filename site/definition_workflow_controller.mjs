@@ -6,7 +6,8 @@ import { browsePublishedSplits, loadPublishedSplitMembership } from "./published
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
   invalidateMapCaches, renderAll, drawMap = () => {}, renderAssignmentCoverage = () => {}, setMapMode, fitMap, groupById, persistProjectLocally, getReturnUrl = () => location.href,
-  visibleVariables, searchVariables, clusterDisplayVariable, expandToClusterMembers, nowIso,
+  visibleVariables, searchVariables, searchSourceGroups = groups => groups.map((group, index) => ({ group, index, variableMatch: "" })),
+  clusterDisplayVariable, expandToClusterMembers, nowIso,
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails = async () => {}, hydrateNeighbors = async () => {},
   prewarmEvidence = async () => {}, commitSchema = async () => {},
@@ -518,7 +519,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   const presenter = createDefinitionWorkflowPresenter({
     state, elements: els, normalized, clusterRep, truncate, definitionSources,
-    definitionResidualIds, definitionCanReview, searchVariables, visibleVariables,
+    definitionResidualIds, definitionCanReview, searchVariables, searchSourceGroups, visibleVariables,
     clusterDisplayVariable, definitionNeighbors,
     resizeMap, fitMap, onSourceSelection: setSourceSelection,
     onToggleVariable: toggleDefinitionVariable, onResidualLabel: setResidualLabel,

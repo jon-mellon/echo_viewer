@@ -712,6 +712,15 @@ function searchAnchorGroups(project, side, query, variableById, limit = 12) {
   return anchorGroupSearchIndex.search(project, side, query, variableById, state.variableSearchStatus === "ready" ? variableSearchCatalog : null, limit);
 }
 
+// Definition source categories search constituent variables through the same
+// catalog as the anchor pickers; hydrated variables alone are empty at startup.
+const definitionSourceSearchIndex = new searchModel.AnchorGroupSearchIndex();
+function searchDefinitionSourceGroups(groups, query, limit = 60) {
+  if (normalized(query) && state.variableSearchStatus === "idle") void loadVariableSearchCatalog();
+  return definitionSourceSearchIndex.searchGroups(groups, state.project.groups, query, state.variableById,
+    state.variableSearchStatus === "ready" ? variableSearchCatalog : null, limit);
+}
+
 async function loadVariableSearchCatalog() {
   if (state.variableSearchStatus === "loading" || state.variableSearchStatus === "ready") return;
   state.variableSearchStatus = "loading";
@@ -730,6 +739,7 @@ async function loadVariableSearchCatalog() {
   renderSearch("iv");
   renderSearch("dv");
   renderSetupGroupPicker("instrument");
+  if (state.definitionDraft?.step === "sources") renderDefinition();
 }
 
 function groupedVariableIds(excludeGroupId = null) {
@@ -1739,7 +1749,7 @@ const toolbarController = createToolbarController({
 const definitionWorkflowController = createDefinitionWorkflowController({
   state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll, drawMap, renderAssignmentCoverage,
   setMapMode, fitMap, groupById, persistProjectLocally, getReturnUrl: () => persistentViewer.currentUrl() || location.href, visibleVariables,
-  searchVariables: searchVisibleVariables,
+  searchVariables: searchVisibleVariables, searchSourceGroups: searchDefinitionSourceGroups,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
   takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),

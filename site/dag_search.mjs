@@ -182,10 +182,14 @@ export class AnchorGroupSearchIndex {
     this.commit(prepared, catalog);
   }
   search(project, side, query, variableById, catalog, limit = 12) {
+    return this.searchGroups(availableSetupAnchorGroups(project, side), project.groups, query, variableById, catalog, limit);
+  }
+  // `available` is the list to match; `allGroups` is every project group, which
+  // keeps the per-group cache stable across callers with different filters.
+  searchGroups(available, allGroups, query, variableById, catalog, limit = 12) {
     query = normalized(query);
-    const available = availableSetupAnchorGroups(project, side);
     if (!query) return available.slice(0, limit).map((group, index) => ({ group, index, labelMatches: true, variableMatch: "", matches: true }));
-    this.update(project.groups, catalog?.status === "ready" ? catalog : null);
+    this.update(allGroups, catalog?.status === "ready" ? catalog : null);
     // Hydrated records may be edited in place. Always inspect those live;
     // catalog-only searches can safely reuse per-group positive/negative hits.
     const cacheable = !variableById.size;

@@ -756,3 +756,34 @@ test("a published split is reviewed on the map and used without a naming step", 
   expect(groups.find(group => group.group_id === fixture.sourceId)?.label).toBe(fixture.sourceLabel);
   browserErrors.check();
 });
+
+test("definition source search matches constituent variables, not only category names", async ({ page }) => {
+  const fs = require("node:fs"), zlib = require("node:zlib");
+  const { PRODUCTION_EVIDENCE_MANIFEST } = await import("../site/dag_data_config.mjs");
+  const snapshot = PRODUCTION_EVIDENCE_MANIFEST.match(/browser-v2\/([0-9a-f]{64})\//)[1];
+  const catalog = JSON.parse(zlib.gunzipSync(fs.readFileSync(`site/search-catalogs/${snapshot}.json.gz`)));
+  const labelOf = new Map(catalog.records.map(row => [row[0], row[1] || row[2]]));
+  await page.addInitScript(() => {
+    localStorage.clear();
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+  });
+  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+  await page.waitForFunction(() => window.__dagBuilderState.publishedSchemaHydrated && !window.__dagBuilderState.publishedSchemaHydrating);
+  // Pick a variable whose own label is not part of its category's name.
+  const target = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 5)
+    .map(group => ({ id: group.group_id, label: group.label, variableId: group.variable_ids[Math.min(3, group.variable_ids.length - 1)] })));
+  const pick = target.find(item => {
+    const text = labelOf.get(item.variableId);
+    return text && text.length > 12 && !item.label.toLowerCase().includes(text.toLowerCase());
+  });
+  expect(pick, JSON.stringify(target.map(t => [t.label, t.variableId, labelOf.get(t.variableId)]))).toBeTruthy();
+  const query = labelOf.get(pick.variableId);
+  await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+  await page.locator("#definitionChooseManual").click();
+  await page.locator("#definitionSourceSearch").fill(query);
+  const row = page.locator(`#definitionSourceList input[data-source-id="${pick.id}"]`);
+  await expect(row).toHaveCount(1, { timeout: 60000 });
+  await expect(page.locator("#definitionSourceList .setup-group-variable-match").first()).toContainText("Matched:");
+});

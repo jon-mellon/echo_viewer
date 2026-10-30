@@ -3,7 +3,7 @@ import { reviewTerms } from "./definition_batch_review.mjs";
 import { h, replaceChildren } from "./dom_builder.mjs";
 
 export function createDefinitionWorkflowPresenter({ state, elements: els, normalized, clusterRep, truncate,
-  definitionSources, definitionResidualIds, definitionCanReview, searchVariables, visibleVariables,
+  definitionSources, definitionResidualIds, definitionCanReview, searchVariables, searchSourceGroups, visibleVariables,
   clusterDisplayVariable, definitionNeighbors, resizeMap, fitMap,
   onSourceSelection, onToggleVariable, onResidualLabel, canUndoBatch,
   browseState, onChoosePublishedSplit }) {
@@ -132,15 +132,17 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     if (draft.step === "sources") {
       const query = normalized(els.definitionSourceSearch.value);
       const selected = new Set(draft.source_group_ids);
-      const groups = (state.project.groups || []).map((group, index) =>
-        searchModel.anchorGroupSearchMatch(group, query, index, state.variableById))
-        .filter(item => item.group.variable_ids?.length && item.matches).slice(0, 60);
-      replaceChildren(els.definitionSourceList, groups.map(({ group, variableMatch }) =>
+      const groups = searchSourceGroups((state.project.groups || []).filter(group => group.variable_ids?.length), query, 60);
+      const searchNote = query && state.variableSearchStatus !== "ready"
+        ? h("div", { className: "small-note", textContent: state.variableSearchStatus === "error"
+          ? "Variable search could not be loaded; only category names are searched."
+          : "Loading variable search… category names match for now." }) : null;
+      replaceChildren(els.definitionSourceList, [...(searchNote ? [searchNote] : []), ...groups.map(({ group, variableMatch }) =>
         h("label", { className: "definition-source-row" }, h("span", { className: "definition-source-copy" },
           h("span", { className: "definition-source-main" }, h("strong", { textContent: group.label || group.group_id }),
             h("span", { textContent: `${new Set(group.variable_ids.map(clusterRep)).size} variables` })),
           variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched: ${truncate(variableMatch, 72)}` }) : null),
-        h("input", { type: "checkbox", dataset: { sourceId: group.group_id }, checked: selected.has(group.group_id) }))));
+        h("input", { type: "checkbox", dataset: { sourceId: group.group_id }, checked: selected.has(group.group_id) })))]);
       els.definitionSourceList.querySelectorAll("input[data-source-id]").forEach(input =>
         input.addEventListener("change", () => onSourceSelection(input.dataset.sourceId, input.checked)));
       const count = definitionSources().reduce((sum, group) =>
