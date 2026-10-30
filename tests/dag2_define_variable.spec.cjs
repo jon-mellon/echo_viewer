@@ -10,7 +10,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
     }
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
 
   await expect(page.locator("#ivGroupPicker [data-define-side=iv]")).toBeVisible();
@@ -126,7 +126,7 @@ test("Variables list definition and split editing are reachable on desktop and m
     localStorage.clear();
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
     && window.__dagBuilderState?.publishedSchemaHydrated
     && !window.__dagBuilderState?.publishedSchemaHydrating);
@@ -190,7 +190,7 @@ test("OpenRouter returns to the variable picker with the current anchors", async
     await route.fulfill({ headers, contentType: "application/json", body: JSON.stringify(body) });
   });
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20 && window.__dagBuilderState?.publishedSchemaHydrated);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
@@ -209,7 +209,7 @@ test("a new variable can be defined through the mobile controls", async ({ page 
     localStorage.clear();
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
     && window.__dagBuilderState?.publishedSchemaHydrated
     && !window.__dagBuilderState?.publishedSchemaHydrating);
@@ -258,7 +258,7 @@ test("mobile spatial editor adds and removes a variable with a tap", async ({ br
       localStorage.clear();
       sessionStorage.setItem("echo-viewer-password-accepted", "yes");
     });
-    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated
       && !window.__dagBuilderState?.publishedSchemaHydrating);
@@ -394,7 +394,7 @@ for (const device of [
       await page.addInitScript(() => {
         sessionStorage.setItem("echo-viewer-password-accepted", "yes");
       });
-      await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+      await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
         && window.__dagBuilderState?.publishedSchemaHydrated);
       await page.locator("#ivGroupPicker [data-define-side=iv]").click();
@@ -565,7 +565,7 @@ test("Jev test and full split resume saved batches after failure and reload", as
   });
   try {
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();
@@ -667,7 +667,7 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
   });
   try {
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();
@@ -701,7 +701,7 @@ test("a published split is reviewed on the map and used without a naming step", 
     }
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
 
   await page.locator("#ivGroupPicker [data-define-side=iv]").click();
@@ -765,7 +765,7 @@ test("definition source search matches constituent variables, not only category 
     localStorage.clear();
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
   await page.waitForFunction(() => window.__dagBuilderState.publishedSchemaHydrated && !window.__dagBuilderState.publishedSchemaHydrating);
   // Pick a variable whose own label is not part of its category's name.
@@ -833,7 +833,7 @@ test("Label 50 more appends to the list, sorts new first, and Name and review sk
   });
   try {
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();

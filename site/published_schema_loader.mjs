@@ -35,18 +35,20 @@ export async function fetchPublishedFile(url, options, fetchImpl, sleep = ms => 
 
 export function publicationPermalink(publicationId, location = globalThis.location, state = null) {
   const origin = location?.origin || PRODUCTION_APP_ORIGIN;
+  // The app may be served below the domain root (staging), so keep its path.
+  const base = new URL(location?.origin ? location.pathname || "/" : "/", origin);
   const groups = state?.project?.groups || [];
   const anchor = side => groups.find(group => group.group_id === state?.project?.[`${side}_group_id`]);
   const hasView = Boolean(anchor("iv")?.variable_ids?.length && anchor("dv")?.variable_ids?.length
     && state.project.iv_group_id !== state.project.dv_group_id);
   const url = hasView
     ? new URL(buildPermalink({
-        location: new URL("/", origin),
+        location: base,
         schemaUrl: "",
         dataVersion: state.data?.snapshot?.snapshot_id || "",
         state,
       }))
-    : new URL("/", origin);
+    : new URL(base);
   url.searchParams.delete("schema_url");
   url.searchParams.set("schema", publicationId);
   return url.href;

@@ -11,9 +11,19 @@ export function ensureDiagnosticFilter(state) {
   return true;
 }
 
+// The causes and consequences views each keep their own focus and settings, so
+// switching between the three tasks never loses work.
+export function createExploreState() {
+  return {
+    causes: { focusId: null, depth: 1, minPapers: 2 },
+    consequences: { focusId: null, depth: 1, minPapers: 2 },
+  };
+}
+
 export function createDagAppState(interfaceMode = "classic") {
   return /** @type {DagAppState} */ ({
     interfaceMode,
+    task: null, explore: createExploreState(),
     data: null,
     variables: [], variableById: new Map(), clusterOf: new Map(), clusterMembers: new Map(),
     rawLinks: [], rawLinksById: new Map(), edgeSupportById: new Map(), linkLookup: new Map(), similarityEdgeMap: new Map(),

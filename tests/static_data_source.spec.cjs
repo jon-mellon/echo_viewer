@@ -11,7 +11,7 @@ for (const corrupt of ["none", "map", "neighbors", "incidents"]) {
       if (route.request().url().endsWith("index.json.gz")) return route.continue();
       return route.fulfill({ status: 200, body: "corrupt" });
     });
-    await page.goto(`${base}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b`);
+    await page.goto(`${base}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
     await page.waitForFunction(() => window.__dagBuilderState?.project
       && window.__dagBuilderState.publishedSchemaHydrated
       && document.getElementById("startupLoading")?.hidden);
@@ -59,7 +59,7 @@ for (const rejectBuffer of [false, true]) {
   test(`cold findings prefetch preserves evidence with rejected buffer=${rejectBuffer}`, async ({ page }) => {
     test.setTimeout(90000);
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-    await page.goto(`${base}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b`);
+    await page.goto(`${base}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
     await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
       && document.getElementById("startupLoading")?.hidden);
     const result = await page.evaluate(async rejectBuffer => {
@@ -108,7 +108,7 @@ for (const route of ["/"]) {
       if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
     });
     // This test exercises the legacy contiguous-ID snapshot and its v1 fixtures.
-    await page.goto(`${base}${route}?schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=${snapshotId}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${base}${route}?schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=${snapshotId}&task=identify`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
       && document.getElementById("startupLoading")?.hidden, null,
       { timeout: 78000 });
@@ -183,7 +183,7 @@ test("content-ID layouts resolve shards through the variable_id lookup", async (
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
-  await page.goto(`${base}/?schema=${publication}&data_version=${contentSnapshot}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${base}/?schema=${publication}&data_version=${contentSnapshot}&task=identify`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
     && window.__dagBuilderState?.publishedSchemaHydrated
     && document.getElementById("startupLoading")?.hidden, null, { timeout: 78000 });

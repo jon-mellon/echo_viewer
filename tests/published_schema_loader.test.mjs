@@ -67,3 +67,21 @@ test("publication permalink is independent of the storage URL", () => {
   assert.match(source, /url\.searchParams\.set\("schema", publicationId\)/);
   assert.match(source, /const hasView = Boolean\(anchor\("iv"\)/);
 });
+
+test("public permalinks keep the app path when it is served below the domain root", async () => {
+  const { publicationPermalink } = await import("../site/published_schema_loader.mjs");
+  const staging = new URL("https://www.jonathanmellon.com/echo_viewer_staging/?p=1&task=causes");
+  const groups = [{ group_id: "iv", variable_ids: ["v1"] }, { group_id: "dv", variable_ids: ["v2"] }];
+  const state = { project: { groups, iv_group_id: "iv", dv_group_id: "dv" }, workflowMode: "group_review",
+    data: { snapshot: { snapshot_id: "snap" } }, explore: { causes: {}, consequences: {} } };
+  const withView = new URL(publicationPermalink("pub-1", staging, state));
+  assert.equal(withView.origin + withView.pathname, "https://www.jonathanmellon.com/echo_viewer_staging/");
+  assert.equal(withView.searchParams.get("schema"), "pub-1");
+  assert.equal(withView.searchParams.get("iv"), "iv");
+  const schemaOnly = new URL(publicationPermalink("pub-1", staging, null));
+  assert.equal(schemaOnly.href, "https://www.jonathanmellon.com/echo_viewer_staging/?schema=pub-1");
+  // Production and callers without a location are unchanged.
+  assert.equal(publicationPermalink("pub-1", new URL("https://echo.epistemicinfra.org/?p=1"), null),
+    "https://echo.epistemicinfra.org/?schema=pub-1");
+  assert.equal(new URL(publicationPermalink("pub-1", undefined, null)).pathname, "/");
+});

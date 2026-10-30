@@ -1,7 +1,7 @@
 const { test, expect } = require("playwright/test");
 const { readFile } = require("node:fs/promises");
 
-const viewer = "http://127.0.0.1:8767/";
+const viewer = "http://127.0.0.1:8767/?task=identify";
 
 async function ready(page) {
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
@@ -38,7 +38,7 @@ test("privacy policy opens without resetting the viewer", async ({ page }) => {
     page.waitForEvent("popup"),
     page.locator(".legal-link").click(),
   ]);
-  await expect(policy).toHaveURL(`${viewer}privacy.html`);
+  await expect(policy).toHaveURL(new URL("privacy.html", viewer).href);
   await expect(policy.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
   expect(await page.evaluate(() => window.__dagBuilderState === window.__privacyViewerState)).toBe(true);
   await policy.close();
@@ -183,7 +183,7 @@ test("definition navigation returns through both Back steps and Cancel", async (
   await page.locator("#definitionCancel").click();
 });
 
-test("variable search catalog starts loading when anchor search gets focus", async ({ page }) => {
+test("variable search catalog preloads once and serves anchor search", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const catalogRequests = [];
   page.on("request", request => {
@@ -191,7 +191,8 @@ test("variable search catalog starts loading when anchor search gets focus", asy
   });
   await page.goto(viewer);
   await ready(page);
-  expect(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("idle");
+  // Setup preloads the catalog; focusing search must reuse it, not fetch it again.
+  expect(["loading", "ready"]).toContain(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus));
   await page.locator("#ivInput").focus();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("ready");
   const hasStaticCatalog = await page.evaluate(async () => {
@@ -264,7 +265,7 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
     if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
   });
   // This checks the precomputed search-catalog path available for this snapshot.
-  await page.goto(`${viewer}?schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
+  await page.goto(`${viewer}&schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
   await ready(page);
   await completeSetup(page);
   const edgeId = await page.evaluate(async () => {
