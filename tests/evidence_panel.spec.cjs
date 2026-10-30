@@ -22,7 +22,7 @@ for (const corrupt of [false, true]) {
       if (route.request().url().endsWith("index.json.gz")) return route.continue();
       return route.fulfill({ status: 200, body: "corrupt" });
     });
-    await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}&task=identify`);
+    await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}`);
     await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
       && document.getElementById("startupLoading")?.hidden);
     await completeSetup(page);
@@ -102,7 +102,7 @@ test("a newer path filter supersedes a dense graph while installation is pending
       }
     };
   });
-  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}&task=identify`);
+  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}`);
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
     && window.__dagBuilderState?.project && document.getElementById("startupLoading")?.hidden);
   await completeSetup(page);
@@ -135,7 +135,7 @@ test("a newer path filter supersedes a dense graph while installation is pending
 test("a reason being typed survives the inspector rebuilding as sources arrive", async ({ page }) => {
   test.setTimeout(90000);
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}&task=identify`);
+  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}`);
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
     && window.__dagBuilderState?.project && document.getElementById("startupLoading")?.hidden);
   await completeSetup(page);

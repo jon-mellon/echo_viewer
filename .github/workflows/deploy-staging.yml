@@ -44,9 +44,6 @@ jobs:
       - name: Enforce evidence loading budgets on the default snapshot
         run: PROFILE_SITE_DIR=dist/site npm run profile:edge-evidence
 
-      - name: Enforce mobile causes and consequences budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:explore
-
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -54,7 +51,6 @@ jobs:
           path: |
             profile-results-diagnostics-mobile/
             profile-results-edge-evidence/
-            profile-results-explore-mobile/
           if-no-files-found: ignore
           retention-days: 1
 
@@ -124,16 +120,6 @@ jobs:
           assert f'{prefix}/dag_builder.js' in html
           assert f'{prefix}/dag_project.mjs' in builder
           assert not (root / "CNAME").exists()
-
-          # Staging opens without the preview password; production keeps it.
-          index = root / "index.html"
-          html = index.read_text()
-          html, gates = re.subn(r'\s*<div id="passwordGate".*?</form>\s*</div>', "", html, count=1, flags=re.S)
-          html, scripts = re.subn(r'\s*<script src="[^"]*password_gate\.js[^"]*"></script>', "", html, count=1)
-          html = html.replace(" password-locked", "", 1)
-          assert gates == 1 and scripts == 1, "password gate markup changed; update the staging step"
-          assert "password-locked" not in html and "passwordGate" not in html
-          index.write_text(html)
 
           print(f"Prepared staging site: {changed} files updated")
           PY

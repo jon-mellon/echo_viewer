@@ -11,14 +11,6 @@ import {
   filterGraphNodes,
 } from "./dag_graph.mjs";
 
-/** Distinct papers with a present finding among these raw links. */
-export function presentPaperIds(rawLinkIds, edgeSupportById, rawLinksById = edgeSupportById) {
-  return new Set((rawLinkIds || []).flatMap(id => {
-    const evidence = edgeSupportById.get(id) || rawLinksById.get(id);
-    return evidence?.paper_id && isPresentLink(evidence) ? [evidence.paper_id] : [];
-  }));
-}
-
 export function excludedForConnectivity(link) {
   return link.display_status === "excluded" && !link.is_target_relation;
 }
@@ -49,9 +41,14 @@ export function deriveDagView({
   hideIrrelevantDiagnosticLinks = false,
   showAllExclusionLinks = false,
 } = {}) {
-  const retainedLinks = excludeSparseEdges ? links.filter(link => presentPaperIds(
-    [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])], edgeSupportById, rawLinksById,
-  ).size >= minimumEdgePapers) : links;
+  const retainedLinks = excludeSparseEdges ? links.filter(link => {
+    const ids = [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])];
+    const papers = new Set(ids.flatMap(id => {
+      const evidence = edgeSupportById.get(id) || rawLinksById.get(id);
+      return evidence?.paper_id && isPresentLink(evidence) ? [evidence.paper_id] : [];
+    }));
+    return papers.size >= minimumEdgePapers;
+  }) : links;
   const fullGraph = createGraph(groups.map((group) => group.group_id), retainedLinks);
   const traversableLink = (link) => !excludedForConnectivity(link);
   const diagnosticOptions = {

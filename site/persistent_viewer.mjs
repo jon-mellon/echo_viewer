@@ -20,8 +20,6 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
   const sessionTitle = () => {
     const groups = state.project?.groups || [];
     const label = id => groups.find(group => group.group_id === id)?.label || "";
-    const explore = state.explore?.[state.task];
-    if (explore?.focusId) return `${state.task === "causes" ? "Causes" : "Consequences"} of ${label(explore.focusId) || explore.focusId}`;
     const iv = label(state.project?.iv_group_id), dv = label(state.project?.dv_group_id);
     return iv && dv ? `${iv} → ${dv}` : iv ? `${iv} → select outcome` : "New view";
   };

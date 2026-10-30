@@ -28,8 +28,6 @@ import { createDagEventController } from "/dag_event_controller.mjs";
 import { createUoaController } from "/uoa_controller.mjs";
 import { createToolbarController } from "/toolbar_controller.mjs";
 import { createDefinitionWorkflowController } from "/definition_workflow_controller.mjs";
-import { createTaskViews } from "/task_views.mjs";
-import { directionalPaperCounter } from "/causal_neighborhood.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
 import { createGroupingSetController } from "/grouping_set_controller.mjs";
 import { createProjectBootstrap } from "/project_bootstrap.mjs?v=compiled-first-v2";
@@ -463,7 +461,6 @@ const renderCoordinator = createRenderCoordinator({
 
 function renderAll(options) {
   renderCoordinator.renderAll(options);
-  taskViews.render();
   persistentViewer.viewerChanged();
 }
 
@@ -724,24 +721,8 @@ function searchDefinitionSourceGroups(groups, query, limit = 60) {
     state.variableSearchStatus === "ready" ? variableSearchCatalog : null, limit);
 }
 
-const exploreSearchIndex = new searchModel.AnchorGroupSearchIndex();
-function searchExploreGroups(groups, query, limit = 200) {
-  if (normalized(query) && state.variableSearchStatus === "idle") void loadVariableSearchCatalog();
-  return exploreSearchIndex.searchGroups(groups, state.project.groups, query, state.variableById,
-    state.variableSearchStatus === "ready" ? variableSearchCatalog : null, limit);
-}
-
-// Callers may wait on an in-flight load (later preloads queue behind it).
-let variableSearchCatalogLoad = null;
-function loadVariableSearchCatalog() {
-  if (state.variableSearchStatus === "loading" || state.variableSearchStatus === "ready") {
-    return variableSearchCatalogLoad || Promise.resolve();
-  }
-  variableSearchCatalogLoad = startVariableSearchCatalogLoad();
-  return variableSearchCatalogLoad;
-}
-
-async function startVariableSearchCatalogLoad() {
+async function loadVariableSearchCatalog() {
+  if (state.variableSearchStatus === "loading" || state.variableSearchStatus === "ready") return;
   state.variableSearchStatus = "loading";
   state.variableSearchError = null;
   try {
@@ -759,7 +740,6 @@ async function startVariableSearchCatalogLoad() {
   renderSearch("dv");
   renderSetupGroupPicker("instrument");
   if (state.definitionDraft?.step === "sources") renderDefinition();
-  taskViews.render();
 }
 
 function groupedVariableIds(excludeGroupId = null) {
@@ -1135,13 +1115,6 @@ const persistentViewer = createPersistentViewer({
   onDiscard: invalidateMapCaches,
 });
 
-const taskViews = createTaskViews({
-  state, searchGroups: searchExploreGroups, searchStatus: () => state.variableSearchStatus,
-  paperSupport: linkPaperSupport, loadPaperSupport: () => void loadLinkSupport(),
-  onChange: () => persistentViewer.viewerChanged(), flushUrl: () => persistentViewer.flushUrl(),
-});
-taskViews.install();
-
 function exportLocalDraft() {
   const schema = currentWorkingGroupingSchema();
   const payload = makeDraftExport({
@@ -1279,66 +1252,29 @@ function hasAnyMapping(sourceIds, targetIds) {
   return rawLinksBetween(sourceIds, targetIds).length > 0;
 }
 
-// Per-finding paper support for every group link. The sparse-edge filter and
-// the causes and consequences views both count papers from these records.
-let linkSupportPromise = null;
-let linkSupportFailed = false;
-let sparseWaitingForSupport = false;
-function missingLinkSupportIds() {
-  return [...new Set((state.project?.links || []).flatMap(link =>
-    [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))]
-    .filter(id => !state.edgeSupportById.has(id) && !state.rawLinksById.has(id));
-}
-function loadLinkSupport() {
-  if (linkSupportPromise) return linkSupportPromise;
-  const missing = missingLinkSupportIds();
-  if (!missing.length) return Promise.resolve(true);
-  const supportCache = state.edgeSupportById;
-  linkSupportPromise = dagDataSource.loadRawLinkSupportByIds(missing).then(rows => {
-    if (state.edgeSupportById !== supportCache) return false;
-    const returned = new Set(rows.map(row => row.raw_causal_link_id));
-    if (missing.some(id => !returned.has(id))) {
-      throw new Error("Some sparse edge evidence is unavailable in this snapshot");
-    }
-    for (const row of rows) state.edgeSupportById.set(row.raw_causal_link_id, row);
-    linkSupportFailed = false;
-    return true;
-  }).catch(error => {
-    if (state.edgeSupportById === supportCache) {
-      linkSupportFailed = true;
-      console.error("Could not load sparse edge evidence", error);
-    }
-    return false;
-  }).finally(() => {
-    linkSupportPromise = null;
-    taskViews.render();
-  });
-  return linkSupportPromise;
-}
-// Checking completeness scans every finding ID, so remember a complete result
-// until the links or the support records change.
-let linkSupportComplete = { links: null, support: null, size: -1 };
-function linkPaperSupport() {
-  if (linkSupportFailed) return { status: "failed", papersFor: directionalPaperCounter() };
-  const links = state.project?.links, support = state.edgeSupportById;
-  const known = linkSupportComplete.links === links && linkSupportComplete.support === support
-    && linkSupportComplete.size === support.size;
-  if (!known) {
-    if (missingLinkSupportIds().length) return { status: "loading", papersFor: null };
-    linkSupportComplete = { links, support, size: support.size };
-  }
-  return { status: "ready", papersFor: directionalPaperCounter(state.edgeSupportById, state.rawLinksById),
-    cacheKey: state.edgeSupportById };
-}
-
+let sparseEdgeEvidencePromise = null;
 function computeVisibleLinks() {
   ensureDiagnosticFilter(state);
-  const missingSparseEvidence = state.excludeSparseEdges ? missingLinkSupportIds() : [];
-  if (missingSparseEvidence.length && !sparseWaitingForSupport) {
-    sparseWaitingForSupport = true;
-    void loadLinkSupport().then(loaded => {
-      sparseWaitingForSupport = false;
-      if (!loaded && linkSupportFailed) state.excludeSparseEdges = false;
+  const missingSparseEvidence = state.excludeSparseEdges
+    ? [...new Set((state.project?.links || []).flatMap(link =>
+      [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))]
+      .filter(id => !state.edgeSupportById.has(id) && !state.rawLinksById.has(id)) : [];
+  if (missingSparseEvidence.length && !sparseEdgeEvidencePromise) {
+    const supportCache = state.edgeSupportById;
+    sparseEdgeEvidencePromise = dagDataSource.loadRawLinkSupportByIds(missingSparseEvidence).then(rows => {
+      if (state.edgeSupportById !== supportCache) return;
+      const returned = new Set(rows.map(row => row.raw_causal_link_id));
+      if (missingSparseEvidence.some(id => !returned.has(id))) {
+        throw new Error("Some sparse edge evidence is unavailable in this snapshot");
+      }
+      for (const row of rows) state.edgeSupportById.set(row.raw_causal_link_id, row);
+    }).catch(error => {
+      if (state.edgeSupportById === supportCache) {
+        state.excludeSparseEdges = false;
+        console.error("Could not load sparse edge evidence", error);
+      }
+    }).finally(() => {
+      sparseEdgeEvidencePromise = null;
       updateDagFilters();
     });
   }
@@ -2040,15 +1976,6 @@ const projectBootstrap = createProjectBootstrap({
   renderAll, constrainMapTransform, drawMap, fitMap, dagNetworkController,
   buildDuplicateClusters, linkKey, pairKey, loadVariableSearchCatalog,
   onLocalSchemaLoaded: record => persistentViewer.setLoadedRecord(record),
-  // Paper support for causes and consequences, loaded once the catalog and query
-  // engine are ready, but only from the start page or those views.
-  onPreloadsDone: () => {
-    if (globalThis.navigator?.connection?.saveData) return;
-    if (state.task && state.task !== "causes" && state.task !== "consequences") return;
-    const start = () => void loadLinkSupport();
-    if (typeof globalThis.requestIdleCallback === "function") globalThis.requestIdleCallback(start, { timeout: 5000 });
-    else setTimeout(start, 1000);
-  },
   onReady: () => {
     persistentViewer.start();
     void definitionWorkflowController.resumeAfterOAuth();
@@ -2102,5 +2029,5 @@ init().catch((error) => {
     h("main", { className: "panel-section" }, h("h1", { textContent: missing ? "Local schema unavailable" : "Echo could not open this view" }),
       h("p", { textContent: error?.message || error }),
       missing ? h("label", { textContent: "Import draft" }, input) : null,
-      missing ? h("a", { href: "?new=1", textContent: "Start new view" }) : null));
+      missing ? h("a", { href: "/?new=1", textContent: "Start new view" }) : null));
 });
