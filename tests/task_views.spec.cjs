@@ -312,7 +312,7 @@ test("the start page preloads the search catalog and query engine", async ({ pag
     && performance.getEntriesByName("echo:evidence:engine").length, null, { timeout: 90000 });
 });
 
-test("mobile home stays on one document and a clean URL through schema hydration", async ({ browser }) => {
+test("mobile home stays on one document while evidence warms in the background", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
@@ -323,7 +323,11 @@ test("mobile home stays on one document and a clean URL through schema hydration
     await expect(page.locator("#taskLanding")).toBeVisible();
     expect(page.url()).toBe(viewer);
     expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
-    expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:engine").length)).toBe(0);
+    await page.waitForFunction(() => performance.getEntriesByName("echo:evidence:engine").length > 0);
+    expect(page.url()).toBe(viewer);
+    expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
+    await expect(page.locator("#startupLoading")).toBeHidden();
+    await expect(page.locator("#taskLanding")).toBeVisible();
     await page.locator("#taskLanding .task-choice[data-task=causes]").tap();
     await expect(page.locator("#exploreView")).toBeVisible();
   } finally {
