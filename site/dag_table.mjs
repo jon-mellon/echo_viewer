@@ -162,6 +162,7 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
   const doc = container.ownerDocument;
   let model = { headers: [], rows: [], study: [], otherLinks: [], variableRows: [], hasPaperColumn: false, linkById: new Map() };
   let selection = { edgeId: null, groupId: null };
+  let shownSignature = null;
   let sortByPapers = false, variableSort = "links";
   let shownRows = TABLE_PAGE_SIZE, shownOther = TABLE_PAGE_SIZE, shownVariables = TABLE_PAGE_SIZE;
 
@@ -291,6 +292,11 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
 
   return {
     update(next) {
+      // A render with nothing new (a late data load, a repeated filter) keeps the table, and the reader's place in it.
+      const signature = JSON.stringify([next.headers, next.candidateHeader, next.rows, next.study, next.otherLinks, next.variableRows,
+        [...next.linkById].map(([id, link]) => [id, link.direction_type])]);
+      if (signature === shownSignature) { model = next; return; }
+      shownSignature = signature;
       model = next;
       shownRows = shownOther = shownVariables = TABLE_PAGE_SIZE;
       render();

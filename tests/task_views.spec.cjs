@@ -427,8 +427,11 @@ test("on a phone the table fits the screen and its controls can be tapped", asyn
     expect(overflow.page).toBeLessThanOrEqual(375);
     expect(overflow.table).toBe(0);
     // Every evidence button is on screen, and the table scrolls rather than the page.
-    for (const button of await page.locator("#dagPathsTable tbody tr").first().getByRole("button").all()) {
-      const rect = await button.boundingBox();
+    const rowButtons = page.locator("#dagPathsTable tbody tr").first().getByRole("button");
+    for (let index = 0, count = await rowButtons.count(); index < count; index++) {
+      // Looked up afresh: a late data load may rebuild the table between buttons.
+      await expect(rowButtons.nth(index)).toBeVisible();
+      const rect = await rowButtons.nth(index).boundingBox();
       expect(rect.x + rect.width).toBeLessThanOrEqual(375);
       expect(rect.height).toBeGreaterThanOrEqual(24); // WCAG 2.2 minimum target size
     }
