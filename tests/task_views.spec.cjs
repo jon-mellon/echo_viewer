@@ -44,7 +44,7 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(page.locator("#taskLanding h1")).toHaveText("What do you want to do?");
   await expect(page.locator("#taskLanding .task-choice")).toHaveCount(3);
   await expect(page.locator("#taskReset")).toBeHidden();
-  await expect.poll(() => new URL(page.url()).searchParams.get("task")).toBe("home");
+  expect(page.url()).toBe(viewer);
 
   // The same picker as Identify, offering the one anchor.
   await page.locator("#taskLanding .task-choice[data-task=causes]").click();
@@ -280,6 +280,25 @@ test("the start page preloads the search catalog and query engine", async ({ pag
   // Nothing has opened a task or a search, yet both arrive in the background.
   await page.waitForFunction(() => window.__dagBuilderState.variableSearchStatus === "ready"
     && performance.getEntriesByName("echo:evidence:engine").length, null, { timeout: 90000 });
+});
+
+test("mobile home stays on one document and a clean URL through schema hydration", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await page.addInitScript(() => sessionStorage.setItem("echo-home-loads",
+      String(Number(sessionStorage.getItem("echo-home-loads") || 0) + 1)));
+    await open(page);
+    await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated);
+    await expect(page.locator("#taskLanding")).toBeVisible();
+    expect(page.url()).toBe(viewer);
+    expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
+    expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:engine").length)).toBe(0);
+    await page.locator("#taskLanding .task-choice[data-task=causes]").tap();
+    await expect(page.locator("#exploreView")).toBeVisible();
+  } finally {
+    await context.close();
+  }
 });
 
 test("paper counts come from the DAG: results are immediate and no findings are counted or downloaded", async ({ page }) => {

@@ -189,6 +189,9 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
 
   function viewerChanged(continuous = false) {
     if (!ready || editorBaseline || state.definitionDraft || commitPending || unsavedSchema) return;
+    // A clean home URL already restores the landing page. Keep it stable rather
+    // than replacing it with a long workspace permalink during startup.
+    if (!state.task && !new URL(window.location.href).searchParams.has("p")) return;
     if (urlTimer !== null) clearTimeout(urlTimer);
     urlTimer = setTimeout(() => {
       urlTimer = null;
