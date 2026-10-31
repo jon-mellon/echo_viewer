@@ -75,6 +75,8 @@ test("connected edge hover updates routed segments in one batch", () => {
   assert.equal(calls.length, 1);
 });
 
+const switchStub = () => ({ classList: { toggle() {} }, setAttribute() {} });
+
 test("DAG rerenders only reconfigure vis when visual options change", async () => {
   const groups = ["a", "b", "c", "d"].map(group_id => ({ group_id, label: group_id, variable_ids: [] }));
   const state = {
@@ -117,7 +119,8 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
     canvasToDOM(point) { return point; }
   }
   const controller = createDagNetworkController({ state,
-    elements: { dagNetwork }, visApi: { DataSet, Network },
+    elements: { dagNetwork, dagTable: { hidden: true }, dagViewGraph: switchStub(), dagViewTable: switchStub() },
+    visApi: { DataSet, Network },
     clusterRep: id => id, groupColor: () => "#000", dagGroups: () => groups,
     groupById: id => groups.find(group => group.group_id === id),
     drawMap() {}, setMapMode() {}, renderAll() {}, selectEdge() {},

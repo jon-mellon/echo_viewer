@@ -294,3 +294,80 @@ test("a notice appears only when there is nothing to list, and goes away with re
   await expect(page.locator(".explore-row").first()).toBeVisible();
   await expect(page.locator("#exploreSummary")).toBeHidden();
 });
+
+test("every view can show the same variables and links as a table, with the same controls", async ({ page }) => {
+  await open(page, `${viewer}?task=causes`);
+  await pick(page, "category-sleep").click();
+  const direct = await renderedEdges(page);
+  await expect(page.locator(".dag-view-switch")).toBeVisible();
+  await expect(page.locator("#dagViewGraph")).toHaveAttribute("aria-pressed", "true");
+  const switchBox = await page.locator(".dag-view-switch").boundingBox();
+  const copyBox = await page.locator("#copyPermalink").boundingBox();
+  expect(switchBox.x).toBeGreaterThan(copyBox.x);
+
+  await page.locator("#dagViewTable").click();
+  await expect(page.locator("#dagTable")).toBeVisible();
+  await expect(page.locator("#dagNetwork")).toBeHidden();
+  await expect(page.locator("#dagViewTable")).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => new URL(page.url()).searchParams.get("dag_view")).toBe("table");
+  // The same links the graph drew, plus the focal variable among the variables.
+  await expect(page.locator("#dagLinksTable tbody tr")).toHaveCount(direct);
+  await expect(page.locator('#dagVariablesTable tr[data-group-id="category-sleep"] td').nth(1)).toHaveText("Focus");
+  // The filters stay where they were, and drive the table.
+  await expect(page.locator(".filter-dropdown > summary")).toBeVisible();
+  await expect(page.locator("#dagSvgZoomIn")).toBeHidden();
+  await page.locator(".filter-dropdown > summary").click();
+  await page.locator("#minimumEdgePapers").fill("20");
+  await expect.poll(() => page.locator("#dagLinksTable tbody tr").count()).toBeLessThan(direct);
+  await page.locator("#minimumEdgePapers").fill("2");
+  await expect(page.locator("#dagLinksTable tbody tr")).toHaveCount(direct);
+
+  // Definitions and evidence open from the table as they do from the graph.
+  const first = page.locator("#dagLinksTable tbody tr").first();
+  const edgeId = await first.getAttribute("data-edge-id");
+  await first.getByRole("button", { name: /^View the evidence/ }).click();
+  await expect(page.locator("#provenancePanel")).toBeVisible();
+  await expect(page.locator("#edgeInspector")).toBeVisible();
+  expect(await page.evaluate(() => window.__dagBuilderState.selectedEdgeId)).toBe(edgeId);
+  await expect(page.locator(`#dagLinksTable tr[data-edge-id="${edgeId}"]`)).toHaveAttribute("aria-current", "true");
+  await page.locator("#closeEvidencePane").click();
+  await page.locator("#dagVariablesTable tbody tr").nth(1).getByRole("button").first().click();
+  await expect(page.locator("#closeEvidencePane")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBeTruthy();
+
+  // The choice survives a reload through the permalink, and switching back restores the graph.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100
+    && document.getElementById("startupLoading")?.hidden);
+  await expect(page.locator("#dagTable")).toBeVisible();
+  await page.locator("#dagViewGraph").click();
+  await expect(page.locator("#dagNetwork")).toBeVisible();
+  await expect(page.locator("#dagTable")).toBeHidden();
+  expect(await renderedEdges(page)).toBe(direct);
+  await expect.poll(() => new URL(page.url()).searchParams.get("dag_view")).toBeNull();
+});
+
+test("the table also covers Identify and works from the keyboard", async ({ page }) => {
+  await open(page, `${viewer}?task=identify`);
+  await page.waitForFunction(() => window.__dagBuilderState?.compiledDag && window.__dagBuilderState?.publishedSchemaHydrated
+    && !window.__dagBuilderState?.publishedSchemaHydrating);
+  const anchors = await page.evaluate(() => {
+    const state = window.__dagBuilderState;
+    const link = state.project.links.find(item => (item.a_to_b_raw_link_ids?.length || item.b_to_a_raw_link_ids?.length)
+      && state.project.groups.some(group => group.group_id === item.group_a && group.variable_ids?.length)
+      && state.project.groups.some(group => group.group_id === item.group_b && group.variable_ids?.length));
+    return [link.group_a, link.group_b];
+  });
+  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
+  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await expect(page.locator("#dagViewTable")).toBeVisible();
+  await page.locator("#dagViewTable").focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#dagTable")).toBeVisible();
+  await expect(page.locator("#dagViewTable")).toBeFocused();
+  await page.locator("#dagLinksTable thead button").first().focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#dagLinksTable thead th[aria-sort=descending]")).toHaveCount(1);
+  await expect(page.locator("#dagLinksTable thead button").first()).toBeFocused();
+});

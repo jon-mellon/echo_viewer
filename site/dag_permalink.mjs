@@ -56,6 +56,7 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state,
   for (const [parameter, field] of Object.entries(booleanFields)) values[parameter] = state[field] ? "1" : "0";
   // "home" marks the start page, so a reload there does not open a task.
   values.task = state.task || "home";
+  if (state.dagDisplay === "table") values.dag_view = "table";
   for (const [view, [focusKey, depthKey, papersKey]] of Object.entries(exploreKeys)) {
     const explore = state.explore?.[view];
     if (!explore?.focusId) continue;
@@ -72,6 +73,7 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state,
 /** Restore the task and explore views; links made before tasks existed open identification. */
 export function applyTaskPermalink(params, state, resolveGroup) {
   const task = params.get("task");
+  state.dagDisplay = params.get("dag_view") === "table" ? "table" : "graph";
   state.task = !params.has("task") ? "identify" : TASKS.includes(task) ? task : null;
   for (const [view, [focusKey, depthKey, papersKey]] of Object.entries(exploreKeys)) {
     const depth = Math.trunc(Number(params.get(depthKey)));

@@ -166,7 +166,7 @@ function initElements() {
     // Right: DAG workspace
     "focusSearchBlock", "focusInput", "focusInputLabel", "focusGroupPicker", "focusPickerCancel",
     "dagWorkspaceSection", "dagNetwork", "dagViewTitle", "diagnosticOverlapKey", "confounderConfig", "confounderDisclosure", "confounderSummary", "confounderStatusList",
-    "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
+    "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag", "dagTable", "dagViewGraph", "dagViewTable",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
     "exportProject", "exportWorkingMap", "projectImport", "strictDagStatus",

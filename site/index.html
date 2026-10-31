@@ -505,10 +505,15 @@
               <button id="dagSvgFit" class="toolbar-button" type="button" title="Reset zoom">Fit</button>
               <button id="fullscreenDag" class="toolbar-button fullscreen-toggle" type="button" aria-pressed="false" title="Expand the DAG to fill the window; press Escape to exit">Full screen DAG</button>
               <button id="copyPermalink" class="toolbar-button" type="button" title="Copy a link to this view of the public schema">Share view</button>
+              <div class="dag-view-switch" role="group" aria-label="Show the data as">
+                <button id="dagViewGraph" class="toolbar-button active" type="button" aria-pressed="true" title="Show the diagram">Graph</button>
+                <button id="dagViewTable" class="toolbar-button" type="button" aria-pressed="false" title="Show the same variables and links as tables">Table</button>
+              </div>
             </div>
           </div>
           <div class="dag-network-wrapper">
             <div id="dagNetwork" class="dag-network"></div>
+            <div id="dagTable" class="dag-table-view" hidden tabindex="-1" aria-label="Variables and links as tables"></div>
             <p id="exploreGraphHint" class="explore-graph-hint" hidden></p>
             <div id="diagnosticOverlapKey" class="diagnostic-overlap-key" hidden></div>
           </div>
