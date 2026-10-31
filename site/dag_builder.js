@@ -1157,6 +1157,7 @@ const taskViews = createTaskViews({
   onExploreChange: () => renderExploreFocus(),
   onFocusPicking: () => { renderAnchorBar(); setupGroupController.renderFocusPicker(); taskViews.render(); },
   onPickerInput: () => setupGroupController.renderFocusPicker(),
+  onSetupNeeded: () => shellController.showMobilePanel("controls"),
   // Each task shows its own graph, so rebuild it from the project's links.
   // Between causes and consequences only the anchor bar, picker and graph change.
   onTaskChange: ({ previous, task }) => {

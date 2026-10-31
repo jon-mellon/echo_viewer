@@ -56,7 +56,7 @@ export function neighborhoodGraph({ rows, focusId, links, direction = "causes" }
 export function createTaskViews({ state, searchGroups, searchStatus = () => "ready", onChange = () => {},
   paperSupport = () => ({ status: "ready", papersFor: undefined }), loadPaperSupport = () => {},
   isDisplayGroup = () => true, onExploreChange = () => {}, onTaskChange = () => {},
-  onFocusPicking = () => {}, onPickerInput = () => {}, openEvidence = () => {}, prepareReset = () => {}, openWindow = (url) => window.open(url, "_blank", "noopener"),
+  onFocusPicking = () => {}, onPickerInput = () => {}, onSetupNeeded = () => {}, openEvidence = () => {}, prepareReset = () => {}, openWindow = (url) => window.open(url, "_blank", "noopener"),
   navigate = (url) => window.location.assign(url) }) {
   const el = id => document.getElementById(id);
   const els = {
@@ -175,7 +175,13 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   }
 
   function setTask(task) {
-    if (state.task === task) return;
+    const needsSetup = () => task === "identify"
+      ? !anchorConfigured("iv") || !anchorConfigured("dv")
+      : !focusId();
+    if (state.task === task) {
+      if (needsSetup()) onSetupNeeded();
+      return;
+    }
     const previous = state.task;
     swapTask(previous, task);
     // The focus search input is shared by both explore views. A first visit
@@ -186,7 +192,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     // The shared workspace can be left in Groups by another task. An
     // unconfigured Identify view must begin at its anchor setup regardless of
     // which tab (or landing choice) opened it.
-    if (task === "identify" && (!anchorConfigured("iv") || !anchorConfigured("dv"))) {
+    if (task === "identify" && needsSetup()) {
       state.workflowMode = "setup";
       state.phase = anchorConfigured("iv") ? "select_dv" : "select_iv";
     }
@@ -194,6 +200,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     changing.consequences = false;
     onTaskChange({ previous, task });
     render();
+    if (needsSetup()) onSetupNeeded();
     onChange();
   }
 

@@ -274,6 +274,36 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
   }
 });
 
+test("mobile task tabs open setup when their view has no chosen variable", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await open(page, `${viewer}?task=causes`);
+    await expect(page.locator("#focusSearchBlock")).toBeVisible();
+    await pick(page, "category-sleep").tap();
+    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
+    await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
+
+    await page.locator("#taskBar .task-tab[data-task=consequences]").tap();
+    await expect(page.locator("#focusSearchBlock")).toBeVisible();
+    await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
+    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
+    await page.locator("#taskBar .task-tab[data-task=consequences]").tap();
+    await expect(page.locator("#focusSearchBlock")).toBeVisible();
+    await pick(page, "category-age").tap();
+    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
+    await page.locator("#taskBar .task-tab[data-task=causes]").tap();
+    await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "dag");
+    await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
+
+    await page.locator("#taskBar .task-tab[data-task=identify]").tap();
+    await expect(page.locator("#setupSection")).toBeVisible();
+    await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
+  } finally {
+    await context.close();
+  }
+});
+
 test("the start page preloads the search catalog and query engine", async ({ page }) => {
   await open(page);
   await expect(page.locator("#taskLanding")).toBeVisible();
