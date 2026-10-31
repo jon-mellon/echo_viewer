@@ -1165,7 +1165,7 @@ const taskViews = createTaskViews({
     if (bothExplore) renderExploreFocus(); else renderAll({ reuseLinks: true });
   },
   openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
-  onChange: () => persistentViewer.viewerChanged(), flushUrl: () => persistentViewer.flushUrl(),
+  onChange: () => persistentViewer.viewerChanged(), prepareReset: () => persistentViewer.prepareReset(),
 });
 taskViews.install();
 

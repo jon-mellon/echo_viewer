@@ -204,6 +204,27 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await expect(page.locator("#focusSearchBlock")).toBeVisible();
 });
 
+test("mobile reset keeps the previous project after navigating", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await open(page, `${viewer}?task=causes`);
+    await pick(page, "category-sleep").tap();
+    await page.locator("#taskReset").tap();
+    await page.locator("#resetHere").tap();
+    await expect(page.locator("#taskLanding")).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
+    await expect.poll(() => page.evaluate(async () => {
+      const { listPreviousSessions } = await import("/local_schema_store.mjs");
+      const sessions = await listPreviousSessions();
+      return sessions.some(session => new URL(session.url).searchParams.get("causes_of") === "category-sleep");
+    })).toBe(true);
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem("echo-pending-reset-session"))).toBeNull();
+  } finally {
+    await context.close();
+  }
+});
+
 test("on a phone the list and graph are tabs, and a tapped variable shows its evidence", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();

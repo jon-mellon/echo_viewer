@@ -56,7 +56,7 @@ export function neighborhoodGraph({ rows, focusId, links, direction = "causes" }
 export function createTaskViews({ state, searchGroups, searchStatus = () => "ready", onChange = () => {},
   paperSupport = () => ({ status: "ready", papersFor: undefined }), loadPaperSupport = () => {},
   isDisplayGroup = () => true, onExploreChange = () => {}, onTaskChange = () => {},
-  onFocusPicking = () => {}, onPickerInput = () => {}, openEvidence = () => {}, flushUrl = async () => {}, openWindow = (url) => window.open(url, "_blank", "noopener"),
+  onFocusPicking = () => {}, onPickerInput = () => {}, openEvidence = () => {}, prepareReset = () => {}, openWindow = (url) => window.open(url, "_blank", "noopener"),
   navigate = (url) => window.location.assign(url) }) {
   const el = id => document.getElementById(id);
   const els = {
@@ -311,10 +311,15 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       openWindow(freshProjectUrl(window.location.href));
       els.dialog.close();
     });
-    el("resetHere").addEventListener("click", async () => {
-      // Record the current project in Previous Sessions before leaving it.
-      try { await flushUrl(); } catch { /* Resetting must not depend on saving history. */ }
-      navigate(freshProjectUrl(window.location.href));
+    el("resetHere").addEventListener("click", () => {
+      try {
+        prepareReset();
+        navigate(freshProjectUrl(window.location.href));
+      } catch (error) {
+        const message = el("resetError");
+        message.textContent = `Could not keep this project in Previous Sessions — ${error.message}`;
+        message.hidden = false;
+      }
     });
   }
 
