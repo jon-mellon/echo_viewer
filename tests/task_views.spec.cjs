@@ -215,7 +215,7 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
       tabs: document.querySelector(".task-tabs").scrollWidth - document.querySelector(".task-tabs").clientWidth }));
     expect(sizes.page).toBeLessThanOrEqual(375);
     expect(sizes.tabs).toBe(0);
-    await expect(page.locator(".mobile-panel-nav .mobile-panel-tab:visible")).toHaveText(["List", "Graph"]);
+    await expect(page.locator(".mobile-panel-nav .mobile-panel-tab:visible")).toHaveText(["Variables", "Map"]);
     await page.locator(".explore-row .explore-row-open").first().tap();
     await expect(page.locator("#closeEvidencePane")).toBeVisible();
     await expect(page.locator("#provenancePanel")).toBeVisible();
