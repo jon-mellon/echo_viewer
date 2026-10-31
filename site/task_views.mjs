@@ -173,6 +173,18 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     if (state.task === task) return;
     const previous = state.task;
     swapTask(previous, task);
+    // The focus search input is shared by both explore views. A first visit
+    // should start with the full picker, rather than another view's query.
+    if ((task === "causes" || task === "consequences") && !focusId()) {
+      els.focusInput.value = "";
+    }
+    // The shared workspace can be left in Groups by another task. An
+    // unconfigured Identify view must begin at its anchor setup regardless of
+    // which tab (or landing choice) opened it.
+    if (task === "identify" && (!state.project?.iv_group_id || !state.project?.dv_group_id)) {
+      state.workflowMode = "setup";
+      state.phase = state.project?.iv_group_id ? "select_dv" : "select_iv";
+    }
     changing.causes = false;
     changing.consequences = false;
     onTaskChange({ previous, task });

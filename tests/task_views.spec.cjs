@@ -16,6 +16,28 @@ const renderedEdges = page => page.evaluate(async () => {
   return api.renderedDagEdgeIds().filter(id => id !== "__study_design_iv_to_dv__").length;
 });
 
+test("tabs start unconfigured views at setup and reopen configured views", async ({ page }) => {
+  await open(page);
+  await page.locator("#taskBar .task-tab[data-task=causes]").click();
+  await expect(page.locator("#focusSearchBlock")).toBeVisible();
+  await pick(page, "category-sleep").click();
+  await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
+
+  await page.locator("#changeDv").click();
+  await page.locator("#focusInput").fill("sleep");
+  await page.locator("#taskBar .task-tab[data-task=consequences]").click();
+  await expect(page.locator("#focusSearchBlock")).toBeVisible();
+  await expect(page.locator("#focusInput")).toHaveValue("");
+  await expect(pick(page, "category-income-earnings")).toBeVisible();
+  await page.evaluate(() => { window.__dagBuilderState.workflowMode = "group_review"; });
+  await page.locator("#taskBar .task-tab[data-task=identify]").click();
+  await expect(page.locator("#setupSection")).toBeVisible();
+  expect(await page.evaluate(() => window.__dagBuilderState.workflowMode)).toBe("setup");
+  await page.locator("#taskBar .task-tab[data-task=causes]").click();
+  await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
+  await expect(page.locator("#exploreResultsBlock")).toBeVisible();
+});
+
 test("the start page leads to causes and consequences views that behave like Identify with one variable", async ({ page }) => {
   await open(page);
   await expect(page.locator("#taskLanding")).toBeVisible();
