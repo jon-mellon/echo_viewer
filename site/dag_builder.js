@@ -166,7 +166,7 @@ function initElements() {
     // Right: DAG workspace
     "focusSearchBlock", "focusInput", "focusInputLabel", "focusGroupPicker", "focusPickerCancel",
     "dagWorkspaceSection", "dagNetwork", "dagViewTitle", "diagnosticOverlapKey", "confounderConfig", "confounderDisclosure", "confounderSummary", "confounderStatusList",
-    "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
+    "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag", "dagTable", "dagViewGraph", "dagViewTable",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
     "exportProject", "exportWorkingMap", "projectImport", "strictDagStatus",
@@ -1962,7 +1962,7 @@ const setupGroupController = createDagSetupGroupController({
 
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll,
+  drawMap, setMapMode, renderAll, exploreRows: () => taskViews.neighborhood().rows,
   onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
   selectEdge: () => {
     if (state.fullscreenPanel) setFullscreenPanel(null);

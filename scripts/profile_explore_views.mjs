@@ -59,7 +59,7 @@ try {
     const result = { errors, timings: [] };
     report.runs.push(result);
     // Each interaction is timed until the list and the graph both show the result.
-    async function measure(name, action, { budget = budgets.interactionMs, ready = null } = {}) {
+    async function measure(name, action, { budget = budgets.interactionMs, ready = null, table = false } = {}) {
       const start = await page.evaluate(() => performance.now());
       await action();
       const timing = await page.evaluate(async ({ start, name, ready }) => {
@@ -71,14 +71,22 @@ try {
         const tasks = window.__exploreTasks.filter(t => t.start >= start);
         const rows = document.querySelectorAll('.explore-row').length;
         const edges = api.renderedDagEdgeIds().filter(id => id !== '__study_design_iv_to_dv__').length;
-        return { name, ms: performance.now() - start, longestTaskMs: Math.max(0, ...tasks.map(t => t.ms)),
+        const layoutPhases = performance.getEntriesByType('measure').filter(m => m.name.startsWith('echo:dag:') && m.startTime >= start).map(m => `${m.name.slice(9)}:${Math.round(m.duration)}`);
+        const layouts = layoutPhases.length;
+        return { name, layouts, layoutPhases, ms: performance.now() - start, longestTaskMs: Math.max(0, ...tasks.map(t => t.ms)),
           rows, edges, summary: document.getElementById('exploreSummary').textContent };
       }, { start, name, ready });
       result.timings.push({ ...timing, budget });
       console.log(JSON.stringify({ run: run + 1, ...timing, budget }));
       if (!timing.rows) throw new Error(`No results after ${name}: ${timing.summary}`);
       // The graph draws exactly the links behind the list, so a stale or empty graph fails here.
-      if (!ready && timing.edges !== timing.rows) throw new Error(`Graph shows ${timing.edges} links for ${timing.rows} listed variables after ${name}`);
+      if (table) {
+        const shown = await page.evaluate(() => ({ links: document.querySelectorAll('#dagPathsTable tbody tr').length,
+          total: Number(/\((\d+)\)/.exec(document.querySelector('#dagPathsTable caption')?.textContent || '')?.[1]),
+          graphHidden: document.getElementById('dagNetwork').hidden }));
+        if (!shown.graphHidden) throw new Error(`The graph is still shown after ${name}`);
+        if (shown.links !== Math.min(shown.total, 200) || shown.total !== timing.rows) throw new Error(`Table shows ${shown.links} of ${shown.total} links for ${timing.rows} listed variables after ${name}`);
+      } else if (!ready && timing.edges !== timing.rows) throw new Error(`Graph shows ${timing.edges} links for ${timing.rows} listed variables after ${name}`);
       if (process.env.PROFILE_DISABLE_BUDGETS !== '1'
         && (timing.ms > budget || (budget === budgets.interactionMs && timing.longestTaskMs > budgets.longestTaskMs))) {
         throw new Error(`Explore budget exceeded: ${name} took ${Math.round(timing.ms)} ms, longest task ${Math.round(timing.longestTaskMs)} ms`);
@@ -90,6 +98,12 @@ try {
       await page.locator('#focusGroupPicker button[data-group-id="category-mental-health"]').click();
       await page.locator('.explore-row').first().waitFor({ timeout: 90000 });
     }, { budget: budgets.firstResultsMs });
+    // Background loading (the search catalog is indexed while the user chooses) competes with whatever is measured
+    // next and showed up as a lone slow interaction; the interactions are what is budgeted, so let it finish.
+    // A slow runner may not have started it yet, so wait for it to be ready rather than only for it not to be running.
+    await page.waitForFunction(() => ['ready', 'error'].includes(window.__dagBuilderState.variableSearchStatus), null, { timeout: 30000 })
+      .catch(() => console.log('search catalog not ready before the interactions were timed'));
+    await page.waitForTimeout(500);
     // On a phone the list and the graph (with its Filters) are separate tabs.
     const showPanel = async panel => { if (mobile) await page.locator(`.mobile-panel-nav [data-mobile-panel="${panel}"]`).click(); };
     await showPanel('dag');
@@ -109,6 +123,17 @@ try {
     });
     await showPanel('dag');
     await measure('consequences distance 4', () => page.locator('#confounderPathLength').fill('4'));
+    await showPanel('controls');
+    // The table shows the same links without laying out a graph, so it is held to the same budgets.
+    await showPanel('dag');
+    await measure('switch to table', () => page.locator('#dagViewTable').click(), { table: true });
+    await measure('table distance 4', () => page.locator('#confounderPathLength').fill('4'), { table: true });
+    await measure('table min papers 5', () => page.locator('#minimumEdgePapers').fill('5'), { table: true });
+    await measure('table sort by papers', () => page.locator('#dagPathsTable thead button').last().click(), { table: true });
+    await measure('open evidence from the table (cold)', () => page.locator('#dagPathsTable .dag-table-arrow').first().click(),
+      { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude finding "]', table: true });
+    await measure('close evidence in the table', () => page.locator('#closeEvidencePane').click(), { table: true });
+    await measure('switch back to graph', () => page.locator('#dagViewGraph').click());
     await showPanel('controls');
     await measure('change the variable', async () => {
       await page.locator('#changeIv').click();

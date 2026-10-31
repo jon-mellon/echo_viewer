@@ -3173,3 +3173,82 @@ h2 {
 }
 /* Identification keeps its own panel heading, so the bar need not repeat the name there. */
 .dag-body.task-identify .task-bar-brand, .dag-body.task-causes .task-bar-brand, .dag-body.task-consequences .task-bar-brand { display: none; }
+
+/* Graph / table switch, top right of the diagram panel. */
+.dag-view-switch {
+  display: inline-flex;
+  order: 99;
+  border: 1px solid var(--line, #cfd8d3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dag-view-switch .toolbar-button {
+  border: 0;
+  border-radius: 0;
+}
+.dag-view-switch .toolbar-button.active {
+  background: var(--accent, #1e6b5c);
+  color: #fff;
+}
+.dag-workspace:has(#dagViewTable.active) #dagSvgZoomIn,
+.dag-workspace:has(#dagViewTable.active) #dagSvgZoomOut,
+.dag-workspace:has(#dagViewTable.active) #dagSvgFit {
+  display: none;
+}
+.dag-table-view {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 10px 12px 16px;
+  background: #fbfcfa;
+  touch-action: pan-x pan-y;
+}
+.dag-table-view[hidden] { display: none; }
+.dag-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+.dag-table caption {
+  text-align: left;
+  font-weight: 700;
+  padding: 4px 0;
+}
+.dag-table th, .dag-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--line, #dfe6e2);
+}
+.dag-table thead th {
+  position: sticky;
+  top: 0;
+  background: #fbfcfa;
+  font-size: 12px;
+}
+.dag-table tr.selected { background: rgba(184, 59, 94, 0.1); }
+.dag-table .dag-table-number { text-align: right; font-variant-numeric: tabular-nums; }
+.dag-table-action { text-align: left; padding: 2px 0; min-height: 24px; }
+.dag-table-action:focus-visible { outline: 2px solid #1e4fa0; outline-offset: 2px; }
+.dag-table-summary, .dag-table-more { margin: 0 0 8px; font-size: 12px; color: var(--muted, #66716a); }
+@media (max-width: 760px) {
+  .dag-view-switch { order: -1; }
+  .dag-table th, .dag-table td { padding: 6px 4px; position: relative; }
+  #dagLinksTable th:nth-child(2) { font-size: 0; width: 1.4em; }
+  .dag-table-action { min-height: 32px; }
+  .dag-table thead th { font-size: 11px; padding-left: 2px; padding-right: 2px; }
+  /* Kept for screen readers; the arrow carries it visually. */
+  .dag-table-direction {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+.dag-table th.dag-table-candidate { text-align: left; font-weight: 600; border-right: 1px solid var(--line, #dfe6e2); }
+.dag-table tr.dag-table-first-line > * { border-top: 2px solid var(--line, #cfd8d3); }
+.dag-table-path { line-height: 1.4; }
+.dag-table-arrow { padding: 0 6px; font-weight: 700; }

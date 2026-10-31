@@ -23,7 +23,7 @@ export function createExploreState() {
 export function createDagAppState(interfaceMode = "classic") {
   return /** @type {DagAppState} */ ({
     interfaceMode,
-    task: null, explore: createExploreState(),
+    task: null, explore: createExploreState(), dagDisplay: "graph",
     data: null,
     variables: [], variableById: new Map(), clusterOf: new Map(), clusterMembers: new Map(),
     rawLinks: [], rawLinksById: new Map(), edgeSupportById: new Map(), linkLookup: new Map(), similarityEdgeMap: new Map(),

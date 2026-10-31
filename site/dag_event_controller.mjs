@@ -234,6 +234,9 @@ function installHandlers() {
     dagNetwork.fit();
   });
   els.fullscreenDag.addEventListener("click", () => toggleFullscreenPanel("dag"));
+  for (const [button, mode] of [[els.dagViewGraph, "graph"], [els.dagViewTable, "table"]]) {
+    button.addEventListener("click", () => dagNetwork.setDagDisplay(mode));
+  }
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && state.fullscreenPanel) setFullscreenPanel(null);
