@@ -620,6 +620,14 @@ test("mobile map toolbar and footer stay within their panels", async ({ browser 
     expect(layout.footerGap).toBeLessThan(2);
     expect(layout.privacyInsideNav).toBe(true);
     expect(layout.privacyClearOfMap).toBe(true);
+    await expect(page.locator(".dag-diagnostic-switch")).toBeVisible();
+    await expect(page.locator(".filter-dropdown-panel #toggleConfoundersOnly")).toHaveCount(0);
+    await expect(page.locator("#toggleConfoundersOnly")).toHaveAttribute("aria-pressed", "true");
+    await page.locator("#toggleCollidersOnly").tap();
+    await expect(page.locator("#toggleCollidersOnly")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#toggleConfoundersOnly")).toHaveAttribute("aria-pressed", "false");
+    await page.locator("#toggleConfoundersOnly").tap();
+    await expect(page.locator("#toggleConfoundersOnly")).toHaveAttribute("aria-pressed", "true");
     await page.setViewportSize({ width: 320, height: 700 });
     const narrowFooter = await page.evaluate(() => {
       const shell = document.querySelector(".dag-shell").getBoundingClientRect();
@@ -630,6 +638,36 @@ test("mobile map toolbar and footer stay within their panels", async ({ browser 
     });
     expect(narrowFooter.gap).toBeLessThan(2);
     expect(narrowFooter.clear).toBe(true);
+  } finally {
+    await context.close();
+  }
+});
+
+test("instrument diagnostics use the same mobile view switch", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+    await page.goto(viewer);
+    await ready(page);
+    const [iv, dv, instrument] = await page.evaluate(() => window.__dagBuilderState.project.groups
+      .filter(group => group.variable_ids?.length).slice(0, 3).map(group => group.group_id));
+    await page.locator(`#ivGroupPicker button[data-group-id="${iv}"]`).tap();
+    await page.locator(`#dvGroupPicker button[data-group-id="${dv}"]`).tap();
+    await page.locator(`#instrumentGroupPicker button[data-group-id="${instrument}"]`).tap();
+    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
+    await expect(page.locator("#toggleConfoundersOnly")).toBeHidden();
+    await expect(page.locator("#toggleCollidersOnly")).toBeHidden();
+    await expect(page.locator("#toggleExclusionViolations")).toBeVisible();
+    await expect(page.locator("#toggleExogeneity")).toBeVisible();
+    await page.locator("#toggleExogeneity").tap();
+    await expect(page.locator("#toggleExogeneity")).toHaveAttribute("aria-pressed", "true");
+    await page.locator("#toggleExclusionViolations").tap();
+    await expect(page.locator("#toggleExclusionViolations")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#toggleExogeneity")).toHaveAttribute("aria-pressed", "false");
+    const switchBox = await page.locator(".dag-diagnostic-switch").boundingBox();
+    expect(switchBox.x).toBeGreaterThanOrEqual(0);
+    expect(switchBox.x + switchBox.width).toBeLessThanOrEqual(390);
   } finally {
     await context.close();
   }
