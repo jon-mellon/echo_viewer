@@ -100,7 +100,9 @@ try {
     }, { budget: budgets.firstResultsMs });
     // Background loading (the search catalog is indexed while the user chooses) competes with whatever is measured
     // next and showed up as a lone slow interaction; the interactions are what is budgeted, so let it finish.
-    await page.waitForFunction(() => window.__dagBuilderState.variableSearchStatus !== 'loading', null, { timeout: 60000 });
+    // A slow runner may not have started it yet, so wait for it to be ready rather than only for it not to be running.
+    await page.waitForFunction(() => ['ready', 'error'].includes(window.__dagBuilderState.variableSearchStatus), null, { timeout: 30000 })
+      .catch(() => console.log('search catalog not ready before the interactions were timed'));
     await page.waitForTimeout(500);
     // On a phone the list and the graph (with its Filters) are separate tabs.
     const showPanel = async panel => { if (mobile) await page.locator(`.mobile-panel-nav [data-mobile-panel="${panel}"]`).click(); };
