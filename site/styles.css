@@ -3248,3 +3248,7 @@ h2 {
     white-space: nowrap;
   }
 }
+.dag-table th.dag-table-candidate { text-align: left; font-weight: 600; border-right: 1px solid var(--line, #dfe6e2); }
+.dag-table tr.dag-table-first-line > * { border-top: 2px solid var(--line, #cfd8d3); }
+.dag-table-path { line-height: 1.4; }
+.dag-table-arrow { padding: 0 6px; font-weight: 700; }

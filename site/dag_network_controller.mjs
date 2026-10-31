@@ -7,7 +7,7 @@ import * as workflow from "./dag_workflow.mjs";
 import * as dagPathHighlights from "./dag_path_highlights.mjs";
 import { STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "./dag_inspector_controller.mjs";
 import { studyDesignEdgeData } from "./dag_study_edges.mjs";
-import { createDagTable, dagTableModel } from "./dag_table.mjs";
+import { createDagTable, dagTableModel, pathView } from "./dag_table.mjs";
 
 export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId, links, visualData) {
   if (previousId === selectedId) return [];
@@ -74,7 +74,7 @@ export function isDagFullyVisible(network, boxes, viewport) {
 
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, selectEdge, selectGroup, onViewportChange = () => {},
+  drawMap, setMapMode, renderAll, selectEdge, selectGroup, onViewportChange = () => {}, exploreRows = () => [],
 }) {
   // The causes and consequences views draw a neighborhood of one variable, not
   // a study design, so there are no IV, DV or instrument anchors to pin or style.
@@ -215,7 +215,12 @@ function renderDagTable(groups, links) {
     edgeId: edge.id, sourceId: edge.from, targetId: edge.to,
     note: edge.id === STUDY_DESIGN_EDGE_ID ? "Study relationship" : "Study instrument",
   }));
-  _dagTable.update(dagTableModel({ groups, links, roleFor: tableRole, studyLinks }));
+  const view = pathView({ ...state, exploring: exploring() });
+  const pathsByGroup = { exogeneity: state.exogeneityPathsByGroup, exclusion: state.exclusionPathsByGroup,
+    colliders: state.colliderPathsByGroup, confounders: state.confounderPathsByGroup }[view];
+  _dagTable.update(dagTableModel({ view, groups, links, pathsByGroup, exploreRows: view === "explore" ? exploreRows() : [],
+    anchors: studyAnchors(), maxPathLength: view === "exclusion" ? state.exclusionMaxPathLength : state.confounderMaxPathLength,
+    roleFor: tableRole, studyLinks }));
   _dagTable.select({ edgeId: state.selectedEdgeId, groupId: state.selectedEvidenceGroupId });
 }
 
@@ -422,6 +427,7 @@ let _dagRenderWorker = null;
 let _dagRenderRequest = 0;
 let _dagApplyingRequest = null;
 let _dagRenderedPromise = Promise.resolve();
+let _resolveRendered = null;
 const _dagGeometryCache = new Map();
 
 function rememberGeometry(key, geometry) {
@@ -441,8 +447,13 @@ async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } =
   if (state.interfaceMode === "dag2" && !exploring()
     && (!hasAnchor(state.project?.iv_group_id) || !hasAnchor(state.project?.dv_group_id)
       || (state.phase === "select_instrument" && !state.changingAnchorSide))) return;
+  // A render that a newer one supersedes never finishes, so anyone already waiting on it is released when the newer one does.
   let resolveRendered;
-  _dagRenderedPromise = new Promise(resolve => { resolveRendered = resolve; });
+  let supersededResolve = _resolveRendered;
+  _dagRenderedPromise = new Promise(resolve => {
+    resolveRendered = () => { resolve(); supersededResolve?.(); supersededResolve = null; };
+  });
+  _resolveRendered = resolveRendered;
   clearLogicalDagEdgeHover();
   clearConfounderPathHover({ redraw: false });
   const groups = dagVisibleGroups();

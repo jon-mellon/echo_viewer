@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { attachDagInteractions } from "../site/dag_interactions.mjs";
 import { createRenderCoordinator } from "../site/render_coordinator.mjs";
+import { computeDagRender } from "../site/dag_render_compute.mjs";
 import { applyLogicalEdgeHover, createDagNetworkController, isDagFullyVisible, selectionUpdatesForSegments } from "../site/dag_network_controller.mjs";
 import { createDagShellController } from "../site/dag_shell_controller.mjs";
 
@@ -318,4 +319,54 @@ test("filter updates preserve project membership and reuse routed graph geometry
   assert.ok(calls.find(call => call[0] === "renderMapToolbarToggles"));
   assert.ok(calls.find(call => call[0] === "renderGroupList"));
   assert.ok(calls.findIndex(call => call[0] === "renderVariablePanel") > 0);
+});
+
+test("a render that a newer one supersedes still releases whoever was waiting on it", async () => {
+  const groups = ["a", "b"].map(group_id => ({ group_id, label: group_id, variable_ids: [] }));
+  const state = { project: { groups, links: [], iv_group_id: "a", dv_group_id: "b" },
+    componentGroupIds: new Set(["a", "b"]), variableById: new Map(), dagLayoutMode: "auto", selectedEdgeId: null,
+    colliderGroupIds: new Set(), colliderPathGroupIds: new Set(), confounderGroupIds: new Set(),
+    confounderPathGroupIds: new Set(), visibleLinks: [] };
+  const element = { clientWidth: 630, clientHeight: 700, style: {}, addEventListener() {}, removeEventListener() {} };
+  class DataSet {
+    constructor(items = []) { this.items = new Map(items.map(item => [item.id, item])); }
+    getIds() { return [...this.items.keys()]; }
+    get() { return [...this.items.values()]; }
+    add(items) { for (const item of items) this.items.set(item.id, item); }
+    update(items) { this.add(items); }
+    remove(ids) { for (const id of ids) this.items.delete(id); }
+  }
+  class Network { on() {} off() {} redraw() {} fit() {} moveTo() {} getScale() { return 1; } setOptions() {}
+    getBoundingBox() { return { left: 0, right: 1, top: 0, bottom: 1 }; } canvasToDOM(point) { return point; } }
+  // The first worker is replaced before it answers; only the newest one replies.
+  const workers = [];
+  const savedWorker = globalThis.Worker;
+  globalThis.Worker = class {
+    constructor() { this.handlers = {}; this.terminated = false; workers.push(this); }
+    addEventListener(name, handler) { this.handlers[name] = handler; }
+    terminate() { this.terminated = true; }
+    postMessage({ requestId, input }) {
+      setTimeout(() => {
+        if (this.terminated) return;
+        const { layout, routes, timings } = computeDagRender(input);
+        this.handlers.message({ data: { requestId, timings, routes,
+          layout: { ...layout, positions: [...layout.positions], boxes: [...layout.boxes] } } });
+      }, 5);
+    }
+  };
+  try {
+    const controller = createDagNetworkController({ state, elements: { dagNetwork: element, dagTable: { hidden: true },
+      dagViewGraph: switchStub(), dagViewTable: switchStub() }, visApi: { DataSet, Network }, clusterRep: id => id,
+    groupColor: () => "#000", dagGroups: () => groups, groupById: id => groups.find(group => group.group_id === id),
+    drawMap() {}, setMapMode() {}, renderAll() {}, selectEdge() {} });
+    controller.renderDag();
+    const first = controller.whenRendered();
+    controller.renderDag();
+    assert.equal(workers.length, 2);
+    assert.equal(workers[0].terminated, true, "the first render was superseded");
+    const outcome = await Promise.race([first.then(() => "released"), new Promise(resolve => setTimeout(() => resolve("hung"), 2000))]);
+    assert.equal(outcome, "released");
+  } finally {
+    globalThis.Worker = savedWorker;
+  }
 });
