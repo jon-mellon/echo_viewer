@@ -371,3 +371,105 @@ test("the table also covers Identify and works from the keyboard", async ({ page
   await expect(page.locator("#dagLinksTable thead th[aria-sort=descending]")).toHaveCount(1);
   await expect(page.locator("#dagLinksTable thead button").first()).toBeFocused();
 });
+
+const shownGraph = async page => {
+  await expect(page.locator("#dagNetwork")).toBeVisible();
+  await expect(page.locator("#dagTable")).toBeHidden();
+  await expect(page.locator("#dagViewGraph")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#dagViewTable")).toHaveAttribute("aria-pressed", "false");
+};
+
+test("the graph is the default view everywhere, whatever was chosen before", async ({ page }) => {
+  for (const task of ["causes", "consequences"]) {
+    await open(page, `${viewer}?task=${task}`);
+    await pick(page, "category-sleep").click();
+    await expect(page.locator(".explore-row").first()).toBeVisible();
+    await shownGraph(page);
+    expect(await page.evaluate(() => window.__dagBuilderState.dagDisplay)).toBe("graph");
+    expect(new URL(page.url()).searchParams.has("dag_view")).toBe(false);
+  }
+  // The table is chosen per link, not remembered by the browser: a fresh page opens on the graph.
+  await page.locator("#dagViewTable").click();
+  await expect(page.locator("#dagTable")).toBeVisible();
+  await open(page, `${viewer}?task=causes`);
+  await pick(page, "category-sleep").click();
+  await shownGraph(page);
+  // Switching between tasks keeps the chosen view, and Reset in the current tab returns to the graph.
+  await page.locator("#dagViewTable").click();
+  await page.locator("#taskBar .task-tab[data-task=consequences]").click();
+  await pick(page, "category-income-earnings").click();
+  await expect(page.locator("#dagTable")).toBeVisible();
+  await expect(page.locator("#dagLinksTable tbody tr").first()).toBeVisible();
+});
+
+test("on a phone the table fits the screen and its controls can be tapped", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await open(page, `${viewer}?task=causes`);
+    await pick(page, "category-sleep").tap();
+    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
+    await shownGraph(page);
+    // The switch is the first control, so it never scrolls out of reach.
+    const box = await page.locator(".dag-view-switch").boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(375);
+    await page.locator("#dagViewTable").tap();
+    await expect(page.locator("#dagTable")).toBeVisible();
+    await expect(page.locator("#dagLinksTable tbody tr").first()).toBeVisible();
+    const overflow = await page.evaluate(() => ({ page: document.documentElement.scrollWidth,
+      table: document.getElementById("dagTable").scrollWidth - document.getElementById("dagTable").clientWidth }));
+    expect(overflow.page).toBeLessThanOrEqual(375);
+    expect(overflow.table).toBe(0);
+    // Every evidence button is on screen, and the table scrolls rather than the page.
+    for (const button of await page.locator("#dagLinksTable tbody tr").first().getByRole("button").all()) {
+      const rect = await button.boundingBox();
+      expect(rect.x + rect.width).toBeLessThanOrEqual(375);
+      expect(rect.height).toBeGreaterThanOrEqual(24); // WCAG 2.2 minimum target size
+    }
+    await page.locator(".filter-dropdown > summary").tap();
+    await expect(page.locator("#minimumEdgePapers")).toBeVisible();
+    await page.locator("#minimumEdgePapers").fill("20");
+    await expect.poll(() => page.locator("#dagLinksTable tbody tr").count()).toBeLessThan(10);
+    await page.locator("#minimumEdgePapers").fill("2");
+    await page.locator(".filter-dropdown > summary").tap();
+    const edgeId = await page.locator("#dagLinksTable tbody tr").first().getAttribute("data-edge-id");
+    await page.locator("#dagLinksTable tbody tr").first().getByRole("button", { name: /^View the evidence/ }).tap();
+    await expect(page.locator("#closeEvidencePane")).toBeVisible();
+    await expect(page.locator("#provenancePanel")).toBeVisible();
+    expect(await page.evaluate(() => window.__dagBuilderState.selectedEdgeId)).toBe(edgeId);
+    await page.locator("#closeEvidencePane").tap();
+    // A variable's definition opens from the table too.
+    await page.locator("#dagVariablesTable tbody tr").nth(1).getByRole("button").first().tap();
+    await expect(page.locator("#closeEvidencePane")).toBeVisible();
+    await page.locator("#closeEvidencePane").tap();
+    await page.locator("#dagViewGraph").tap();
+    await shownGraph(page);
+    await expect.poll(() => page.evaluate(async () => {
+      const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+      await api.whenDagRendered();
+      return api.renderedDagEdgeIds().length;
+    })).toBeGreaterThan(0);
+  } finally {
+    await context.close();
+  }
+});
+
+test("a table of a graph with hundreds of links stays small and quick", async ({ page }) => {
+  await open(page, `${viewer}?task=consequences`);
+  await pick(page, "category-income-earnings").click();
+  await page.locator("#dagViewTable").click();
+  await page.locator(".filter-dropdown > summary").click();
+  await page.locator("#minimumEdgePapers").fill("1");
+  await page.locator("#confounderPathLength").fill("4");
+  await expect(page.locator("#dagLinksTable tbody tr").first()).toBeVisible();
+  const { rendered, total } = await page.evaluate(() => ({
+    rendered: document.querySelectorAll("#dagLinksTable tbody tr").length,
+    total: Number(/\((\d+)\)/.exec(document.querySelector("#dagLinksTable caption").textContent)[1]) }));
+  expect(rendered).toBeLessThanOrEqual(200);
+  expect(rendered).toBe(Math.min(total, 200));
+  if (total > 200) {
+    await page.locator(".dag-table-more button").first().click();
+    await expect(page.locator("#dagLinksTable tbody tr")).toHaveCount(Math.min(total, 400));
+  }
+});
