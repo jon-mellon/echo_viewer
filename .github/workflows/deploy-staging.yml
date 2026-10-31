@@ -38,6 +38,15 @@ jobs:
       - name: Install profiling browser
         run: npx playwright install --with-deps chromium
 
+      # Published schema files are immutable; keep them between runs instead of
+      # downloading about 5 MB per page load from Supabase every time.
+      - name: Restore published schema cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/supabase-published
+          key: supabase-published-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/supabase_cache.cjs') }}
+          restore-keys: supabase-published-
+
       - name: Enforce mobile diagnostic switching budgets
         run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
 
