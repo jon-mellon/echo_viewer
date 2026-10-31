@@ -90,8 +90,8 @@ h1 {
 }
 
 h2 {
-  font-size: 13px;
-  line-height: 1.2;
+  font-size: 15px;
+  line-height: 1.3;
 }
 
 .model-badge {
@@ -135,6 +135,11 @@ h2 {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+.section-title h2 {
+  font-size: 16px;
+  line-height: 1.3;
 }
 
 .text-button,
@@ -1244,8 +1249,9 @@ h2 {
   display: block;
   margin: 10px 0 5px;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
@@ -1606,10 +1612,10 @@ h2 {
 
 .setup-group-picker-title {
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 750;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 
 .setup-group-picker-list {
@@ -1626,7 +1632,7 @@ h2 {
 
 .setup-group-picker-row strong {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .setup-group-picker-row span {
@@ -1837,6 +1843,10 @@ h2 {
   padding: 10px 14px 8px;
   border-bottom: 1px solid var(--line);
   margin: 0 !important;
+}
+.dag-ws-header #dagViewTitle {
+  font-size: 17px;
+  line-height: 1.3;
 }
 .dag-ws-controls {
   display: flex;
@@ -2239,14 +2249,14 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 13px;
 }
 .anchor-tag {
   flex: 0 0 auto;
   padding: 1px 6px;
   border-radius: 4px;
   font-weight: 800;
-  font-size: 10px;
+  font-size: 11px;
   color: #fff;
 }
 .anchor-tag.anchor-dv { background: #9b5c2e; }
@@ -2254,11 +2264,13 @@ h2 {
 .anchor-tag.anchor-instrument { background: #6d4cb3; }
 .anchor-label {
   flex: 1 1 auto;
+  font-size: 14px;
+  line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.anchor-row .text-button { flex: 0 0 auto; }
+.anchor-row .text-button { flex: 0 0 auto; font-weight: 650; }
 
 .mode-tab {
   min-height: 38px;
@@ -2586,7 +2598,7 @@ h2 {
     inset: auto 0 0;
     z-index: 110;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 112px));
+    grid-template-columns: auto repeat(2, minmax(0, 112px));
     justify-content: center;
     gap: 8px;
     min-height: var(--mobile-nav-height);
@@ -2594,6 +2606,14 @@ h2 {
     border-top: 1px solid var(--line);
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 -6px 20px rgba(23, 32, 51, 0.08);
+  }
+
+  .mobile-panel-nav-label {
+    align-self: center;
+    margin-right: 4px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
   }
 
   .dag-body.focus-variable-map .mobile-panel-nav,
@@ -2609,8 +2629,8 @@ h2 {
   .mobile-panel-tab {
     min-height: 44px;
     border: 1px solid var(--line);
-    border-radius: 9px;
-    background: #f7f8f5;
+    border-radius: 6px;
+    background: transparent;
     color: var(--muted);
     font: inherit;
     font-size: 13px;
@@ -2618,9 +2638,10 @@ h2 {
   }
 
   .mobile-panel-tab.active {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: #fff;
+    border-color: var(--line);
+    border-bottom: 3px solid var(--accent);
+    background: #f2f7f4;
+    color: var(--accent);
   }
 
   .mobile-variable-tab {
@@ -3094,7 +3115,7 @@ h2 {
 .task-choice:hover, .task-choice:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px #e6f2ee; }
 
 .explore-summary { margin: 16px 0; color: var(--ink); line-height: 1.45; }
-.explore-group h2 { margin: 20px 0 8px; font-size: 15px; }
+.explore-group h2 { margin: 20px 0 8px; font-size: 17px; }
 .explore-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .explore-row {
   display: grid;
@@ -3170,6 +3191,11 @@ h2 {
   .task-tab { padding: 7px 7px; font-size: 14px; }
   .task-landing-inner { padding: 24px 16px 48px; }
   .task-landing-inner h1 { font-size: 22px; }
+}
+@media (max-width: 360px) {
+  .task-bar { gap: 4px; padding: 0 6px; }
+  .task-tab { padding: 7px 5px; font-size: 13px; }
+  .task-reset { padding-inline: 8px; font-size: 11px; }
 }
 /* Identification keeps its own panel heading, so the bar need not repeat the name there. */
 .dag-body.task-identify .task-bar-brand, .dag-body.task-causes .task-bar-brand, .dag-body.task-consequences .task-bar-brand { display: none; }
