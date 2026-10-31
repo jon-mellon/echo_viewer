@@ -3252,3 +3252,7 @@ h2 {
 .dag-table tr.dag-table-first-line > * { border-top: 2px solid var(--line, #cfd8d3); }
 .dag-table-path { line-height: 1.4; }
 .dag-table-arrow { padding: 0 6px; font-weight: 700; }
+/* With nothing chosen yet the hint ("Choose a variable...") is the whole view, as it is for the graph. */
+.dag-network-wrapper:has(.explore-graph-hint:not([hidden])) .dag-table-view {
+  visibility: hidden;
+}
