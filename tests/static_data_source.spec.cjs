@@ -1,4 +1,4 @@
-const { test, expect } = require("playwright/test");
+const { test, expect } = require("./fixtures.cjs");
 
 const base = process.env.DAG_VIEWER_URL || "http://127.0.0.1:8767";
 const snapshotId = "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0";

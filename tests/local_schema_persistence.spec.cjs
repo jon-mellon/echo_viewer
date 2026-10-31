@@ -1,4 +1,4 @@
-const { test, expect } = require("playwright/test");
+const { test, expect } = require("./fixtures.cjs");
 
 test("the local schema database upgrade preserves saved schemas and sessions", async ({ page }) => {
   await page.route("http://127.0.0.1:8767/", route =>

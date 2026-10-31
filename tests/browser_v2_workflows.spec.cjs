@@ -1,4 +1,4 @@
-const { test, expect } = require("playwright/test");
+const { test, expect } = require("./fixtures.cjs");
 const { EventEmitter } = require("node:events");
 const { watchBrowserErrors } = require("./browser_errors.cjs");
 

@@ -1,4 +1,4 @@
-const { test, expect } = require("playwright/test");
+const { test, expect } = require("./fixtures.cjs");
 const base = process.env.DAG_VIEWER_URL || "http://127.0.0.1:8767";
 const snapshot = "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b";
 const publication = "c221423a-9470-4c82-8a3d-8bcf4a01ef7c";
