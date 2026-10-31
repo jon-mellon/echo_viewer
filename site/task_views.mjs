@@ -56,7 +56,7 @@ export function neighborhoodGraph({ rows, focusId, links, direction = "causes" }
 export function createTaskViews({ state, searchGroups, searchStatus = () => "ready", onChange = () => {},
   paperSupport = () => ({ status: "ready", papersFor: undefined }), loadPaperSupport = () => {},
   isDisplayGroup = () => true, onExploreChange = () => {}, onTaskChange = () => {},
-  onFocusPicking = () => {}, onPickerInput = () => {}, onSetupNeeded = () => {}, openEvidence = () => {}, prepareReset = () => {}, openWindow = (url) => window.open(url, "_blank", "noopener"),
+  onFocusPicking = () => {}, onPickerInput = () => {}, onSetupNeeded = () => {}, openEvidence = () => {}, prepareReset = () => {}, whenReady = () => Promise.resolve(), openWindow = (url) => window.open(url, "_blank", "noopener"),
   navigate = (url) => window.location.assign(url) }) {
   const el = id => document.getElementById(id);
   const els = {
@@ -335,12 +335,15 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       openWindow(freshProjectUrl(window.location.href));
       els.dialog.close();
     });
-    el("resetHere").addEventListener("click", () => {
+    el("resetHere").addEventListener("click", async () => {
+      const message = el("resetError");
       try {
+        // Pressed during start-up, Reset waits for the saving layer rather than failing: the project must reach Previous Sessions first.
+        message.hidden = true;
+        await whenReady();
         prepareReset();
         navigate(freshProjectUrl(window.location.href));
       } catch (error) {
-        const message = el("resetError");
         message.textContent = `Could not keep this project in Previous Sessions — ${error.message}`;
         message.hidden = false;
       }

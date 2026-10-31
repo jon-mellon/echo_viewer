@@ -230,11 +230,14 @@ test("mobile reset keeps the previous project after navigating", async ({ browse
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
+    // A slow phone reaches Reset before start-up has finished; the reset must wait for it, not fail.
+    await page.context().newCDPSession(page).then(cdp => cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 }));
     await open(page, `${viewer}?task=causes`);
     await pick(page, "category-sleep").tap();
     await page.locator("#taskReset").tap();
     await page.locator("#resetHere").tap();
-    await expect(page.locator("#taskLanding")).toBeVisible();
+    await expect(page.locator("#taskLanding")).toBeVisible({ timeout: 60000 });
+    await expect(page.locator("#resetError")).toBeHidden();
     expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
     await expect.poll(() => page.evaluate(async () => {
       const { listPreviousSessions } = await import("/local_schema_store.mjs");
