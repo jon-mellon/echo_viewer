@@ -29,7 +29,7 @@ import { createUoaController } from "/uoa_controller.mjs";
 import { createToolbarController } from "/toolbar_controller.mjs";
 import { createDefinitionWorkflowController } from "/definition_workflow_controller.mjs";
 import { createTaskViews } from "/task_views.mjs";
-import { directionalPaperCounter } from "/causal_neighborhood.mjs";
+import { directionalPaperCounter, linksNeedingExactCounts } from "/causal_neighborhood.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
 import { createGroupingSetController } from "/grouping_set_controller.mjs";
 import { createProjectBootstrap } from "/project_bootstrap.mjs?v=compiled-first-v2";
@@ -1150,7 +1150,7 @@ const persistentViewer = createPersistentViewer({
 
 const taskViews = createTaskViews({
   state, searchGroups: searchExploreGroups, searchStatus: () => state.variableSearchStatus,
-  paperSupport: linkPaperSupport, loadPaperSupport: () => void loadLinkSupport(),
+  paperSupport: linkPaperSupport, loadPaperSupport: () => void loadLinkSupport(linkPaperSupport().links),
   isDisplayGroup: isDagDisplayGroup,
   // A new variable updates the anchor bar, picker and graph, like a distance change,
   // instead of re-rendering all of Identify's setup.
@@ -1308,19 +1308,20 @@ function hasAnyMapping(sourceIds, targetIds) {
   return rawLinksBetween(sourceIds, targetIds).length > 0;
 }
 
-// Per-finding paper support for every group link. The sparse-edge filter and
-// the causes and consequences views both count papers from these records.
+// Per-finding paper support. The sparse-edge filter needs it for every group
+// link. Causes and consequences read the paper counts already in the aggregated
+// DAG, and need it only for links a local edit touched (which carry no keys).
 let linkSupportPromise = null;
 let linkSupportFailed = false;
 let sparseWaitingForSupport = false;
-function missingLinkSupportIds() {
-  return [...new Set((state.project?.links || []).flatMap(link =>
+function missingLinkSupportIds(links = state.project?.links || []) {
+  return [...new Set(links.flatMap(link =>
     [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))]
     .filter(id => !state.edgeSupportById.has(id) && !state.rawLinksById.has(id));
 }
-function loadLinkSupport() {
+function loadLinkSupport(links) {
   if (linkSupportPromise) return linkSupportPromise;
-  const missing = missingLinkSupportIds();
+  const missing = missingLinkSupportIds(links);
   if (!missing.length) return Promise.resolve(true);
   const supportCache = state.edgeSupportById;
   linkSupportPromise = dagDataSource.loadRawLinkSupportByIds(missing).then(rows => {
@@ -1340,25 +1341,22 @@ function loadLinkSupport() {
     return false;
   }).finally(() => {
     linkSupportPromise = null;
-    // The graph of an explore view waits on these counts, so redraw it now.
+    // An explore view waiting on these counts redraws now.
     if (taskViews.exploring()) updateDagFilters();
-    else taskViews.render();
-    void taskViews.warmCounts();
   });
   return linkSupportPromise;
 }
-// Checking completeness scans every finding ID, so remember a complete result
-// until the links or the support records change.
-let linkSupportComplete = { links: null, support: null, size: -1 };
+// What the causes and consequences views need to count papers: nothing, unless
+// an edit left some links without paper keys, in which case only those links'
+// findings are fetched. Remembered per links array, since it scans every link.
+let exactCountLinks = { links: null, needing: [] };
 function linkPaperSupport() {
+  const links = state.project?.links || [];
+  if (exactCountLinks.links !== links) exactCountLinks = { links, needing: linksNeedingExactCounts(links) };
+  const { needing } = exactCountLinks;
+  if (!needing.length) return { status: "ready", papersFor: directionalPaperCounter() };
   if (linkSupportFailed) return { status: "failed", papersFor: directionalPaperCounter() };
-  const links = state.project?.links, support = state.edgeSupportById;
-  const known = linkSupportComplete.links === links && linkSupportComplete.support === support
-    && linkSupportComplete.size === support.size;
-  if (!known) {
-    if (missingLinkSupportIds().length) return { status: "loading", papersFor: null };
-    linkSupportComplete = { links, support, size: support.size };
-  }
+  if (missingLinkSupportIds(needing).length) return { status: "loading", papersFor: null, links: needing };
   return { status: "ready", papersFor: directionalPaperCounter(state.edgeSupportById, state.rawLinksById),
     cacheKey: state.edgeSupportById };
 }
@@ -1387,7 +1385,7 @@ function computeVisibleLinks() {
   const missingSparseEvidence = state.excludeSparseEdges ? missingLinkSupportIds() : [];
   if (missingSparseEvidence.length && !sparseWaitingForSupport) {
     sparseWaitingForSupport = true;
-    void loadLinkSupport().then(loaded => {
+    void loadLinkSupport(state.project?.links).then(loaded => {
       sparseWaitingForSupport = false;
       if (!loaded && linkSupportFailed) state.excludeSparseEdges = false;
       updateDagFilters();
@@ -2114,15 +2112,6 @@ const projectBootstrap = createProjectBootstrap({
   renderAll, constrainMapTransform, drawMap, fitMap, dagNetworkController,
   buildDuplicateClusters, linkKey, pairKey, loadVariableSearchCatalog,
   onLocalSchemaLoaded: record => persistentViewer.setLoadedRecord(record),
-  // Paper support for causes and consequences, loaded once the catalog and query
-  // engine are ready, but only from the start page or those views.
-  onPreloadsDone: () => {
-    if (globalThis.navigator?.connection?.saveData) return;
-    if (state.task && state.task !== "causes" && state.task !== "consequences") return;
-    const start = () => void loadLinkSupport().then(() => taskViews.warmCounts());
-    if (typeof globalThis.requestIdleCallback === "function") globalThis.requestIdleCallback(start, { timeout: 5000 });
-    else setTimeout(start, 1000);
-  },
   onReady: () => {
     persistentViewer.start();
     void definitionWorkflowController.resumeAfterOAuth();

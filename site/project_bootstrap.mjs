@@ -11,7 +11,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
   resizeMap, initializeProject, loadLatestSchemaGroups,
   normalizeProjectDuplicateAssignments, publicationController, renderAll,
   constrainMapTransform, drawMap, fitMap, dagNetworkController, buildDuplicateClusters,
-  linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {}, onPreloadsDone = () => {},
+  linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {},
   onLocalSchemaLoaded = () => {} }) {
   const presenter = createProjectBootstrapPresenter({});
   const setStartupStage = message => presenter.setStartupStage(message);
@@ -157,9 +157,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       if (typeof globalThis.requestIdleCallback === "function") globalThis.requestIdleCallback(start, { timeout: 5000 });
       else setTimeout(start, 1000);
     });
-    // Later preloads wait for the search catalog and query engine, so they
-    // never compete with them for bandwidth or the main thread.
-    const preload = catalog => void Promise.allSettled([catalog, prewarmEvidenceEngine()]).then(() => onPreloadsDone());
+    const preload = () => void prewarmEvidenceEngine();
     // A fresh project carries placeholder anchor IDs, so check for real groups.
     const anchored = side => (state.project.groups || []).some(group => group.group_id === state.project[`${side}_group_id`]);
     const catalogIfSettingUp = () => (!anchored("iv") || !anchored("dv")
@@ -196,23 +194,23 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.publishedMembershipReadyGroups = new Set(schema.groups.map(group => group.group_id));
         state.publishedSchemaLoadFailed = false;
         await applyLoadedSchema(schema, true);
-        const catalog = catalogIfSettingUp();
+        void catalogIfSettingUp();
         publicationController.setSchemaReady?.(true);
         void publicationController.refreshPublicationState?.();
         onReady();
-        preload(catalog);
+        preload();
       }).catch(error => {
         if ((state.compiledDagRevision || 0) !== revision) return;
         state.publishedSchemaHydrating = false;
         state.publishedSchemaLoadFailed = true;
         publicationController.setSchemaLoadFailed?.();
         console.error("Could not finish loading the published schema.", error);
-        preload(Promise.resolve());
+        preload();
       });
     } else {
-      const catalog = catalogIfSettingUp();
+      void catalogIfSettingUp();
       onReady();
-      preload(catalog);
+      preload();
     }
   }
 

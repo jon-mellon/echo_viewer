@@ -231,23 +231,53 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
   }
 });
 
-test("the start page preloads the search catalog, then paper support", async ({ page }) => {
-  // Counting papers scans every finding; that must be one verified download, not many range requests.
-  const findings = [];
-  page.on("request", request => {
-    if (/\/causal_link_occurrences\.parquet/.test(request.url())) findings.push({ range: request.headers().range || null });
-  });
+test("the start page preloads the search catalog and query engine", async ({ page }) => {
   await open(page);
   await expect(page.locator("#taskLanding")).toBeVisible();
   // Nothing has opened a task or a search, yet both arrive in the background.
   await page.waitForFunction(() => window.__dagBuilderState.variableSearchStatus === "ready"
-    && performance.getEntriesByName("echo:evidence:engine").length
-    && window.__dagBuilderState.edgeSupportById.size > 1000, null, { timeout: 90000 });
+    && performance.getEntriesByName("echo:evidence:engine").length, null, { timeout: 90000 });
+});
+
+test("paper counts come from the DAG: results are immediate and no findings are counted or downloaded", async ({ page }) => {
+  const findings = [];
+  page.on("request", request => {
+    if (/\/causal_link_occurrences\.parquet/.test(request.url())) findings.push(request.url());
+  });
+  await open(page);
   await page.locator("#taskLanding .task-choice[data-task=causes]").click();
   await pick(page, "category-sleep").click();
-  // No "Counting the papers…" wait once support is preloaded.
-  await expect(page.locator(".explore-row").first()).toBeVisible({ timeout: 1000 });
-  expect(findings).toEqual([{ range: null }]);
+  // No waiting on anything: the numbers are already on the links.
+  await expect(page.locator(".explore-row").first()).toBeVisible({ timeout: 1500 });
+  await expect(page.locator("#exploreSummary")).toBeHidden();
+  expect(await page.evaluate(() => window.__dagBuilderState.edgeSupportById.size)).toBe(0);
+  await page.waitForTimeout(2000);
+  expect(findings).toEqual([]);
+});
+
+test("links an edit left without paper keys are counted from their own findings only", async ({ page }) => {
+  await open(page, `${viewer}?task=causes`);
+  await pick(page, "category-sleep").click();
+  await expect(page.locator(".explore-row").first()).toBeVisible();
+  const before = await page.locator(".explore-row").count();
+  const target = await page.locator(".explore-row").first().getAttribute("data-edge-id");
+  // What a local edit does to an edge: replace the links with a copy that has no paper keys on one.
+  await page.evaluate(edgeId => {
+    const s = window.__dagBuilderState;
+    s.project.links = s.project.links.map(link => {
+      if (link.edge_id !== edgeId) return link;
+      const { a_to_b_paper_table_keys, b_to_a_paper_table_keys, distinct_paper_count, ...rest } = link;
+      return rest;
+    });
+  }, target);
+  await page.locator(".filter-dropdown > summary").click();
+  await page.locator("#confounderPathLength").fill("2");
+  await page.locator("#confounderPathLength").fill("1");
+  // It is counted exactly, so the same variables are listed, from a handful of findings rather than all of them.
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.edgeSupportById.size)).toBeGreaterThan(0);
+  await expect(page.locator(".explore-row")).toHaveCount(before);
+  await expect(page.locator("#exploreSummary")).toBeHidden();
+  expect(await page.evaluate(() => window.__dagBuilderState.edgeSupportById.size)).toBeLessThan(2000);
 });
 
 test("a notice appears only when there is nothing to list, and goes away with results", async ({ page }) => {

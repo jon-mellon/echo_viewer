@@ -99,33 +99,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   }
 
   /**
-   * Count the papers behind every link ahead of the first pick, a slice at a
-   * time so the page stays responsive. The counts are cached for neighborhood().
-   */
-  let warming = false;
-  async function warmCounts() {
-    const support = paperSupport();
-    if (warming || support.status !== "ready" || !support.papersFor) return;
-    warming = true;
-    try {
-      const links = state.project?.links || [];
-      const counter = cachedCounter(support);
-      let sliceStart = performance.now();
-      for (let index = 0; index < links.length; index++) {
-        counter(links[index], true);
-        counter(links[index], false);
-        if ((index & 63) === 63 && performance.now() - sliceStart > 8) {
-          await new Promise(resolve => setTimeout(resolve, 0));
-          sliceStart = performance.now();
-          if (state.project?.links !== links) return;
-        }
-      }
-    } finally {
-      warming = false;
-    }
-  }
-
-  /**
    * The list rows and graph for the current view, shared by the list and the
    * graph and reused until the links, support or settings change.
    */
@@ -231,14 +204,14 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     // A notice appears only when there is something to say; otherwise the list stands on its own.
     const notice = text => { els.summary.textContent = text; els.summary.hidden = !text; };
     if (status === "loading") {
-      // The same per-finding records the sparse-edge filter uses; loaded once.
+      // Only after a local edit: links it touched are counted from their findings.
       loadPaperSupport();
-      notice("Counting the papers that support each link…");
+      notice("Counting the papers behind your edits…");
       replaceChildren(els.results);
       return;
     }
     notice(!rows.length ? `Nothing ${causes ? "causes" : "is caused by"} ${labelFor(focus)} at this distance and paper count. Try a greater distance or fewer papers.`
-      : status === "failed" ? "Finding details could not load, so paper counts may include tables and null findings." : "");
+      : status === "failed" ? "Some paper details could not load, so links changed by your edits may be missing." : "");
     const byDistance = new Map();
     for (const row of rows) {
       if (!byDistance.has(row.distance)) byDistance.set(row.distance, []);
@@ -345,6 +318,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     });
   }
 
-  return { install, render, setTask, refreshSelection, neighborhood, warmCounts, exploring, focus, searchFocusGroups,
+  return { install, render, setTask, refreshSelection, neighborhood, exploring, focus, searchFocusGroups,
     chooseFocus, changeFocus, freshProjectUrl };
 }
