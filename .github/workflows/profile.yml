@@ -20,6 +20,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npx playwright install --with-deps chromium
+      # Published schema files are immutable; keep them between runs instead of
+      # downloading about 5 MB per test from Supabase every time.
+      - name: Restore published schema cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/supabase-published
+          key: supabase-published-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/supabase_cache.cjs') }}
+          restore-keys: supabase-published-
       - run: npm run test:browser
       - run: npm run profile
       - run: PROFILE_DEVICE=mobile npm run profile

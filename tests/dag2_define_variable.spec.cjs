@@ -1,4 +1,4 @@
-const { test, expect } = require("playwright/test");
+const { test, expect } = require("./fixtures.cjs");
 const { watchBrowserErrors } = require("./browser_errors.cjs");
 
 test("DAG2 defines a canonical variable from per-source residual slices", async ({ page }) => {

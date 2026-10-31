@@ -1,4 +1,4 @@
-const { test, expect } = require("playwright/test");
+const { test, expect } = require("./fixtures.cjs");
 const { readFile } = require("node:fs/promises");
 
 const viewer = "http://127.0.0.1:8767/?task=identify";
