@@ -527,6 +527,11 @@ test("mobile map controls accept taps and sharing falls back when clipboard acce
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
   await page.locator('#instrumentGroupPicker button[data-select-none]').click();
   await page.locator('[data-mobile-panel="dag"]').last().tap();
+  // Fit does nothing until the graph has been drawn, so wait for it rather than racing the render.
+  await page.evaluate(async () => {
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    await api.whenDagRendered();
+  });
   const fit = page.locator("#dagSvgFit");
   await fit.scrollIntoViewIfNeeded();
   await page.evaluate(async () => {
