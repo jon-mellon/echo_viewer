@@ -47,6 +47,10 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
         showPanel("controls");
       } else if (document.body.dataset.mobilePanel === "dag" && document.body.classList.contains("defining-variable")) {
         showPanel("controls");
+      } else if (document.body.dataset.mobilePanel !== "controls" && document.body.classList.contains("initial-setup")
+        && !document.body.classList.contains("defining-variable")) {
+        // Choosing the first variables has no tab bar and no graph: arriving from another view's Graph tab would otherwise leave a blank screen.
+        showPanel("controls");
       }
     }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
     showPanel(document.body.dataset.mobilePanel);

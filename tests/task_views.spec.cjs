@@ -215,7 +215,7 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
       tabs: document.querySelector(".task-tabs").scrollWidth - document.querySelector(".task-tabs").clientWidth }));
     expect(sizes.page).toBeLessThanOrEqual(375);
     expect(sizes.tabs).toBe(0);
-    await expect(page.locator(".mobile-panel-nav .mobile-panel-tab:visible")).toHaveText(["List", "Graph"]);
+    await expect(page.locator(".mobile-panel-nav .mobile-panel-tab:visible")).toHaveText(["Variables", "Map"]);
     await page.locator(".explore-row .explore-row-open").first().tap();
     await expect(page.locator("#closeEvidencePane")).toBeVisible();
     await expect(page.locator("#provenancePanel")).toBeVisible();
@@ -599,4 +599,46 @@ test("links the view implies beyond the paths are listed too, as many as the gra
   await arrow.click();
   await expect(page.locator("#provenancePanel")).toBeVisible();
   expect(await page.evaluate(() => window.__dagBuilderState.selectedEdgeId)).toBe(edgeId);
+});
+
+test("on a phone, Identify opens on its setup even when another view was left on its Graph tab", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await open(page, `${viewer}?task=causes`);
+    await pick(page, "category-sleep").tap();
+    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
+    await expect(page.locator("#dagNetwork")).toBeVisible();
+    await page.locator("#taskBar .task-tab[data-task=identify]").tap();
+    // Not a blank screen: the setup is shown, and tapping Identify again changes nothing.
+    await expect(page.locator("#ivGroupPicker")).toBeVisible();
+    await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
+    await page.locator("#taskBar .task-tab[data-task=identify]").tap();
+    await expect(page.locator("#ivGroupPicker")).toBeVisible();
+    // The same from Consequences, and the other views still open on their own panels afterwards.
+    await page.locator("#taskBar .task-tab[data-task=consequences]").tap();
+    await pick(page, "category-income-earnings").tap();
+    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
+    await page.locator("#taskBar .task-tab[data-task=identify]").tap();
+    await expect(page.locator("#ivGroupPicker")).toBeVisible();
+    await page.locator("#taskBar .task-tab[data-task=causes]").tap();
+    await expect(page.locator("#exploreView")).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+test("the table never prints stray text, and shows the choose-a-variable hint alone before anything is chosen", async ({ page }) => {
+  await open(page, `${viewer}?task=consequences`);
+  await page.locator("#dagViewTable").click();
+  await expect(page.locator("#exploreGraphHint")).toBeVisible();
+  await expect(page.locator("#dagTable")).toBeHidden();
+  expect(await page.locator("#dagTable").evaluate(node => node.textContent)).not.toContain("null");
+  await pick(page, "category-income-earnings").click();
+  await expect(page.locator("#dagPathsTable tbody tr").first()).toBeVisible();
+  await expect(page.locator("#exploreGraphHint")).toBeHidden();
+  await expect(page.locator("#dagTable")).toBeVisible();
+  for (const text of ["null", "undefined", "NaN", "[object"]) {
+    expect(await page.locator("#dagTable").evaluate(node => node.textContent)).not.toContain(text);
+  }
 });
