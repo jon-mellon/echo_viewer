@@ -284,7 +284,8 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
       el("p", { class: "dag-table-summary", role: "status", text: model.variableRows.length
         ? `${model.variableRows.length} variables, ${model.pathCount} paths and ${model.otherLinks.length} other links, the same as the graph. Arrows open the evidence for a link.`
         : "Nothing to show yet." }),
-      ...studyTable(), ...pathsTable(), ...otherLinksTable(), ...variablesTable());
+      // Tables return null for a "Show more" line they do not need; replaceChildren would print it as the text "null".
+      ...[...studyTable(), ...pathsTable(), ...otherLinksTable(), ...variablesTable()].filter(Boolean));
     container.scrollTop = scroll;
     // Re-sorting or selecting rebuilds the table; keep the keyboard user where they were.
     if (focused) [...container.querySelectorAll("button")].find(node => node.getAttribute("aria-label") === focused)?.focus();
