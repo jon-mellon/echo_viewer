@@ -657,6 +657,7 @@ h2 {
 }
 
 .dag-body {
+  display: flow-root;
   --app-top: 48px;
   overflow: hidden;
   background: #eef1ed;
