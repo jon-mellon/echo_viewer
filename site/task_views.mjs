@@ -3,7 +3,7 @@ import { causalNeighborhood, MAX_NEIGHBORHOOD_DEPTH } from "./causal_neighborhoo
 
 const TASK_CLASSES = { identify: "task-identify", causes: "task-causes", consequences: "task-consequences" };
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
-const EXPLORE_NAV_LABELS = { controls: "Variables", dag: "Map" };
+const EXPLORE_NAV_LABELS = { controls: "Variables view", dag: "Map view" };
 const IDENTIFY_DEFAULTS = { confounderMaxPathLength: 1, excludeSparseEdges: false, minimumEdgePapers: 2 };
 const clampDepth = value => Math.max(1, Math.min(MAX_NEIGHBORHOOD_DEPTH, Math.trunc(Number(value)) || 1));
 

@@ -577,6 +577,64 @@ test("mobile map controls accept taps and sharing falls back when clipboard acce
   await context.close();
 });
 
+test("mobile map toolbar and footer stay within their panels", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await context.newPage();
+  try {
+    await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+    await page.goto(viewer);
+    await ready(page);
+    await completeSetup(page);
+    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
+    await expect(page.locator("#dagNetwork")).toBeVisible();
+    const layout = await page.evaluate(() => {
+      const header = document.querySelector(".dag-ws-header").getBoundingClientRect();
+      const controls = document.querySelector(".dag-ws-controls");
+      const buttons = [...controls.children].filter(node => getComputedStyle(node).display !== "none")
+        .map(node => node.getBoundingClientRect());
+      const filter = controls.querySelector(".filter-dropdown > summary");
+      const filterText = document.createRange();
+      filterText.selectNodeContents(filter.firstChild);
+      const filterBox = filter.getBoundingClientRect();
+      const textBox = filterText.getBoundingClientRect();
+      const shell = document.querySelector(".dag-shell").getBoundingClientRect();
+      const nav = document.querySelector(".mobile-panel-nav").getBoundingClientRect();
+      const privacy = document.querySelector(".legal-link").getBoundingClientRect();
+      return {
+        top: header.top,
+        taskBottom: document.querySelector("#taskBar").getBoundingClientRect().bottom,
+        overflow: getComputedStyle(document.querySelector(".dag-right-panel")).overflowY,
+        rows: new Set(buttons.map(rect => Math.round(rect.top))).size,
+        inside: buttons.every(rect => rect.left >= header.left - 1 && rect.right <= header.right + 1),
+        filterTextOffset: Math.abs((textBox.top + textBox.bottom) / 2 - (filterBox.top + filterBox.bottom) / 2),
+        footerGap: Math.abs(nav.top - shell.bottom),
+        privacyInsideNav: privacy.top >= nav.top && privacy.bottom <= nav.bottom,
+        privacyClearOfMap: privacy.left >= document.querySelector('.mobile-panel-nav [data-mobile-panel="dag"]').getBoundingClientRect().right,
+      };
+    });
+    expect(layout.top).toBeGreaterThanOrEqual(layout.taskBottom - 1);
+    expect(layout.overflow).toBe("hidden");
+    expect(layout.rows).toBeGreaterThan(1);
+    expect(layout.inside).toBe(true);
+    expect(layout.filterTextOffset).toBeLessThan(2);
+    expect(layout.footerGap).toBeLessThan(2);
+    expect(layout.privacyInsideNav).toBe(true);
+    expect(layout.privacyClearOfMap).toBe(true);
+    await page.setViewportSize({ width: 320, height: 700 });
+    const narrowFooter = await page.evaluate(() => {
+      const shell = document.querySelector(".dag-shell").getBoundingClientRect();
+      const nav = document.querySelector(".mobile-panel-nav").getBoundingClientRect();
+      const privacy = document.querySelector(".legal-link").getBoundingClientRect();
+      const map = document.querySelector('.mobile-panel-nav [data-mobile-panel="dag"]').getBoundingClientRect();
+      return { gap: Math.abs(nav.top - shell.bottom), clear: privacy.left >= map.right };
+    });
+    expect(narrowFooter.gap).toBeLessThan(2);
+    expect(narrowFooter.clear).toBe(true);
+  } finally {
+    await context.close();
+  }
+});
+
 test("bibliography, Markdown, and LaTeX export controls produce downloads", async ({ page }) => {
   // The combined graph can cite hundreds of papers. Enrichment is deliberately
   // rate-limited to five Crossref requests per second and is reused by exports.

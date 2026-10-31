@@ -28,7 +28,7 @@ test("the table follows the diagnostic the graph shows, with the graph's precede
 const anchors = { ivId: "iv", dvId: "dv" };
 const ids = chain => chain.nodes.map(node => node.id);
 
-test("each confounder is one row with its paths to the Ind var and to the Dep var, one link per arrow", () => {
+test("each confounder retains its paths to the Ind var and Dep var, one link per arrow", () => {
   const pathsByGroup = new Map([
     ["c2", { toIv: ["c2", "m", "iv"], toDv: ["c2", "dv"] }],
     ["c1", { toIv: ["c1", "iv"], toDv: ["c1", "dv"] }],
@@ -57,7 +57,7 @@ test("all of a confounder's paths are listed together, its own witness path firs
     "its witness path to the Ind var, then the direct one");
   assert.deepEqual(row.lines.map(line => line[1].nodes.map(node => node.id).join(">") || "-"), ["c2>dv", "c2>m2>dv"],
     "the Dep var side lists the witness path then the alternative, never passing through the Ind var");
-  assert.equal(model.pathCount, 2);
+  assert.equal(model.pathCount, 4);
   // Paths through the other anchor are not alternatives, and a shorter limit drops longer paths.
   const short = dagTableModel({ view: "confounders", groups: withM2, links: more, anchors, maxPathLength: 1,
     pathsByGroup: new Map([["c2", { toIv: ["c2", "m", "iv"], toDv: ["c2", "dv"] }]]) });

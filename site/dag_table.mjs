@@ -56,7 +56,7 @@ export function enumeratePaths(outgoing, fromId, toId, { blocked = [], maxLength
   return found.sort((a, b) => a.length - b.length).slice(0, cap);
 }
 
-/** The path columns each view shows, and where its paths come from. */
+/** The route labels each view shows, and where its paths come from. */
 const PATH_VIEWS = {
   confounders: { fields: ["toIv", "toDv"], headers: ["Path to Ind var", "Path to Dep var"], candidate: "Confounder" },
   exogeneity: { fields: ["toIv", "toDv"], headers: ["Path to Instrument", "Path to Dep var"], candidate: "Common cause" },
@@ -77,8 +77,9 @@ export function pathView({ showExogeneity, showExclusionViolations, showCollider
 /**
  * Rows for the tables. A path is `{ nodes: [{ id, label }], edgeIds }` with one
  * link per hop (null where none is drawn). A row is a candidate (a confounder,
- * say) with a line per pair of its paths, so every path of one candidate sits
- * together; views without candidates have one path per row. `pathsByGroup`
+ * say) with paths paired internally by side. The table renders each path on
+ * its own row, with the candidate cell spanning those rows. Views without
+ * candidates have one path per row. `pathsByGroup`
  * holds the diagnostic's own witness paths by candidate, `exploreRows` the
  * neighborhood's, already in causal order.
  */
@@ -142,7 +143,8 @@ export function dagTableModel({ view, groups, links, pathsByGroup = new Map(), e
   });
   return {
     headers, rows, study, otherLinks, hasPaperColumn, linkById, candidateHeader,
-    pathCount: rows.reduce((total, row) => total + row.lines.length, 0),
+    pathCount: rows.reduce((total, row) => total + (candidateHeader
+      ? row.lines.flat().filter(path => path.nodes.length).length : row.lines.length), 0),
     variableRows: groups.map(group => ({ groupId: group.group_id, label: group.label, role: roleFor(group),
       variables: group.variable_ids?.length || group.member_count || 0, links: linkCounts.get(group.group_id) || 0 })),
   };
@@ -183,8 +185,9 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
   };
 
   /** One path: variable, arrow, variable ...; each arrow opens that link's evidence. */
-  function pathCell(path) {
+  function pathCell(path, routeLabel = null) {
     const cell = el("td", { class: "dag-table-path" });
+    if (routeLabel) cell.append(el("span", { class: "dag-table-route-label", text: routeLabel }));
     path.nodes.forEach((node, index) => {
       if (index > 0) {
         const edgeId = path.edgeIds[index - 1];
@@ -193,10 +196,10 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
           const link = model.linkById.get(edgeId);
           const both = link?.direction_type === "BIDIRECTIONAL";
           const selected = edgeId === selection.edgeId;
-          cell.append(button(both ? "↔" : "→", `Show the evidence for ${from} to ${to}`, () => onOpenEvidence(edgeId),
+          cell.append(button(both ? "⟷" : "⟶", `Show the evidence for ${from} to ${to}`, () => onOpenEvidence(edgeId),
             { class: `text-button dag-table-action dag-table-arrow${selected ? " selected" : ""}`, "data-edge-id": edgeId,
               "aria-pressed": selected ? "true" : "false" }));
-        } else cell.append(el("span", { class: "dag-table-arrow", "aria-hidden": "true", text: "→" }));
+        } else cell.append(el("span", { class: "dag-table-arrow", "aria-hidden": "true", text: "⟶" }));
       }
       cell.append(button(node.label, `Open the definition of ${node.label}`, () => onOpenVariable(node.id),
         { class: "text-button dag-table-action dag-table-node", "data-group-id": node.id }));
@@ -223,20 +226,28 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
 
   function pathsTable() {
     const rows = sortedPathRows(model.rows, sortByPapers && model.hasPaperColumn);
-    const columns = [...(model.candidateHeader ? [headerCell(model.candidateHeader)] : []), ...model.headers.map(text => headerCell(text)),
-      ...(model.hasPaperColumn ? [headerCell("Papers", true, sortByPapers, () => { sortByPapers = !sortByPapers; render(); })] : [])];
+    const columns = model.candidateHeader
+      ? [headerCell(model.candidateHeader), headerCell("Route")]
+      : [...model.headers.map(text => headerCell(text)),
+        ...(model.hasPaperColumn ? [headerCell("Papers", true, sortByPapers, () => { sortByPapers = !sortByPapers; render(); })] : [])];
     const body = el("tbody", {});
     for (const row of rows.slice(0, shownRows)) {
-      row.lines.forEach((line, index) => {
+      const routes = model.candidateHeader
+        ? model.headers.flatMap((header, side) => row.lines.map(line => line[side])
+          .filter(path => path.nodes.length).map(path => ({ header, path })))
+        : row.lines.map(line => ({ line }));
+      routes.forEach((route, index) => {
         const tr = el("tr", { "data-row-id": row.id, class: index === 0 ? "dag-table-first-line" : "" });
-        // One cell for the candidate spans all of its paths, which are listed together.
+        // One cell for the candidate spans every route listed below it.
         if (model.candidateHeader && index === 0) {
-          const cell = el("th", { scope: "row", rowspan: row.lines.length, class: "dag-table-candidate" },
+          const cell = el("th", { scope: "row", rowspan: routes.length, class: "dag-table-candidate" },
             button(row.label, `Open the definition of ${row.label}`, () => onOpenVariable(row.id),
               { class: "text-button dag-table-action dag-table-node", "data-group-id": row.id }));
           tr.append(cell);
         }
-        tr.append(...line.map(path => path.nodes.length ? pathCell(path) : el("td", { text: "–" })));
+        if (model.candidateHeader) {
+          tr.append(pathCell(route.path, route.header.replace(/^Path (to|from) /, (_, direction) => `${direction === "to" ? "To" : "From"} `)));
+        } else tr.append(...route.line.map(path => path.nodes.length ? pathCell(path) : el("td", { text: "–" })));
         if (model.hasPaperColumn) tr.append(el("td", { class: "dag-table-number", text: row.papers === null || row.papers === undefined ? "–" : String(row.papers) }));
         body.append(tr);
       });

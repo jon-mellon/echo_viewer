@@ -258,7 +258,7 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
       tabs: document.querySelector(".task-tabs").scrollWidth - document.querySelector(".task-tabs").clientWidth }));
     expect(sizes.page).toBeLessThanOrEqual(375);
     expect(sizes.tabs).toBe(0);
-    await expect(page.locator(".mobile-panel-nav .mobile-panel-tab:visible")).toHaveText(["Variables", "Map"]);
+    await expect(page.locator(".mobile-panel-nav .mobile-panel-tab:visible")).toHaveText(["Variables view", "Map view"]);
     await page.locator(".explore-row .explore-row-open").first().tap();
     await expect(page.locator("#closeEvidencePane")).toBeVisible();
     await expect(page.locator("#provenancePanel")).toBeVisible();
@@ -267,8 +267,8 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
     await page.locator("#taskBar .task-tab[data-task=identify]").tap();
     await expect(page.locator("#setupSection")).toBeVisible();
     // Identify gets its own tab names back.
-    await expect(page.locator('.mobile-panel-nav [data-mobile-panel="controls"]')).toHaveText("Setup");
-    await expect(page.locator('.mobile-panel-nav [data-mobile-panel="dag"]')).toHaveText("Map");
+    await expect(page.locator('.mobile-panel-nav [data-mobile-panel="controls"]')).toHaveText("Setup view");
+    await expect(page.locator('.mobile-panel-nav [data-mobile-panel="dag"]')).toHaveText("Map view");
   } finally {
     await context.close();
   }
@@ -466,7 +466,7 @@ test("the table also covers Identify and works from the keyboard", async ({ page
   await expect(page.locator("#dagVariablesTable thead th[aria-sort=descending]")).toHaveCount(1);
   await expect(page.locator("#dagVariablesTable thead button").first()).toBeFocused();
   // Identify shows each confounder as a path to the Ind var and a path to the Dep var.
-  await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Confounder", "Path to Ind var", "Path to Dep var"]);
+  await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Confounder", "Route"]);
 });
 
 const shownGraph = async page => {
@@ -601,7 +601,7 @@ test("in Identify each row is a confounder path with an arrow per link that open
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
   await page.locator('#instrumentGroupPicker button[data-select-none]').click();
   await page.locator("#dagViewTable").click();
-  await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Confounder", "Path to Ind var", "Path to Dep var"]);
+  await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Confounder", "Route"]);
   const rows = page.locator("#dagPathsTable tbody tr");
   expect(await rows.count()).toBeGreaterThan(0);
   // A confounder's paths sit together: its name is one cell spanning all of its rows.
@@ -612,18 +612,22 @@ test("in Identify each row is a confounder path with an arrow per link that open
   const order = await rows.evaluateAll(trs => trs.map(tr => tr.dataset.rowId));
   expect(order.filter(id => id === confounder).length).toBe(await own.count());
   expect(order.indexOf(confounder)).toBe(order.lastIndexOf(confounder) - (await own.count()) + 1);
+  const routeRows = await own.evaluateAll(trs => trs.map(tr => ({
+    route: tr.querySelector(".dag-table-route-label")?.textContent.trim(),
+    end: tr.querySelector(".dag-table-path .dag-table-node:last-of-type")?.dataset.groupId,
+  })));
+  expect([...new Set(routeRows.map(item => item.route))]).toEqual(["To Ind var", "To Dep var"]);
+  expect(routeRows.every(item => item.end === anchors[item.route === "To Ind var" ? 0 : 1])).toBe(true);
   const row = rows.first();
-  await expect(row.locator("td")).toHaveCount(2);
-  for (const cell of await row.locator("td").all()) {
+  await expect(row.locator("td")).toHaveCount(1);
+  for (const cell of await own.locator("td").all()) {
     expect(await cell.locator(".dag-table-arrow").count()).toBeGreaterThan(0);
     // Each path starts at the confounder and ends at an anchor.
     await expect(cell.locator(".dag-table-node").first()).toHaveAttribute("data-group-id", /.+/);
   }
-  const ends = await row.locator("td").evaluateAll(cells => cells.map(cell => cell.querySelector(".dag-table-node:last-of-type")?.dataset.groupId));
-  expect(ends).toEqual(anchors);
   // The arrows are the only way into evidence: there is no separate column.
   await expect(page.locator("#dagPathsTable").getByText("Evidence", { exact: true })).toHaveCount(0);
-  const arrow = row.locator("td").nth(1).locator(".dag-table-arrow").last();
+  const arrow = row.locator("td").first().locator(".dag-table-arrow").last();
   const edgeId = await arrow.getAttribute("data-edge-id");
   await arrow.click();
   await expect(page.locator("#provenancePanel")).toBeVisible();
