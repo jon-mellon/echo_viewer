@@ -36,6 +36,8 @@ export function createDagInspectorController({
   const provenancePages = new Map();
   const clearPendingExclude = () => { pendingExclude = null; };
   const diagnosticView = () => ({
+    preferredEvidenceDirection: (state.task === "causes" || state.task === "consequences")
+      ? state.visibleLinks?.find(link => link.edge_id === state.selectedEdgeId)?.direction_type : null,
     showConfoundersOnly: state.showConfoundersOnly,
     showCollidersOnly: state.showCollidersOnly,
     showExclusionViolations: state.showExclusionViolations,
