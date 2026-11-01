@@ -65,7 +65,8 @@ test("a schema published from a Cloudflare page lands in R2 and the D1 registry 
     canonicalPublishedReference(`${FILES}old/memberships/health.tsv`));
 
   // The registry answers for it, and the files read back to the same canonical hash.
-  const row = await lookupPublishedSchema(result.publicationId, null, { source: "cloudflare", apiUrl: API, fetchImpl: w.cloudflare.fetchImpl });
+  // The registry row is read from its static file beside the publication's files, not from the worker.
+  const row = await lookupPublishedSchema(result.publicationId, null, { source: "cloudflare", fetchImpl: w.readFetch });
   assert.equal(row.content_hash, result.contentHash);
   assert.equal(row.storage_prefix, prefix.slice(0, -1));
   const loaded = await loadGroupingSchemaFolder(`${FILES}${prefix}`, w.readFetch);
@@ -144,15 +145,35 @@ test("a published schema that references its parent's files loads and verifies, 
   const result = await publish(w, changed);
   const savedLocation = globalThis.location, savedFetch = globalThis.fetch;
   globalThis.location = new URL("https://echo.test/?schema_source=cloudflare");
-  // The registry is read with the page's fetch, the files with the one passed in.
-  globalThis.fetch = (url, init) => w.cloudflare.fetchImpl(url, init);
+  // The registry row is a static file, read with the page's fetch like the files; no call reaches the worker.
+  const workerCalls = [];
+  globalThis.fetch = (url, init) => String(url).startsWith(FILES) ? w.readFetch(url) : (workerCalls.push(String(url)), w.cloudflare.fetchImpl(url, init));
   try {
     const published = await loadPublishedSchema(result.publicationId, null, w.readFetch);
     const loaded = await published.loadSchema();
     assert.deepEqual(loaded.schema.groups.find(item => item.group_id === "health").variable_ids, ["c"], "a parent's file, by reference");
     assert.deepEqual(loaded.schema.groups.find(item => item.group_id === "verbal").variable_ids, ["a"], "its own file");
+    assert.deepEqual(workerCalls, [], "reading a publication needs no worker request");
   } finally {
     globalThis.location = savedLocation;
     globalThis.fetch = savedFetch;
   }
+});
+
+test("a registry row is only accepted for the publication asked for, and with the fields the viewer relies on", async () => {
+  const good = { id: PARENT, owner_id: "o", content_hash: "h".repeat(64), title: "T", storage_prefix: "o/p" };
+  const serve = body => async () => body === null ? new Response(null, { status: 404 }) : new Response(JSON.stringify(body));
+  const read = (body, id = PARENT) => lookupPublishedSchema(id, null, { source: "cloudflare", fetchImpl: serve(body) });
+  assert.deepEqual(await read(good), good);
+  await assert.rejects(read(null), /No published schema.*HTTP 404/);
+  await assert.rejects(read({ ...good, id: "00000000-0000-4000-8000-0000000000aa" }), /not valid/, "another publication's row");
+  for (const field of ["owner_id", "content_hash", "title", "storage_prefix"]) {
+    await assert.rejects(read({ ...good, [field]: "" }), /not valid/, field);
+  }
+  await assert.rejects(read("a string"), /not valid/);
+  await assert.rejects(lookupPublishedSchema("nope", null, { source: "cloudflare", fetchImpl: serve(good) }), /Invalid schema publication ID/);
+  // The static file is found beside the publication's other files.
+  const urls = [];
+  await lookupPublishedSchema(PARENT.toUpperCase(), null, { source: "cloudflare", fetchImpl: async url => { urls.push(String(url)); return new Response(JSON.stringify(good)); } });
+  assert.deepEqual(urls, [`${FILES}_registry/${PARENT}.json`], "lower-cased, under published-schemas/_registry/");
 });

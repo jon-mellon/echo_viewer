@@ -78,7 +78,15 @@ test("a publication is reserved, written file by file into R2, then registered a
   assert.equal(finished.status, 201);
   const { row } = await finished.json();
   assert.equal(row.storage_prefix, `${owner}/${id(1)}`);
-  assert.deepEqual([...env.BUCKET.objects.keys()].sort(), Object.keys(files).map(path => `published-schemas/${owner}/${id(1)}/${path}`).sort());
+  const registryFile = `published-schemas/_registry/${id(1)}.json`;
+  assert.deepEqual([...env.BUCKET.objects.keys()].filter(key => key !== registryFile).sort(),
+    Object.keys(files).map(path => `published-schemas/${owner}/${id(1)}/${path}`).sort());
+  // The registry row is also a static file, identical to what the API answers, cached like the other files.
+  const staticRow = JSON.parse(new TextDecoder().decode(env.BUCKET.objects.get(registryFile).bytes));
+  assert.deepEqual(staticRow, await (await call("GET", `/v1/schemas/${id(1)}`)).json());
+  assert.equal(env.BUCKET.objects.get(registryFile).httpMetadata.cacheControl, "public, max-age=31536000, immutable");
+  assert.equal("total_bytes" in staticRow, false);
+  assert.equal(staticRow.created_at, new Date(NOW * 1000).toISOString());
   const stored = env.BUCKET.objects.get(`published-schemas/${owner}/${id(1)}/manifest.json`);
   assert.deepEqual(stored.bytes, files["manifest.json"]);
   assert.equal(stored.httpMetadata.cacheControl, "public, max-age=31536000, immutable");
@@ -330,4 +338,23 @@ test("the whole service has a daily byte allowance that no number of owners or a
   assert.equal((await small(2)).status, 429, "then everyone is refused until the next day");
   const other = await newOwner(call, "4.4.4.4");
   assert.equal((await call("POST", "/v1/publications", { body: declaredBytes(3, 400), headers: authed(other), address: "4.4.4.4" })).status, 429);
+});
+
+test("finishing can be retried after registering failed: the static row is kept and the registry then agrees with it", async () => {
+  const { env, call } = setup();
+  const token = await newOwner(call);
+  await call("POST", "/v1/publications", { body: startBody(), headers: authed(token) });
+  for (const [path, bytes] of Object.entries(files)) await put(call, token, 1, path, bytes);
+  // The first finish writes the static row, then the registry insert fails.
+  env.DB.raw.exec("alter table published_schemas rename to published_schemas_away");
+  const failed = await call("POST", `/v1/publications/${id(1)}/finish`, { headers: authed(token) });
+  assert.equal(failed.status, 500);
+  const registryFile = `published-schemas/_registry/${id(1)}.json`;
+  const first = env.BUCKET.objects.get(registryFile).bytes;
+  env.DB.raw.exec("alter table published_schemas_away rename to published_schemas");
+  // A later finish (a different moment) leaves the static row alone, and D1 holds the same created_at.
+  const retried = await call("POST", `/v1/publications/${id(1)}/finish`, { headers: authed(token), now: NOW + 600 });
+  assert.equal(retried.status, 201);
+  assert.deepEqual(env.BUCKET.objects.get(registryFile).bytes, first, "never rewritten");
+  assert.equal((await (await call("GET", `/v1/schemas/${id(1)}`)).json()).created_at, JSON.parse(new TextDecoder().decode(first)).created_at);
 });

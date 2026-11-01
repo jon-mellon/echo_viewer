@@ -10,8 +10,14 @@ Reads of the files stay on `https://data.epistemicinfra.org/published-schemas/..
 | `POST /v1/publications` | owner | reserves a publication and the exact files it may write (or returns the owner's earlier publication of the same content) |
 | `PUT /v1/publications/:id/files/*` | owner | writes one declared file, **create-only** (a written file is never replaced) |
 | `POST /v1/publications/:id/finish` | owner | checks every declared file is present at its size, then registers the publication |
-| `GET /v1/schemas/:id` | anyone | the registry row |
+| `GET /v1/schemas/:id` | anyone | the registry row (the viewer reads the same row from a static file instead, see below) |
 | `GET /v1/splits?group_id=…` | anyone | approved splits that include a source group |
+
+**Reads need no Worker.** When a publication finishes, the Worker also writes its registry row to
+`published-schemas/_registry/<id>.json` (create-only, immutable, cached like the files), and the viewer reads that
+file on pages that read from Cloudflare. A page load therefore makes no Worker request; only publishing and the
+splits list do. `harvest_abstracts` `write_registry_rows_r2.py` writes the rows of publications that already
+existed (Supabase's 31, plus any made through the Worker before this was added; pass them with `--also`).
 
 Clients cannot delete or replace anything. Limits (in `src/index.mjs`):
 

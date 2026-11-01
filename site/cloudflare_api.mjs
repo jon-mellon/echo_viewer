@@ -1,5 +1,6 @@
 import { CLOUDFLARE_API_URL, TURNSTILE_SITE_KEY } from "./cloudflare_config.mjs";
 import { solveTurnstile } from "./turnstile.mjs";
+import { publishedFileUrl } from "./schema_source.mjs";
 
 // Client for the publishing worker (cloudflare/publish-worker/README.md lists its routes).
 const OWNER_KEY = "echo-owner-token";
@@ -34,8 +35,20 @@ export async function ensureOwner({ apiUrl = CLOUDFLARE_API_URL, fetchImpl = glo
   return owner;
 }
 
-export async function getSchema(publicationId, { apiUrl = CLOUDFLARE_API_URL, fetchImpl = globalThis.fetch.bind(globalThis) } = {}) {
-  return (await request(apiUrl, fetchImpl, `/v1/schemas/${publicationId}`)).json();
+/**
+ * A publication's registry row. It is a static file beside the publication's other files (the worker writes it when
+ * the publication finishes), so reading it needs no worker and is cached like them. The row is checked to be for
+ * the publication asked for; the files it points at are verified by their content hash when they are read.
+ */
+const ROW_FIELDS = ["id", "owner_id", "content_hash", "title", "storage_prefix"];
+export async function getPublishedRow(publicationId, { fetchImpl = globalThis.fetch.bind(globalThis) } = {}) {
+  const response = await fetchImpl(publishedFileUrl(`_registry/${publicationId.toLowerCase()}.json`, "cloudflare"));
+  if (!response.ok) throw new Error(`No published schema ${publicationId} (HTTP ${response.status}).`);
+  const row = await response.json();
+  if (!row || row.id !== publicationId.toLowerCase() || ROW_FIELDS.some(field => typeof row[field] !== "string" || !row[field])) {
+    throw new Error(`The registry row for ${publicationId} is not valid.`);
+  }
+  return row;
 }
 
 export async function getSplits(groupId, { apiUrl = CLOUDFLARE_API_URL, fetchImpl = globalThis.fetch.bind(globalThis) } = {}) {
