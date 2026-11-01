@@ -230,11 +230,14 @@ test("mobile reset keeps the previous project after navigating", async ({ browse
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
+    // A slow phone reaches Reset before start-up has finished; the reset must wait for it, not fail.
+    await page.context().newCDPSession(page).then(cdp => cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 }));
     await open(page, `${viewer}?task=causes`);
     await pick(page, "category-sleep").tap();
     await page.locator("#taskReset").tap();
     await page.locator("#resetHere").tap();
-    await expect(page.locator("#taskLanding")).toBeVisible();
+    await expect(page.locator("#taskLanding")).toBeVisible({ timeout: 60000 });
+    await expect(page.locator("#resetError")).toBeHidden();
     expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
     await expect.poll(() => page.evaluate(async () => {
       const { listPreviousSessions } = await import("/local_schema_store.mjs");
@@ -312,7 +315,7 @@ test("the start page preloads the search catalog and query engine", async ({ pag
     && performance.getEntriesByName("echo:evidence:engine").length, null, { timeout: 90000 });
 });
 
-test("mobile home stays on one document and a clean URL through schema hydration", async ({ browser }) => {
+test("mobile home stays on one document while evidence warms in the background", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
@@ -323,7 +326,11 @@ test("mobile home stays on one document and a clean URL through schema hydration
     await expect(page.locator("#taskLanding")).toBeVisible();
     expect(page.url()).toBe(viewer);
     expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
-    expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:engine").length)).toBe(0);
+    await page.waitForFunction(() => performance.getEntriesByName("echo:evidence:engine").length > 0);
+    expect(page.url()).toBe(viewer);
+    expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
+    await expect(page.locator("#startupLoading")).toBeHidden();
+    await expect(page.locator("#taskLanding")).toBeVisible();
     await page.locator("#taskLanding .task-choice[data-task=causes]").tap();
     await expect(page.locator("#exploreView")).toBeVisible();
   } finally {

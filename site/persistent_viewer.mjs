@@ -12,6 +12,8 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
   let editorBaseline = null;
   let urlTimer = null;
   let ready = false;
+  let markReady;
+  const whenReady = new Promise(resolve => { markReady = resolve; });
   let commitPending = null;
   let unsavedSchema = false;
   let sessionId = null;
@@ -48,6 +50,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
   function start() {
     committedSchema = structuredClone(getSchema());
     ready = true;
+    markReady();
     let pending = null;
     try { pending = JSON.parse(sessionStorage.getItem("echo-pending-session-restore") || "null"); }
     catch { /* An invalid handoff starts an independent session. */ }
@@ -235,7 +238,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     status("Definition draft remains in memory");
   }
 
-  return { setLoadedRecord, start, beginEditor, discardEditor, finishEditor, markPublished,
+  return { setLoadedRecord, start, whenReady: () => whenReady, beginEditor, discardEditor, finishEditor, markPublished,
     saveIndependentCopy,
     clearSaveFailure,
     commitDecision, viewerChanged, flushUrl, prepareReset, currentUrl,
