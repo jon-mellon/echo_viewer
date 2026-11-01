@@ -211,7 +211,7 @@ function tableRole(group) {
 
 async function renderDagTable(groups, links) {
   _dagTable ||= createDagTable({ container: els.dagTable, onOpenVariable: openVariable, onOpenEvidence: openEvidence });
-  const studyLinks = studyDesignEdgeData(groups, state.project).map(edge => ({
+  const studyLinks = studyDesignEdgeData(groups, state.project, state.task).map(edge => ({
     edgeId: edge.id, sourceId: edge.from, targetId: edge.to,
     note: edge.id === STUDY_DESIGN_EDGE_ID ? "Study relationship" : "Study instrument",
   }));
@@ -598,7 +598,7 @@ async function applyDagRender(groups, layout, routes) {
   _dagBoundsCache = null;
   const previousNodeData = _dagNodeDataById;
   _dagNodeDataById = new Map(nodeData.map(node => [node.id, node]));
-  edgeData.push(...studyDesignEdgeData(groups, state.project));
+  edgeData.push(...studyDesignEdgeData(groups, state.project, state.task));
   _dagEdgeSegments = edgeSegments;
   _renderedSelectedEdgeId = state.selectedEdgeId;
 

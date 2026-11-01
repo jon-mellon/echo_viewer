@@ -88,6 +88,8 @@ test("selected instrument adds a matching study link alongside the existing IV t
   assert.equal(edges[0].color.color, edges[1].color.color);
   assert.equal(edges[0].width, edges[1].width);
   assert.equal(studyDesignEdgeData(groups, { ...project, instrument_group_id: null }).length, 1);
+  assert.deepEqual(studyDesignEdgeData(groups, project, "causes"), []);
+  assert.deepEqual(studyDesignEdgeData(groups, project, "consequences"), []);
 });
 
 test("exogeneity colors common causes while keeping the three study anchors", () => {
