@@ -44,7 +44,7 @@ try {
       window.__exploreObserver.observe({ type: 'longtask', buffered: true });
     });
     const cdp = await context.newCDPSession(page);
-    if (mobile) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    if (mobile) await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.PROFILE_CPU_RATE || 4) });
     // Optional slow network for the data requests, e.g. PROFILE_NETWORK_LATENCY_MS=100 PROFILE_NETWORK_KBPS=2500.
     if (process.env.PROFILE_NETWORK_LATENCY_MS || process.env.PROFILE_NETWORK_KBPS) {
       const kbps = Number(process.env.PROFILE_NETWORK_KBPS || 0);
