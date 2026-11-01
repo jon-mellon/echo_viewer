@@ -487,9 +487,12 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   async function resumeAfterOAuth() {
     const oauthDraft = jevAssist.takeResumeDraft();
-    // Saved checkpoints are not resumed at startup: only the OAuth handoff or an
-    // already-open draft is. Otherwise an old run resurfaces unprompted.
-    const draft = oauthDraft || state.definitionDraft;
+    const checkpointDraft = !oauthDraft && !state.definitionDraft
+      ? await jevAssist.latestResumeDraft().catch(error => {
+        console.warn("Could not read saved Jev draft.", error);
+        return null;
+      }) : null;
+    const draft = oauthDraft || state.definitionDraft || checkpointDraft;
     if (!draft || !["sources", "partition"].includes(draft.step) || !Array.isArray(draft.eligible_variable_ids)) return;
     // A source-step draft is resumed here only when it belongs to the OAuth
     // handoff. Startup may otherwise race with a newly opened manual draft.
@@ -499,7 +502,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       const current = groupById(snap.group_id);
       return current && JSON.stringify(current.variable_ids) === JSON.stringify(snap.variable_ids);
     })) return;
-    if (oauthDraft) {
+    if (oauthDraft || checkpointDraft) {
       state.definitionDraft = draft;
       state.selectedVariableIds = new Set(draft.new_variable_ids || []);
     }
