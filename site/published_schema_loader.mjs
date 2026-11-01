@@ -1,3 +1,4 @@
+import { SCHEMA_SOURCE_PARAM, schemaSource, schemaSourceRequested } from "./schema_source.mjs";
 import { supabase } from "./supabase_client.mjs";
 import { PRODUCTION_APP_ORIGIN } from "./dag_data_config.mjs";
 import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
@@ -50,6 +51,8 @@ export function publicationPermalink(publicationId, location = globalThis.locati
       }))
     : new URL(base);
   url.searchParams.delete("schema_url");
+  // A page that named its schema source keeps naming it in the links it shares.
+  if (schemaSourceRequested(location)) url.searchParams.set(SCHEMA_SOURCE_PARAM, schemaSource(location));
   url.searchParams.set("schema", publicationId);
   return url.href;
 }

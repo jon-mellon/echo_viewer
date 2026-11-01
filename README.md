@@ -119,6 +119,19 @@ Disconnecting removes the key from app memory; the OpenRouter key-settings link
 remains available for revocation. Refreshing the page also clears the key from
 app memory.
 
+## Published schema source
+
+Published schema files are read from Supabase Storage by default. Add
+`?schema_source=cloudflare` to read the same files (same keys, byte for byte) from the
+R2 bucket behind `data.epistemicinfra.org/published-schemas/`; links and fresh projects
+made from that page keep the parameter. Publishing still writes to Supabase, and the
+registry stays there. Copy the files to R2 with `mirror_published_schemas_r2.py` in
+harvest_abstracts (`analysis/10k/echo_viewer_bundle`), and rerun it after publishing a
+schema until Cloudflare is the default. The default is `DEFAULT_SCHEMA_SOURCE` in
+`site/schema_source.mjs`. Browser tests answer the Cloudflare address with Supabase's
+copy (through the disk cache) so they need no mirror; set `ECHO_REAL_CLOUDFLARE=1` to
+use the real one.
+
 ## Performance profiling
 
 Run `npm run profile` to start a local preview and measure startup, definition

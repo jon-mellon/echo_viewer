@@ -1,5 +1,6 @@
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contracts.mjs";
 import { validateGroupingSchema } from "./data_validation.mjs";
+import { publishedReferenceUrl } from "./schema_source.mjs";
 /** @typedef {import("./app_contracts.mjs").GroupingSchema} GroupingSchema */
 const LIST_COLUMNS = new Set(["member_variable_ids", "previous_group_ids"]);
 
@@ -138,10 +139,9 @@ export async function loadGroupingSchemaStructure(baseUrl, fetchImpl = fetch) {
     const membershipRows = await mapWithConcurrency(wanted, 16, async groupId => {
       const relative = manifest.group_membership_files[groupId];
       const reference = manifest.group_membership_references?.[groupId];
-      const url = new URL(reference || relative, base);
-      if (reference && (url.origin !== base.origin || !url.pathname.startsWith("/storage/v1/object/public/published-schemas/"))) {
-        throw new Error(`Invalid published membership reference for ${groupId}.`);
-      }
+      // A parent's file is named by its Supabase address in the manifest; read it from the same source as this schema.
+      const url = reference ? publishedReferenceUrl(reference, base) : new URL(relative, base);
+      if (!url) throw new Error(`Invalid published membership reference for ${groupId}.`);
       return { groupId, rows: parseTsv(await fetchText(url, fetchImpl), relative) };
     });
     for (const { groupId, rows } of membershipRows) {
