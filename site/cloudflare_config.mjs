@@ -1,4 +1,4 @@
-// Public settings for the Cloudflare publishing worker (cloudflare/publish-worker). Both are public values.
+// Public settings for the Cloudflare publishing service (see docs/publishing-api.md). Both are public values.
 // On a `?schema_source=cloudflare` page the registry and publishing go through the worker. If either value is blank,
 // the registry stays on Supabase and publishing from a Cloudflare page is refused rather than quietly writing to Supabase.
 export const CLOUDFLARE_API_URL = "https://echo-api.epistemicinfra.org";
