@@ -13,11 +13,16 @@ Reads of the files stay on `https://data.epistemicinfra.org/published-schemas/..
 | `GET /v1/schemas/:id` | anyone | the registry row |
 | `GET /v1/splits?group_id=…` | anyone | approved splits that include a source group |
 
-Clients cannot delete or replace anything. Limits (in `src/index.mjs`): 500 files, 25 MB a file,
-120 MB a publication, 30 publications per owner and 60 per address per day, 500 a day overall,
-20 new owners per address per hour. An hourly cron deletes the files of uploads that never
-finished. The viewer checks content hashes when it reads, so the worker bounds what can be
-written and does not recompute the hash.
+Clients cannot delete or replace anything. Limits (in `src/index.mjs`):
+
+- **Size:** 500 files, 16 MB a file, 30 MB a publication (the largest real publication is about 10.5 MB, the median about 1 MB).
+- **Publications per day:** 30 per owner, 60 per address, 500 overall; 20 new owners per address per hour.
+- **Bytes reserved per day** (an abandoned upload counts): 150 MB per owner, 300 MB per address, 2 GB overall, so a flood of owners cannot fill the bucket.
+- **Storage ceiling:** publishing pauses (HTTP 507) once all published schemas plus open uploads hold `MAX_PUBLISHED_BYTES` (3 GB; set in `wrangler.toml`). Raise it there and redeploy to resume.
+
+An hourly cron deletes the files of uploads that never finished. Also set a Cloudflare billing
+alert on the account as a backstop. The viewer checks content hashes when it reads, so the
+worker bounds what can be written and does not recompute the hash.
 
 ## One-time setup
 
