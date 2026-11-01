@@ -10,8 +10,14 @@ Reads of the files stay on `https://data.epistemicinfra.org/published-schemas/..
 | `POST /v1/publications` | owner | reserves a publication and the exact files it may write (or returns the owner's earlier publication of the same content) |
 | `PUT /v1/publications/:id/files/*` | owner | writes one declared file, **create-only** (a written file is never replaced) |
 | `POST /v1/publications/:id/finish` | owner | checks every declared file is present at its size, then registers the publication |
-| `GET /v1/schemas/:id` | anyone | the registry row |
+| `GET /v1/schemas/:id` | anyone | the registry row (the viewer reads the same row from a static file instead, see below) |
 | `GET /v1/splits?group_id=…` | anyone | approved splits that include a source group |
+
+**Reads need no Worker.** When a publication finishes, the Worker also writes its registry row to
+`published-schemas/_registry/<id>.json` (create-only, immutable, cached like the files), and the viewer reads that
+file on pages that read from Cloudflare. A page load therefore makes no Worker request; only publishing and the
+splits list do. `harvest_abstracts` `write_registry_rows_r2.py` writes the rows of publications that already
+existed (Supabase's 31, plus any made through the Worker before this was added; pass them with `--also`).
 
 Clients cannot delete or replace anything. Limits (in `src/index.mjs`):
 
@@ -20,7 +26,7 @@ Clients cannot delete or replace anything. Limits (in `src/index.mjs`):
 - **Bytes reserved per day** (an abandoned upload counts): 150 MB per owner, 300 MB per address, 2 GB overall, so a flood of owners cannot fill the bucket.
 - **Storage ceiling:** publishing pauses (HTTP 507) once all published schemas plus open uploads hold `MAX_PUBLISHED_BYTES` (3 GB; set in `wrangler.toml`). Raise it there and redeploy to resume.
 
-An hourly cron deletes the files of uploads that never finished. Also set a Cloudflare billing
+The hourly clean-up of uploads that never finished is written but switched off: Cloudflare only allows cron triggers once the account has a workers.dev subdomain (register one in the dashboard, then uncomment `[triggers]` in `wrangler.toml`). Until then abandoned uploads are small leftovers that count against the daily byte allowance. Also set a Cloudflare billing
 alert on the account as a backstop. The viewer checks content hashes when it reads, so the
 worker bounds what can be written and does not recompute the hash.
 

@@ -3,14 +3,16 @@ const { test, expect } = require("./fixtures.cjs");
 const viewer = "http://127.0.0.1:8767/";
 const CLOUDFLARE = "https://data.epistemicinfra.org/published-schemas/";
 const SUPABASE_STORAGE = "/storage/v1/object/public/published-schemas/";
+const REGISTRY_FILE = "/published-schemas/_registry/";
 
 // Counts published-schema requests by where they went. (Tests answer the Cloudflare address with Supabase's copy
 // of the same file, standing in for the mirror; see tests/support/supabase_cache.cjs.)
 function watchSources(page) {
-  const seen = { cloudflare: new Set(), supabase: new Set(), workerRegistry: new Set(), supabaseRegistry: new Set() };
+  const seen = { cloudflare: new Set(), supabase: new Set(), workerRegistry: new Set(), supabaseRegistry: new Set(), staticRegistry: new Set() };
   page.on("request", request => {
     const url = request.url();
-    if (url.startsWith(CLOUDFLARE)) seen.cloudflare.add(url);
+    if (url.startsWith(CLOUDFLARE) && url.includes(REGISTRY_FILE)) seen.staticRegistry.add(url);
+    else if (url.startsWith(CLOUDFLARE)) seen.cloudflare.add(url);
     else if (url.includes(SUPABASE_STORAGE)) seen.supabase.add(url);
     else if (url.startsWith("https://echo-api.epistemicinfra.org/v1/")) seen.workerRegistry.add(url);
     else if (url.includes("/rest/v1/published_schemas")) seen.supabaseRegistry.add(url);
@@ -41,8 +43,9 @@ test("?schema_source=cloudflare reads the same files from Cloudflare and keeps t
   await open(page, `${viewer}?task=causes&schema_source=cloudflare`);
   expect(seen.cloudflare.size).toBeGreaterThan(10);
   expect(seen.supabase.size).toBe(0);
-  // The registry comes from the worker, not Supabase's table.
-  expect([...seen.workerRegistry].some(url => url.includes("/v1/schemas/"))).toBe(true);
+  // The registry row is a static file beside the files: no worker request and no Supabase table read.
+  expect(seen.staticRegistry.size).toBe(1);
+  expect(seen.workerRegistry.size).toBe(0);
   expect(seen.supabaseRegistry.size).toBe(0);
   // The viewer works from it: choose a variable and read its causes.
   await page.locator('#focusGroupPicker button[data-group-id="category-sleep"]').click();

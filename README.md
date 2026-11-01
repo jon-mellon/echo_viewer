@@ -124,8 +124,9 @@ app memory.
 Published schema files are read from Supabase Storage by default. Add
 `?schema_source=cloudflare` to read the same files (same keys, byte for byte) from the
 R2 bucket behind `data.epistemicinfra.org/published-schemas/`; links and fresh projects
-made from that page keep the parameter. Publishing still writes to Supabase, and the
-registry stays there. Copy the files to R2 with `mirror_published_schemas_r2.py` in
+made from that page keep the parameter. On a Cloudflare page a publication's registry row is the static file
+`published-schemas/_registry/<id>.json` beside its files (no Worker request), and publishing goes through the Worker
+(`cloudflare/publish-worker`). On the default source, publishing and the registry stay on Supabase. Copy the files to R2 with `mirror_published_schemas_r2.py` in
 harvest_abstracts (`analysis/10k/echo_viewer_bundle`), and rerun it after publishing a
 schema until Cloudflare is the default. The default is `DEFAULT_SCHEMA_SOURCE` in
 `site/schema_source.mjs`. Browser tests and the profile scripts keep published schema files on disk (`tests/support/supabase_cache.cjs`),

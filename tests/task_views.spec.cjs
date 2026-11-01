@@ -607,7 +607,9 @@ test("in Identify each row is a confounder path with an arrow per link that open
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
   await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await expect(page.locator("#diagnosticOverlapKey")).toBeVisible();
   await page.locator("#dagViewTable").click();
+  await expect(page.locator("#diagnosticOverlapKey")).toBeHidden();
   await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Confounder", "Route"]);
   const rows = page.locator("#dagPathsTable tbody tr");
   expect(await rows.count()).toBeGreaterThan(0);
@@ -643,6 +645,22 @@ test("in Identify each row is a confounder path with an arrow per link that open
   // Switching back restores the graph.
   await page.locator("#dagViewGraph").click();
   await expect(page.locator("#dagNetwork")).toBeVisible();
+  await expect(page.locator("#diagnosticOverlapKey")).toBeVisible();
+  // The study arrow must not carry over when the same schema is explored from one focal variable.
+  for (const [task, focus] of [["causes", "category-sleep"], ["consequences", "category-income-earnings"]]) {
+    await page.locator(`#taskBar .task-tab[data-task=${task}]`).click();
+    await pick(page, focus).click();
+    await page.locator("#dagViewGraph").click();
+    expect(await renderedEdges(page)).toBeGreaterThan(0);
+    const hasStudyArrow = await page.evaluate(async () => {
+      const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+      return api.renderedDagEdgeIds().includes("__study_design_iv_to_dv__");
+    });
+    expect(hasStudyArrow).toBe(false);
+    await page.locator("#dagViewTable").click();
+    await expect(page.locator("#dagPathsTable tbody tr").first()).toBeVisible();
+    await expect(page.locator("#dagStudyTable")).toHaveCount(0);
+  }
 });
 
 test("links the view implies beyond the paths are listed too, as many as the graph draws", async ({ page }) => {

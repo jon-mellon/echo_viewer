@@ -3006,6 +3006,7 @@ h2 {
   pointer-events: none;
 }
 .diagnostic-overlap-key[hidden] { display: none; }
+#dagTable:not([hidden]) ~ .diagnostic-overlap-key { display: none; }
 .diagnostic-key-item { display: inline-flex; align-items: center; gap: 6px; }
 .diagnostic-key-swatch { width: 15px; height: 15px; border-radius: 3px; }
 .collider-key .diagnostic-key-fill, .confounder-key .diagnostic-key-outline { background: #c62828; }

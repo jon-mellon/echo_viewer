@@ -3,7 +3,7 @@
 //   POST /v1/publications                (owner)     -> reserve a publication and the files it may write
 //   PUT  /v1/publications/:id/files/*    (owner)     -> write one declared file, create-only, into R2
 //   POST /v1/publications/:id/finish     (owner)     -> check the files are all there, then register it
-//   GET  /v1/schemas/:id                             -> the registry row
+//   GET  /v1/schemas/:id                             -> the registry row (also a static file in R2, which the viewer reads)
 //   GET  /v1/splits?group_id=...                     -> approved splits that include a source group
 // Files are written once and never replaced or deleted by clients, so published
 // schemas stay immutable. The viewer verifies content hashes when it reads them, so
@@ -134,6 +134,8 @@ function validatePublication(body) {
 /** The registry row as clients see it: the byte count is the worker's own bookkeeping. */
 const publicRow = ({ total_bytes: _bytes, ...row }) => row;
 const contentTypeOf = path => CONTENT_TYPES[path.split(".").pop()] || "application/octet-stream";
+/** Where a publication's registry row is also kept as a static file, so reading it needs no Worker and is cached like the files. */
+const registryKey = (env, id) => `${env.OBJECT_PREFIX || "published-schemas/"}_registry/${id}.json`;
 const objectKey = (env, prefix, path) => `${env.OBJECT_PREFIX || "published-schemas/"}${prefix}/${path}`;
 
 async function startPublication(request, env, now, address) {
@@ -167,6 +169,7 @@ async function startPublication(request, env, now, address) {
     compiled_manifest_path: body.row.compiled_manifest_path ?? null,
     compiled_manifest_hash: body.row.compiled_manifest_hash ?? null, compiler_version: body.compilerVersion,
     total_bytes: body.totalBytes,
+    created_at: new Date(now * 1000).toISOString(),   // fixed here so the static row and D1 agree, even if finishing is retried
   };
   await env.DB.prepare(
     "insert into publication_uploads (id, owner_id, content_hash, row_json, files_json, total_bytes, expires_at) values (?, ?, ?, ?, ?, ?, ?)")
@@ -212,12 +215,15 @@ async function finishPublication(request, env, id, now) {
   const missing = upload.files.filter(file => present.get(file.path) !== file.size).map(file => file.path);
   if (missing.length) return json({ error: "incomplete", message: "Some files are missing or the wrong size.", missing: missing.slice(0, 20) }, 409);
   const row = upload.row;
+  // The static copy goes first, create-only: if registering then fails, finishing can be retried and finds it already there.
+  await env.BUCKET.put(registryKey(env, row.id), JSON.stringify(publicRow(row)),
+    { onlyIf: { etagDoesNotMatch: "*" }, httpMetadata: { contentType: "application/json", cacheControl: CACHE_CONTROL } });
   await env.DB.batch([
     env.DB.prepare(
       "insert into published_schemas (id, owner_id, content_hash, title, description, evidence_snapshot, storage_prefix, parent_schema_id, "
-      + "compiled_manifest_path, compiled_manifest_hash, compiler_version, total_bytes) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      + "compiled_manifest_path, compiled_manifest_hash, compiler_version, total_bytes, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .bind(row.id, row.owner_id, row.content_hash, row.title, row.description, row.evidence_snapshot, row.storage_prefix,
-        row.parent_schema_id, row.compiled_manifest_path, row.compiled_manifest_hash, row.compiler_version, row.total_bytes),
+        row.parent_schema_id, row.compiled_manifest_path, row.compiled_manifest_hash, row.compiler_version, row.total_bytes, row.created_at),
     env.DB.prepare("delete from publication_uploads where id = ?").bind(row.id),
   ]);
   return json({ row: publicRow(row) }, 201);
