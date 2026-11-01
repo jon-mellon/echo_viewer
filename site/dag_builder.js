@@ -1894,6 +1894,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
     publicationController.workingCopyChanged();
   },
   onCommitFailureRestored: () => persistentViewer.clearSaveFailure(),
+  onFocusDefined: groupId => taskViews.chooseFocus(groupId),
   onInstrumentReady: () => shellController.showMobilePanel("dag"),
   prewarmEvidence: async () => {
     if (await dagDataSource.prewarmVariableMap(state.variableLayoutSource)) return;

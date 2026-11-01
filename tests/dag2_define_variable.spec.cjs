@@ -899,3 +899,52 @@ test("Label 50 more appends to the list, sorts new first, and Name and review sk
     await context.close();
   }
 });
+
+test("Causes offers Define a variable and the new variable becomes the focus without changing the anchors", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page, { warnings: true });
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem("dag2-test-initialized")) {
+      localStorage.clear();
+      sessionStorage.setItem("dag2-test-initialized", "1");
+    }
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+  });
+  await page.goto("http://127.0.0.1:8767/?task=causes", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+
+  const define = page.locator("#focusGroupPicker [data-define-focus]");
+  await expect(define).toBeVisible();
+  const anchorsBefore = await page.evaluate(() => {
+    const { iv_group_id, dv_group_id } = window.__dagBuilderState.project;
+    return { iv_group_id, dv_group_id };
+  });
+  await define.click();
+  await page.locator("#definitionChooseManual").click();
+  const usable = page.locator("#definitionSourceList input[data-source-id]");
+  await expect(usable.nth(0)).toBeVisible();
+  await usable.nth(0).check();
+  await page.locator("#definitionContinue").click();
+  await expect(page.locator("body"), browserErrors.errors.join("\n")).toHaveClass(/defining-variable/);
+  await page.locator("#definitionMethodManual").click();
+  const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
+  await page.locator("#definitionVariableSearch").fill(variableId);
+  await page.locator("#definitionVariableResults .result-button").first().click();
+  await page.locator("#definitionReview").click();
+  await page.locator("#definitionNewLabel").fill("Browser focus construct");
+  await page.locator("#definitionNewDescription").fill("A browser test construct defined from the causes view.");
+  const residuals = page.locator("#definitionResidualLabels input[data-residual-id]");
+  for (let i = 0; i < await residuals.count(); i++) await residuals.nth(i).fill(`Browser residual ${i}`);
+  await page.locator("#definitionSave").click();
+
+  await expect(page.locator("body")).not.toHaveClass(/defining-variable/);
+  const result = await page.evaluate(() => {
+    const state = window.__dagBuilderState;
+    const group = state.project.groups.find(candidate => candidate.label === "Browser focus construct");
+    return { task: state.task, groupId: group?.group_id, anchors: { iv_group_id: state.project.iv_group_id,
+      dv_group_id: state.project.dv_group_id }, title: document.querySelector("#dagViewTitle")?.textContent };
+  });
+  expect(result.task).toBe("causes");
+  expect(result.anchors).toEqual(anchorsBefore);
+  expect(result.title).toContain("Browser focus construct");
+  expect(browserErrors.errors).toEqual([]);
+});

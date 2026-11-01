@@ -3169,8 +3169,8 @@ h2 {
 /* Causes and consequences are the Identify workspace with one variable: the
    same shell, anchor bar, Filters and evidence pane. Only Identify's own setup
    and diagnostic controls are left out. */
-.dag-body.task-causes .dag-left-panel > #setupSection,
-.dag-body.task-consequences .dag-left-panel > #setupSection,
+.dag-body.task-causes:not(.definition-active) .dag-left-panel > #setupSection,
+.dag-body.task-consequences:not(.definition-active) .dag-left-panel > #setupSection,
 .dag-body.task-causes .dag-left-panel > #variablePanel,
 .dag-body.task-consequences .dag-left-panel > #variablePanel,
 .dag-body.task-causes .dag-left-panel > #confounderConfig,
@@ -3184,6 +3184,12 @@ h2 {
 .dag-body.task-causes #toggleAllExclusionLinks, .dag-body.task-consequences #toggleAllExclusionLinks,
 .dag-body.task-causes #diagnosticOverlapKey, .dag-body.task-consequences #diagnosticOverlapKey { display: none !important; }
 .dag-body.task-causes .dag-diagnostic-switch, .dag-body.task-consequences .dag-diagnostic-switch { display: none; }
+/* Defining a variable from Causes or Consequences borrows only the definition
+   panel from Identify's setup section. */
+.dag-body.task-causes.definition-active .dag-left-panel > #exploreView,
+.dag-body.task-consequences.definition-active .dag-left-panel > #exploreView,
+.dag-body.task-causes.definition-active #setupSection > :not(#definitionBlock),
+.dag-body.task-consequences.definition-active #setupSection > :not(#definitionBlock) { display: none; }
 .dag-body.task-causes .mobile-variable-tab, .dag-body.task-consequences .mobile-variable-tab { display: none; }
 
 .reset-dialog-actions { display: grid; gap: 8px; margin-top: 18px; }

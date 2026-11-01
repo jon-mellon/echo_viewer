@@ -11,7 +11,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails = async () => {}, hydrateNeighbors = async () => {},
   prewarmEvidence = async () => {}, commitSchema = async () => {},
-  onCommitFailureRestored = () => {}, onInstrumentReady = () => {} }) {
+  onCommitFailureRestored = () => {}, onInstrumentReady = () => {}, onFocusDefined = null }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
   let lastBatch = null;
@@ -377,15 +377,21 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         state.showConfoundersOnly = false;
         state.showCollidersOnly = false;
       }
+      // In Causes and Consequences a new variable becomes the focus; it is not
+      // an anchor and has no group panel to open.
+      const forFocus = Boolean(onFocusDefined) && draft.role === "candidate" && draft.mode !== "edit"
+        && (state.task === "causes" || state.task === "consequences");
       state.definitionDraft = null;
       state.selectedVariableIds.clear();
       state.activeGroupId = null;
       state.focusedGroupId = newGroupId;
-      if (draft.role === "candidate") state.pendingVariablePanelGroupId = newGroupId;
+      if (draft.role === "candidate" && !forFocus) state.pendingVariablePanelGroupId = newGroupId;
       const initialAnchor = draft.mode !== "edit" && !state.changingAnchorSide;
-      state.phase = initialAnchor && draft.role === "iv" ? "select_dv"
-        : initialAnchor && draft.role === "dv" ? "select_instrument" : "build";
-      state.workflowMode = state.phase === "build" ? "group_review" : "setup";
+      if (!forFocus) {
+        state.phase = initialAnchor && draft.role === "iv" ? "select_dv"
+          : initialAnchor && draft.role === "dv" ? "select_instrument" : "build";
+        state.workflowMode = state.phase === "build" ? "group_review" : "setup";
+      }
       state.changingAnchorSide = null;
       invalidateMapCaches();
       addToUndoHistory(draft.mode === "edit" ? `Updated split "${draft.new_label}"`
@@ -393,6 +399,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
           : `Defined "${draft.new_label}" as ${draft.role.toUpperCase()}`, before);
       setMapMode("select");
       renderAll();
+      if (forFocus) onFocusDefined(newGroupId);
       if (draft.role === "instrument") onInstrumentReady();
     } catch (error) {
       state.compiledDagRevision = (state.compiledDagRevision || 0) + 1;
