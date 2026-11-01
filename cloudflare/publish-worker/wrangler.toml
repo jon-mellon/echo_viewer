@@ -1,0 +1,27 @@
+# Echo's publishing API: anonymous, create-only uploads into R2 and the schema registry in D1.
+# Setup (once): see README.md. Nothing here holds a secret; the secrets are set with `wrangler secret put`.
+name = "echo-publish"
+main = "src/index.mjs"
+compatibility_date = "2026-10-01"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "causal-evidence"          # the bucket behind data.epistemicinfra.org
+
+[[d1_databases]]
+binding = "DB"
+database_name = "echo-registry"
+database_id = ""                          # set from the output of `wrangler d1 create echo-registry`
+migrations_dir = "migrations"
+
+[vars]
+# Browsers allowed to call the API, comma separated.
+ALLOWED_ORIGINS = "https://echo.epistemicinfra.org,https://www.jonathanmellon.com,https://jonathanmellon.com"
+OBJECT_PREFIX = "published-schemas/"
+# Ceiling on the bytes of all published schemas plus open uploads (default 3 GB); publishing pauses beyond it.
+MAX_PUBLISHED_BYTES = "3221225472"
+
+[triggers]
+crons = ["17 * * * *"]                    # removes the files of uploads that never finished
+
+# Secrets: TURNSTILE_SECRET (Cloudflare Turnstile secret key) and OWNER_SECRET (any long random string).
