@@ -1,7 +1,9 @@
 import { canonicalFolderHash, stableJson, writeGroupingSchemaFolder } from "./grouping_schema_writer.mjs";
 import { publicSchemaBaseUrl, lookupPublishedSchema } from "./publication_access.mjs";
 import { PUBLISHED_SCHEMA_BUCKET } from "./publication_constants.mjs";
-import { canonicalPublishedReference, isPublishedFileUrl, publishedReferenceUrl } from "./schema_source.mjs";
+import { canonicalPublishedReference, isPublishedFileUrl, publishedReferenceUrl, schemaSource } from "./schema_source.mjs";
+import { cloudflareApiConfigured, CLOUDFLARE_API_URL } from "./cloudflare_config.mjs";
+import { ensureOwner, publishFiles } from "./cloudflare_api.mjs";
 import { ensureAnonymousPublicationUser } from "./dag_anonymous_auth.mjs";
 import { createCompiledArtifacts, evidenceSnapshotForSchema, fullCompileDag,
   COMPILED_DAG_PATH, COMPILED_MANIFEST_PATH, DAG_COMPILER_VERSION } from "./compiled_dag.mjs";
@@ -52,11 +54,19 @@ export async function publishWorkingSchema({
   cryptoApi = globalThis.crypto,
   onProgress = () => {},
   fetchImpl = globalThis.fetch,
+  // Where to publish: the page's schema source. The Cloudflare service settings (apiUrl, fetchImpl, storage, solve) can be given for tests.
+  source = schemaSource(),
+  cloudflare = {},
 }) {
-  const user = await ensureAnonymousPublicationUser(client);
+  const viaCloudflare = source === "cloudflare";
+  if (viaCloudflare && !cloudflareApiConfigured(cloudflare.apiUrl ?? CLOUDFLARE_API_URL)) {
+    throw new Error("Publishing to Cloudflare is not set up yet. Remove schema_source=cloudflare from the address to publish.");
+  }
+  const user = viaCloudflare ? await ensureOwner(cloudflare) : await ensureAnonymousPublicationUser(client);
   const publicSchema = publicSchemaProjection(schema);
   const canonical = await canonicalizeWorkingSchema(publicSchema, cryptoApi);
-  const existing = await findOwnedPublication(client, user.id, canonical.contentHash);
+  // The Cloudflare service answers "already published" when it is asked to reserve the publication.
+  const existing = viaCloudflare ? null : await findOwnedPublication(client, user.id, canonical.contentHash);
   if (existing) return { ...existing, publicationId: existing.id, contentHash: existing.content_hash, reused: true };
 
   const publicationId = cryptoApi.randomUUID();
@@ -76,10 +86,10 @@ export async function publishWorkingSchema({
   const parentId = previousPublication?.publication_id || CANONICAL_BASELINE_ID;
   let parentPrefix = previousPublication?.storage_prefix;
   if (!parentPrefix && /^[0-9a-f-]{36}$/i.test(parentId)) {
-    parentPrefix = (await lookupPublishedSchema(parentId, client)).storage_prefix;
+    parentPrefix = (await lookupPublishedSchema(parentId, client, { source, ...cloudflare })).storage_prefix;
   }
   if (parentPrefix) {
-    const base = publicSchemaBaseUrl(client, parentPrefix);
+    const base = publicSchemaBaseUrl(client, parentPrefix, source);
     const response = await fetchImpl(new URL("manifest.json", base));
     if (!response.ok) throw new Error(`Could not read parent manifest: ${response.status}`);
     const parent = await response.json();
@@ -115,6 +125,22 @@ export async function publishWorkingSchema({
   files.set(COMPILED_DAG_PATH, compiled.dagBytes);
   files.set(COMPILED_MANIFEST_PATH, compiled.manifestBytes);
   const entries = [...files.entries()].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+  const compiledManifestHash = await (async () => {
+    const digest = await cryptoApi.subtle.digest("SHA-256", compiled.manifestBytes);
+    return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+  })();
+  const parentSchemaId = previousPublication?.publication_id || CANONICAL_BASELINE_ID;
+  if (viaCloudflare) {
+    const saved = await publishFiles({
+      owner: user, publicationId, contentHash: canonical.contentHash, compilerVersion: compiled.manifest.compiler_version,
+      row: { title: schema.label || "Published grouping schema", description: schema.description || null,
+        evidence_snapshot: evidenceSnapshot, parent_schema_id: parentSchemaId, compiled_manifest_path: COMPILED_MANIFEST_PATH,
+        compiled_manifest_hash: compiledManifestHash },
+      files: new Map(entries), onProgress, apiUrl: cloudflare.apiUrl ?? CLOUDFLARE_API_URL,
+      ...(cloudflare.fetchImpl ? { fetchImpl: cloudflare.fetchImpl } : {}),
+    });
+    return { ...saved.row, publicationId: saved.row.id, contentHash: saved.row.content_hash, fileCount: entries.length, reused: saved.reused };
+  }
   for (const [index, [path, bytes]] of entries.entries()) {
     onProgress(index + 1, entries.length, path);
     const type = contentType(path);
@@ -124,7 +150,6 @@ export async function publishWorkingSchema({
     if (error) throw error;
   }
 
-  const parentSchemaId = previousPublication?.publication_id || CANONICAL_BASELINE_ID;
   const row = {
     id: publicationId,
     owner_id: user.id,
@@ -135,10 +160,7 @@ export async function publishWorkingSchema({
     storage_prefix: storagePrefix,
     parent_schema_id: parentSchemaId,
     compiled_manifest_path: COMPILED_MANIFEST_PATH,
-    compiled_manifest_hash: await (async () => {
-      const digest = await cryptoApi.subtle.digest("SHA-256", compiled.manifestBytes);
-      return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
-    })(),
+    compiled_manifest_hash: compiledManifestHash,
     compiler_version: compiled.manifest.compiler_version,
   };
   const { error: insertError } = await client.from("published_schemas").insert(row);
