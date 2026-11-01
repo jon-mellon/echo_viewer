@@ -582,6 +582,11 @@ test("Jev test and full split resume saved batches after failure and reload", as
     await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/50 saved)");
     const failedTestBatch = requestedBatches[1];
     await page.reload({ waitUntil: "domcontentloaded" });
+    // Nothing is restored on load; the saved run is offered from Define.
+    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+    await expect(page.locator("#definitionPartitionStep")).toBeHidden();
+    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionResumeList button", { hasText: "Resume" }).click();
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
     await page.locator("#definitionAiConnect").click();
     await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/50 saved)");
@@ -606,6 +611,9 @@ test("Jev test and full split resume saved batches after failure and reload", as
     const failedBatch = requestedBatches[6];
     expect(decisions).toBe(7);
     await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionResumeList button", { hasText: "Resume" }).click();
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
     await page.locator("#definitionAiConnect").click();
     await expect(page.locator("#definitionAiFullRun")).toContainText("Resume full split (16/");
@@ -947,4 +955,36 @@ test("Causes offers Define a variable and the new variable becomes the focus wit
   expect(result.anchors).toEqual(anchorsBefore);
   expect(result.title).toContain("Browser focus construct");
   expect(browserErrors.errors).toEqual([]);
+});
+
+test("a saved AI split is not restored on load; Define offers it in Causes and resumes it", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  const ready = () => page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState.publishedSchemaHydrated);
+  await page.goto("http://127.0.0.1:8767/?task=causes", { waitUntil: "domcontentloaded" });
+  await ready();
+  await page.evaluate(async () => {
+    const { saveJevRun } = await import("/definition_jev_checkpoint.mjs");
+    const group = window.__dagBuilderState.project.groups.find(candidate => candidate.variable_ids?.length > 3);
+    await saveJevRun({ id: "seeded-run", sampleIds: [], createdAt: Date.now(), draft: {
+      role: "iv", step: "partition", source_group_ids: [group.group_id],
+      source_snapshot: [{ group_id: group.group_id, label: group.label, variable_ids: [...group.variable_ids] }],
+      eligible_variable_ids: [...group.variable_ids], new_variable_ids: [], new_label: "", new_description: "",
+      residual_labels: {}, reviewed_variable_ids: [], ai_description: "Seeded saved split" } });
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await ready();
+  expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft)).toBeNull();
+  await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
+
+  await page.locator("#focusGroupPicker [data-define-focus]").click();
+  const row = page.locator("#definitionResumeList .definition-resume-row");
+  await expect(row).toContainText("Seeded saved split");
+  await row.getByRole("button", { name: "Resume" }).click();
+  await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+  expect(await page.evaluate(() => {
+    const draft = window.__dagBuilderState.definitionDraft;
+    return { step: draft.step, role: draft.role, description: draft.ai_description };
+  })).toEqual({ step: "partition", role: "candidate", description: "Seeded saved split" });
+  await page.evaluate(async () => (await import("/definition_jev_checkpoint.mjs")).deleteJevRun("seeded-run"));
 });

@@ -109,6 +109,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     invalidateMapCaches();
     renderDraft();
     els.definitionChooseManual.focus();
+    void renderSavedRuns();
   }
 
   async function startEditSplit(groupId = null) {
@@ -492,27 +493,17 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     els.definitionSave.addEventListener("click", saveDefinition);
   }
 
-  async function resumeAfterOAuth() {
-    const oauthDraft = jevAssist.takeResumeDraft();
-    // Causes and Consequences have no split panel, so a restored run there would
-    // show its preview on the map with nothing the user could do about it.
-    const exploring = state.task === "causes" || state.task === "consequences";
-    const checkpointDraft = !oauthDraft && !state.definitionDraft && !exploring
-      ? await jevAssist.latestResumeDraft().catch(error => {
-        console.warn("Could not read saved Jev draft.", error);
-        return null;
-      }) : null;
-    const draft = oauthDraft || state.definitionDraft || checkpointDraft;
-    if (!draft || !["sources", "partition"].includes(draft.step) || !Array.isArray(draft.eligible_variable_ids)) return;
-    // A source-step draft is resumed here only when it belongs to the OAuth
-    // handoff. Startup may otherwise race with a newly opened manual draft.
-    if (draft.step === "sources" && !oauthDraft) return;
+  const sourcesUnchanged = draft => Boolean(draft.source_snapshot?.every(snap => {
+    const current = groupById(snap.group_id);
+    return current && JSON.stringify(current.variable_ids) === JSON.stringify(snap.variable_ids);
+  }));
+
+  // Saved runs are only offered from Define, never restored at startup, so a
+  // preview appears only where its controls do. `adopt` makes the draft current.
+  async function resumeJevDraft(draft, { adopt }) {
+    if (!sourcesUnchanged(draft)) return;
     state.definitionMethod = "jev";
-    if (!draft.source_snapshot?.every(snap => {
-      const current = groupById(snap.group_id);
-      return current && JSON.stringify(current.variable_ids) === JSON.stringify(snap.variable_ids);
-    })) return;
-    if (oauthDraft || checkpointDraft) {
+    if (adopt) {
       state.definitionDraft = draft;
       state.selectedVariableIds = new Set(draft.new_variable_ids || []);
     }
@@ -525,6 +516,53 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     fitMap(draft.eligible_variable_ids);
     try { await jevAssist.restoreForDraft({ force: true }); }
     catch (error) { console.warn("Could not restore saved Jev progress.", error); }
+  }
+
+  async function resumeAfterOAuth() {
+    const draft = jevAssist.takeResumeDraft() || state.definitionDraft;
+    if (!draft || !["sources", "partition"].includes(draft.step) || !Array.isArray(draft.eligible_variable_ids)) return;
+    // A source-step draft is resumed here only when it belongs to the OAuth
+    // handoff. Startup may otherwise race with a newly opened manual draft.
+    if (draft.step === "sources" && draft === state.definitionDraft) return;
+    await resumeJevDraft(draft, { adopt: draft !== state.definitionDraft });
+  }
+
+  /** Lists saved, unfinished AI splits under the method choice of a new definition. */
+  async function renderSavedRuns() {
+    const draft = state.definitionDraft;
+    presenter.showSavedRuns([]);
+    let saved = [];
+    try { saved = await jevAssist.listSavedRuns(); }
+    catch (error) { console.warn("Could not read saved Jev runs.", error); }
+    if (state.definitionDraft !== draft || draft?.step !== "sources") return;
+    // Group memberships may still be loading, which would look like a change.
+    const loading = state.publishedSchemaHydrating;
+    presenter.showSavedRuns(saved
+      .filter(({ run }) => run.draft?.step === "partition" && Array.isArray(run.draft.eligible_variable_ids))
+      .map(({ run, batchCount }) => {
+        const usable = !loading && sourcesUnchanged(run.draft);
+        const sources = (run.draft.source_snapshot || []).map(snap => snap.label || snap.group_id).join(", ");
+        return {
+          title: truncate(run.draft.ai_description || "Untitled split", 90),
+          detail: `${sources || "Unknown sources"} · ${run.draft.eligible_variable_ids.length} variables · ${batchCount} batches saved · ${new Date(run.createdAt).toLocaleString()}`,
+          note: usable ? "" : loading ? "Loading group memberships…" : "The source categories have changed since this was saved.",
+          usable,
+          onResume: () => {
+            if (state.definitionDraft !== draft) return;
+            // The saved run keeps its classifications; the role is whatever this definition is for.
+            const resumed = structuredClone(run.draft);
+            resumed.role = draft.role;
+            void resumeJevDraft(resumed, { adopt: true });
+          },
+          onDiscard: async () => {
+            await jevAssist.discardSavedRun(run.id).catch(error => console.warn("Could not remove Jev checkpoint.", error));
+            if (state.definitionDraft === draft) void renderSavedRuns();
+          },
+        };
+      }));
+    if (loading) setTimeout(() => {
+      if (state.definitionDraft === draft) void renderSavedRuns();
+    }, 400);
   }
 
   const presenter = createDefinitionWorkflowPresenter({

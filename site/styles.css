@@ -829,6 +829,19 @@ h2 {
 .definition-method-step h2 { margin: 0 0 12px; font-size: 1.1rem; }
 
 .definition-method-choices { display: grid; gap: 10px; }
+.definition-resume-list { display: grid; gap: 8px; margin-top: 18px; }
+.definition-resume-list h3 { margin: 0; font-size: 0.95rem; }
+.definition-resume-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+}
+.definition-resume-row > div { display: grid; gap: 2px; min-width: 0; }
 
 .definition-method-choice {
   display: grid;
