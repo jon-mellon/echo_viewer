@@ -11,13 +11,19 @@
 
 export const LIMITS = {
   maxFiles: 500,
-  maxFileBytes: 25 * 1024 * 1024,
-  maxTotalBytes: 120 * 1024 * 1024,
+  maxFileBytes: 16 * 1024 * 1024,        // the largest real file is the compiled DAG, about 7.4 MB
+  maxTotalBytes: 30 * 1024 * 1024,       // the largest real publication is about 10.5 MB; the median about 1 MB
   uploadTtlSeconds: 3600,
   ownersPerAddressPerHour: 20,
   publicationsPerOwnerPerDay: 30,
   publicationsPerAddressPerDay: 60,
   publicationsPerDay: 500,
+  // Bytes reserved per day (an abandoned upload counts), so a flood of owners cannot fill the bucket.
+  bytesPerOwnerPerDay: 150 * 1024 * 1024,
+  bytesPerAddressPerDay: 300 * 1024 * 1024,
+  bytesPerDay: 2 * 1024 * 1024 * 1024,
+  // Ceiling on the bytes of all published schemas and open uploads; env.MAX_PUBLISHED_BYTES overrides it.
+  maxPublishedBytes: 3 * 1024 * 1024 * 1024,
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -72,12 +78,12 @@ async function readJson(request, limit = 256 * 1024) {
   try { return JSON.parse(text); } catch { return fail(400, "bad_json", "Body must be JSON."); }
 }
 
-/** Counts one use of a limit in a fixed window; refuses once the limit is passed. */
-async function spend(db, scope, key, windowSeconds, limit, now) {
+/** Counts `amount` against a limit in a fixed window; refuses once the limit is passed. */
+async function spend(db, scope, key, windowSeconds, limit, now, amount = 1) {
   const window = Math.floor(now / windowSeconds) * windowSeconds;
   const row = await db.prepare(
-    "insert into rate_counters (scope, key, window, n) values (?, ?, ?, 1) "
-    + "on conflict (scope, key, window) do update set n = n + 1 returning n").bind(scope, key, window).first();
+    "insert into rate_counters (scope, key, window, n) values (?, ?, ?, ?) "
+    + "on conflict (scope, key, window) do update set n = n + excluded.n returning n").bind(scope, key, window, amount).first();
   if (row.n > limit) fail(429, "rate_limited", "Too many requests. Please try again later.");
 }
 
@@ -122,9 +128,11 @@ function validatePublication(body) {
   }
   if (total > LIMITS.maxTotalBytes) fail(413, "too_large", "The publication is too large.");
   if (!seen.has("manifest.json")) fail(400, "no_manifest", "manifest.json is required.");
-  return { id: id.toLowerCase(), contentHash, compilerVersion, row, files };
+  return { id: id.toLowerCase(), contentHash, compilerVersion, row, files, totalBytes: total };
 }
 
+/** The registry row as clients see it: the byte count is the worker's own bookkeeping. */
+const publicRow = ({ total_bytes: _bytes, ...row }) => row;
 const contentTypeOf = path => CONTENT_TYPES[path.split(".").pop()] || "application/octet-stream";
 const objectKey = (env, prefix, path) => `${env.OBJECT_PREFIX || "published-schemas/"}${prefix}/${path}`;
 
@@ -134,11 +142,18 @@ async function startPublication(request, env, now, address) {
   const existing = await env.DB.prepare(
     "select * from published_schemas where owner_id = ? and content_hash = ? and compiler_version = ? limit 1")
     .bind(ownerId, body.contentHash, body.compilerVersion).first();
-  if (existing) return json({ reused: true, row: existing }, 200);
+  if (existing) return json({ reused: true, row: publicRow(existing) }, 200);
 
   await spend(env.DB, "owner-day", ownerId, 86400, LIMITS.publicationsPerOwnerPerDay, now);
   await spend(env.DB, "address-day", address, 86400, LIMITS.publicationsPerAddressPerDay, now);
   await spend(env.DB, "global-day", "all", 86400, LIMITS.publicationsPerDay, now);
+  await spend(env.DB, "owner-bytes-day", ownerId, 86400, LIMITS.bytesPerOwnerPerDay, now, body.totalBytes);
+  await spend(env.DB, "address-bytes-day", address, 86400, LIMITS.bytesPerAddressPerDay, now, body.totalBytes);
+  await spend(env.DB, "global-bytes-day", "all", 86400, LIMITS.bytesPerDay, now, body.totalBytes);
+  const ceiling = Number(env.MAX_PUBLISHED_BYTES) || LIMITS.maxPublishedBytes;
+  const held = await env.DB.prepare(
+    "select (select coalesce(sum(total_bytes), 0) from published_schemas) + (select coalesce(sum(total_bytes), 0) from publication_uploads) as bytes").first();
+  if (held.bytes + body.totalBytes > ceiling) fail(507, "storage_full", "Publishing is paused: the published-schema storage limit has been reached.");
   const taken = await env.DB.prepare(
     "select 1 as taken from published_schemas where id = ? union all select 1 from publication_uploads where id = ?")
     .bind(body.id, body.id).first();
@@ -151,10 +166,11 @@ async function startPublication(request, env, now, address) {
     storage_prefix: prefix, parent_schema_id: body.row.parent_schema_id ?? null,
     compiled_manifest_path: body.row.compiled_manifest_path ?? null,
     compiled_manifest_hash: body.row.compiled_manifest_hash ?? null, compiler_version: body.compilerVersion,
+    total_bytes: body.totalBytes,
   };
   await env.DB.prepare(
-    "insert into publication_uploads (id, owner_id, content_hash, row_json, files_json, expires_at) values (?, ?, ?, ?, ?, ?)")
-    .bind(body.id, ownerId, body.contentHash, JSON.stringify(row), JSON.stringify(body.files), now + LIMITS.uploadTtlSeconds).run();
+    "insert into publication_uploads (id, owner_id, content_hash, row_json, files_json, total_bytes, expires_at) values (?, ?, ?, ?, ?, ?, ?)")
+    .bind(body.id, ownerId, body.contentHash, JSON.stringify(row), JSON.stringify(body.files), body.totalBytes, now + LIMITS.uploadTtlSeconds).run();
   return json({ reused: false, publication_id: body.id, storage_prefix: prefix, expires_in: LIMITS.uploadTtlSeconds }, 201);
 }
 
@@ -199,12 +215,12 @@ async function finishPublication(request, env, id, now) {
   await env.DB.batch([
     env.DB.prepare(
       "insert into published_schemas (id, owner_id, content_hash, title, description, evidence_snapshot, storage_prefix, parent_schema_id, "
-      + "compiled_manifest_path, compiled_manifest_hash, compiler_version) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      + "compiled_manifest_path, compiled_manifest_hash, compiler_version, total_bytes) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .bind(row.id, row.owner_id, row.content_hash, row.title, row.description, row.evidence_snapshot, row.storage_prefix,
-        row.parent_schema_id, row.compiled_manifest_path, row.compiled_manifest_hash, row.compiler_version),
+        row.parent_schema_id, row.compiled_manifest_path, row.compiled_manifest_hash, row.compiler_version, row.total_bytes),
     env.DB.prepare("delete from publication_uploads where id = ?").bind(row.id),
   ]);
-  return json({ row }, 201);
+  return json({ row: publicRow(row) }, 201);
 }
 
 async function getSchema(env, id) {

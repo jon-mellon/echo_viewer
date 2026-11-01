@@ -13,6 +13,7 @@ create table if not exists published_schemas (
   compiled_manifest_path text,
   compiled_manifest_hash text,
   compiler_version text,
+  total_bytes integer not null default 0,  -- bytes the publication wrote (0 for ones loaded from Supabase)
   created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 create index if not exists published_schemas_owner_hash
@@ -44,6 +45,7 @@ create table if not exists publication_uploads (
   content_hash text not null,
   row_json text not null,              -- the registry row to insert on finish
   files_json text not null,            -- [{ path, size }]
+  total_bytes integer not null default 0,
   expires_at integer not null          -- unix seconds
 );
 create index if not exists publication_uploads_expiry on publication_uploads (expires_at);

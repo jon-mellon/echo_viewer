@@ -18,6 +18,8 @@ migrations_dir = "migrations"
 # Browsers allowed to call the API, comma separated.
 ALLOWED_ORIGINS = "https://echo.epistemicinfra.org,https://www.jonathanmellon.com,https://jonathanmellon.com"
 OBJECT_PREFIX = "published-schemas/"
+# Ceiling on the bytes of all published schemas plus open uploads (default 3 GB); publishing pauses beyond it.
+MAX_PUBLISHED_BYTES = "3221225472"
 
 [triggers]
 crons = ["17 * * * *"]                    # removes the files of uploads that never finished

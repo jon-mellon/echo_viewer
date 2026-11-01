@@ -171,7 +171,7 @@ test("requests that are malformed, oversized or aimed outside the publication ar
     ["huge file", startBody(1, { files: [...declared, { path: "big.tsv", size: LIMITS.maxFileBytes + 1 }] })],
     ["too many files", startBody(1, { files: Array.from({ length: LIMITS.maxFiles + 1 }, (_, i) => ({ path: i ? `f${i}.tsv` : "manifest.json", size: 1 })) })],
   ]) assert.ok([400, 413].includes((await start(body)).status), why);
-  const total = startBody(1, { files: [...declared, ...Array.from({ length: 6 }, (_, i) => ({ path: `p${i}.tsv`, size: 24 * 1024 * 1024 }))] });
+  const total = startBody(1, { files: [...declared, ...Array.from({ length: 3 }, (_, i) => ({ path: `p${i}.tsv`, size: 15 * 1024 * 1024 }))] });
   assert.equal((await start(total)).status, 413, "total size");
   assert.equal((await call("POST", "/v1/publications", { raw: "{not json", headers: authed(token) })).status, 400);
   assert.equal((await call("GET", "/nothing")).status, 404);
@@ -259,4 +259,75 @@ test("the Supabase registry exports to SQL that loads into D1, publications befo
   assert.equal(read.title, "It's a schema");
   assert.equal(read.description, null);
   assert.deepEqual((await (await call("GET", "/v1/splits?group_id=b")).json())[0].source_group_ids, ["a", "b"]);
+});
+
+// A publication of `bytes` in total: a small manifest and the rest in files under the per-file cap.
+const declaredBytes = (n, bytes, extra = {}) => {
+  const manifest = Math.min(bytes, 1000), pieces = [];
+  for (let left = bytes - manifest; left > 0; left -= 15 * 1024 * 1024) pieces.push(Math.min(left, 15 * 1024 * 1024));
+  return startBody(n, { content_hash: hash(n), files: [{ path: "manifest.json", size: manifest },
+    ...pieces.map((size, i) => ({ path: `p${i}.tsv`, size }))], ...extra });
+};
+
+test("bytes are limited per owner, per address and overall each day, and a day's allowance renews", async () => {
+  const MB = 1024 * 1024;
+  const { call } = setup();
+  const token = await newOwner(call);
+  const start = (n, bytes, options = {}) => call("POST", "/v1/publications", { body: declaredBytes(n, bytes), headers: authed(token), ...options });
+  // Five 30 MB publications use the owner's 150 MB; the sixth is refused although publications are few.
+  for (let n = 1; n <= 5; n++) assert.equal((await start(n, 30 * MB)).status, 201, `publication ${n}`);
+  assert.equal((await start(6, 30 * MB)).status, 429, "owner byte allowance");
+  assert.equal((await start(6, 1000)).status, 429, "even a small one, once the allowance is gone");
+  assert.equal((await start(7, 30 * MB, { now: NOW + 86400 })).status, 201, "renewed the next day");
+  // Owners on one address share its 300 MB: two owners spend it, and a third (with allowance of their own) is refused.
+  const second = await newOwner(call);
+  for (let n = 20; n < 25; n++) {
+    assert.equal((await call("POST", "/v1/publications", { body: declaredBytes(n, 30 * MB), headers: authed(second) })).status, 201, `second owner ${n}`);
+  }
+  const crowd = await newOwner(call);
+  assert.equal((await call("POST", "/v1/publications", { body: declaredBytes(40, 30 * MB), headers: authed(crowd) })).status, 429,
+    "address byte allowance spent, though this owner has used none of theirs");
+  // Another address is unaffected.
+  const third = await newOwner(call, "7.7.7.7");
+  assert.equal((await call("POST", "/v1/publications", { body: declaredBytes(30, 30 * MB), headers: authed(third), address: "7.7.7.7" })).status, 201);
+});
+
+test("publishing pauses at the storage ceiling, counting finished schemas and open uploads, and resumes when it is raised", async () => {
+  const MB = 1024 * 1024;
+  const { env, call } = setup();
+  env.MAX_PUBLISHED_BYTES = String(60 * MB);
+  const token = await newOwner(call);
+  const start = (n, bytes) => call("POST", "/v1/publications", { body: declaredBytes(n, bytes), headers: authed(token) });
+  assert.equal((await start(1, 25 * MB)).status, 201);
+  assert.equal((await start(2, 25 * MB)).status, 201);
+  const full = await start(3, 25 * MB);
+  assert.equal(full.status, 507);
+  assert.equal((await full.json()).error, "storage_full");
+  assert.equal((await start(4, 5 * MB)).status, 201, "what still fits is accepted");
+  env.MAX_PUBLISHED_BYTES = String(200 * MB);
+  assert.equal((await start(3, 25 * MB)).status, 201, "raising the ceiling resumes publishing");
+});
+
+test("clients do not see the worker's byte bookkeeping, and the reserved bytes are what was declared", async () => {
+  const { env, call } = setup();
+  const token = await newOwner(call);
+  const finished = await publish(call, token);
+  const { row } = await finished.json();
+  assert.equal("total_bytes" in row, false);
+  const stored = env.DB.raw.prepare("select total_bytes from published_schemas where id = ?").get(id(1)).total_bytes;
+  assert.equal(stored, declared.reduce((total, file) => total + file.size, 0));
+  const again = await (await call("POST", "/v1/publications", { body: startBody(1, { publication_id: id(2) }), headers: authed(token) })).json();
+  assert.equal("total_bytes" in again.row, false);
+});
+
+test("the whole service has a daily byte allowance that no number of owners or addresses can get around", async () => {
+  const { env, call } = setup();
+  const window = Math.floor(NOW / 86400) * 86400;
+  env.DB.raw.prepare("insert into rate_counters (scope, key, window, n) values ('global-bytes-day', 'all', ?, ?)").run(window, LIMITS.bytesPerDay - 500);
+  const token = await newOwner(call, "3.3.3.3");
+  const small = n => call("POST", "/v1/publications", { body: declaredBytes(n, 400), headers: authed(token), address: "3.3.3.3" });
+  assert.equal((await small(1)).status, 201, "what is left of the allowance");
+  assert.equal((await small(2)).status, 429, "then everyone is refused until the next day");
+  const other = await newOwner(call, "4.4.4.4");
+  assert.equal((await call("POST", "/v1/publications", { body: declaredBytes(3, 400), headers: authed(other), address: "4.4.4.4" })).status, 429);
 });
