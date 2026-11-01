@@ -26,7 +26,8 @@ worker bounds what can be written and does not recompute the hash.
 
 ## One-time setup
 
-Needs a Cloudflare login (`npx wrangler login`); nothing here is secret.
+Needs a Cloudflare login (`npx wrangler login`); nothing here is secret. `./setup.sh` does the steps below in one go (and
+`./setup.sh registry` loads the registry); the manual commands are listed so each step is visible.
 
 ```bash
 cd cloudflare/publish-worker
