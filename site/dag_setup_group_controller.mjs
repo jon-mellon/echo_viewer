@@ -467,10 +467,14 @@ export function createDagSetupGroupController({
       : query && state.variableSearchStatus === "loading" ? "Existing groups · variable search loading…"
         : query && state.variableSearchStatus === "error" ? "Existing groups · variable search unavailable"
           : "Existing groups";
+    const defineRow = h("div", { className: "setup-group-picker-row define-new-row" },
+      h("div", {}, h("strong", { textContent: "Define a variable" }), h("span", { textContent: "Chop one or more existing categories in the spatial viewer" })),
+      h("button", { className: "action-button", type: "button", dataset: { defineFocus: "true" }, textContent: "Define" }));
     replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: title }),
-      h("div", { className: "setup-group-picker-list" }, ...rows));
+      h("div", { className: "setup-group-picker-list" }, defineRow, ...rows));
     container.querySelectorAll("button[data-group-id]").forEach(button =>
       button.addEventListener("click", () => onChooseFocus(button.dataset.groupId)));
+    container.querySelector("button[data-define-focus]")?.addEventListener("click", () => startDefinition?.("candidate"));
   }
 
   function renderGroupList() {

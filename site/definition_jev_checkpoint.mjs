@@ -47,12 +47,15 @@ export async function loadJevRun(id) {
   return run ? { run, batches } : null;
 }
 
-export async function latestJevRun() {
+export async function listJevRuns() {
   const db = await openJevDatabase();
-  const tx = db.transaction(RUNS, "readonly");
+  const tx = db.transaction([RUNS, BATCHES], "readonly");
   const done = transactionDone(tx);
-  const [runs] = await Promise.all([requestResult(tx.objectStore(RUNS).getAll()), done]);
-  return runs.sort((a, b) => b.createdAt - a.createdAt)[0] || null;
+  const runs = await requestResult(tx.objectStore(RUNS).getAll());
+  const counts = await Promise.all(runs.map(run => requestResult(tx.objectStore(BATCHES).index("runId").count(run.id))));
+  await done;
+  return runs.map((run, index) => ({ run, batchCount: counts[index] }))
+    .sort((a, b) => b.run.createdAt - a.run.createdAt);
 }
 
 export async function saveJevRun(run) {
