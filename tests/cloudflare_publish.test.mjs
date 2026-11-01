@@ -4,6 +4,7 @@ import { publishWorkingSchema, canonicalizeWorkingSchema } from "../site/dag_pub
 import { loadGroupingSchemaFolder } from "../site/grouping_schema_loader.mjs";
 import { canonicalFolderHash, stableJson } from "../site/grouping_schema_writer.mjs";
 import { lookupPublishedSchema } from "../site/publication_access.mjs";
+import { loadPublishedSchema } from "../site/published_schema_loader.mjs";
 import { browsePublishedSplits } from "../site/published_split_browser.mjs";
 import { canonicalPublishedReference } from "../site/schema_source.mjs";
 import { handle } from "../cloudflare/publish-worker/src/index.mjs";
@@ -17,10 +18,10 @@ const schema = groups => ({ schema_version: "groupings-v3", grouping_set_id: "te
 const group = (group_id, variable_ids) => ({ group_id, label: group_id, variable_ids });
 const PARENT = "00000000-0000-4000-8000-000000000099";
 
-async function world() {
+async function world(parentPrefix = "old") {
   const env = { DB: fakeD1(), BUCKET: fakeR2(), TURNSTILE_SECRET: "s", OWNER_SECRET: "o", ALLOWED_ORIGINS: "", OBJECT_PREFIX: "published-schemas/" };
   const original = schema([group("education", ["a", "b"]), group("health", ["c"])]);
-  for (const [path, bytes] of (await canonicalizeWorkingSchema(original)).files) await env.BUCKET.put(`published-schemas/old/${path}`, bytes);
+  for (const [path, bytes] of (await canonicalizeWorkingSchema(original)).files) await env.BUCKET.put(`published-schemas/${parentPrefix}/${path}`, bytes);
   const challenges = [];
   const turnstile = async () => new Response(JSON.stringify({ success: true }));
   const apiFetch = async (url, init = {}) => {
@@ -39,11 +40,11 @@ async function world() {
   const storage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value) };
   let solved = 0;
   const cloudflare = { apiUrl: API, fetchImpl: apiFetch, storage, solve: async () => { solved++; return "good-token"; } };
-  return { env, original, readFetch, cloudflare, calls: challenges, store, solved: () => solved };
+  return { env, original, readFetch, cloudflare, calls: challenges, store, solved: () => solved, parentPrefix };
 }
 
 const publish = (w, changed, overrides = {}) => publishWorkingSchema({ schema: changed, source: "cloudflare", cloudflare: w.cloudflare,
-  previousPublication: { publication_id: PARENT, storage_prefix: "old" }, client: null, fetchImpl: w.readFetch,
+  previousPublication: { publication_id: PARENT, storage_prefix: w.parentPrefix }, client: null, fetchImpl: w.readFetch,
   compileInput: { rawLinks: [] }, ...overrides });
 
 test("a schema published from a Cloudflare page lands in R2 and the D1 registry and loads back identically", async () => {
@@ -133,4 +134,25 @@ test("splits and registry reads use the worker only on a Cloudflare page with th
   await assert.rejects(browsePublishedSplits(["a"], null, { source: "supabase", apiUrl: API }), /Supabase is not configured/);
   await assert.rejects(browsePublishedSplits(["a"], null, { source: "cloudflare", apiUrl: "" }), /Supabase is not configured/);
   await assert.rejects(lookupPublishedSchema(PARENT, null, { source: "supabase", apiUrl: API }), /Supabase is not configured/);
+});
+
+test("a published schema that references its parent's files loads and verifies, even when both folder names are the same length", async () => {
+  // Real folders are '<owner uuid>/<publication uuid>'. The loader once filed a parent's file under a slice of its address,
+  // which for same-length folders was the real path, and then deleted it, so every such schema failed verification.
+  const w = await world(`${"a".repeat(8)}-0000-4000-8000-000000000001/${"b".repeat(8)}-0000-4000-8000-000000000002`);
+  const changed = schema([group("verbal", ["a"]), group("nonverbal", ["b"]), group("health", ["c"])]);
+  const result = await publish(w, changed);
+  const savedLocation = globalThis.location, savedFetch = globalThis.fetch;
+  globalThis.location = new URL("https://echo.test/?schema_source=cloudflare");
+  // The registry is read with the page's fetch, the files with the one passed in.
+  globalThis.fetch = (url, init) => w.cloudflare.fetchImpl(url, init);
+  try {
+    const published = await loadPublishedSchema(result.publicationId, null, w.readFetch);
+    const loaded = await published.loadSchema();
+    assert.deepEqual(loaded.schema.groups.find(item => item.group_id === "health").variable_ids, ["c"], "a parent's file, by reference");
+    assert.deepEqual(loaded.schema.groups.find(item => item.group_id === "verbal").variable_ids, ["a"], "its own file");
+  } finally {
+    globalThis.location = savedLocation;
+    globalThis.fetch = savedFetch;
+  }
 });
