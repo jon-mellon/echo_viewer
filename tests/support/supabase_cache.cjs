@@ -16,6 +16,9 @@ const STORAGE_OBJECT = /\/storage\/v1\/object\/public\/published-schemas\//;
 // The Cloudflare mirror holds the same files at the same keys. Until it exists (and so tests do not depend on it),
 // requests for it are answered with Supabase's copy, through the same disk cache. ECHO_REAL_CLOUDFLARE=1 uses the real mirror.
 const CLOUDFLARE_OBJECT = /^https:\/\/data\.epistemicinfra\.org\/published-schemas\//;
+// The worker's registry answers for a Cloudflare page. Rows are immutable, so they are kept on disk like the files, and a
+// page served from localhost (which the worker does not list for CORS) still gets them.
+const WORKER_REGISTRY = /^https:\/\/echo-api\.epistemicinfra\.org\/v1\/(schemas|splits)/;
 const SUPABASE_OBJECT_BASE = "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/";
 
 function cacheDirectory() {
@@ -58,6 +61,7 @@ async function installSupabaseCache(context) {
     return route.fulfill({ response });
   };
   await context.route(STORAGE_OBJECT, route => serve(route, route.request().url()));
+  await context.route(WORKER_REGISTRY, route => serve(route, route.request().url()));
   if (process.env.ECHO_REAL_CLOUDFLARE !== "1") {
     await context.route(CLOUDFLARE_OBJECT, route => serve(route,
       SUPABASE_OBJECT_BASE + route.request().url().slice("https://data.epistemicinfra.org/published-schemas/".length)));
