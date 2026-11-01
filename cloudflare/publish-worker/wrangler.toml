@@ -4,6 +4,9 @@ name = "echo-publish"
 main = "src/index.mjs"
 compatibility_date = "2026-10-01"
 
+# Served at its custom domain (added in the dashboard), not at a workers.dev address.
+workers_dev = false
+
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "causal-evidence"          # the bucket behind data.epistemicinfra.org
@@ -21,7 +24,9 @@ OBJECT_PREFIX = "published-schemas/"
 # Ceiling on the bytes of all published schemas plus open uploads (default 3 GB); publishing pauses beyond it.
 MAX_PUBLISHED_BYTES = "3221225472"
 
-[triggers]
-crons = ["17 * * * *"]                    # removes the files of uploads that never finished
+# The hourly clean-up of uploads that never finished needs a workers.dev subdomain on the account (Cloudflare will not set cron
+# triggers without one). Register one in the dashboard (Workers & Pages), then uncomment:
+# [triggers]
+# crons = ["17 * * * *"]
 
 # Secrets: TURNSTILE_SECRET (Cloudflare Turnstile secret key) and OWNER_SECRET (any long random string).
