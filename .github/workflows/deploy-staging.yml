@@ -35,6 +35,19 @@ jobs:
       - name: Build Echo
         run: npm run build:site
 
+      # Staging reads published schemas from Cloudflare by default; production stays on Supabase (the source default)
+      # until it is switched on purpose. ?schema_source=supabase still opts a staging page back.
+      - name: Make Cloudflare the staging default schema source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("dist/site/schema_source.mjs")
+          text = path.read_text()
+          old = 'export const DEFAULT_SCHEMA_SOURCE = "supabase";'
+          assert text.count(old) == 1, "schema_source.mjs changed; update the staging step"
+          path.write_text(text.replace(old, 'export const DEFAULT_SCHEMA_SOURCE = "cloudflare";'))
+          PY
+
       - name: Install profiling browser
         run: npx playwright install --with-deps chromium
 
