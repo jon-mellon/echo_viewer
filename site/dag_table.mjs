@@ -231,7 +231,8 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
       : [...model.headers.map(text => headerCell(text)),
         ...(model.hasPaperColumn ? [headerCell("Papers", true, sortByPapers, () => { sortByPapers = !sortByPapers; render(); })] : [])];
     const body = el("tbody", {});
-    for (const row of rows.slice(0, shownRows)) {
+    const buildRows = row => {
+      const trs = [];
       const routes = model.candidateHeader
         ? model.headers.flatMap((header, side) => row.lines.map(line => line[side])
           .filter(path => path.nodes.length).map(path => ({ header, path })))
@@ -249,9 +250,11 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
           tr.append(pathCell(route.path, route.header.replace(/^Path (to|from) /, (_, direction) => `${direction === "to" ? "To" : "From"} `)));
         } else tr.append(...route.line.map(path => path.nodes.length ? pathCell(path) : el("td", { text: "–" })));
         if (model.hasPaperColumn) tr.append(el("td", { class: "dag-table-number", text: row.papers === null || row.papers === undefined ? "–" : String(row.papers) }));
-        body.append(tr);
+        trs.push(tr);
       });
-    }
+      return trs;
+    };
+    pendingFills.push({ body, items: rows.slice(0, shownRows), build: buildRows });
     const table = el("table", { class: "dag-table", id: "dagPathsTable" },
       el("caption", { text: `Paths in this view (${model.pathCount})` }),
       el("thead", {}, el("tr", {}, ...columns)), body);
@@ -260,46 +263,73 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
 
   function otherLinksTable() {
     if (!model.otherLinks.length) return [];
+    const body = el("tbody", {});
+    pendingFills.push({ body, items: model.otherLinks.slice(0, shownOther), build: row => [el("tr", { "data-row-id": row.id },
+      pathCell(row.chains[0]),
+      el("td", { class: "dag-table-number", text: row.papers === null ? "–" : String(row.papers) }))] });
     const table = el("table", { class: "dag-table", id: "dagOtherLinksTable" },
       el("caption", { text: `Other links in this view (${model.otherLinks.length})` }),
       el("thead", {}, el("tr", {}, headerCell("Link"), headerCell("Papers"))),
-      el("tbody", {}, ...model.otherLinks.slice(0, shownOther).map(row => el("tr", { "data-row-id": row.id },
-        pathCell(row.chains[0]),
-        el("td", { class: "dag-table-number", text: row.papers === null ? "–" : String(row.papers) })))));
+      body);
     return [table, more(shownOther, model.otherLinks.length, "links", () => { shownOther += TABLE_PAGE_SIZE; render(); })];
   }
 
   function variablesTable() {
     const rows = model.variableRows.slice().sort(VARIABLE_SORTS[variableSort]);
     const sorter = (text, key) => headerCell(text, true, variableSort === key, () => { variableSort = key; render(); });
+    const body = el("tbody", {});
+    pendingFills.push({ body, items: rows.slice(0, shownVariables), build: row => {
+      const selected = row.groupId === selection.groupId;
+      return [el("tr", { "data-group-id": row.groupId, class: selected ? "selected" : "", "aria-current": selected ? "true" : null },
+        el("td", {}, button(row.label, `Open the definition of ${row.label}`, () => onOpenVariable(row.groupId),
+          { "aria-pressed": selected ? "true" : "false" })),
+        el("td", { text: row.role }),
+        el("td", { class: "dag-table-number", text: String(row.variables) }),
+        el("td", { class: "dag-table-number", text: String(row.links) }))];
+    } });
     const table = el("table", { class: "dag-table", id: "dagVariablesTable" },
       el("caption", { text: `Variables in this view (${rows.length})` }),
       el("thead", {}, el("tr", {}, sorter("Variable", "label"), headerCell("Role"), sorter("Variables", "variables"), sorter("Links", "links"))),
-      el("tbody", {}, ...rows.slice(0, shownVariables).map(row => {
-        const selected = row.groupId === selection.groupId;
-        return el("tr", { "data-group-id": row.groupId, class: selected ? "selected" : "", "aria-current": selected ? "true" : null },
-          el("td", {}, button(row.label, `Open the definition of ${row.label}`, () => onOpenVariable(row.groupId),
-            { "aria-pressed": selected ? "true" : "false" })),
-          el("td", { text: row.role }),
-          el("td", { class: "dag-table-number", text: String(row.variables) }),
-          el("td", { class: "dag-table-number", text: String(row.links) }));
-      })));
+      body);
     return [table, more(shownVariables, rows.length, "variables", () => { shownVariables += TABLE_PAGE_SIZE; render(); })];
   }
 
-  function render() {
+  let renderToken = 0;
+  let pendingFills = [];
+  const ROW_CHUNK = 40;
+
+  function restoreFocus(label) {
+    if (label) [...container.querySelectorAll("button")].find(node => node.getAttribute("aria-label") === label)?.focus();
+  }
+
+  /**
+   * Builds the tables a screenful of rows at a time, the first chunk at once and the rest in later tasks, so a
+   * big table never holds a slow phone in one long task. Resolves when every row is in (or a newer render took over).
+   */
+  async function render() {
     const focused = doc.activeElement && container.contains(doc.activeElement)
       ? doc.activeElement.getAttribute("aria-label") : null;
     const scroll = container.scrollTop;
+    const token = ++renderToken;
+    pendingFills = [];
     container.replaceChildren(
       el("p", { class: "dag-table-summary", role: "status", text: model.variableRows.length
         ? `${model.variableRows.length} variables, ${model.pathCount} paths and ${model.otherLinks.length} other links, the same as the graph. Arrows open the evidence for a link.`
         : "Nothing to show yet." }),
       // Tables return null for a "Show more" line they do not need; replaceChildren would print it as the text "null".
       ...[...studyTable(), ...pathsTable(), ...otherLinksTable(), ...variablesTable()].filter(Boolean));
+    const fills = pendingFills;
+    for (const { body, items, build } of fills) {
+      for (let at = 0; at < items.length; at += ROW_CHUNK) {
+        if (at || body !== fills[0].body) await new Promise(resolve => setTimeout(resolve, 0));
+        if (token !== renderToken) return;
+        const fragment = doc.createDocumentFragment();
+        for (const item of items.slice(at, at + ROW_CHUNK)) fragment.append(...build(item));
+        body.append(fragment);
+      }
+    }
     container.scrollTop = scroll;
-    // Re-sorting or selecting rebuilds the table; keep the keyboard user where they were.
-    if (focused) [...container.querySelectorAll("button")].find(node => node.getAttribute("aria-label") === focused)?.focus();
+    restoreFocus(focused);
   }
 
   return {
@@ -307,11 +337,11 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
       // A render with nothing new (a late data load, a repeated filter) keeps the table, and the reader's place in it.
       const signature = JSON.stringify([next.headers, next.candidateHeader, next.rows, next.study, next.otherLinks, next.variableRows,
         [...next.linkById].map(([id, link]) => [id, link.direction_type])]);
-      if (signature === shownSignature) { model = next; return; }
+      if (signature === shownSignature) { model = next; return Promise.resolve(); }
       shownSignature = signature;
       model = next;
       shownRows = shownOther = shownVariables = TABLE_PAGE_SIZE;
-      render();
+      return render();
     },
     select(next) {
       const changed = next.edgeId !== selection.edgeId || next.groupId !== selection.groupId;
