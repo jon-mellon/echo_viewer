@@ -728,11 +728,21 @@ test("a published split is reviewed on the map and used without a naming step", 
       split_id: "published_new", source_group_ids: [fixture.sourceId], name: "Published fixture split",
       description: "A published fixture split taken from one source category.", storage_prefix: "fixture-owner/fixture-pub",
       membership_path: fixture.membershipPath, owner_id: "someone", published_at: "2026-10-15T00:00:00Z" }]) }));
-  await page.route("**/storage/v1/object/public/published-schemas/fixture-owner/fixture-pub/**", route => {
+  // The viewer runs on the Cloudflare source in tests (as staging ships it): the splits list comes from the worker and
+  // the publication's files from the Cloudflare address. Both sources are answered, so the test stands on either.
+  await page.route("**/echo-api.epistemicinfra.org/v1/splits**", route => route.fulfill({ contentType: "application/json",
+    headers: { "access-control-allow-origin": "*" },
+    body: JSON.stringify([{ publication_id: "00000000-0000-0000-0000-000000000001", group_id: "published_new",
+      split_id: "published_new", source_group_ids: [fixture.sourceId], name: "Published fixture split",
+      description: "A published fixture split taken from one source category.", storage_prefix: "fixture-owner/fixture-pub",
+      membership_path: fixture.membershipPath, owner_id: "someone", published_at: "2026-10-15T00:00:00Z" }]) }));
+  const serveFixtureFile = route => {
     const path = new URL(route.request().url()).pathname.split("/fixture-pub/")[1];
     return fixture.files[path] === undefined ? route.fulfill({ status: 404, body: "" })
-      : route.fulfill({ body: fixture.files[path] });
-  });
+      : route.fulfill({ body: fixture.files[path], headers: { "access-control-allow-origin": "*" } });
+  };
+  await page.route("**/storage/v1/object/public/published-schemas/fixture-owner/fixture-pub/**", serveFixtureFile);
+  await page.route("**/data.epistemicinfra.org/published-schemas/fixture-owner/fixture-pub/**", serveFixtureFile);
   await page.locator(`#definitionSourceList input[data-source-id="${sourceId}"]`).check();
   await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
   await page.locator("#definitionBrowseResults button[data-split-index]").click();

@@ -1,12 +1,13 @@
 const { test, expect } = require("./fixtures.cjs");
+const { testDefaultSource } = require("./support/default_source.cjs");
 
 const viewer = "http://127.0.0.1:8767/";
 const CLOUDFLARE = "https://data.epistemicinfra.org/published-schemas/";
 const SUPABASE_STORAGE = "/storage/v1/object/public/published-schemas/";
 const REGISTRY_FILE = "/published-schemas/_registry/";
 
-// Counts published-schema requests by where they went. (Tests answer the Cloudflare address with Supabase's copy
-// of the same file, standing in for the mirror; see tests/support/supabase_cache.cjs.)
+// Counts published-schema requests by where they went. (A page's requests are answered from the test disk cache, which
+// fills its misses from the Cloudflare mirror; see tests/support/supabase_cache.cjs.)
 function watchSources(page) {
   const seen = { cloudflare: new Set(), supabase: new Set(), workerRegistry: new Set(), supabaseRegistry: new Set(), staticRegistry: new Set() };
   page.on("request", request => {
@@ -28,14 +29,30 @@ async function open(page, url) {
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated && !window.__dagBuilderState?.publishedSchemaHydrating);
 }
 
-test("by default published schema files are read from Supabase and never from Cloudflare", async ({ page }) => {
+test("a page that names no source reads from the source the tests run on (Cloudflare, as staging ships it)", async ({ page }) => {
   const seen = watchSources(page);
   await open(page, `${viewer}?task=causes`);
+  if (testDefaultSource() === "cloudflare") {
+    expect(seen.cloudflare.size).toBeGreaterThan(10);
+    expect(seen.supabase.size).toBe(0);
+    // No Supabase call at all for the registry: its row is a static file beside the files.
+    expect(seen.staticRegistry.size).toBe(1);
+    expect(seen.supabaseRegistry.size).toBe(0);
+  } else {
+    expect(seen.supabase.size).toBeGreaterThan(10);
+    expect(seen.cloudflare.size).toBe(0);
+    expect(seen.supabaseRegistry.size).toBeGreaterThan(0);
+  }
+  expect(seen.workerRegistry.size).toBe(0);
+});
+
+test("?schema_source=supabase still reads files and the registry from Supabase", async ({ page }) => {
+  const seen = watchSources(page);
+  await open(page, `${viewer}?task=causes&schema_source=supabase`);
   expect(seen.supabase.size).toBeGreaterThan(10);
   expect(seen.cloudflare.size).toBe(0);
-  // The registry is Supabase's table, as before.
   expect(seen.supabaseRegistry.size).toBeGreaterThan(0);
-  expect(seen.workerRegistry.size).toBe(0);
+  expect(seen.staticRegistry.size).toBe(0);
 });
 
 test("?schema_source=cloudflare reads the same files from Cloudflare and keeps the choice in links", async ({ page }) => {
