@@ -11,7 +11,7 @@ bucket_name = "causal-evidence"          # the bucket behind data.epistemicinfra
 [[d1_databases]]
 binding = "DB"
 database_name = "echo-registry"
-database_id = ""                          # set from the output of `wrangler d1 create echo-registry`
+database_id = "7fb8e908-9d91-43c9-91ce-99589a9ddb3e"   # the echo-registry D1 database in the account
 migrations_dir = "migrations"
 
 [vars]

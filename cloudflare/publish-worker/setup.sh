@@ -33,7 +33,11 @@ if ! $WR secret list 2>/dev/null | grep -q OWNER_SECRET; then
   openssl rand -hex 32 | $WR secret put OWNER_SECRET >/dev/null
   echo "OWNER_SECRET set."
 fi
-if ! $WR secret list 2>/dev/null | grep -q TURNSTILE_SECRET; then
+if $WR secret list 2>/dev/null | grep -q TURNSTILE_SECRET; then
+  :
+elif [ ! -t 0 ]; then
+  echo "TURNSTILE_SECRET is not set yet (no terminal to ask in). Set it later with: npx wrangler secret put TURNSTILE_SECRET"
+else
   echo "Create a Turnstile widget (dashboard > Turnstile > Add widget; hostnames: echo.epistemicinfra.org, www.jonathanmellon.com, jonathanmellon.com)."
   echo "Keep the SITE key for the viewer; paste the SECRET key here (nothing is shown as you type):"
   read -rs TURNSTILE_SECRET
