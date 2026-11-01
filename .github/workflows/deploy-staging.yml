@@ -39,7 +39,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # Published schema files are immutable; keep them between runs instead of
-      # downloading about 5 MB per page load from Supabase every time.
+      # downloading about 5 MB per page load every time; a miss is fetched from the Cloudflare mirror, never Supabase.
       - name: Restore published schema cache
         uses: actions/cache@v4
         with:

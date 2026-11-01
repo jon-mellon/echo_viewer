@@ -128,9 +128,11 @@ made from that page keep the parameter. Publishing still writes to Supabase, and
 registry stays there. Copy the files to R2 with `mirror_published_schemas_r2.py` in
 harvest_abstracts (`analysis/10k/echo_viewer_bundle`), and rerun it after publishing a
 schema until Cloudflare is the default. The default is `DEFAULT_SCHEMA_SOURCE` in
-`site/schema_source.mjs`. Browser tests answer the Cloudflare address with Supabase's
-copy (through the disk cache) so they need no mirror; set `ECHO_REAL_CLOUDFLARE=1` to
-use the real one.
+`site/schema_source.mjs`. Browser tests and the profile scripts keep published schema files on disk (`tests/support/supabase_cache.cjs`),
+keyed by file so either address shares an entry. A missing file is fetched from the Cloudflare mirror, so CI
+sends no schema traffic to Supabase; set `ECHO_FETCH_SCHEMAS_FROM=supabase` to fetch from Supabase instead.
+Publications that are not in the mirror yet (new Supabase publications) need `mirror_published_schemas_r2.py`
+before CI can load them.
 
 ## Performance profiling
 
