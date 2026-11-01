@@ -23,6 +23,9 @@ const CLOUDFLARE_OBJECT = /^https:\/\/data\.epistemicinfra\.org\/published-schem
 // The worker's registry answers for a Cloudflare page. Rows are immutable, so they are kept on disk like the files, and a
 // page served from localhost (which the worker does not list for CORS) still gets them.
 const WORKER_REGISTRY = /^https:\/\/echo-api\.epistemicinfra\.org\/v1\/(schemas|splits)/;
+// A publication's registry row in Supabase's table (read only by a page that asks for the Supabase source). Rows never change, so
+// they are kept on disk too and a warm run makes no Supabase call at all.
+const SUPABASE_REGISTRY_ROW = /^https:\/\/xfsivvvmsgzbdnthupzg\.supabase\.co\/rest\/v1\/published_schemas\?/;
 const SUPABASE_OBJECT_BASE = "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/";
 
 /** A file's one canonical (Supabase-form) address, whichever address the page asked for. */
@@ -79,6 +82,7 @@ async function installSupabaseCache(context) {
   };
   await context.route(STORAGE_OBJECT, route => serve(route, route.request().url()));
   await context.route(WORKER_REGISTRY, route => serve(route, route.request().url()));
+  await context.route(SUPABASE_REGISTRY_ROW, route => serve(route, route.request().url()));
   await context.route(CLOUDFLARE_OBJECT, route => serve(route, route.request().url()));
 }
 

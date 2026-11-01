@@ -130,11 +130,14 @@ made from that page keep the parameter. On a Cloudflare page a publication's reg
 `analysis/10k/echo_viewer_bundle/publish_worker`). On the default source, publishing and the registry stay on Supabase. Copy the files to R2 with `mirror_published_schemas_r2.py` in
 harvest_abstracts (`analysis/10k/echo_viewer_bundle`), and rerun it after publishing a
 schema until Cloudflare is the default. The default is `DEFAULT_SCHEMA_SOURCE` in
-`site/schema_source.mjs`. Browser tests and the profile scripts keep published schema files on disk (`tests/support/supabase_cache.cjs`),
-keyed by file so either address shares an entry. A missing file is fetched from the Cloudflare mirror, so CI
-sends no schema traffic to Supabase; set `ECHO_FETCH_SCHEMAS_FROM=supabase` to fetch from Supabase instead.
-Publications that are not in the mirror yet (new Supabase publications) need `mirror_published_schemas_r2.py`
-before CI can load them.
+`site/schema_source.mjs`. Browser tests and the profile scripts run the viewer as staging ships it, on the Cloudflare source
+(`tests/support/default_source.cjs` rewrites the one default line as the page loads; the repo's default stays
+Supabase, and `ECHO_TEST_DEFAULT_SOURCE=supabase` runs the tests on it). They keep published schema files on disk
+(`tests/support/supabase_cache.cjs`), keyed by file so either address shares an entry, and a missing file is fetched from the
+Cloudflare mirror, so CI sends no schema traffic to Supabase; set `ECHO_FETCH_SCHEMAS_FROM=supabase` to fetch from Supabase
+instead. Only the one test that asks for `?schema_source=supabase` reads Supabase's registry row, and that is cached on
+disk too. `ECHO_LOG_SUPABASE_CALLS=<file>` records what a run still asks Supabase for. Publications that are not in the mirror yet
+need `mirror_published_schemas_r2.py` (in harvest_abstracts) before CI can load them.
 
 ## Performance profiling
 
