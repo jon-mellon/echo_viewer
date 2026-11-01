@@ -487,7 +487,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   async function resumeAfterOAuth() {
     const oauthDraft = jevAssist.takeResumeDraft();
-    const checkpointDraft = !oauthDraft && !state.definitionDraft
+    // Causes and Consequences have no split panel, so a restored run there would
+    // show its preview on the map with nothing the user could do about it.
+    const exploring = state.task === "causes" || state.task === "consequences";
+    const checkpointDraft = !oauthDraft && !state.definitionDraft && !exploring
       ? await jevAssist.latestResumeDraft().catch(error => {
         console.warn("Could not read saved Jev draft.", error);
         return null;
