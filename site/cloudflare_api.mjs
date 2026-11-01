@@ -2,7 +2,7 @@ import { CLOUDFLARE_API_URL, TURNSTILE_SITE_KEY } from "./cloudflare_config.mjs"
 import { solveTurnstile } from "./turnstile.mjs";
 import { publishedFileUrl } from "./schema_source.mjs";
 
-// Client for the publishing worker (cloudflare/publish-worker/README.md lists its routes).
+// Client for the publishing service (docs/publishing-api.md is the contract; the Worker itself lives in harvest_abstracts).
 const OWNER_KEY = "echo-owner-token";
 
 class CloudflareApiError extends Error {
