@@ -7,11 +7,13 @@ const SUPABASE_STORAGE = "/storage/v1/object/public/published-schemas/";
 // Counts published-schema requests by where they went. (Tests answer the Cloudflare address with Supabase's copy
 // of the same file, standing in for the mirror; see tests/support/supabase_cache.cjs.)
 function watchSources(page) {
-  const seen = { cloudflare: new Set(), supabase: new Set() };
+  const seen = { cloudflare: new Set(), supabase: new Set(), workerRegistry: new Set(), supabaseRegistry: new Set() };
   page.on("request", request => {
     const url = request.url();
     if (url.startsWith(CLOUDFLARE)) seen.cloudflare.add(url);
     else if (url.includes(SUPABASE_STORAGE)) seen.supabase.add(url);
+    else if (url.startsWith("https://echo-api.epistemicinfra.org/v1/")) seen.workerRegistry.add(url);
+    else if (url.includes("/rest/v1/published_schemas")) seen.supabaseRegistry.add(url);
   });
   return seen;
 }
@@ -29,6 +31,9 @@ test("by default published schema files are read from Supabase and never from Cl
   await open(page, `${viewer}?task=causes`);
   expect(seen.supabase.size).toBeGreaterThan(10);
   expect(seen.cloudflare.size).toBe(0);
+  // The registry is Supabase's table, as before.
+  expect(seen.supabaseRegistry.size).toBeGreaterThan(0);
+  expect(seen.workerRegistry.size).toBe(0);
 });
 
 test("?schema_source=cloudflare reads the same files from Cloudflare and keeps the choice in links", async ({ page }) => {
@@ -36,6 +41,9 @@ test("?schema_source=cloudflare reads the same files from Cloudflare and keeps t
   await open(page, `${viewer}?task=causes&schema_source=cloudflare`);
   expect(seen.cloudflare.size).toBeGreaterThan(10);
   expect(seen.supabase.size).toBe(0);
+  // The registry comes from the worker, not Supabase's table.
+  expect([...seen.workerRegistry].some(url => url.includes("/v1/schemas/"))).toBe(true);
+  expect(seen.supabaseRegistry.size).toBe(0);
   // The viewer works from it: choose a variable and read its causes.
   await page.locator('#focusGroupPicker button[data-group-id="category-sleep"]').click();
   await expect(page.locator(".explore-row").first()).toBeVisible();
