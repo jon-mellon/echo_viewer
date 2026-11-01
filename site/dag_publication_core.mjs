@@ -1,6 +1,7 @@
 import { canonicalFolderHash, stableJson, writeGroupingSchemaFolder } from "./grouping_schema_writer.mjs";
 import { publicSchemaBaseUrl, lookupPublishedSchema } from "./publication_access.mjs";
 import { PUBLISHED_SCHEMA_BUCKET } from "./publication_constants.mjs";
+import { canonicalPublishedReference, isPublishedFileUrl, publishedReferenceUrl } from "./schema_source.mjs";
 import { ensureAnonymousPublicationUser } from "./dag_anonymous_auth.mjs";
 import { createCompiledArtifacts, evidenceSnapshotForSchema, fullCompileDag,
   COMPILED_DAG_PATH, COMPILED_MANIFEST_PATH, DAG_COMPILER_VERSION } from "./compiled_dag.mjs";
@@ -91,16 +92,16 @@ export async function publishWorkingSchema({
         const [groupId, path] = candidates[next++];
         const oldPath = parent.group_membership_files?.[groupId];
         if (!oldPath) continue;
-        const url = new URL(parent.group_membership_references?.[groupId] || oldPath, base);
-        if (url.origin !== new URL(base).origin || !url.pathname.startsWith("/storage/v1/object/public/published-schemas/")) {
-          throw new Error(`Invalid parent membership reference for ${groupId}.`);
-        }
+        const reference = parent.group_membership_references?.[groupId];
+        const url = reference ? publishedReferenceUrl(reference, base) : new URL(oldPath, base);
+        if (!url || !isPublishedFileUrl(url, base)) throw new Error(`Invalid parent membership reference for ${groupId}.`);
         const oldResponse = await fetchImpl(url);
         if (!oldResponse.ok) throw new Error(`Could not read parent membership for ${groupId}: ${oldResponse.status}`);
         const oldBytes = new Uint8Array(await oldResponse.arrayBuffer());
         const current = files.get(path);
         if (oldBytes.length === current.length && oldBytes.every((byte, index) => byte === current[index])) {
-          references[groupId] = url.href;
+          // Stored as the Supabase address whichever source the parent was read from.
+          references[groupId] = canonicalPublishedReference(url);
           files.delete(path);
         }
       }

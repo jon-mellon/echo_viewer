@@ -11,7 +11,7 @@ const clampDepth = value => Math.max(1, Math.min(MAX_NEIGHBORHOOD_DEPTH, Math.tr
 export function freshProjectUrl(href) {
   const current = new URL(href);
   const fresh = new URL(current.pathname, current.origin);
-  for (const key of ["schema", "data_version", "evidence_manifest"]) {
+  for (const key of ["schema", "data_version", "evidence_manifest", "schema_source"]) {
     if (current.searchParams.has(key)) fresh.searchParams.set(key, current.searchParams.get(key));
   }
   return fresh.href;

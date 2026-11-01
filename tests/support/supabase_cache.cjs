@@ -13,6 +13,10 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const STORAGE_OBJECT = /\/storage\/v1\/object\/public\/published-schemas\//;
+// The Cloudflare mirror holds the same files at the same keys. Until it exists (and so tests do not depend on it),
+// requests for it are answered with Supabase's copy, through the same disk cache. ECHO_REAL_CLOUDFLARE=1 uses the real mirror.
+const CLOUDFLARE_OBJECT = /^https:\/\/data\.epistemicinfra\.org\/published-schemas\//;
+const SUPABASE_OBJECT_BASE = "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/";
 
 function cacheDirectory() {
   return process.env.ECHO_SUPABASE_CACHE || path.resolve(".cache/supabase-published");
@@ -22,22 +26,22 @@ async function installSupabaseCache(context) {
   if (process.env.ECHO_NO_SUPABASE_CACHE === "1") return;
   const directory = cacheDirectory();
   fs.mkdirSync(directory, { recursive: true });
-  await context.route(STORAGE_OBJECT, async route => {
+  const serve = async (route, sourceUrl) => {
     const request = route.request();
     if (request.method() !== "GET") return route.fallback();
-    const key = crypto.createHash("sha256").update(request.url()).digest("hex");
+    const key = crypto.createHash("sha256").update(sourceUrl).digest("hex");
     const bodyPath = path.join(directory, `${key}.body`);
     const metaPath = path.join(directory, `${key}.json`);
     if (fs.existsSync(bodyPath) && fs.existsSync(metaPath)) {
       const saved = JSON.parse(fs.readFileSync(metaPath, "utf8"));
-      if (process.env.ECHO_SUPABASE_CACHE_VERBOSE === "2") console.log(`[supabase-cache] served ${saved.wire ?? 0} ${request.url()}`);
+      if (process.env.ECHO_SUPABASE_CACHE_VERBOSE === "2") console.log(`[supabase-cache] served ${saved.wire ?? 0} ${sourceUrl}`);
       return route.fulfill({ status: 200, headers: saved.headers, body: fs.readFileSync(bodyPath) });
     }
-    const response = await route.fetch();
+    const response = await route.fetch({ url: sourceUrl });
     const body = response.status() === 200 ? await response.body() : null;
     // What Supabase sent over the wire (compressed), for measuring the egress this saves.
     const wire = Number(response.headers()["content-length"]) || (body ? body.length : 0);
-    if (process.env.ECHO_SUPABASE_CACHE_VERBOSE) console.log(`[supabase-cache] fetched ${wire} ${request.url()}`);
+    if (process.env.ECHO_SUPABASE_CACHE_VERBOSE) console.log(`[supabase-cache] fetched ${wire} ${sourceUrl}`);
     if (response.status() === 200) {
       const headers = { "access-control-allow-origin": "*" };
       for (const name of ["content-type", "cache-control"]) {
@@ -48,11 +52,16 @@ async function installSupabaseCache(context) {
       const stamp = `${process.pid}.${Date.now()}`;
       fs.writeFileSync(`${bodyPath}.${stamp}`, body);
       fs.renameSync(`${bodyPath}.${stamp}`, bodyPath);
-      fs.writeFileSync(`${metaPath}.${stamp}`, JSON.stringify({ url: request.url(), headers, wire }));
+      fs.writeFileSync(`${metaPath}.${stamp}`, JSON.stringify({ url: sourceUrl, headers, wire }));
       fs.renameSync(`${metaPath}.${stamp}`, metaPath);
     }
     return route.fulfill({ response });
-  });
+  };
+  await context.route(STORAGE_OBJECT, route => serve(route, route.request().url()));
+  if (process.env.ECHO_REAL_CLOUDFLARE !== "1") {
+    await context.route(CLOUDFLARE_OBJECT, route => serve(route,
+      SUPABASE_OBJECT_BASE + route.request().url().slice("https://data.epistemicinfra.org/published-schemas/".length)));
+  }
 }
 
 module.exports = { installSupabaseCache, cacheDirectory };
