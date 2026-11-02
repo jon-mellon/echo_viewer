@@ -247,6 +247,25 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionContinue.title = `Could not load variables: ${error?.message || error}`;
   }
 
+  /** Saved AI splits offered under the method choice; an empty list hides it. */
+  function showSavedRuns(rows) {
+    els.definitionResumeList.hidden = !rows.length;
+    replaceChildren(els.definitionResumeList, rows.length ? [
+      h("h3", { textContent: "Resume a saved AI split" }),
+      ...rows.map(row => {
+        const resume = h("button", { className: "action-button", type: "button", textContent: "Resume", disabled: !row.usable });
+        resume.addEventListener("click", row.onResume);
+        const discard = h("button", { className: "text-button", type: "button", textContent: "Discard" });
+        discard.addEventListener("click", row.onDiscard);
+        return h("div", { className: "definition-resume-row" },
+          h("div", {},
+            h("strong", { textContent: row.title }),
+            h("span", { className: "small-note", textContent: row.detail }),
+            row.note ? h("span", { className: "small-note", textContent: row.note }) : null),
+          resume, discard);
+      })] : []);
+  }
+
   function setJevPreviewStatus(ids, mode) {
     els.definitionMapPreviewStatus.hidden = !ids || state.definitionMethod === "manual";
     els.definitionMapPreviewStatus.textContent = ids
@@ -254,5 +273,5 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
   }
 
   return { render, showValidationError, clearDescriptionValidation, setContinueLoading, showLoadError,
-    setJevPreviewStatus, selectedTermIds: () => [...currentTermIds], changeTermPage };
+    setJevPreviewStatus, showSavedRuns, selectedTermIds: () => [...currentTermIds], changeTermPage };
 }

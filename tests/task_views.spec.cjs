@@ -230,11 +230,14 @@ test("mobile reset keeps the previous project after navigating", async ({ browse
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
+    // A slow phone reaches Reset before start-up has finished; the reset must wait for it, not fail.
+    await page.context().newCDPSession(page).then(cdp => cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 }));
     await open(page, `${viewer}?task=causes`);
     await pick(page, "category-sleep").tap();
     await page.locator("#taskReset").tap();
     await page.locator("#resetHere").tap();
-    await expect(page.locator("#taskLanding")).toBeVisible();
+    await expect(page.locator("#taskLanding")).toBeVisible({ timeout: 60000 });
+    await expect(page.locator("#resetError")).toBeHidden();
     expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
     await expect.poll(() => page.evaluate(async () => {
       const { listPreviousSessions } = await import("/local_schema_store.mjs");
@@ -312,7 +315,7 @@ test("the start page preloads the search catalog and query engine", async ({ pag
     && performance.getEntriesByName("echo:evidence:engine").length, null, { timeout: 90000 });
 });
 
-test("mobile home stays on one document and a clean URL through schema hydration", async ({ browser }) => {
+test("mobile home stays on one document while evidence warms in the background", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
@@ -323,7 +326,11 @@ test("mobile home stays on one document and a clean URL through schema hydration
     await expect(page.locator("#taskLanding")).toBeVisible();
     expect(page.url()).toBe(viewer);
     expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
-    expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:engine").length)).toBe(0);
+    await page.waitForFunction(() => performance.getEntriesByName("echo:evidence:engine").length > 0);
+    expect(page.url()).toBe(viewer);
+    expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
+    await expect(page.locator("#startupLoading")).toBeHidden();
+    await expect(page.locator("#taskLanding")).toBeVisible();
     await page.locator("#taskLanding .task-choice[data-task=causes]").tap();
     await expect(page.locator("#exploreView")).toBeVisible();
   } finally {
@@ -600,7 +607,9 @@ test("in Identify each row is a confounder path with an arrow per link that open
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
   await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await expect(page.locator("#diagnosticOverlapKey")).toBeVisible();
   await page.locator("#dagViewTable").click();
+  await expect(page.locator("#diagnosticOverlapKey")).toBeHidden();
   await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Confounder", "Route"]);
   const rows = page.locator("#dagPathsTable tbody tr");
   expect(await rows.count()).toBeGreaterThan(0);
@@ -636,6 +645,22 @@ test("in Identify each row is a confounder path with an arrow per link that open
   // Switching back restores the graph.
   await page.locator("#dagViewGraph").click();
   await expect(page.locator("#dagNetwork")).toBeVisible();
+  await expect(page.locator("#diagnosticOverlapKey")).toBeVisible();
+  // The study arrow must not carry over when the same schema is explored from one focal variable.
+  for (const [task, focus] of [["causes", "category-sleep"], ["consequences", "category-income-earnings"]]) {
+    await page.locator(`#taskBar .task-tab[data-task=${task}]`).click();
+    await pick(page, focus).click();
+    await page.locator("#dagViewGraph").click();
+    expect(await renderedEdges(page)).toBeGreaterThan(0);
+    const hasStudyArrow = await page.evaluate(async () => {
+      const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+      return api.renderedDagEdgeIds().includes("__study_design_iv_to_dv__");
+    });
+    expect(hasStudyArrow).toBe(false);
+    await page.locator("#dagViewTable").click();
+    await expect(page.locator("#dagPathsTable tbody tr").first()).toBeVisible();
+    await expect(page.locator("#dagStudyTable")).toHaveCount(0);
+  }
 });
 
 test("links the view implies beyond the paths are listed too, as many as the graph draws", async ({ page }) => {

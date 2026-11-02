@@ -120,7 +120,7 @@ function initElements() {
     "ivInput", "ivInputLabel", "ivDefineNew", "ivSeeds", "ivResults", "ivGroupPicker",
     "instrumentInput", "instrumentDefineNew", "instrumentGroupPicker",
     "schemaChoice", "loadSchema", "skipSchema",
-    "definitionBlock", "definitionTitle", "definitionCancel", "definitionMethodStep", "definitionChooseManual", "definitionChooseJev", "definitionChooseBrowse",
+    "definitionBlock", "definitionTitle", "definitionCancel", "definitionMethodStep", "definitionResumeList", "definitionChooseManual", "definitionChooseJev", "definitionChooseBrowse",
     "definitionAiSetupStep", "definitionAiSetupHost", "definitionAiChangeMethod", "definitionAiSetup", "definitionAiWork", "definitionAiResults", "definitionSourcesStep", "definitionChosenMethod", "definitionChangeMethod",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults",
     "definitionPartitionStep", "definitionMethodJev", "definitionMethodManual", "definitionLoadStatus", "definitionJevPanel", "definitionManualPanel",
@@ -1166,7 +1166,7 @@ const taskViews = createTaskViews({
     if (bothExplore) renderExploreFocus(); else renderAll({ reuseLinks: true });
   },
   openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
-  onChange: () => persistentViewer.viewerChanged(), prepareReset: () => persistentViewer.prepareReset(),
+  onChange: () => persistentViewer.viewerChanged(), prepareReset: () => persistentViewer.prepareReset(), whenReady: () => persistentViewer.whenReady(),
 });
 taskViews.install();
 
@@ -1894,6 +1894,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
     publicationController.workingCopyChanged();
   },
   onCommitFailureRestored: () => persistentViewer.clearSaveFailure(),
+  onFocusDefined: groupId => taskViews.chooseFocus(groupId),
   onInstrumentReady: () => shellController.showMobilePanel("dag"),
   prewarmEvidence: async () => {
     if (await dagDataSource.prewarmVariableMap(state.variableLayoutSource)) return;

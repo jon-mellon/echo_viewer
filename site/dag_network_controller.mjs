@@ -209,19 +209,21 @@ function tableRole(group) {
   return "";
 }
 
-function renderDagTable(groups, links) {
+async function renderDagTable(groups, links) {
   _dagTable ||= createDagTable({ container: els.dagTable, onOpenVariable: openVariable, onOpenEvidence: openEvidence });
-  const studyLinks = studyDesignEdgeData(groups, state.project).map(edge => ({
+  const studyLinks = studyDesignEdgeData(groups, state.project, state.task).map(edge => ({
     edgeId: edge.id, sourceId: edge.from, targetId: edge.to,
     note: edge.id === STUDY_DESIGN_EDGE_ID ? "Study relationship" : "Study instrument",
   }));
   const view = pathView({ ...state, exploring: exploring() });
   const pathsByGroup = { exogeneity: state.exogeneityPathsByGroup, exclusion: state.exclusionPathsByGroup,
     colliders: state.colliderPathsByGroup, confounders: state.confounderPathsByGroup }[view];
-  _dagTable.update(dagTableModel({ view, groups, links, pathsByGroup, exploreRows: view === "explore" ? exploreRows() : [],
+  const built = _dagTable.update(dagTableModel({ view, groups, links, pathsByGroup, exploreRows: view === "explore" ? exploreRows() : [],
     anchors: studyAnchors(), maxPathLength: view === "exclusion" ? state.exclusionMaxPathLength : state.confounderMaxPathLength,
     roleFor: tableRole, studyLinks }));
   _dagTable.select({ edgeId: state.selectedEdgeId, groupId: state.selectedEvidenceGroupId });
+  // The table builds in chunks; the render is done when every row is in.
+  await built;
 }
 
 function showDagDisplay() {
@@ -473,7 +475,7 @@ async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } =
   if (els.dagTable.hidden === tableShown()) showDagDisplay();
   if (tableShown()) {
     // No layout: the graph is rebuilt from the same groups and links when it is shown again.
-    renderDagTable(groups, links);
+    await renderDagTable(groups, links);
     resolveRendered();
     return;
   }
@@ -596,7 +598,7 @@ async function applyDagRender(groups, layout, routes) {
   _dagBoundsCache = null;
   const previousNodeData = _dagNodeDataById;
   _dagNodeDataById = new Map(nodeData.map(node => [node.id, node]));
-  edgeData.push(...studyDesignEdgeData(groups, state.project));
+  edgeData.push(...studyDesignEdgeData(groups, state.project, state.task));
   _dagEdgeSegments = edgeSegments;
   _renderedSelectedEdgeId = state.selectedEdgeId;
 
