@@ -1,5 +1,5 @@
 import { h, replaceChildren } from "./dom_builder.mjs";
-import { jevRunId, loadJevRun, latestJevRun, saveJevRun, saveJevBatch, deleteJevRun } from "./definition_jev_checkpoint.mjs";
+import { jevRunId, loadJevRun, listJevRuns, saveJevRun, saveJevBatch, deleteJevRun } from "./definition_jev_checkpoint.mjs";
 import { JEV_MODEL as MODEL, JEV_BATCH_SIZE as BATCH_SIZE, JEV_TEST_SIZE as TEST_SIZE, cappedKeyStatus, randomSampleIds, jevRecords, jevRequest, jevResults, openRouterJson, parseJevPricing, jevRequestSizes, estimatedJevCharge } from "./definition_jev_core.mjs";
 export { cappedKeyStatus, randomSampleIds } from "./definition_jev_core.mjs";
 
@@ -120,7 +120,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
 
   function checkpointSource(draft, description) {
     return { version: 1, model: MODEL, description,
-      role: draft.role, split_id: draft.split_id || null,
+      split_id: draft.split_id || null,
       source_snapshot: draft.source_snapshot,
       eligible_variable_ids: draft.eligible_variable_ids,
       records: recordsFor(draft.eligible_variable_ids) };
@@ -737,5 +737,5 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   }
 
   return { install, render, clearPreview, takeResumeDraft, restoreForDraft,
-    latestResumeDraft: async () => (await latestJevRun())?.draft || null };
+    listSavedRuns: listJevRuns, discardSavedRun: deleteJevRun };
 }

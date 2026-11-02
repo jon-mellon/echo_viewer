@@ -582,6 +582,11 @@ test("Jev test and full split resume saved batches after failure and reload", as
     await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/50 saved)");
     const failedTestBatch = requestedBatches[1];
     await page.reload({ waitUntil: "domcontentloaded" });
+    // Nothing is restored on load; the saved run is offered from Define.
+    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+    await expect(page.locator("#definitionPartitionStep")).toBeHidden();
+    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionResumeList button", { hasText: "Resume" }).click();
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
     await page.locator("#definitionAiConnect").click();
     await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/50 saved)");
@@ -606,6 +611,9 @@ test("Jev test and full split resume saved batches after failure and reload", as
     const failedBatch = requestedBatches[6];
     expect(decisions).toBe(7);
     await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionResumeList button", { hasText: "Resume" }).click();
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
     await page.locator("#definitionAiConnect").click();
     await expect(page.locator("#definitionAiFullRun")).toContainText("Resume full split (16/");
@@ -898,4 +906,85 @@ test("Label 50 more appends to the list, sorts new first, and Name and review sk
   } finally {
     await context.close();
   }
+});
+
+test("Causes offers Define a variable and the new variable becomes the focus without changing the anchors", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page, { warnings: true });
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem("dag2-test-initialized")) {
+      localStorage.clear();
+      sessionStorage.setItem("dag2-test-initialized", "1");
+    }
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+  });
+  await page.goto("http://127.0.0.1:8767/?task=causes", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+
+  const define = page.locator("#focusGroupPicker [data-define-focus]");
+  await expect(define).toBeVisible();
+  const anchorsBefore = await page.evaluate(() => {
+    const { iv_group_id, dv_group_id } = window.__dagBuilderState.project;
+    return { iv_group_id, dv_group_id };
+  });
+  await define.click();
+  await page.locator("#definitionChooseManual").click();
+  const usable = page.locator("#definitionSourceList input[data-source-id]");
+  await expect(usable.nth(0)).toBeVisible();
+  await usable.nth(0).check();
+  await page.locator("#definitionContinue").click();
+  await expect(page.locator("body"), browserErrors.errors.join("\n")).toHaveClass(/defining-variable/);
+  await page.locator("#definitionMethodManual").click();
+  const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
+  await page.locator("#definitionVariableSearch").fill(variableId);
+  await page.locator("#definitionVariableResults .result-button").first().click();
+  await page.locator("#definitionReview").click();
+  await page.locator("#definitionNewLabel").fill("Browser focus construct");
+  await page.locator("#definitionNewDescription").fill("A browser test construct defined from the causes view.");
+  const residuals = page.locator("#definitionResidualLabels input[data-residual-id]");
+  for (let i = 0; i < await residuals.count(); i++) await residuals.nth(i).fill(`Browser residual ${i}`);
+  await page.locator("#definitionSave").click();
+
+  await expect(page.locator("body")).not.toHaveClass(/defining-variable/);
+  const result = await page.evaluate(() => {
+    const state = window.__dagBuilderState;
+    const group = state.project.groups.find(candidate => candidate.label === "Browser focus construct");
+    return { task: state.task, groupId: group?.group_id, anchors: { iv_group_id: state.project.iv_group_id,
+      dv_group_id: state.project.dv_group_id }, title: document.querySelector("#dagViewTitle")?.textContent };
+  });
+  expect(result.task).toBe("causes");
+  expect(result.anchors).toEqual(anchorsBefore);
+  expect(result.title).toContain("Browser focus construct");
+  expect(browserErrors.errors).toEqual([]);
+});
+
+test("a saved AI split is not restored on load; Define offers it in Causes and resumes it", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  const ready = () => page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState.publishedSchemaHydrated);
+  await page.goto("http://127.0.0.1:8767/?task=causes", { waitUntil: "domcontentloaded" });
+  await ready();
+  await page.evaluate(async () => {
+    const { saveJevRun } = await import("/definition_jev_checkpoint.mjs");
+    const group = window.__dagBuilderState.project.groups.find(candidate => candidate.variable_ids?.length > 3);
+    await saveJevRun({ id: "seeded-run", sampleIds: [], createdAt: Date.now(), draft: {
+      role: "iv", step: "partition", source_group_ids: [group.group_id],
+      source_snapshot: [{ group_id: group.group_id, label: group.label, variable_ids: [...group.variable_ids] }],
+      eligible_variable_ids: [...group.variable_ids], new_variable_ids: [], new_label: "", new_description: "",
+      residual_labels: {}, reviewed_variable_ids: [], ai_description: "Seeded saved split" } });
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await ready();
+  expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft)).toBeNull();
+  await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
+
+  await page.locator("#focusGroupPicker [data-define-focus]").click();
+  const row = page.locator("#definitionResumeList .definition-resume-row");
+  await expect(row).toContainText("Seeded saved split");
+  await row.getByRole("button", { name: "Resume" }).click();
+  await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+  expect(await page.evaluate(() => {
+    const draft = window.__dagBuilderState.definitionDraft;
+    return { step: draft.step, role: draft.role, description: draft.ai_description };
+  })).toEqual({ step: "partition", role: "candidate", description: "Seeded saved split" });
+  await page.evaluate(async () => (await import("/definition_jev_checkpoint.mjs")).deleteJevRun("seeded-run"));
 });
