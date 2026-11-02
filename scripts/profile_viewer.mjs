@@ -120,6 +120,12 @@ async function snapshot() {
   }));
 }
 
+// The Filters dropdown closes on an outside click, so reopen it before steps that need its controls.
+async function openFilters() {
+  const dropdown = page.locator(".filter-dropdown");
+  if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
+}
+
 async function measure(name, action) {
   const before = await snapshot();
   const startedAt = Date.now();
@@ -487,6 +493,7 @@ try {
     ["bottleneck filter", "toggleBottleneckedConfounders", "excludeBottleneckedConfounders"],
     ["path links filter", "toggleIrrelevantConfounderLinks", "hideIrrelevantConfounderLinks"],
   ]) {
+    if (["toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks"].includes(id)) await openFilters();
     await measure(name, async () => {
       const previous = await page.evaluate(key => window.__dagBuilderState[key], stateKey);
       await page.locator(`#${id}`).click();
@@ -495,6 +502,7 @@ try {
       await waitForGraph();
     });
   }
+  await openFilters();
   await measure("path length", async () => {
     await page.locator("#confounderPathLength").fill("2");
     await page.waitForFunction(() => window.__dagBuilderState.confounderMaxPathLength === 2);
