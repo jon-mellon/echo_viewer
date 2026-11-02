@@ -42,7 +42,7 @@ test("share rebuilds a published permalink from the current view state", () => {
 test("successful sharing gives visible feedback on the share button", () => {
   assert.match(source, /button\.textContent = "✓ Copied"/);
   assert.match(source, /button\.classList\.add\("share-copied"\)/);
-  assert.match(source, /button\.textContent = "Share view"/);
+  assert.match(source, /button\.textContent = "Share"/);
   assert.match(source, /showShareCopied\(\)/);
 });
 
