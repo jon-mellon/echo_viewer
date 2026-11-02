@@ -179,7 +179,7 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
     return node;
   }
   const button = (text, label, onClick, props = {}) => {
-    const node = el("button", { type: "button", class: "text-button dag-table-action", "aria-label": label, text, ...props });
+    const node = el("button", { type: "button", class: "btn btn--ghost dag-table-action", "aria-label": label, text, ...props });
     node.addEventListener("click", onClick);
     return node;
   };
@@ -197,12 +197,12 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
           const both = link?.direction_type === "BIDIRECTIONAL";
           const selected = edgeId === selection.edgeId;
           cell.append(button(both ? "⟷" : "⟶", `Show the evidence for ${from} to ${to}`, () => onOpenEvidence(edgeId),
-            { class: `text-button dag-table-action dag-table-arrow${selected ? " selected" : ""}`, "data-edge-id": edgeId,
+            { class: `btn btn--ghost dag-table-action dag-table-arrow${selected ? " selected" : ""}`, "data-edge-id": edgeId,
               "aria-pressed": selected ? "true" : "false" }));
         } else cell.append(el("span", { class: "dag-table-arrow", "aria-hidden": "true", text: "⟶" }));
       }
       cell.append(button(node.label, `Open the definition of ${node.label}`, () => onOpenVariable(node.id),
-        { class: "text-button dag-table-action dag-table-node", "data-group-id": node.id }));
+        { class: "btn btn--ghost dag-table-action dag-table-node", "data-group-id": node.id }));
     });
     return cell;
   }
@@ -243,7 +243,7 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
         if (model.candidateHeader && index === 0) {
           const cell = el("th", { scope: "row", rowspan: routes.length, class: "dag-table-candidate" },
             button(row.label, `Open the definition of ${row.label}`, () => onOpenVariable(row.id),
-              { class: "text-button dag-table-action dag-table-node", "data-group-id": row.id }));
+              { class: "btn btn--ghost dag-table-action dag-table-node", "data-group-id": row.id }));
           tr.append(cell);
         }
         if (model.candidateHeader) {
@@ -255,8 +255,7 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence }) {
       return trs;
     };
     pendingFills.push({ body, items: rows.slice(0, shownRows), build: buildRows });
-    const table = el("table", { class: "dag-table", id: "dagPathsTable" },
-      el("caption", { text: `Paths in this view (${model.pathCount})` }),
+    const table = el("table", { class: "dag-table", id: "dagPathsTable", "data-path-count": model.pathCount },
       el("thead", {}, el("tr", {}, ...columns)), body);
     return [table, more(shownRows, rows.length, model.candidateHeader ? "variables" : "paths", () => { shownRows += TABLE_PAGE_SIZE; render(); })];
   }

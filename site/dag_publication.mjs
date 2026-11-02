@@ -118,13 +118,13 @@ export function createPublicationController({
     const button = elements.share;
     if (!button) return;
     clearTimeout(shareFeedbackTimer);
-    button.textContent = "✓ Copied";
     button.classList.add("share-copied");
-    button.setAttribute("aria-label", "View link copied to clipboard");
+    button.setAttribute("aria-label", "Copied");
+    button.title = "Link copied";
     shareFeedbackTimer = setTimeout(() => {
-      button.textContent = "Share view";
       button.classList.remove("share-copied");
-      button.removeAttribute("aria-label");
+      button.setAttribute("aria-label", "Share view");
+      button.title = "Copy a link to this view";
     }, 2400);
   }
 

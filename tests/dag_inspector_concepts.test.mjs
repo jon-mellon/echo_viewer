@@ -157,7 +157,7 @@ test("a finding's exclude control waits for both concept labels", () => {
     assert.equal(elements.provenancePanel.findAll("button").length, 0);
     state.variableById.set("v2", { concept_label: "Target" });
     controller.renderProvenance();
-    assert.equal(elements.provenancePanel.findAll("button")[0].textContent, "×");
+    assert.equal(elements.provenancePanel.findAll("button")[0].textContent, "Exclude");
     elements.provenancePanel.findAll("button")[0].click();
     assert.ok(elements.provenancePanel.findAll("option")
       .some(option => option.textContent === "Concept miscategorized"));
@@ -267,7 +267,7 @@ test("concept exclude control passes the selected concept to the group update pa
       excludeConcept: (...args) => exclusions.push(args),
     }).renderGroupDefinition();
     const button = elements.edgeInspector.querySelector("[data-exclude-concept-id]");
-    assert.equal(button.textContent, "×");
+    assert.equal(button.textContent, "Exclude");
     button.click();
     assert.deepEqual(exclusions, [["g1", "v1", "Concept one"]]);
   } finally {

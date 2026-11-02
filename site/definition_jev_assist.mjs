@@ -66,7 +66,10 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   let busy = false;
   let activePhase = null;
   let activeRequest = null;
-  let message = "After connecting, set a non-resetting $5 or lower maximum spend in OpenRouter key settings. This key cannot run classification until it passes the limit check.";
+  let message = "";
+  // "idle" before a key exists, then "checking", "ok", "invalid" (the key breaks a rule) or "error" (the check itself failed).
+  let keyCheck = "idle";
+  const LOW_SCORE = 0.65;
   let runRevision = 0;
   let checkpoint = null;
   let checkpointDraft = null;
@@ -262,11 +265,16 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
 
   function renderSummary(draft) {
     const newCount = preview.filter(item => item.side === "new").length;
-    const uncertain = preview.filter(item => item.confidence < 0.65).length;
-    const counts = `${newCount} suggested for new · ${preview.length - newCount} leftover · ${uncertain} lower-score choices.`;
-    els.definitionAiSummary.textContent = previewMode === "test"
-      ? `Labeled ${preview.length} of ${draft.eligible_variable_ids.length} variables. ${counts} Review the choices, then label more or run the full split. Name and review is available once every variable is labeled.`
-      : `${counts} This is a preview; your draft has not changed. Spot check the choices, then use them in your draft. Every choice is included, even those not shown here.`;
+    const low = preview.filter(item => item.confidence < LOW_SCORE).length;
+    const total = draft.eligible_variable_ids.length;
+    replaceChildren(els.definitionAiSummary,
+      h("div", { className: "definition-ai-counts" },
+        h("span", {}, h("strong", { textContent: newCount.toLocaleString() }), " suggested In"),
+        h("span", {}, h("strong", { textContent: (preview.length - newCount).toLocaleString() }), " suggested Out"),
+        h("span", {}, h("strong", { textContent: low.toLocaleString() }), ` low score (under ${Math.round(LOW_SCORE * 100)}%)`)),
+      h("p", { className: "small-note", textContent: previewMode === "test"
+        ? `${preview.length.toLocaleString()} of ${total.toLocaleString()} concepts classified. Change any suggestion you disagree with; the AI's instructions stay the same.`
+        : `All ${total.toLocaleString()} concepts classified. Low-score suggestions are listed first. Every suggestion is used, including those not shown.` }));
   }
 
   function recordsFor(ids) { return jevRecords(ids, getVariable); }
@@ -332,76 +340,138 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     els.definitionAiReviewFilter.value = reviewFilter;
     const rows = [...(reviewFilter === "spot" ? spotRows
       : reviewFilter === "all" ? preview
-        : preview.filter(item => reviewFilter === "uncertain" ? item.confidence < 0.65 : item.side === reviewFilter))]
+        : preview.filter(item => reviewFilter === "uncertain" ? item.confidence < LOW_SCORE : item.side === reviewFilter))]
       .sort(bySide);
     const pageCount = Math.max(1, Math.ceil(rows.length / REVIEW_PAGE_SIZE));
     reviewPage = Math.min(reviewPage, pageCount - 1);
     const start = reviewPage * REVIEW_PAGE_SIZE;
     const shown = rows.slice(start, start + REVIEW_PAGE_SIZE);
-    els.definitionAiReviewPage.textContent = `${rows.length ? start + 1 : 0}–${Math.min(start + REVIEW_PAGE_SIZE, rows.length)} of ${rows.length}`;
+    els.definitionAiReviewPage.textContent = rows.length
+      ? `${start + 1}–${Math.min(start + REVIEW_PAGE_SIZE, rows.length)} of ${rows.length}` : "";
+    els.definitionAiReviewPrev.hidden = els.definitionAiReviewNext.hidden = pageCount <= 1;
     els.definitionAiReviewPrev.disabled = reviewPage === 0;
     els.definitionAiReviewNext.disabled = reviewPage >= pageCount - 1;
-    replaceChildren(els.definitionAiRows, shown.length ? shown.map(item => h("div", { className: "definition-ai-row" },
-      h("span", { textContent: `${item.label} · ${Math.round(item.confidence * 100)}% model score` }),
-      h("select", { dataset: { variableId: item.id }, attrs: { "aria-label": `Side for ${item.label}` } },
-        h("option", { value: "new", textContent: "New variable", selected: item.side === "new" }),
-        h("option", { value: "leftover", textContent: "Leftover", selected: item.side === "leftover" }))))
-      : h("div", { className: "small-note", textContent: "No results in this view. Choose another filter to inspect more." }));
-    els.definitionAiRows.querySelectorAll("select[data-variable-id]").forEach(select =>
-      select.addEventListener("change", () => {
-        const item = preview.find(entry => entry.id === select.dataset.variableId);
-        if (item) item.side = select.value;
+    const side = (item, value, text, verb) => h("button", { type: "button",
+      className: item.side === value ? "active" : "", dataset: { aiSide: value, variableId: item.id },
+      attrs: { "aria-pressed": String(item.side === value), "aria-label": `${verb} “${item.label}”` }, textContent: text });
+    replaceChildren(els.definitionAiRows, shown.length ? shown.map(item => {
+      const low = item.confidence < LOW_SCORE;
+      return h("div", { className: `definition-ai-row${low ? " is-low" : ""}`, role: "listitem" },
+        h("span", { className: "definition-ai-row-label", textContent: item.label }),
+        h("span", { className: "definition-ai-row-score", title: "The model's score for its choice",
+          textContent: `${low ? "Low score · " : ""}${Math.round(item.confidence * 100)}%` }),
+        h("div", { className: "definition-side-buttons", role: "group", attrs: { "aria-label": `AI suggestion for ${item.label}` } },
+          side(item, "new", "In", "Suggest including"), side(item, "leftover", "Out", "Suggest excluding")));
+    }) : h("p", { className: "small-note", textContent: "No suggestions in this view. Choose another filter." }));
+    els.definitionAiRows.querySelectorAll("button[data-ai-side]").forEach(button =>
+      button.addEventListener("click", () => {
+        const item = preview.find(entry => entry.id === button.dataset.variableId);
+        if (item) item.side = button.dataset.aiSide;
         onPreviewChange(preview.filter(entry => entry.side === "new").map(entry => entry.id), previewMode);
         renderSummary(draft);
         renderReviewRows(draft);
       }));
   }
 
+  function setStep(element, stepState) {
+    element.dataset.state = stepState;
+    if (stepState === "current" || stepState === "error") element.setAttribute("aria-current", "step");
+    else element.removeAttribute("aria-current");
+  }
+
   function render() {
     const draft = getDraft();
     const active = draft?.step === "partition";
-    if (active && els.definitionAiDescription.value !== (draft.ai_description || "")) {
+    if (active && document.activeElement !== els.definitionAiDescription
+      && els.definitionAiDescription.value !== (draft.ai_description || "")) {
       els.definitionAiDescription.value = draft.ai_description || "";
     }
-    els.definitionAiConnect.hidden = Boolean(key);
-    els.definitionAiRecheck.hidden = !key;
-    els.definitionAiDisconnect.hidden = !key;
     els.definitionMethodJev.disabled = busy;
     els.definitionMethodManual.disabled = busy;
     const description = String(draft?.ai_description || "").trim();
     if (active && description) void restoreForDraft().catch(() => {});
-    const canRun = active && key && !cappedKeyStatus(keyInfo) && !busy && description
+    const limitOk = Boolean(key) && keyCheck === "ok";
+    const canRun = active && limitOk && !busy && description
       && [...description].length >= 20 && draft.eligible_variable_ids?.length;
-    els.definitionAiRun.disabled = activePhase === "test" ? false : !canRun;
+    const eligibleCount = draft?.eligible_variable_ids?.length || 0;
+    const sampleSize = Math.min(TEST_SIZE, eligibleCount || TEST_SIZE);
     const testSaved = completedCount("test");
     const fullSaved = completedCount("full");
-    els.definitionAiRun.textContent = activePhase === "test" ? "Stop test (save progress)"
-      : testSaved && !testResults ? `Resume test (${testSaved}/${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)} saved)`
-        : testResults ? `Review saved ${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)}-variable test`
-          : `Test split on ${Math.min(TEST_SIZE, draft?.eligible_variable_ids?.length || TEST_SIZE)} variables`;
-    replaceChildren(els.definitionAiStatus, h("span", { textContent: message }),
-      settingsUrl ? h("a", { href: settingsUrl, target: "_blank", rel: "noopener noreferrer",
-        textContent: "Open key settings" }) : null);
-    renderCost(draft, description);
     const currentTest = sampleDraft === draft && sampleSignature === eligibleSignature(draft)
       && testDescription === description && Boolean(testResults?.length);
-    const showPreview = active && currentTest && previewDraft === draft && preview?.length;
-    els.definitionAiPreview.hidden = !showPreview;
-    els.definitionAiFullRun.hidden = !showPreview || previewMode !== "test";
-    els.definitionAiFullRun.disabled = activePhase === "full" ? false : !canRun;
-    els.definitionAiFullRun.textContent = activePhase === "full" ? "Stop full run (save progress)" : fullSaved
-      ? `Resume full split (${fullSaved}/${Math.max(0, (draft?.eligible_variable_ids?.length || 0) - (sampleIds?.length || 0))} saved)`
-      : "Run full split";
-    const eligibleCount = draft?.eligible_variable_ids?.length || 0;
+    const showPreview = Boolean(active && currentTest && previewDraft === draft && preview?.length);
+    const fullDone = showPreview && previewMode === "full";
+
+    // 1 · Connect
+    setStep(els.definitionAiStepConnect, key ? "done" : "current");
+    els.definitionAiConnectSummary.textContent = key ? "Connected" : "";
+    els.definitionAiConnect.hidden = Boolean(key);
+    els.definitionAiDisconnect.hidden = !key || busy;
+
+    // 2 · Spending limit: explained once, then whatever the check found.
+    const limitState = !key ? "todo" : keyCheck === "ok" ? "done"
+      : keyCheck === "invalid" || keyCheck === "error" ? "error" : "current";
+    setStep(els.definitionAiStepLimit, limitState);
+    els.definitionAiLimitSummary.textContent = limitOk && keyInfo
+      ? `$${keyInfo.limit} cap · $${Number(keyInfo.limit_remaining).toFixed(2)} left` : "";
+    els.definitionAiLimitText.textContent = !key
+      ? "The key needs a maximum spend of $5 or less that never resets. This is checked after you connect."
+      : keyCheck === "checking" ? "Checking the key's spending limit…"
+        : keyCheck === "invalid" || keyCheck === "error" ? message
+          : "The key needs a maximum spend of $5 or less that never resets.";
+    els.definitionAiLimitText.classList.toggle("is-error", limitState === "error");
+    els.definitionAiRecheck.hidden = !key || keyCheck === "ok" || keyCheck === "checking";
+    replaceChildren(els.definitionAiSettingsLink, key && settingsUrl && limitState === "error"
+      ? h("a", { href: settingsUrl, target: "_blank", rel: "noopener noreferrer", textContent: "Open key settings on OpenRouter ↗" }) : null);
+
+    // 3 · Sample
+    setStep(els.definitionAiStepSample, !limitOk && !currentTest ? "todo" : fullDone ? "done" : "current");
+    els.definitionAiSampleSummary.textContent = currentTest ? `${testResults.length.toLocaleString()} classified` : "";
+    els.definitionAiRun.hidden = currentTest && activePhase !== "test";
+    els.definitionAiRun.disabled = activePhase === "test" ? false : !canRun;
+    els.definitionAiRun.textContent = activePhase === "test" ? "Stop (progress is saved)"
+      : testSaved && !testResults ? `Resume the sample (${testSaved} of ${sampleSize} done)`
+        : `Classify a sample of ${sampleSize}`;
     const labeled = testResults?.length || 0;
     const canLabelMore = showPreview && previewMode === "test" && !fullSaved && labeled < eligibleCount;
-    els.definitionAiMore.hidden = !canLabelMore;
+    els.definitionAiMore.hidden = !canLabelMore && activePhase !== "more";
     els.definitionAiMore.disabled = activePhase === "more" ? false : !canRun;
-    els.definitionAiMore.textContent = activePhase === "more" ? "Stop (save progress)"
-      : sampleIds?.length > labeled ? `Resume labeling (${completedCount("test") - labeled}/${sampleIds.length - labeled} saved)`
-        : `Label ${Math.min(TEST_SIZE, eligibleCount - labeled)} more`;
-    els.definitionAiApply.hidden = !showPreview || previewMode !== "full";
+    els.definitionAiMore.textContent = activePhase === "more" ? "Stop (progress is saved)"
+      : sampleIds?.length > labeled ? `Resume (${completedCount("test") - labeled} of ${sampleIds.length - labeled} done)`
+        : `Classify ${Math.min(TEST_SIZE, eligibleCount - labeled)} more`;
+    renderCost(draft, description);
+    els.definitionAiCost.hidden = !limitOk || fullDone;
+
+    // 4 · The rest, then review and use.
+    setStep(els.definitionAiStepFull, !currentTest ? "todo" : "current");
+    const remaining = Math.max(0, eligibleCount - (sampleIds?.length || 0));
+    els.definitionAiFullSummary.textContent = "";
+    els.definitionAiFullText.textContent = !currentTest ? "Available after the sample."
+      : fullDone ? "Check the suggestions below, then use them. Your choices don't change until you do."
+        : `The AI classifies the other ${remaining.toLocaleString()} concepts. You review its suggestions before they are used.`;
+    els.definitionAiFullRun.hidden = !currentTest || fullDone;
+    els.definitionAiFullRun.disabled = activePhase === "full" ? false : !canRun;
+    els.definitionAiFullRun.textContent = activePhase === "full" ? "Stop (progress is saved)" : fullSaved
+      ? `Resume (${fullSaved} of ${remaining} done)` : `Classify the remaining ${remaining.toLocaleString()} concepts`;
+    const manualChoices = draft?.reviewed_variable_ids?.length || 0;
+    els.definitionAiApply.hidden = !fullDone;
     els.definitionAiApply.disabled = busy;
+    els.definitionAiApply.textContent = manualChoices ? "Replace my choices with these suggestions" : "Use these suggestions";
+    els.definitionAiApplyNote.hidden = !fullDone || !manualChoices;
+    els.definitionAiApplyNote.textContent = `This replaces your ${manualChoices.toLocaleString()} existing choices: concepts suggested In become included and all others excluded. You can undo it in Choose manually.`;
+    els.definitionAiDiscard.hidden = !showPreview || busy;
+
+    // Progress and errors sit with the step they belong to.
+    const statusHost = !key ? (message ? els.definitionAiStepConnect.querySelector(".definition-ai-step-body") : null)
+      : limitState === "error" || keyCheck === "checking" ? null
+      : activePhase === "full" || fullSaved || fullDone ? els.definitionAiFullHost : els.definitionAiSampleHost;
+    const statusText = statusHost ? message : "";
+    els.definitionAiStatus.textContent = statusText;
+    els.definitionAiStatus.hidden = !statusText;
+    if (statusHost && els.definitionAiStatus.parentElement !== statusHost) statusHost.prepend(els.definitionAiStatus);
+    const previewHost = previewMode === "full" ? els.definitionAiFullHost : els.definitionAiSampleHost;
+    if (els.definitionAiPreview.parentElement !== previewHost) previewHost.append(els.definitionAiPreview);
+    els.definitionAiPreview.hidden = !showPreview;
     if (!showPreview) return;
     renderSummary(draft);
     renderReviewRows(draft);
@@ -410,9 +480,19 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   async function checkKey(signal) {
     if (!key) return false;
     keyInfo = null;
+    keyCheck = "checking";
     onConnectionChange(false);
     render();
-    const body = await openRouterJson("/api/v1/key", key, { signal });
+    let body;
+    try {
+      body = await openRouterJson("/api/v1/key", key, { signal });
+    } catch (error) {
+      // A failed check says nothing about the key; it can simply be retried.
+      keyCheck = "error";
+      message = `Could not check the limit: ${error.message}. Try again.`;
+      render();
+      throw error;
+    }
     keyInfo = body.data;
     const problem = cappedKeyStatus(keyInfo);
     pricing = null;
@@ -423,7 +503,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       } catch { /* The split can still run if pricing is temporarily unavailable. */ }
     }
     if (signal?.aborted) return false;
-    message = problem || `Connected. This key has a $${keyInfo.limit} non-resetting cap and $${Number(keyInfo.limit_remaining).toFixed(2)} remaining.`;
+    keyCheck = problem ? "invalid" : "ok";
+    message = problem || "";
     render();
     onConnectionChange(!problem);
     return !problem;
@@ -584,7 +665,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       previewMode = "test";
       spotRows = spotCheckResults(preview);
       onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "test");
-      message = "Test ready. Review the sample, then label more or run the full split.";
+      message = "";
     } catch (error) {
       if (revision === runRevision) message = `Test paused: ${error.message} Completed batches are saved in this browser. Resume the test when ready.`;
     } finally {
@@ -631,7 +712,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       preview = testResults;
       spotRows = spotCheckResults(preview);
       onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "test");
-      message = `${testResults.length} of ${draft.eligible_variable_ids.length} variables labeled. Review them, label more, or run the full split.`;
+      message = "";
     } catch (error) {
       if (revision === runRevision) message = `Labeling paused: ${error.message} Completed batches are saved in this browser. Resume when ready.`;
     } finally {
@@ -671,7 +752,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       reviewFilter = "spot";
       reviewPage = 0;
       onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "full");
-      message = "Full suggestions ready. Review them before applying.";
+      message = "";
     } catch (error) {
       if (revision === runRevision) message = `Full run paused: ${error.message} ${completedCount("full")} completed variables are saved in this browser. Resume when ready.`;
     } finally {
@@ -699,9 +780,9 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       });
     });
     els.definitionAiDisconnect.addEventListener("click", () => {
-      key = null; keyInfo = null; pricing = null;
+      key = null; keyInfo = null; pricing = null; keyCheck = "idle";
       onConnectionChange(false);
-      message = "Disconnected from OpenRouter in this tab. You can revoke the key in OpenRouter.";
+      message = "";
       clearPreview({ keepCheckpoint: true });
     });
     els.definitionAiRun.addEventListener("click", () => activePhase === "test" ? stopRun() : void runTest());

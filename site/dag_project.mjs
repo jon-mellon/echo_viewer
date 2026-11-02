@@ -414,6 +414,50 @@ export function updateSplitCategories(project, {
   };
 }
 
+/** The custom variable a user made, when it can still be edited or deleted. */
+export function customVariableContext(project, groupId) {
+  const context = editableSplitContext(project, groupId);
+  return context && context.newGroup.group_id === groupId ? context : null;
+}
+
+/**
+ * Undo a split: the custom variable's concepts go back to the variables they
+ * came from, those variables get their names back, and the custom variable is
+ * removed. Roles that pointed at it are cleared.
+ */
+export function deleteSplitCategories(project, { groupId, timestamp }) {
+  const context = customVariableContext(project, groupId);
+  if (!context) throw new Error("This variable was changed by a later edit and cannot be deleted.");
+  const { splitId, newGroup, residuals } = context;
+  const owners = newGroup.provenance.source_group_by_variable;
+  const returned = new Map(residuals.map(group => [group.group_id, []]));
+  for (const id of newGroup.variable_ids || []) returned.get(owners[id])?.push(id);
+  const removedIds = new Set([newGroup.group_id]);
+  const groups = project.groups.filter(group => !removedIds.has(group.group_id)).map(group => {
+    if (!returned.has(group.group_id)) return group;
+    const priorLabel = String(group.provenance?.prior_label || "").trim();
+    const { provenance, ...rest } = group;
+    return { ...rest, label: priorLabel || group.label,
+      variable_ids: [...group.variable_ids, ...returned.get(group.group_id)],
+      updated_at: timestamp };
+  });
+  // Restoring an old name must not collide with a variable named since.
+  const labels = groups.map(group => String(group.label || "").trim().toLowerCase()).filter(Boolean);
+  if (new Set(labels).size !== labels.length) {
+    throw new Error("A variable now uses one of the original names; rename it before deleting this one.");
+  }
+  const clearRole = key => (project[key] === groupId ? { [key]: null } : {});
+  return { ...project, groups,
+    ...clearRole("iv_group_id"), ...clearRole("dv_group_id"), ...clearRole("instrument_group_id"),
+    decisions: [...(project.decisions || []), {
+      decision_id: `decision_${(project.decisions || []).length + 1}`,
+      type: "split_categories_deleted", timestamp,
+      payload: { split_id: splitId, deleted_group_id: groupId,
+        restored_group_ids: residuals.map(group => group.group_id) },
+    }],
+  };
+}
+
 // Role promotion shares membership arrays and all evidence/decision inputs.
 // Never take this shortcut for a real schema edit or an undo snapshot.
 export function isAnchorOnlyChange(previous, next) {

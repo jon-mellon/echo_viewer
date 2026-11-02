@@ -1,7 +1,7 @@
 import { h, replaceChildren } from "./dom_builder.mjs";
 
 export function diagnosticViewTitle(state, anchorsReady) {
-  if (!anchorsReady) return "Working map";
+  if (!anchorsReady) return "";
   if (state.showExclusionViolations) return "Exclusion restriction";
   if (state.showExogeneity) return "Exogeneity";
   if (state.showConfoundersOnly) return "Confounders";

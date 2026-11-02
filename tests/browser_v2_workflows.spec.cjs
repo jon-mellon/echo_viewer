@@ -74,7 +74,7 @@ test("browser-v2 supports group detail, auto layout, fullscreen and project expo
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
   await expect(page.locator('#dvGroupPicker button[data-group-id]').first()).toBeVisible();
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.getByText('Variable schema', { exact: true }).click();
+  await page.locator('#groupingPanel summary').click();
   await expect.poll(async () => page.getByRole('link', { name: 'Open public version' }).getAttribute('href'))
     .toContain(`iv=${anchors[0]}`);
   const publicView = await page.getByRole('link', { name: 'Open public version' }).getAttribute('href');

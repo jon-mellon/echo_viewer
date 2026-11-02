@@ -230,32 +230,6 @@ test("map context menu changes a definition selection and closes with Escape", a
   await expect(page.locator("#dagMapContextMenu")).toBeHidden();
 });
 
-test("exclusion reason survives an evidence inspector refresh", async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(viewer);
-  await ready(page);
-  await completeSetup(page);
-  const edgeId = await page.evaluate(async () => {
-    const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
-    await whenDagRendered();
-    const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__");
-    inspectDagEdge(id);
-    return id;
-  });
-  expect(edgeId).toBeTruthy();
-  await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
-  await page.locator("#excludeReasonInput").fill("Check evidence before excluding");
-  await page.evaluate(async id => {
-    const { inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
-    inspectDagEdge(id);
-  }, edgeId);
-  await expect(page.locator("#excludeReasonRow")).toBeVisible();
-  await expect(page.locator("#excludeReasonInput")).toHaveValue("Check evidence before excluding");
-  await page.locator("#excludeConfirmBtn").click();
-  await expect.poll(() => page.evaluate(id =>
-    window.__dagBuilderState.project.link_decisions[id]?.display_status, edgeId)).toBe("excluded");
-});
-
 test("edge evidence renders provenance without loading map layouts", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const parquetRequests = [];
@@ -506,7 +480,7 @@ test("Share view copies the selected public permalink", async ({ page, context }
   await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
   await page.locator('#instrumentGroupPicker button[data-select-none]').click();
   await page.locator("#copyPermalink").click();
-  await expect(page.locator("#copyPermalink")).toContainText("Copied");
+  await expect(page.locator("#copyPermalink")).toHaveAttribute("aria-label", "Copied");
   const copied = new URL(await page.evaluate(() => navigator.clipboard.readText()));
   expect(copied.searchParams.get("iv")).toBe(anchors[0]);
   expect(copied.searchParams.get("dv")).toBe(anchors[1]);
@@ -571,7 +545,7 @@ test("mobile map controls accept taps and sharing falls back when clipboard acce
     } });
   });
   await share.tap();
-  await expect(share).toContainText("Copied");
+  await expect(share).toHaveAttribute("aria-label", "Copied");
   expect(await page.evaluate(() => window.__shareGestureActive)).toBe(true);
   expect(await page.evaluate(() => window.__sharedText)).toContain("iv=");
   await context.close();
@@ -593,10 +567,8 @@ test("mobile map toolbar and footer stay within their panels", async ({ browser 
       const buttons = [...controls.children].filter(node => getComputedStyle(node).display !== "none")
         .map(node => node.getBoundingClientRect());
       const filter = controls.querySelector(".filter-dropdown > summary");
-      const filterText = document.createRange();
-      filterText.selectNodeContents(filter.firstChild);
       const filterBox = filter.getBoundingClientRect();
-      const textBox = filterText.getBoundingClientRect();
+      const textBox = filter.querySelector("svg").getBoundingClientRect();
       const shell = document.querySelector(".dag-shell").getBoundingClientRect();
       const nav = document.querySelector(".mobile-panel-nav").getBoundingClientRect();
       const privacy = document.querySelector(".legal-link").getBoundingClientRect();

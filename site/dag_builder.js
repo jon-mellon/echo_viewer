@@ -28,6 +28,7 @@ import { createDagEventController } from "/dag_event_controller.mjs";
 import { createUoaController } from "/uoa_controller.mjs";
 import { createToolbarController } from "/toolbar_controller.mjs";
 import { createDefinitionWorkflowController } from "/definition_workflow_controller.mjs";
+import { createCustomVariablesPresenter } from "/custom_variables_presenter.mjs";
 import { createTaskViews } from "/task_views.mjs";
 import { directionalPaperCounter, linksNeedingExactCounts } from "/causal_neighborhood.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
@@ -120,24 +121,33 @@ function initElements() {
     "ivInput", "ivInputLabel", "ivDefineNew", "ivSeeds", "ivResults", "ivGroupPicker",
     "instrumentInput", "instrumentDefineNew", "instrumentGroupPicker",
     "schemaChoice", "loadSchema", "skipSchema",
-    "definitionBlock", "definitionTitle", "definitionCancel", "definitionMethodStep", "definitionResumeList", "definitionChooseManual", "definitionChooseJev", "definitionChooseBrowse",
-    "definitionAiSetupStep", "definitionAiSetupHost", "definitionAiChangeMethod", "definitionAiSetup", "definitionAiWork", "definitionAiResults", "definitionSourcesStep", "definitionChosenMethod", "definitionChangeMethod",
+    "definitionBlock", "definitionTitle", "definitionCancel", "definitionDescribeStep", "definitionDescribeNext", "definitionResumeList",
+    "definitionAiWork", "definitionSourcesStep", "definitionSourcesBack",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults",
     "definitionPartitionStep", "definitionMethodJev", "definitionMethodManual", "definitionLoadStatus", "definitionJevPanel", "definitionManualPanel",
-    "definitionCounts", "definitionTermChips", "definitionTermSummary",
+    "definitionConceptsIntro", "definitionCountIncluded", "definitionCountExcluded", "definitionCountUnreviewed",
+    "definitionSourcesDetails", "definitionSourcesSummary", "definitionTermSummary",
+    "definitionConceptSearch", "definitionStatusFilter", "definitionTermSelect", "definitionActiveFilters",
+    "definitionIncludedFilter", "definitionRelated", "definitionSaveHint",
+    "definitionAiStepConnect", "definitionAiStepLimit", "definitionAiStepSample", "definitionAiStepFull",
+    "definitionAiConnectSummary", "definitionAiLimitSummary", "definitionAiSampleSummary", "definitionAiFullSummary",
+    "definitionAiLimitText", "definitionAiSettingsLink", "definitionAiSampleHost", "definitionAiFullHost",
+    "definitionAiFullText", "definitionAiApplyNote",
     "definitionAiDescription", "definitionAiConnect", "definitionAiRecheck", "definitionAiDisconnect", "definitionAiStatus", "definitionAiCost",
     "definitionAiRun", "definitionAiPreview", "definitionAiSummary", "definitionAiRows", "definitionAiFullRun", "definitionAiMore",
     "definitionAiReviewTools", "definitionAiReviewFilter", "definitionAiReviewPage", "definitionAiReviewPrev", "definitionAiReviewNext",
     "definitionAiApply", "definitionAiDiscard",
     "definitionTermItems", "definitionTermPrev", "definitionTermPage", "definitionTermNext",
-    "definitionTermToNew", "definitionTermToLeftover", "definitionUndoBatch", "definitionVariableSearch",
-    "definitionVariableResults", "definitionSelectedVariables", "definitionAddNeighbors", "definitionNeighborResults",
-    "definitionBack", "definitionReview",
-    "definitionReviewStep", "definitionNewLabel", "definitionNewDescription", "definitionReviewVariables", "definitionResidualLabels",
-    "definitionManualReview", "definitionValidation", "definitionReviewBack", "definitionSave",
+    "definitionTermToNew", "definitionTermToLeftover", "definitionUndoBatch",
+    "definitionSelectedVariables", "definitionAddNeighbors", "definitionNeighborResults",
+    "definitionBack", "definitionSelectedTitle", "definitionSaveStatus",
+    "definitionNewLabel", "definitionNewDescription", "definitionResidualLabels",
+    "definitionValidation", "definitionSave",
+    "openCustomVariables", "customVariablesView", "customVariablesTitle", "customVariablesCreate", "customVariablesClose",
+    "customVariablesFilter", "customVariablesStatus", "customVariablesTable",
     "workflowHint", "dagStatusBadge",
     "variablePanel", "variableDefineNew", "variablePanelDisclosure", "variablePanelCount", "variablePanelList", "variablePanelPagination",
-    "anchorBar", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn", "dag2HistoryStatus", "historyStatus",
+    "anchorBar", "exploreFocusSelector", "exploreFocusName", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "historyStatus",
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",
     // Grouping schema
@@ -156,7 +166,7 @@ function initElements() {
     // Right: group editor
     "groupEditorSection", "groupEditorTitle", "groupEditorHint", "groupDescription", "cancelGroupEdit",
     "discardGroupEdit", "localSaveStatus", "retryLocalSave", "saveIndependentCopy",
-    "exportLocalDraft", "importLocalDraft", "previousSessions", "previousSessionsPanel",
+    "exportLocalDraft", "importLocalDraft", "previousSessionsPanel",
     "previousSessionsList",
     "groupLabelInput", "groupNotesInput", "useGroupAsAnchor",
     "zoomGroup", "editSplit",
@@ -169,7 +179,7 @@ function initElements() {
     "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag", "dagTable", "dagViewGraph", "dagViewTable",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
-    "exportProject", "exportWorkingMap", "projectImport", "strictDagStatus",
+    "exportProject", "exportWorkingMap", "projectImport",
     "exportBib", "exportMd", "exportTex",
     // Panel resizers
     "leftResizer", "rightResizer",
@@ -180,27 +190,27 @@ function initElements() {
   state.map.ctx = state.map.canvas.getContext("2d");
   els.confounderDisclosure.addEventListener("toggle", renderConfounderStatuses);
   els.exportLocalDraft?.addEventListener("click", exportLocalDraft);
-  els.previousSessions?.addEventListener("click", async () => {
-    const panel = els.previousSessionsPanel;
-    if (!panel.hidden) {
-      panel.hidden = true;
-      els.previousSessions.setAttribute("aria-expanded", "false");
-      return;
-    }
+  // History (previous sessions) is a top-bar menu; its list is rebuilt each time it opens.
+  const historyMenu = /** @type {HTMLDetailsElement | null} */ (document.getElementById("historyMenu"));
+  historyMenu?.addEventListener("toggle", async () => {
+    if (!historyMenu.open) return;
     try {
       await persistentViewer.flushUrl();
       const sessions = (await listPreviousSessions())
         .filter(record => record.id !== persistentViewer.sessionId);
       replaceChildren(els.previousSessionsList);
       if (!sessions.length) replaceChildren(els.previousSessionsList,
-        h("p", { textContent: "No previous views saved in this browser." }));
+        h("p", { className: "menu-note", textContent: "No earlier sessions" }));
       for (const record of sessions) {
         const url = new URL(record.url, window.location.origin);
         if (url.origin !== window.location.origin || url.searchParams.get("p") !== "1") continue;
-        const button = h("button", { type: "button", className: "text-button previous-session-entry" },
-          h("strong", { textContent: record.title || "Untitled view" }),
-          h("span", { className: "previous-session-meta",
-            textContent: `${url.searchParams.has("local_schema") ? "Local draft" : "Published schema"} · ${new Date(record.updatedAt).toLocaleString()}` }));
+        const title = record.title || "Untitled view";
+        const when = formatSessionTime(record.updatedAt);
+        // Only the exception is worth a label: most sessions use the published schema.
+        const meta = url.searchParams.has("local_schema") ? `${when} · Local draft` : when;
+        const button = h("button", { type: "button", className: "menu-item previous-session-entry", title },
+          h("span", { className: "previous-session-title", textContent: title }),
+          h("span", { className: "previous-session-meta", textContent: meta }));
         button.addEventListener("click", () => {
           if ((persistentViewer.editorDirty || state.definitionDraft)
             && !window.confirm("Discard uncommitted changes and open this previous view?")) return;
@@ -210,8 +220,6 @@ function initElements() {
         });
         els.previousSessionsList.append(button);
       }
-      panel.hidden = false;
-      els.previousSessions.setAttribute("aria-expanded", "true");
     } catch (error) { els.localSaveStatus.textContent = `Could not list previous views — ${error.message}`; }
   });
   els.retryLocalSave?.addEventListener("click", () => {
@@ -393,31 +401,55 @@ function renderUndoRedo() {
     ? `Redo: ${state.undoHistory[state.undoPointer + 1]?.description}` : "Nothing to redo";
   const next = state.undoPointer < state.undoHistory.length - 1
     ? state.undoHistory[state.undoPointer + 1]?.description : null;
-  const status = [last && `Undo: ${last}`, next && `Redo: ${next}`].filter(Boolean).join(" · ") || "No edits to undo or redo";
-  for (const element of [els.historyStatus, els.dag2HistoryStatus]) {
-    if (element) element.textContent = status;
-  }
+  if (els.historyStatus) els.historyStatus.textContent = [last && `Undo: ${last}`, next && `Redo: ${next}`].filter(Boolean).join(" · ");
+  const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
+  if (last) els.undoBtn.title = `${els.undoBtn.title} (${shortcut}Z)`;
+  if (next) els.redoBtn.title = `${els.redoBtn.title} (${shortcut}Shift+Z)`;
   els.undoBtn.setAttribute("aria-label", els.undoBtn.title);
   els.redoBtn.setAttribute("aria-label", els.redoBtn.title);
-  if (els.dag2UndoBtn) {
-    els.dag2UndoBtn.disabled = els.undoBtn.disabled;
-    els.dag2UndoBtn.title = els.undoBtn.title;
-    els.dag2RedoBtn.disabled = els.redoBtn.disabled;
-    els.dag2RedoBtn.title = els.redoBtn.title;
-    els.dag2UndoBtn.setAttribute("aria-label", els.undoBtn.title);
-    els.dag2RedoBtn.setAttribute("aria-label", els.redoBtn.title);
-  }
+  if (state.showActionHistory) renderActionHistory();
 }
 
+/** Undo or redo until the given step is the current one (-1 is before any edit). */
+function jumpToHistory(pointer) {
+  let guard = state.undoHistory.length + 1;
+  while (state.undoPointer > pointer && guard-- > 0) projectController.undo();
+  while (state.undoPointer < pointer && guard-- > 0) projectController.redo();
+  void persistentViewer.commitDecision().catch(error => console.error("Could not save history jump", error));
+}
+
+/** "Today, 4:29 PM", "Yesterday, 4:12 PM", "Oct 30, 9:05 AM", or with the year when it isn't this one. */
+function formatSessionTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const daysAgo = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86_400_000);
+  if (daysAgo === 0) return `Today, ${time}`;
+  if (daysAgo === 1) return `Yesterday, ${time}`;
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  const day = date.toLocaleDateString(undefined, sameYear ? { month: "short", day: "numeric" } : { year: "numeric", month: "short", day: "numeric" });
+  return `${day}, ${time}`;
+}
+
+/** The edit-history menu: newest first; steps after the current one are undone and can be redone. */
 function renderActionHistory() {
-  if (!state.showActionHistory) return;
-  if (!state.actionLog.length) {
-    replaceChildren(els.actionHistory, h("div", { className: "ah-empty", textContent: "No actions yet." }));
+  if (!state.showActionHistory || !els.actionHistory) return;
+  if (!state.undoHistory.length) {
+    replaceChildren(els.actionHistory, h("p", { className: "menu-note", textContent: "No edits yet" }));
     return;
   }
-  replaceChildren(els.actionHistory, state.actionLog.map(entry => h("div", { className: "ah-entry" },
-    h("span", { className: "ah-desc", textContent: entry.description }),
-    h("span", { className: "ah-time", textContent: entry.time.slice(11, 19) }))));
+  const entry = (pointer, description) => {
+    const current = pointer === state.undoPointer;
+    return h("li", {},
+      h("button", { type: "button", className: `menu-item edit-history-entry${pointer > state.undoPointer ? " undone" : ""}`,
+        attrs: current ? { "aria-current": "step" } : {},
+        title: current ? "Current state" : pointer > state.undoPointer ? "Redo to here" : "Undo to here",
+        onclick: () => { if (!current) jumpToHistory(pointer); } },
+      h("span", { textContent: description })));
+  };
+  const rows = state.undoHistory.map((item, index) => entry(index, item.description)).reverse();
+  replaceChildren(els.actionHistory, h("ol", { className: "edit-history-steps" }, rows, entry(-1, "Start of this session")));
 }
 
 // ─── Mode management ──────────────────────────────────────────────────────────
@@ -644,9 +676,31 @@ function definitionResidualIds(source) { return definitionWorkflowController.def
 function toggleDefinitionVariable(variableId, add = null) { return definitionWorkflowController.toggleDefinitionVariable(variableId, add); }
 function definitionCanReview() { return definitionWorkflowController.definitionCanReview(); }
 function definitionNeighbors() { return definitionWorkflowController.definitionNeighbors(); }
-function renderDefinition() { return definitionWorkflowController.renderDefinition(); }
+function renderDefinition() {
+  definitionWorkflowController.renderDefinition();
+  customVariablesPresenter.render();
+}
 function saveDefinition() { return definitionWorkflowController.saveDefinition(); }
-function installDefinitionHandlers() { return definitionWorkflowController.installDefinitionHandlers(); }
+function installDefinitionHandlers() {
+  definitionWorkflowController.installDefinitionHandlers();
+  customVariablesPresenter.install();
+}
+
+/** Delete a custom variable: its concepts return to where they came from. Undoable. */
+async function deleteCustomVariable(groupId) {
+  const group = groupById(groupId);
+  const before = takeSnapshot();
+  const next = projectOps.deleteSplitCategories(state.project, { groupId, timestamp: nowIso() });
+  if (applyProjectOperation(next) === false) throw new Error("Variable memberships are still loading. Try again in a moment.");
+  for (const key of ["focusedGroupId", "activeGroupId", "selectedEvidenceGroupId"]) {
+    if (state[key] === groupId) state[key] = null;
+  }
+  addToUndoHistory(`Deleted variable "${group?.label || groupId}"`, before);
+  invalidateMapCaches();
+  renderAll();
+  await persistentViewer.commitDecision();
+  publicationController.workingCopyChanged();
+}
 
 // ─── Search ───────────────────────────────────────────────────────────────────
 
@@ -802,7 +856,7 @@ function renderRejectedVariablesPanel() {
         h("span", { className: "group-row-meta", textContent: `${entry.member_variable_ids?.length || 1} vars` })),
       h("span", { textContent: entry.reason || "low_quality" }), h("div", { className: "group-row-footer" },
         h("span", { className: "group-status-label rejected", textContent: "rejected variable" }),
-        h("button", { className: "action-button", type: "button", dataset: { action: "restore" }, textContent: "Restore" }))))
+        h("button", { className: "btn btn--sm", type: "button", dataset: { action: "restore" }, textContent: "Restore" }))))
     : h("div", { className: "small-note", textContent: "No rejected variables match this search." }));
   els.rejectedVariablesList.querySelectorAll("button[data-action='restore']").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1106,7 +1160,8 @@ function addVariableToGroup(group, variableId) {
 }
 function addVariableSetToGroup(group, ids) {
   if (group?.group_id === "__definition_new__") {
-    for (const id of ids) toggleDefinitionVariable(id, true);
+    // One change for the whole lasso, so a single Undo reverts it.
+    if (state.definitionMethod === "manual") definitionWorkflowController.classifyDefinitionVariables(ids, "in");
     return;
   }
   return groupEditorController.addVariableSetToGroup(group, ids);
@@ -1166,6 +1221,8 @@ const taskViews = createTaskViews({
     if (bothExplore) renderExploreFocus(); else renderAll({ reuseLinks: true });
   },
   openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
+  onRowHover: row => dagNetworkController.hoverExploreRow(row),
+  placeEvidencePane: () => shellController.placeEvidencePane(),
   onChange: () => persistentViewer.viewerChanged(), prepareReset: () => persistentViewer.prepareReset(), whenReady: () => persistentViewer.whenReady(),
 });
 taskViews.install();
@@ -1464,7 +1521,7 @@ function showExcludedLinks() {
     h("strong", { textContent: "Excluded links" }),
     ...links.map(link => {
       const model = inspector.edgeInspector(link, state.project);
-      const button = h("button", { className: "action-button", type: "button",
+      const button = h("button", { className: "btn btn--sm", type: "button",
         textContent: `${model.sourceLabel} ${model.arrow} ${model.targetLabel}` });
       button.addEventListener("click", () => inspectDagEdge(link.edge_id));
       return button;
@@ -1511,7 +1568,7 @@ async function showExcludedFindings() {
       const reason = code === "not_relevant_to_target_population" ? "Not relevant to target population"
         : code === "concept_miscategorized" ? "Concept miscategorized"
           : code === "other" ? "Other" : "";
-      const restore = h("button", { className: "text-button", type: "button", textContent: "Restore" });
+      const restore = h("button", { className: "btn btn--ghost", type: "button", textContent: "Restore" });
       restore.addEventListener("click", () => {
         const before = takeSnapshot();
         if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
@@ -1645,7 +1702,6 @@ function renderSelectedEdge() {
 // The open evidence is per task; clear what the old task showed so the pane
 // matches the new task's selection (restored by the task views).
 function dismissEvidenceForTask() {
-  inspectorController.clearPendingExclude();
   state.selectedVariableIds.clear();
   state.comparisonVariableIds = [];
   if (!state.selectedEdgeId) {
@@ -1656,7 +1712,6 @@ function dismissEvidenceForTask() {
 }
 
 function dismissEvidencePane() {
-  inspectorController.clearPendingExclude();
   els.provenancePanel.scrollLeft = 0;
   els.closeEvidencePane.closest(".dag-ws-footer").scrollLeft = 0;
   state.selectedEdgeId = null;
@@ -1700,9 +1755,10 @@ function initializeProjectShape() {
 function renderExportStatus() {
   const cycle = detectDirectedCycle();
   const bidirectional = state.project.links.some((l) => l.direction_type === "BIDIRECTIONAL" && l.display_status !== "excluded");
-  els.strictDagStatus.textContent = cycle || bidirectional
-    ? "Strict DAG export unavailable until bidirectional links and cycles are resolved."
-    : "Strict DAG export conditions are currently satisfied.";
+  // Shown as the Causal diagram export's tooltip.
+  els.exportWorkingMap.title = cycle || bidirectional
+    ? "Not a strict DAG: has cycles or two-way links"
+    : "Valid strict DAG";
 }
 
 // ─── Decision log ──────────────────────────────────────────────────────────────
@@ -1905,6 +1961,19 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   },
 });
 
+const customVariablesPresenter = createCustomVariablesPresenter({
+  state, elements: els, truncate, normalized,
+  customVariables: () => (state.project?.groups || []).filter(group => group.source === "user_split")
+    .sort((a, b) => String(a.label || "").localeCompare(String(b.label || ""))),
+  sourceLabels: group => (group.provenance?.source_group_ids || []).map(id => groupById(id)?.label).filter(Boolean),
+  canChange: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
+  onCreate: () => startDefinition("candidate"),
+  onEdit: groupId => startEditSplit(groupId),
+  onDelete: deleteCustomVariable,
+  canExplore: () => taskViews.exploring(),
+  onExplore: groupId => taskViews.chooseFocus(groupId),
+});
+
 const projectController = createDagProjectController({
   state, storage: window.localStorage, storagePrefix: PROJECT_STORAGE_PREFIX,
   nowIso, invalidateMapCaches, renderAll, rebuildLinkDecision, renderUndoRedo, renderActionHistory,
@@ -1964,7 +2033,8 @@ const setupGroupController = createDagSetupGroupController({
 
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, exploreRows: () => taskViews.neighborhood().rows,
+  drawMap, setMapMode, renderAll, exploreRows: () => taskViews.neighborhood().included,
+  onNodeHover: id => taskViews.highlightRow(id),
   onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
   selectEdge: () => {
     if (state.fullscreenPanel) setFullscreenPanel(null);

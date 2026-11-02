@@ -87,17 +87,15 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(page.locator("#exploreView")).toBeVisible();
   await expect(page.locator("#provenancePanel")).toBeHidden();
 
-  // Distance and minimum papers use the usual Filters controls.
-  await page.locator(".filter-dropdown > summary").click();
-  await expect(page.locator("#confounderPathLengthLabel")).toHaveText("Distance");
-  await expect(page.locator("#toggleConfoundersOnly")).toBeHidden();
-  await expect(page.locator("#toggleSparseEdges")).toBeVisible();
-  await page.locator("#confounderPathLength").fill("2");
+  // Distance and minimum papers live in the list's funnel menu; the graph header has no Filters menu.
+  await expect(page.locator(".dag-ws-controls > .filter-dropdown")).toBeHidden();
+  await page.locator(".list-filter > summary").click();
+  await page.locator(".list-filter-distance").fill("2");
   await expect(page.locator('.explore-row[data-distance="2"]').first()).toBeVisible();
   await expect(page.locator('.explore-row[data-distance="2"] .explore-row-path').first()).toContainText("via ");
   const withTwoSteps = await page.locator(".explore-row").count();
   expect(await renderedEdges(page)).toBe(withTwoSteps);
-  await page.locator("#minimumEdgePapers").fill("10");
+  await page.locator(".list-filter-papers").fill("10");
   await expect.poll(() => page.locator(".explore-row").count()).toBeLessThan(withTwoSteps);
   await expect.poll(() => new URL(page.url()).searchParams.get("causes_min_papers")).toBe("10");
   await expect.poll(() => new URL(page.url()).searchParams.get("causes_depth")).toBe("2");
@@ -150,8 +148,8 @@ test("the graph puts the chosen variable in the middle with its causes and conse
   await open(page, `${viewer}?task=causes`);
   await pick(page, "category-sleep").click();
   await page.locator(".explore-row").first().waitFor();
-  await page.locator(".filter-dropdown > summary").click();
-  await page.locator("#confounderPathLength").fill("2");
+  await page.locator(".list-filter > summary").click();
+  await page.locator(".list-filter-distance").fill("2");
   await expect(page.locator('.explore-row[data-distance="2"]').first()).toBeVisible();
   const layout = await page.evaluate(async () => {
     const s = window.__dagBuilderState;
@@ -197,6 +195,7 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await pick(page, "category-sleep").click();
   await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
 
+  await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
   const dialog = page.locator("#resetDialog");
   await expect(dialog).toBeVisible();
@@ -206,6 +205,7 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await expect(dialog).toBeHidden();
   await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
 
+  await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
   const [tab] = await Promise.all([context.waitForEvent("page"),
     dialog.getByRole("button", { name: "Open new project in a new tab" }).click()]);
@@ -216,6 +216,7 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
   await tab.close();
 
+  await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
   await dialog.getByRole("button", { name: "Reset in current tab" }).click();
   await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100
@@ -234,6 +235,7 @@ test("mobile reset keeps the previous project after navigating", async ({ browse
     await page.context().newCDPSession(page).then(cdp => cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 }));
     await open(page, `${viewer}?task=causes`);
     await pick(page, "category-sleep").tap();
+    await page.locator("#historyToggle").tap();
     await page.locator("#taskReset").tap();
     await page.locator("#resetHere").tap();
     await expect(page.locator("#taskLanding")).toBeVisible({ timeout: 60000 });
@@ -369,9 +371,9 @@ test("links an edit left without paper keys are counted from their own findings 
       return rest;
     });
   }, target);
-  await page.locator(".filter-dropdown > summary").click();
-  await page.locator("#confounderPathLength").fill("2");
-  await page.locator("#confounderPathLength").fill("1");
+  await page.locator(".list-filter > summary").click();
+  await page.locator(".list-filter-distance").fill("2");
+  await page.locator(".list-filter-distance").fill("1");
   // It is counted exactly, so the same variables are listed, from a handful of findings rather than all of them.
   // (Whether the findings are fetched or were already in memory depends on what had loaded, so only the outcome is checked.)
   await expect(page.locator(".explore-row")).toHaveCount(before);
@@ -384,12 +386,12 @@ test("a notice appears only when there is nothing to list, and goes away with re
   await pick(page, "category-sleep").click();
   await expect(page.locator(".explore-row").first()).toBeVisible();
   await expect(page.locator("#exploreSummary")).toBeHidden();
-  await page.locator(".filter-dropdown > summary").click();
-  await page.locator("#minimumEdgePapers").fill("99999");
+  await page.locator(".list-filter > summary").click();
+  await page.locator(".list-filter-papers").fill("99999");
   await expect(page.locator(".explore-row")).toHaveCount(0);
   await expect(page.locator("#exploreSummary")).toBeVisible();
   await expect(page.locator("#exploreSummary")).toContainText("Nothing causes sleep at this distance and paper count");
-  await page.locator("#minimumEdgePapers").fill("2");
+  await page.locator(".list-filter-papers").fill("2");
   await expect(page.locator(".explore-row").first()).toBeVisible();
   await expect(page.locator("#exploreSummary")).toBeHidden();
 });
@@ -400,9 +402,7 @@ test("every view can show the same variables and links as a table, with the same
   const direct = await renderedEdges(page);
   await expect(page.locator(".dag-view-switch")).toBeVisible();
   await expect(page.locator("#dagViewGraph")).toHaveAttribute("aria-pressed", "true");
-  const switchBox = await page.locator(".dag-view-switch").boundingBox();
-  const copyBox = await page.locator("#copyPermalink").boundingBox();
-  expect(switchBox.x).toBeGreaterThan(copyBox.x);
+  await expect(page.locator(".dag-overlay-controls #copyPermalink")).toBeVisible();
 
   await page.locator("#dagViewTable").click();
   await expect(page.locator("#dagTable")).toBeVisible();
@@ -413,12 +413,12 @@ test("every view can show the same variables and links as a table, with the same
   await expect(page.locator("#dagPathsTable tbody tr")).toHaveCount(direct);
   await expect(page.locator('#dagVariablesTable tr[data-group-id="category-sleep"] td').nth(1)).toHaveText("Focus");
   // The filters stay where they were, and drive the table.
-  await expect(page.locator(".filter-dropdown > summary")).toBeVisible();
+  await expect(page.locator(".list-filter > summary")).toBeVisible();
   await expect(page.locator("#dagSvgZoomIn")).toBeHidden();
-  await page.locator(".filter-dropdown > summary").click();
-  await page.locator("#minimumEdgePapers").fill("20");
+  await page.locator(".list-filter > summary").click();
+  await page.locator(".list-filter-papers").fill("20");
   await expect.poll(() => page.locator("#dagPathsTable tbody tr").count()).toBeLessThan(direct);
-  await page.locator("#minimumEdgePapers").fill("2");
+  await page.locator(".list-filter-papers").fill("2");
   await expect(page.locator("#dagPathsTable tbody tr")).toHaveCount(direct);
 
   // Definitions and evidence open from the table as they do from the graph.
@@ -534,12 +534,15 @@ test("on a phone the table fits the screen and its controls can be tapped", asyn
       expect(rect.x + rect.width).toBeLessThanOrEqual(375);
       expect(rect.height).toBeGreaterThanOrEqual(24); // WCAG 2.2 minimum target size
     }
-    await page.locator(".filter-dropdown > summary").tap();
-    await expect(page.locator("#minimumEdgePapers")).toBeVisible();
-    await page.locator("#minimumEdgePapers").fill("20");
+    // Explore's filters sit in the variable list's funnel menu, one tab over.
+    await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').tap();
+    await page.locator(".list-filter > summary").tap();
+    await expect(page.locator(".list-filter-papers")).toBeVisible();
+    await page.locator(".list-filter-papers").fill("20");
     await expect.poll(() => page.locator("#dagPathsTable tbody tr").count()).toBeLessThan(10);
-    await page.locator("#minimumEdgePapers").fill("2");
-    await page.locator(".filter-dropdown > summary").tap();
+    await page.locator(".list-filter-papers").fill("2");
+    await page.locator(".list-filter > summary").tap();
+    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
     const arrow = page.locator("#dagPathsTable .dag-table-arrow").first();
     const edgeId = await arrow.getAttribute("data-edge-id");
     await arrow.tap();
@@ -567,13 +570,13 @@ test("a table of a graph with hundreds of links stays small and quick", async ({
   await open(page, `${viewer}?task=consequences`);
   await pick(page, "category-income-earnings").click();
   await page.locator("#dagViewTable").click();
-  await page.locator(".filter-dropdown > summary").click();
-  await page.locator("#minimumEdgePapers").fill("1");
-  await page.locator("#confounderPathLength").fill("4");
+  await page.locator(".list-filter > summary").click();
+  await page.locator(".list-filter-papers").fill("1");
+  await page.locator(".list-filter-distance").fill("4");
   await expect(page.locator("#dagPathsTable tbody tr").first()).toBeVisible();
   const { rendered, total } = await page.evaluate(() => ({
     rendered: document.querySelectorAll("#dagPathsTable tbody tr").length,
-    total: Number(/\((\d+)\)/.exec(document.querySelector("#dagPathsTable caption").textContent)[1]) }));
+    total: Number(document.querySelector("#dagPathsTable").dataset.pathCount) }));
   expect(rendered).toBeLessThanOrEqual(200);
   expect(rendered).toBe(Math.min(total, 200));
   if (total > 200) {

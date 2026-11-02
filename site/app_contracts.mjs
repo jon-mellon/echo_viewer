@@ -158,6 +158,7 @@
  * @property {string | null} focusId
  * @property {number} depth
  * @property {number} minPapers
+ * @property {string[]} [excluded] Variables left off the map (still listed).
  */
 
 export const GROUPING_FORMAT_VERSION = "groupings-v3";

@@ -6,6 +6,8 @@ export const TASKS = ["identify", "causes", "consequences"];
 // Each explore view's URL keys: focus group, depth and minimum papers per link.
 const exploreKeys = { causes: ["causes_of", "causes_depth", "causes_min_papers"],
   consequences: ["effects_of", "effects_depth", "effects_min_papers"] };
+// Variables left off each explore view's map, one parameter per variable.
+const exploreExcludedKeys = { causes: "causes_excluded", consequences: "effects_excluded" };
 
 const booleanFields = {
   conf: "showConfoundersOnly", coll: "showCollidersOnly", excl: "showExclusionViolations", exog: "showExogeneity",
@@ -68,6 +70,10 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state,
     values[papersKey] = String(explore.minPapers);
   }
   for (const [key, value] of Object.entries(values)) if (value !== "") url.searchParams.set(key, value);
+  for (const [view, key] of Object.entries(exploreExcludedKeys)) {
+    const explore = state.explore?.[view];
+    if (explore?.focusId) for (const id of explore.excluded || []) url.searchParams.append(key, id);
+  }
   if (publishedSchemaId) url.searchParams.set("schema", publishedSchemaId);
   if (localSchemaId) url.searchParams.set("local_schema", localSchemaId);
   return url.href;
@@ -86,6 +92,8 @@ export function applyTaskPermalink(params, state, resolveGroup) {
       depth: depth >= 1 && depth <= MAX_NEIGHBORHOOD_DEPTH ? depth : 1,
       minPapers: Number.isSafeInteger(papers) && papers >= 1 ? papers : 2,
     };
+    const excluded = [...new Set(params.getAll(exploreExcludedKeys[view]).map(resolveGroup).filter(Boolean))];
+    if (state.explore[view].focusId && excluded.length) state.explore[view].excluded = excluded;
   }
 }
 

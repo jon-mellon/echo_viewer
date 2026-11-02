@@ -112,6 +112,7 @@ export function attachDagInteractions(network, element, actions) {
     hoverNode(event) {
       if (tappedCandidateId && isTouchGesture(event)) return;
       clearTappedCandidate();
+      actions.onNodeHover?.(event.node);
       if (actions.isDiagnosticCandidate(event.node)) {
         actions.clearEdgeHover();
         actions.highlightPaths(event.node);
@@ -121,6 +122,7 @@ export function attachDagInteractions(network, element, actions) {
       }
     },
     blurNode: () => {
+      actions.onNodeHover?.(null);
       if (!tappedCandidateId) actions.clearPathHover();
       actions.clearEdgeHover();
     },
@@ -174,6 +176,7 @@ export function attachDagInteractions(network, element, actions) {
     },
   };
   const leave = () => {
+    actions.onNodeHover?.(null);
     if (!tappedCandidateId) actions.clearPathHover();
     actions.clearEdgeHover();
   };

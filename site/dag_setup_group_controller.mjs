@@ -72,14 +72,15 @@ export function createDagSetupGroupController({
     if (!elements.anchorBar) return;
     const focus = exploreFocus();
     const anchorRows = [elements.anchorDvLabel, elements.anchorIvLabel].map(node => node.closest(".anchor-row"));
+    if (elements.exploreFocusSelector) elements.exploreFocusSelector.hidden = !focus.active;
     if (focus.active) {
-      // One anchor only: Dep var when finding causes, Ind var when finding consequences.
-      elements.anchorBar.hidden = !focus.groupId;
-      anchorRows[0].hidden = focus.side !== "dv";
-      anchorRows[1].hidden = focus.side !== "iv";
-      const label = focus.side === "dv" ? elements.anchorDvLabel : elements.anchorIvLabel;
-      label.textContent = focus.label || "";
-      label.title = focus.label || "";
+      // The variable is shown by the search box in the Explore panel, and undo
+      // and redo live in the top bar, so the anchor bar has nothing to show.
+      elements.anchorBar.hidden = true;
+      elements.exploreFocusSelector.hidden = true;
+      for (const row of anchorRows) row.hidden = true;
+      elements.exploreFocusName.textContent = focus.label || "";
+      elements.exploreFocusSelector.title = focus.label ? `Change the selected variable (${focus.label})` : "";
       if (elements.editSplitIv) elements.editSplitIv.hidden = true;
       if (elements.editSplitDv) elements.editSplitDv.hidden = true;
       if (elements.instrumentRow) elements.instrumentRow.hidden = true;
@@ -170,21 +171,21 @@ export function createDagSetupGroupController({
         ? "Finding concepts used in this view…"
         : state.publishedSchemaHydrating ? "Loading concepts…" : "No underlying concepts." }),
       failedConceptViews.has(viewKey) ? h("button", {
-        className: "text-button", type: "button", textContent: "Could not prioritize concepts. Retry",
+        className: "btn btn--ghost", type: "button", textContent: "Could not prioritize concepts. Retry",
         onclick: () => { failedConceptViews.delete(viewKey); renderVariableConcepts(group); },
       }) : null,
       failedConceptPages.has(pageKey) ? h("button", {
-        className: "text-button", type: "button", textContent: "Could not load concepts. Retry",
+        className: "btn btn--ghost", type: "button", textContent: "Could not load concepts. Retry",
         onclick: () => { failedConceptPages.delete(pageKey); renderVariableConcepts(group); },
       }) : null,
       !priorityPending && ids.length > conceptPageSize ? h("div", { className: "group-concept-pagination" },
-        h("button", { className: "toolbar-button", type: "button", disabled: currentPage === 0,
+        h("button", { className: "btn", type: "button", disabled: currentPage === 0,
           textContent: "Previous", onclick: () => {
             conceptPages.set(group.group_id, { viewKey, page: currentPage - 1 });
             renderVariableConcepts(group);
           } }),
         h("span", { textContent: `${start + 1}–${Math.min(start + conceptPageSize, ids.length)} of ${ids.length}` }),
-        h("button", { className: "toolbar-button", type: "button",
+        h("button", { className: "btn", type: "button",
           disabled: start + conceptPageSize >= ids.length, textContent: "Next", onclick: () => {
             conceptPages.set(group.group_id, { viewKey, page: currentPage + 1 });
             renderVariableConcepts(group);
@@ -264,7 +265,7 @@ export function createDagSetupGroupController({
     replaceChildren(elements.variablePanelList, groups.slice(start, start + variablePageSize).map(group => {
       const concepts = h("div", { className: "group-concepts variable-panel-concepts" });
       conceptHosts.set(group.group_id, concepts);
-      const editButton = canEditSplit(group) ? h("button", { className: "text-button variable-panel-edit", type: "button",
+      const editButton = canEditSplit(group) ? h("button", { className: "btn btn--ghost variable-panel-edit", type: "button",
         textContent: "Edit split", title: `Edit the split containing ${group.label || group.group_id}` }) : null;
       editButton?.addEventListener("click", () => startEditSplit?.(group.group_id));
       const detail = h("details", { className: "variable-panel-item", dataset: { groupId: group.group_id }, open: expandedVariableIds.has(group.group_id) },
@@ -287,9 +288,9 @@ export function createDagSetupGroupController({
     elements.variablePanelList.scrollTop = scrollTop;
     elements.variablePanelPagination.hidden = groups.length <= variablePageSize;
     if (groups.length > variablePageSize) {
-      const previous = h("button", { className: "toolbar-button", type: "button", disabled: variablePage === 0,
+      const previous = h("button", { className: "btn", type: "button", disabled: variablePage === 0,
         textContent: "Previous" });
-      const next = h("button", { className: "toolbar-button", type: "button",
+      const next = h("button", { className: "btn", type: "button",
         disabled: start + variablePageSize >= groups.length, textContent: "Next" });
       previous.addEventListener("click", () => { variablePage -= 1; renderVariablePanel(); elements.variablePanelList.scrollTop = 0; });
       next.addEventListener("click", () => { variablePage += 1; renderVariablePanel(); elements.variablePanelList.scrollTop = 0; });
@@ -318,7 +319,7 @@ export function createDagSetupGroupController({
             : `Define new ${state.definitionDraft.role.toUpperCase()}`;
         elements.dagStatusBadge.textContent = state.definitionDraft.step === "sources" ? "Sources"
           : state.definitionDraft.step === "partition" ? "Construct" : "Review";
-        elements.dagStatusBadge.className = "status-pill";
+        elements.dagStatusBadge.className = "badge";
         elements.workflowHint.textContent = state.definitionDraft.step === "sources"
           ? "Choose the existing categories whose canonical variables should be available."
           : "Use the Variables tab to tap points or draw around them. Return to Setup to search, review, and save.";
@@ -339,7 +340,7 @@ export function createDagSetupGroupController({
           : changingInstrument ? "Select instrument (optional)" : "Setup complete";
       elements.dagStatusBadge.textContent = changingInstrument ? "Instrument"
         : ivSet && dvSet ? "Ready" : ivSet ? "Select Dep var" : "Select Ind var";
-      elements.dagStatusBadge.className = `status-pill${ivSet && dvSet && !changingInstrument ? " muted" : ""}`;
+      elements.dagStatusBadge.className = `badge${ivSet && dvSet && !changingInstrument ? " muted" : ""}`;
       elements.workflowHint.textContent = !ivSet || changingIv
         ? "Choose the independent-variable group from the default schema."
         : !dvSet || changingDv
@@ -354,7 +355,7 @@ export function createDagSetupGroupController({
     }
     if (state.workflowMode !== "setup") {
       elements.dagStatusBadge.textContent = state.workflowMode === "group_review" ? "Groups" : "Build";
-      elements.dagStatusBadge.className = "status-pill muted";
+      elements.dagStatusBadge.className = "badge muted";
       return;
     }
     const labels = { select_dv: "Select Dep var", define_dv: "Define Dep var", select_iv: "Select Ind var",
@@ -366,7 +367,7 @@ export function createDagSetupGroupController({
       define_iv: "Define independent-variable group", schema_choice: "Load candidate grouping schema?", build: "Build causal map" };
     elements.currentStepTitle.textContent = titles[state.phase] || "Build causal map";
     elements.dagStatusBadge.textContent = labels[state.phase] || "Build";
-    elements.dagStatusBadge.className = "status-pill";
+    elements.dagStatusBadge.className = "badge";
     elements.workflowHint.textContent = hint();
     elements.dvSearchBlock.hidden = state.phase !== "select_dv";
     elements.ivSearchBlock.hidden = state.phase !== "select_iv";
@@ -400,12 +401,12 @@ export function createDagSetupGroupController({
     const groups = searchAnchorGroups(searchProject, side, query, state.variableById, Infinity);
     container.hidden = false;
     const defineRow = h("div", { className: "setup-group-picker-row define-new-row" },
-      h("div", {}, h("strong", { textContent: "Define a group" }), h("span", { textContent: "Chop one or more existing categories in the spatial viewer" })),
-      h("button", { className: "action-button", type: "button", dataset: { defineSide: side }, textContent: "Define" }));
+      h("div", {}, h("strong", { textContent: "Create a variable" }), h("span", { textContent: "Make a new one from concepts in existing variables" })),
+      h("button", { className: "btn btn--sm", type: "button", dataset: { defineSide: side }, textContent: "Create" }));
     const noneRow = side === "instrument" ? h("div", { className: "setup-group-picker-row instrument-none-row" },
       h("div", {}, h("strong", { textContent: "None" }),
         h("span", { textContent: "Work without an instrument" })),
-      h("button", { className: "primary-button", type: "button",
+      h("button", { className: "btn btn--primary", type: "button",
         dataset: { selectNone: "true" }, textContent: "Use None" })) : null;
     const rows = groups.map(({ group, variableMatch }) => h("div", { className: "setup-group-picker-row" },
       h("div", {}, h("strong", { textContent: group.label || group.group_id }),
@@ -414,7 +415,7 @@ export function createDagSetupGroupController({
         group.description ? h("details", { className: "setup-group-definition" },
           h("summary", { textContent: "Definition" }),
           h("p", { textContent: group.description })) : null),
-      h("button", { className: "action-button", type: "button", dataset: { side, groupId: group.group_id },
+      h("button", { className: "btn btn--sm", type: "button", dataset: { side, groupId: group.group_id },
         textContent: side === "instrument" ? "Use as instrument" : `Use as ${side.toUpperCase()}` })));
     const emptyTitle = query && state.variableSearchStatus === "loading"
       ? "Loading variable search…"
@@ -445,36 +446,51 @@ export function createDagSetupGroupController({
     if (!container) return;
     const focus = exploreFocus();
     const picking = Boolean(focus.active && focus.picking);
-    elements.focusSearchBlock.hidden = !picking;
-    if (!picking) { container.hidden = true; container.replaceChildren(); return; }
+    // The search box stays at the top of the panel. Once a variable is chosen it
+    // shows that variable; searching swaps the results list for matching
+    // groups, drawn in the same row style, until one is picked or Escape.
+    const chosen = Boolean(focus.active && focus.groupId);
+    elements.focusSearchBlock.hidden = !focus.active;
+    elements.focusSearchBlock.classList.toggle("has-focus", chosen);
+    if (elements.focusInputLabel) elements.focusInputLabel.textContent = "Primary variable";
+    elements.focusInput.placeholder = chosen && picking ? `Search to replace ${focus.label}`
+      : "Search group or constituent variable";
+    if (chosen && !picking && document.activeElement !== elements.focusInput) elements.focusInput.value = focus.label;
+    if (!picking) { container.hidden = true; container.replaceChildren(); elements.focusPickerCancel.hidden = true; return; }
     elements.focusPickerCancel.hidden = !focus.groupId;
     const query = normalized(elements.focusInput.value);
     const groups = searchFocusGroups(query);
     container.hidden = false;
-    const rows = groups.map(({ group, variableMatch }) => h("div", { className: "setup-group-picker-row" },
-      h("div", {}, h("strong", { textContent: group.label || group.group_id }),
-        h("span", { textContent: `${group.variable_ids?.length || 0} vars` }),
-        variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched variable: ${truncate(variableMatch, 86)}` }) : null,
-        group.description ? h("details", { className: "setup-group-definition" },
-          h("summary", { textContent: "Definition" }),
-          h("p", { textContent: group.description })) : null),
-      h("button", { className: "action-button", type: "button", dataset: { groupId: group.group_id },
-        textContent: `Use as ${focus.tag}` })));
-    const emptyTitle = query && state.variableSearchStatus === "loading" ? "Loading variable search…"
+    const row = ({ group, variableMatch }) => {
+      const label = group.label || group.group_id;
+      const count = group.variable_ids?.length || Number(group.member_count) || 0;
+      return h("li", { className: "explore-row" },
+        h("button", { type: "button", className: "explore-row-open", dataset: { groupId: group.group_id },
+          title: group.description || "", attrs: { "aria-label": `${label}, ${count} variables` } },
+        h("span", { className: "explore-row-text" },
+          h("span", { className: "explore-row-label", textContent: label },
+            group.source === "user_split" ? h("span", { className: "explore-row-tag", textContent: "custom" }) : null),
+          variableMatch ? h("span", { className: "explore-row-path", textContent: `matches ${truncate(variableMatch, 70)}` }) : null),
+        h("span", { className: "explore-row-papers", textContent: String(count) })));
+    };
+    // One list under "Primary variable", filtered by the search box. Custom
+    // variables are listed with the rest and managed from the Custom variables page.
+    const status = query && state.variableSearchStatus === "loading" ? "Variable search is loading; matching names only for now."
       : query && state.publishedSchemaHydrating ? "Loading group memberships…"
-        : query && state.variableSearchStatus === "error" ? "Variable search unavailable" : "No matching existing groups";
-    const title = !groups.length ? emptyTitle
-      : query && state.variableSearchStatus === "loading" ? "Existing groups · variable search loading…"
-        : query && state.variableSearchStatus === "error" ? "Existing groups · variable search unavailable"
-          : "Existing groups";
-    const defineRow = h("div", { className: "setup-group-picker-row define-new-row" },
-      h("div", {}, h("strong", { textContent: "Define a variable" }), h("span", { textContent: "Chop one or more existing categories in the spatial viewer" })),
-      h("button", { className: "action-button", type: "button", dataset: { defineFocus: "true" }, textContent: "Define" }));
-    replaceChildren(container, h("div", { className: "setup-group-picker-title", textContent: title }),
-      h("div", { className: "setup-group-picker-list" }, defineRow, ...rows));
+        : query && state.variableSearchStatus === "error" ? "Variable search is unavailable; matching names only." : "";
+    replaceChildren(container,
+      status ? h("p", { className: "explore-subsection-empty", role: "status", textContent: status }) : null,
+      groups.length ? h("ol", { className: "explore-list" }, groups.map(row))
+        : h("div", { className: "explore-subsection-empty" },
+          h("p", { textContent: query ? "No matching variables." : "None available." }),
+          query ? h("button", { className: "btn btn--sm", type: "button", dataset: { clearFocusSearch: "true" }, textContent: "Clear search" }) : null));
     container.querySelectorAll("button[data-group-id]").forEach(button =>
       button.addEventListener("click", () => onChooseFocus(button.dataset.groupId)));
-    container.querySelector("button[data-define-focus]")?.addEventListener("click", () => startDefinition?.("candidate"));
+    container.querySelector("button[data-clear-focus-search]")?.addEventListener("click", () => {
+      elements.focusInput.value = "";
+      elements.focusInput.dispatchEvent(new Event("input", { bubbles: true }));
+      elements.focusInput.focus();
+    });
   }
 
   function renderGroupList() {
@@ -488,9 +504,9 @@ export function createDagSetupGroupController({
       className: `group-row${item.isActive ? " group-row-active" : ""}`, dataset: { groupId: item.groupId },
     }, h("div", { className: "group-row-head" }, h("strong", { textContent: item.label }),
       h("span", { className: "group-row-meta", textContent: `${item.variableCount} vars` })),
-    item.roleLabels.length ? h("div", { className: "role-list" }, item.roleLabels.map(label => h("span", { className: "role-pill", textContent: label }))) : null,
+    item.roleLabels.length ? h("div", { className: "role-list" }, item.roleLabels.map(label => h("span", { className: "badge badge--info", textContent: label }))) : null,
     h("div", { className: "group-row-footer" }, h("span", { className: "group-role-label", textContent: item.anchorLabel }),
-      h("button", { className: "action-button group-open-btn", type: "button", dataset: { action: "open" },
+      h("button", { className: "btn btn--sm group-open-btn", type: "button", dataset: { action: "open" },
         disabled: state.publishedSchemaLoadFailed || (state.publishedSchemaHydrating && !state.publishedMembershipReadyGroups.has(item.groupId)),
         title: state.publishedSchemaLoadFailed ? "This published schema could not be verified"
           : state.publishedSchemaHydrating && !state.publishedMembershipReadyGroups.has(item.groupId)
@@ -513,7 +529,7 @@ export function createDagSetupGroupController({
     const active = (state.data.grouping_sets || []).find(set => set.grouping_set_id === state.project.active_grouping_set_id) || (state.data.grouping_sets || [])[0];
     elements.groupingSummary.textContent = active
       ? state.interfaceMode === "dag2"
-        ? `${active.groups?.length || 0} groups loaded. Import a compatible JSON schema to replace this view.`
+        ? `${active.groups?.length || 0} groups. Import a schema draft to replace it.`
         : `${active.groups?.length || 0} groups available; import to view all groups, or load the groups relevant to an Ind var/Dep var setup.`
       : "No schema loaded. Import a schema or create groups manually.";
   }

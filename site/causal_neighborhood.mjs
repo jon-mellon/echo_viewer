@@ -55,9 +55,11 @@ export function directedHops(links = [], minPapers = 1, papersFor = directionalP
  * and `edgeId` is the link joining the variable to its neighbour toward the
  * focus, which is the evidence for why it belongs in the list.
  * `isNode` lets callers leave out groups that are not drawn (such as "other").
+ * `isPassable` lets callers keep a variable in the results without following
+ * routes through it, as when the user excludes it from the map.
  */
 export function causalNeighborhood({ links = [], focusId, direction = "causes", depth = 1, minPapers = 2,
-  papersFor = directionalPaperCounter(), isNode = () => true } = {}) {
+  papersFor = directionalPaperCounter(), isNode = () => true, isPassable = () => true } = {}) {
   if (!focusId) return [];
   const limit = Math.max(1, Math.min(MAX_NEIGHBORHOOD_DEPTH, Math.trunc(depth) || 1));
   const towardFocus = new Map();
@@ -89,7 +91,7 @@ export function causalNeighborhood({ links = [], focusId, direction = "causes", 
       distance.set(node, level);
       best.set(node, entry);
     }
-    frontier = [...reached.keys()];
+    frontier = [...reached.keys()].filter(isPassable);
   }
   const results = [];
   for (const [node, level] of distance) {

@@ -75,6 +75,7 @@ export function isDagFullyVisible(network, boxes, viewport) {
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
   drawMap, setMapMode, renderAll, selectEdge, selectGroup, onViewportChange = () => {}, exploreRows = () => [],
+  onNodeHover = () => {},
 }) {
   // The causes and consequences views draw a neighborhood of one variable, not
   // a study design, so there are no IV, DV or instrument anchors to pin or style.
@@ -100,6 +101,7 @@ let _dagHoveredConfounderId = null;
 let _dagPathLaneSegments = [];
 let _dagEdgeHoverBaseline = null;
 let _dagHoveredLogicalEdgeIds = new Set();
+let _exploreRowHoverNode = null;
 
 function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -367,6 +369,21 @@ function highlightLogicalDagEdges(logicalEdgeIds) {
 
 function highlightLogicalDagEdge(segmentId) {
   highlightLogicalDagEdges([_dagEdgeSegments.get(segmentId) || segmentId]);
+}
+
+/**
+ * A row in the Explore list was hovered: light its link and halo its node with
+ * the same amber the graph uses for its own hover (null clears both).
+ */
+function hoverExploreRow(row) {
+  if (_exploreRowHoverNode && _visNodes?.get(_exploreRowHoverNode.id)) _visNodes.update(_exploreRowHoverNode);
+  _exploreRowHoverNode = null;
+  if (!row) { clearLogicalDagEdgeHover(); return; }
+  highlightLogicalDagEdges([row.edgeId]);
+  const node = _visNodes?.get(row.groupId);
+  if (!node) return;
+  _exploreRowHoverNode = { id: node.id, shadow: node.shadow || false };
+  _visNodes.update({ id: node.id, shadow: { enabled: true, color: "rgba(154,90,10,0.45)", size: 12, x: 0, y: 0 } });
 }
 
 function highlightConnectedDagEdges(nodeId) {
@@ -808,6 +825,7 @@ function attachDagNetworkHandlers(network) {
     drawPathLanes: drawConfounderPathLanes,
     highlightEdge: highlightLogicalDagEdge,
     highlightNodeEdges: highlightConnectedDagEdges,
+    onNodeHover: id => { if (exploring()) onNodeHover(id); },
     clearEdgeHover: clearLogicalDagEdgeHover,
     clearPathHover: clearConfounderPathHover,
     highlightPaths: highlightConfounderPaths,
@@ -820,6 +838,13 @@ function attachDagNetworkHandlers(network) {
     hasGroup: id => Boolean(groupById(id)),
     logicalEdgeId: id => _dagEdgeSegments.get(id) || id,
     focusGroup(id) {
+      // In Explore a variable on the graph is a row in the list: open that row's link.
+      const row = exploring() ? exploreRows().find(item => item.groupId === id) : null;
+      if (row?.edgeId) {
+        state.selectedEdgeId = row.edgeId;
+        selectEdge();
+        return;
+      }
       Object.assign(state, workflow.transition(state, { type: "focus-group", groupId: id }));
       drawMap();
       selectGroup(id);
@@ -854,7 +879,7 @@ function edgeHoverText(link) {
     refreshEdgeSelection, setDagDisplay,
     dagDisplay: () => state.dagDisplay,
     highlightConfounderPaths, clearConfounderPathHover, clearLogicalDagEdgeHover,
-    highlightConnectedDagEdges,
+    highlightConnectedDagEdges, hoverExploreRow,
     whenRendered: () => _dagRenderedPromise,
     renderedEdgeIds: () => [...new Set((_visEdges?.getIds() || []).map(id => _dagEdgeSegments.get(id) || id))],
     isEdgeRendered: edgeId => Boolean(_visEdges?.getIds().some(id => (_dagEdgeSegments.get(id) || id) === edgeId)),

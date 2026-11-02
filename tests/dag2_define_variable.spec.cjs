@@ -104,10 +104,10 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
     .toBe("Browser test construct updated");
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.undoHistory.length),
   { timeout: 1000 }).toBeGreaterThan(0);
-  await page.locator("#dag2UndoBtn").click();
+  await page.locator("#undoBtn").click();
   expect(await page.evaluate(groupId => window.__dagBuilderState.project.groups
     .find(group => group.group_id === groupId).label, splitGroupId)).toBe("Browser test construct");
-  await page.locator("#dag2UndoBtn").click();
+  await page.locator("#undoBtn").click();
   const undone = await page.evaluate(({ sourceIds, originals }) => ({
     newExists: window.__dagBuilderState.project.groups.some(group => group.label === "Browser test construct"),
     restored: sourceIds.map(id => {
@@ -137,7 +137,7 @@ test("Variables list definition and split editing are reachable on desktop and m
   await expect(page.locator("#variableDefineNew")).toBeVisible();
 
   await page.locator("#variableDefineNew").click();
-  await expect(page.locator("#definitionTitle")).toHaveText("Define new variable");
+  await expect(page.locator("#definitionTitle")).toHaveText("Create a variable");
   expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.role)).toBe("candidate");
   await page.locator("#definitionChooseManual").click();
   const source = page.locator("#definitionSourceList input[data-source-id]").nth(2);
@@ -165,7 +165,7 @@ test("Variables list definition and split editing are reachable on desktop and m
   await page.setViewportSize({ width: 390, height: 800 });
   await expect(page.locator("#variableDefineNew")).toBeVisible();
   await page.locator("#variableDefineNew").click();
-  await expect(page.locator("#definitionTitle")).toHaveText("Define new variable");
+  await expect(page.locator("#definitionTitle")).toHaveText("Create a variable");
   await page.locator("#definitionCancel").click();
   await splitRow.getByRole("button", { name: "Edit split" }).click();
   await expect(page.locator("#definitionTitle")).toHaveText("Edit split");
@@ -199,7 +199,7 @@ test("OpenRouter returns to the variable picker with the current anchors", async
   await page.locator("#definitionChooseJev").click();
   await page.locator("#definitionAiConnect").click();
   await expect(page.locator("#definitionSourcesStep")).toBeVisible();
-  await expect(page.locator("#definitionTitle")).toHaveText("Define new variable");
+  await expect(page.locator("#definitionTitle")).toHaveText("Create a variable");
   expect(await page.evaluate(() => [window.__dagBuilderState.definitionDraft.role, window.__dagBuilderState.project.iv_group_id, window.__dagBuilderState.project.dv_group_id])).toEqual(["candidate", ...anchors]);
 });
 
