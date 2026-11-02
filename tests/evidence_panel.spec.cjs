@@ -109,8 +109,10 @@ test("a newer path filter supersedes a dense graph while installation is pending
   await page.locator('button[data-mobile-panel="dag"]').click();
   const settled = () => page.evaluate(async () => (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).whenDagRendered());
   await settled();
-  await page.locator('.filter-dropdown > summary').click();
+  const dropdown = page.locator("details.filter-dropdown");
   for (const id of ["toggleCollidersOnly", "toggleConfoundersOnly", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks"]) {
+    // The Filters dropdown closes on an outside click, and some of these toggles sit outside it.
+    if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
     await page.locator(`#${id}`).click();
     await settled();
   }
