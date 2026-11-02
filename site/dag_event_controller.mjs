@@ -356,6 +356,15 @@ function installMapHandlers() {
     if (event.target === canvas && event.button === 2) return;
     hideMapContextMenu();
   });
+  document.addEventListener("pointerdown", (event) => {
+    for (const dropdown of document.querySelectorAll("details.filter-dropdown[open]")) {
+      if (!dropdown.contains(event.target)) dropdown.open = false;
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    for (const dropdown of document.querySelectorAll("details.filter-dropdown[open]")) dropdown.open = false;
+  });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     if (els.dagMapContextMenu?.hidden) return;

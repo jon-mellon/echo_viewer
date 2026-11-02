@@ -70,6 +70,9 @@ try {
     report.runs.push(result);
     await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); profiling = true;
     async function measure(name, id, expectedMode) {
+      // The Filters dropdown closes on an outside click; reopen it for a control inside it.
+      const dropdown = page.locator('.filter-dropdown');
+      if (await dropdown.locator(`#${id}`).count() && !(await dropdown.evaluate(element => element.open))) await dropdown.locator('summary').click();
       const start = await page.evaluate(() => performance.now());
       await page.locator(`#${id}`).click();
       await settled();
