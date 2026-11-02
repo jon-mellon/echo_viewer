@@ -105,6 +105,11 @@ try {
       .catch(() => console.log('search catalog not ready before the interactions were timed'));
     await page.waitForTimeout(500);
     // On a phone the list and the graph (with its Filters) are separate tabs.
+    // The Filters dropdown closes on an outside click, so reopen it before steps that need its controls.
+    const openFilters = async () => {
+      const dropdown = page.locator('.filter-dropdown');
+      if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator('summary').click();
+    };
     const showPanel = async panel => { if (mobile) await page.locator(`.mobile-panel-nav [data-mobile-panel="${panel}"]`).click(); };
     await showPanel('dag');
     await page.locator('.filter-dropdown > summary').click();
@@ -122,11 +127,13 @@ try {
       await page.locator('#focusGroupPicker button[data-group-id="category-income-earnings"]').click();
     });
     await showPanel('dag');
+    await openFilters();
     await measure('consequences distance 4', () => page.locator('#confounderPathLength').fill('4'));
     await showPanel('controls');
     // The table shows the same links without laying out a graph, so it is held to the same budgets.
     await showPanel('dag');
     await measure('switch to table', () => page.locator('#dagViewTable').click(), { table: true });
+    await openFilters();
     await measure('table distance 4', () => page.locator('#confounderPathLength').fill('4'), { table: true });
     await measure('table min papers 5', () => page.locator('#minimumEdgePapers').fill('5'), { table: true });
     await measure('table sort by papers', () => page.locator('#dagPathsTable thead button').last().click(), { table: true });

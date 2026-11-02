@@ -701,6 +701,8 @@ test("links the view implies beyond the paths are listed too, as many as the gra
   expect(await tabled()).toEqual(await drawnLinks());
   await expect(page.locator("#dagOtherLinksTable")).toHaveCount(0);
   // With "Path links only" off the graph also draws links no confounder path uses; the table lists them after the paths.
+  // Choosing the Table view closed the Filters dropdown; reopen it for the toggle.
+  if (!(await page.locator("details.filter-dropdown").evaluate(element => element.open))) await page.locator(".filter-dropdown > summary").click();
   await pathOnly.click();
   await expect(pathOnly).toHaveAttribute("aria-pressed", "false");
   const all = await drawnLinks();
