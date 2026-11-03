@@ -28,7 +28,7 @@ test("display records preserve node roles, selection, edge styles and descriptio
   vm.runInContext(readFileSync(new URL("./fixtures/legacy_dag_display.js", import.meta.url), "utf8"), legacy);
   const plain = value => JSON.parse(JSON.stringify(value));
   // Colours, fonts, hover behaviour and shadows are restyled; geometry and text are not.
-  const geometry = ({ color, font, chosen, shadow, borderWidth, borderWidthSelected, ...rest }) => rest;
+  const geometry = ({ color, font, chosen, shadow, shapeProperties, ...rest }) => rest;
   const before = structuredClone(groups);
   for (const mode of ["normal", "confounder", "collider"]) for (const selected of [null, "candidate", "iv"]) {
     state.showCollidersOnly = mode === "collider";
@@ -42,7 +42,6 @@ test("display records preserve node roles, selection, edge styles and descriptio
       assert.deepEqual(plain(geometry(node)), plain(geometry(legacy.visNodeData(group, point, { nodeMaxWidth: width }))));
       assert.equal(node.chosen.label, false);
       assert.equal(typeof node.chosen.node, "function");
-      assert.equal(node.color.border, node.color.background);
     }
   }
   for (const direction_type of ["A_TO_B", "B_TO_A", "BIDIRECTIONAL"]) {
@@ -113,10 +112,10 @@ test("exogeneity colors common causes while keeping the three study anchors", ()
   const mediator = display.visNodeData(group("via"), null, {}, view);
   const instrument = display.visNodeData(group("z"), null, {}, view);
   const iv = display.visNodeData(group("iv", "iv"), null, {}, view);
-  assert.equal(candidate.color.background, display.mixHex("#f8f8f8", "#c62828", 0.6));
-  assert.equal(mediator.color.background, display.mixHex("#f8f8f8", "#6b7280", 0.6));
-  assert.equal(instrument.color.background, display.mixHex("#f8f8f8", "#166534", 0.6));
-  assert.equal(iv.color.background, display.mixHex("#f8f8f8", "#123456", 0.6));
+  assert.equal(candidate.color.background, display.mixHex("#D55E00", "#ffffff", 0.4));
+  assert.equal(mediator.color.background, display.mixHex("#999999", "#ffffff", 0.4));
+  assert.equal(instrument.color.background, display.mixHex("#009E73", "#ffffff", 0.4));
+  assert.equal(iv.color.background, display.mixHex("#123456", "#ffffff", 0.4));
   assert.equal(instrument.shape, "ellipse");
 });
 
@@ -132,22 +131,26 @@ test("group centroid skips cold membership scans and retains duplicate-represent
 });
 
 
-test("overlapping diagnostic roles glow in the opposite role colour without a border", () => {
+test("overlapping diagnostic roles get a dashed border in the opposite role colour", () => {
   const group = { group_id: "both", label: "Both", variable_ids: [] };
   const base = { confounderGroupIds: new Set(["both"]), colliderGroupIds: new Set(["both"]),
     confounderPathGroupIds: new Set(), colliderPathGroupIds: new Set(), groupColor: "#123456" };
-  for (const [mode, color] of [["showConfoundersOnly", "#801744"], ["showCollidersOnly", "#c62828"]]) {
-    const node = display.visNodeData(group, null, {}, { ...base, [mode]: true, activeGroupId: "other" });
-    assert.equal(node.color.border, node.color.background);
-    assert.equal(node.color.highlight.border, node.color.background);
-    assert.equal(node.shadow.color, color);
-    assert.equal(node.borderWidth, 2.4);
+  for (const [mode, role] of [["showConfoundersOnly", "#CC79A7"], ["showCollidersOnly", "#D55E00"]]) {
+    const color = display.mixHex(role, "#000000", 0.35);
+    const node = display.visNodeData(group, null, {}, { ...base, [mode]: true, activeGroupId: "both" });
+    assert.equal(node.color.border, color);
+    assert.equal(node.color.highlight.border, color);
+    assert.equal(node.color.hover.border, color);
+    assert.equal(node.borderWidth, 4);
+    assert.deepEqual(node.shapeProperties.borderDashes, [6, 4]);
   }
+  const plain = display.visNodeData(group, null, {}, { ...base, activeGroupId: "other" });
+  assert.equal(plain.shapeProperties, undefined);
 });
 
-test("hovering a node colours its clear border without changing its size", () => {
+test("hovering a node colours its border without changing its size", () => {
   const hover = display.chosenNodeHover("#0072B2");
-  const values = { borderWidth: 2.4, borderColor: "#cce3f0", color: "#cce3f0" };
+  const values = { borderWidth: 2.4, borderColor: "#fbfcfa", color: "#cce3f0" };
   hover(values, "n", false, true);
   assert.equal(values.borderWidth, 2.4);
   assert.equal(values.borderColor, "#0072B2");

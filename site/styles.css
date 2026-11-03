@@ -56,6 +56,10 @@
   --role-dv: #9b5c2e;
   --role-instrument: #6d4cb3;
   --role-confounder: #801744;
+  --dag-confounder: #D55E00;
+  --dag-collider: #CC79A7;
+  --dag-confounder-deep: #8a3d00;
+  --dag-collider-deep: #854f6d;
   --role-preview: #bd38b2;
   --role-preview-strong: #9a1694;
   --diag-instrument: #166534;
@@ -3097,10 +3101,10 @@ h2 {
 #dagTable:not([hidden]) ~ .diagnostic-overlap-key { display: none; }
 .diagnostic-key-item { display: inline-flex; align-items: center; gap: var(--space-1); }
 .diagnostic-key-swatch { width: 15px; height: 15px; border-radius: var(--radius-sm); }
-.collider-key .diagnostic-key-fill, .confounder-key .diagnostic-key-outline { background: var(--danger); }
-.confounder-key .diagnostic-key-fill { background: var(--role-confounder); }
-.collider-key .diagnostic-key-outline { background: var(--danger); box-shadow: 0 0 5px 2px var(--role-confounder); }
-.confounder-key .diagnostic-key-outline { background: var(--role-confounder); box-shadow: 0 0 5px 2px var(--danger); }
+.collider-key .diagnostic-key-fill, .collider-key .diagnostic-key-outline { background: color-mix(in srgb, var(--dag-confounder) 60%, white); }
+.confounder-key .diagnostic-key-fill, .confounder-key .diagnostic-key-outline { background: color-mix(in srgb, var(--dag-collider) 60%, white); }
+.collider-key .diagnostic-key-outline { border: 3px dashed var(--dag-collider-deep); }
+.confounder-key .diagnostic-key-outline { border: 3px dashed var(--dag-confounder-deep); }
 
 /* Give the initial variable selection the whole viewport. */
 .dag2-mode.initial-setup:not(.definition-active) .dag-shell {
