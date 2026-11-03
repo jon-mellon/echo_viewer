@@ -58,6 +58,9 @@
   --role-confounder: #801744;
   --dag-confounder: #D55E00;
   --dag-collider: #CC79A7;
+  --dag-iv: #0072B2;
+  --dag-dv: #E69F00;
+  --dag-instrument: #009E73;
   --dag-confounder-deep: #8a3d00;
   --dag-collider-deep: #854f6d;
   --role-preview: #bd38b2;
@@ -3122,8 +3125,11 @@ h2 {
   display: none !important;
 }
 
-.diagnostic-key-instrument { background: var(--diag-instrument); border-radius: 50%; }
-.diagnostic-key-violation { background: var(--danger); }
+.diagnostic-key-iv, .diagnostic-key-dv, .diagnostic-key-instrument { width: 20px; border-radius: 50%; }
+.diagnostic-key-iv { background: color-mix(in srgb, var(--dag-iv) 60%, var(--surface)); }
+.diagnostic-key-dv { background: color-mix(in srgb, var(--dag-dv) 60%, var(--surface)); }
+.diagnostic-key-instrument { background: color-mix(in srgb, var(--dag-instrument) 60%, var(--surface)); }
+.diagnostic-key-violation, .diagnostic-key-cause { background: color-mix(in srgb, var(--dag-confounder) 60%, var(--surface)); }
 .diagnostic-key-path { background: var(--diag-path); height: 3px; border-radius: 0; }
 
 
