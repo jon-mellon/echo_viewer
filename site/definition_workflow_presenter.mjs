@@ -2,7 +2,7 @@ import { h, replaceChildren } from "./dom_builder.mjs";
 
 export function createDefinitionWorkflowPresenter({ state, elements: els, normalized, clusterRep, truncate,
   definitionSources, definitionResidualIds, definitionCanReview, searchSourceGroups,
-  clusterDisplayVariable,
+  clusterDisplayVariable, resizeMap, fitMap,
   onSourceSelection, onResidualLabel, onCancel,
   browseState, onChoosePublishedSplit }) {
   let renderedStep = null;
@@ -130,9 +130,17 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     const draft = state.definitionDraft;
     const stepChanged = draft?.step !== renderedStep;
     renderedStep = draft?.step || null;
+    const wasSpatial = document.body.classList.contains("defining-variable");
     const isSpatial = draft?.step === "partition";
     document.body.classList.toggle("definition-active", Boolean(draft));
     document.body.classList.toggle("defining-variable", isSpatial);
+    // The map is display:none in the normal DAG2 layout, so its initial canvas
+    // backing store is 1x1. Resize only after the browser has laid out the
+    // temporary spatial workspace, including when a saved draft is resumed.
+    if (isSpatial && !wasSpatial) requestAnimationFrame(() => {
+      resizeMap();
+      fitMap(draft.eligible_variable_ids);
+    });
     els.definitionBlock.hidden = !draft;
     if (!draft) return;
     if (stepChanged) {
@@ -155,6 +163,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionLoadStatus.textContent = draft.details_error
       ? `Some concept details could not load: ${draft.details_error}. You can still edit this variable.`
       : draft.details_loading ? "Loading concepts…" : "";
+    els.definitionMapPreviewStatus.hidden = !state.definitionAiPreviewIds;
     if (draft.step === "describe") {
       if (document.activeElement !== els.definitionNewLabel) els.definitionNewLabel.value = draft.new_label || "";
       if (document.activeElement !== els.definitionNewDescription) els.definitionNewDescription.value = draft.new_description || "";
@@ -255,6 +264,12 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       })] : []);
   }
 
+  function setJevPreviewStatus(ids, mode) {
+    els.definitionMapPreviewStatus.hidden = !ids;
+    els.definitionMapPreviewStatus.textContent = ids
+      ? `AI ${mode === "test" ? "sample" : "full"} preview only · ${ids.length} suggested for new` : "";
+  }
+
   return { render, install, showDescribeError, showSaveError, clearDescriptionValidation, setContinueLoading, showLoadError,
-    showSavedRuns };
+    setJevPreviewStatus, showSavedRuns };
 }

@@ -14,8 +14,10 @@ export function createRenderCoordinator(view) {
       view.renderSelectedEdge();
     }
     view.renderExportStatus();
+    view.renderMapModeControls();
     view.renderMapToolbarToggles();
     view.renderUndoRedo();
+    view.drawMap();
     view.saveProjectLocally();
   }
   function rebuildLinkDecision() {
@@ -36,7 +38,7 @@ export function createRenderCoordinator(view) {
     view.renderConfounderStatuses?.();
     view.renderGroupList();
     // Graph filters do not change variable assignments, membership or UOA.
-    view.renderMapToolbarToggles();
+    view.renderMapToolbarToggles({ includeCoverage: false });
     view.renderDag({ reuseGeometry: true });
     view.renderSelectedEdge();
     view.renderExportStatus();
@@ -62,8 +64,10 @@ export function createRenderCoordinator(view) {
       view.renderGroupList();
       view.renderDag({ reuseGeometry: true });
       if (!view.renderVariableComparison()) view.renderSelectedEdge();
-        view.renderMapToolbarToggles();
-      } else view.renderVariablePanel?.();
+      view.renderMapModeControls();
+      view.renderMapToolbarToggles({ includeCoverage: false });
+      view.drawMap();
+    } else view.renderVariablePanel?.();
   }
   function selectEdge({ redraw = true } = {}) {
     view.refreshDagEdgeSelection({ redraw });

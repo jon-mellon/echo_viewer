@@ -277,6 +277,7 @@ textarea.search-input, .dag-textarea { padding: var(--space-2); line-height: var
 }
 .result-button strong, .group-row strong, .candidate-card strong { font-size: var(--text-base); font-weight: var(--weight-normal); }
 
+
 /* ── Type roles: every piece of text is one of these five. Contexts set colour and
    spacing only, never size, weight or case. ── */
 h1,
@@ -306,9 +307,9 @@ h2,
 .dag-label,
 .stat-label,
 .setup-group-picker-title,
-.group-status-label,
-.group-role-label,
-.detail-field strong {
+.group-status-label, .group-role-label,
+.detail-field strong,
+.variable-layout-control label {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   line-height: var(--leading-tight);
@@ -332,6 +333,8 @@ h2,
 .finding-excluded-label,
 .dag-table-route-label,
 .tooltip-duplicate-heading,
+.map-context-menu-title,
+.map-context-menu-item strong,
 .duplicate-member strong,
 .explore-summary {
   font-size: var(--text-sm);
@@ -359,6 +362,8 @@ h2,
   .definition-side-buttons button,
   .dag-workspace .evidence-close { min-height: var(--control-touch); }
 }
+
+
 
 * {
   box-sizing: border-box;
@@ -488,6 +493,8 @@ h2 {
   margin-bottom: var(--space-3);
 }
 
+
+
 .field-controls {
   display: grid;
   gap: var(--space-2);
@@ -549,6 +556,9 @@ h2 {
   gap: var(--space-2);
   margin-top: var(--space-3);
 }
+
+
+
 
 .search-input,
 .select-input {
@@ -687,9 +697,67 @@ h2 {
   cursor: grabbing;
 }
 
+.map-toolbar {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 10;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--overlay);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
+}
+
+.variable-layout-control {
+  top: 72px;
+  right: auto;
+  left: 18px;
+  align-items: center;
+  max-width: calc(100% - 36px);
+}
+
+.variable-layout-control label {
+  color: var(--text-muted);
+  
+  
+  white-space: nowrap;
+}
+
+.variable-layout-control select {
+  max-width: min(320px, calc(100vw - 520px));
+}
+
+.assignment-coverage {
+  display: inline-flex;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.coverage-count {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+}
+
+.coverage-count.assigned {
+  border-color: var(--accent-border);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+
 #dagZoomIn, #dagZoomOut, #dagSvgZoomIn, #dagSvgZoomOut {
   touch-action: manipulation;
 }
+
 
 .tooltip {
   position: absolute;
@@ -735,6 +803,28 @@ h2 {
 
 .tooltip pre {
   max-height: 310px;
+}
+
+.map-context-menu {
+  position: absolute;
+  z-index: 24;
+  min-width: 240px;
+  max-width: min(360px, calc(100% - 24px));
+  max-height: min(72vh, calc(100% - 16px));
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--overlay);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.map-context-menu-title {
+  margin: 0 0 var(--space-1);
+  color: var(--text);
+  
+  
+  
 }
 
 .duplicate-details {
@@ -792,6 +882,67 @@ h2 {
   color: var(--accent);
   font-size: var(--text-sm);
   font-weight: var(--weight-normal);
+}
+
+.map-context-menu-subtitle {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.map-context-menu-search {
+  width: 100%;
+  min-height:  var(--control-md);
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
+.map-context-menu-actions {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-2);
+}
+
+.map-context-menu-list {
+  display: grid;
+  gap: var(--space-1);
+  max-height: min(38vh, 300px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.map-context-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.map-context-menu-item:hover {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.map-context-menu-item strong {
+  display: block;
+  
+}
+
+.map-context-menu-item span {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
 }
 
 .small-link {
@@ -857,6 +1008,20 @@ h2 {
   overflow: hidden;
 }
 
+.dag-map-panel {
+  position: relative;
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    var(--hover-bg);
+  background-size: 44px 44px;
+}
+
 /* DAG2 is a presentation profile of the same application. The variable-map
    DOM remains inert for shared controller compatibility but is not part of the
    interface; the existing DAG workspace becomes the primary working surface. */
@@ -877,6 +1042,7 @@ h2 {
   display: flex;
 }
 
+.dag2-mode .dag-map-panel,
 .dag2-mode #rightResizer,
 .dag2-mode #modeSwitcher,
 .dag2-mode #groupListPanel,
@@ -893,6 +1059,21 @@ h2 {
 
 .dag2-mode.defining-variable .dag-right-panel {
   display: none;
+}
+
+.dag2-mode.defining-variable .dag-map-toolbar {
+  left: 10px;
+  right: 10px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.dag2-mode.defining-variable .dag-map-toolbar > * { flex-shrink: 0; }
+
+.dag2-mode.defining-variable .dag-map-panel {
+  display: flex !important;
+  grid-column: 3;
+  grid-row: 1;
 }
 
 .definition-block {
@@ -967,6 +1148,24 @@ h2 {
   font: inherit;
 }
 
+
+.definition-map-preview-status {
+  position: absolute;
+  z-index: 8;
+  top: 114px;
+  left: 12px;
+  max-width: calc(100% - 24px);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--role-preview);
+  border-radius: var(--radius-md);
+  background: var(--overlay);
+  color: var(--role-preview-strong);
+  font-weight: var(--weight-normal);
+  pointer-events: none;
+}
+
+.definition-map-preview-status[hidden] { display: none; }
+
 .dag2-mode .uoa-chips {
   max-height: 280px;
   overflow-y: auto;
@@ -1007,16 +1206,24 @@ h2 {
   
 }
 
+
+
 /* Focus either visualization without leaving the current workflow. */
+.dag-body.focus-variable-map .dag-shell,
 .dag-body.focus-dag .dag-shell {
   display: block;
 }
 
+.dag-body.focus-variable-map .dag-left-panel,
+.dag-body.focus-variable-map .dag-right-panel,
+.dag-body.focus-variable-map .panel-resizer,
 .dag-body.focus-dag .dag-left-panel,
+.dag-body.focus-dag .dag-map-panel,
 .dag-body.focus-dag .panel-resizer {
   display: none;
 }
 
+.dag-body.focus-variable-map .dag-map-panel,
 .dag-body.focus-dag .dag-right-panel {
   position: fixed;
   inset: 0;
@@ -1035,6 +1242,80 @@ h2 {
   color: var(--surface);
 }
 
+#dagMapCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+#dagMapCanvas.brush-mode {
+  cursor: crosshair;
+}
+
+#dagMapCanvas.dragging {
+  cursor: grabbing;
+}
+
+.mobile-definition-map-hint {
+  display: none;
+}
+
+.dag-map-labels {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.map-label {
+  position: absolute;
+  z-index: 1;
+  max-width: 280px;
+  padding: var(--space-1) var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--overlay);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height:  var(--leading-tight);
+  text-shadow: none;
+  box-shadow: var(--shadow-sm);
+  transform: translate(9px, -50%);
+  white-space: normal;
+}
+
+.map-label.seed,
+.map-label.active,
+.map-label.selected {
+  max-width: 360px;
+  background: var(--overlay);
+  color: var(--text);
+  font-size: var(--text-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.map-label.search {
+  color: var(--text);
+}
+
+.map-label.group-region-label {
+  z-index: 3;
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  background: var(--overlay);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-lg);
+  border: 1.5px solid;
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+  box-shadow: var(--shadow-sm);
+}
+
 .dag-bottom-panel {
   grid-column: 2;
   grid-row: 2;
@@ -1051,6 +1332,11 @@ h2 {
   
   
 }
+
+
+
+
+
 
 .warning-note {
   margin-top: var(--space-2);
@@ -1263,6 +1549,8 @@ h2 {
   gap: var(--space-2);
   align-items: center;
 }
+
+
 
 /* ── UOA filter ── */
 .uoa-chips {
@@ -1584,6 +1872,9 @@ h2 {
   flex-wrap: wrap;
   gap: var(--space-1);
 }
+
+
+
 
 /* Filters menu: flat rows, a checkmark column for toggles, numbers right-aligned.
    Rows are not boxes; only hover and focus tint them. */
@@ -1971,6 +2262,7 @@ h2 {
   gap: var(--space-1);
 }
 
+
 .provenance-table {
   width: 100%;
   border-collapse: collapse;
@@ -2092,6 +2384,9 @@ h2 {
   font-size: var(--text-md);
 }
 
+
+
+
 .anchor-label {
   flex: 1 1 auto;
   
@@ -2100,6 +2395,7 @@ h2 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 
 .mode-tab {
   
@@ -2199,6 +2495,12 @@ h2 {
   gap: var(--space-2);
 }
 
+
+
+
+
+
+
 /* ── Edge inspector ── */
 
 .edge-inspector {
@@ -2281,7 +2583,10 @@ h2 {
     grid-row: 1 / 3;
   }
 
-  
+  .dag-map-panel {
+    grid-column: 2;
+    grid-row: 1;
+  }
 
   .dag-right-panel {
     grid-column: 2;
@@ -2352,16 +2657,20 @@ h2 {
     overflow-y: auto;
   }
 
-  
+  .dag-map-panel {
+    height: 100%;
+  }
 
   .panel-resizer,
-.dag-shell > .dag-left-panel,
-.dag-shell > .dag-right-panel {
+  .dag-shell > .dag-left-panel,
+  .dag-shell > .dag-map-panel,
+  .dag-shell > .dag-right-panel {
     display: none !important;
   }
 
   .dag-body[data-mobile-panel="controls"] .dag-shell > .dag-left-panel,
-.dag-body[data-mobile-panel="dag"] .dag-shell > .dag-right-panel {
+  .dag-body[data-mobile-panel="variables"].defining-variable .dag-shell > .dag-map-panel,
+  .dag-body[data-mobile-panel="dag"] .dag-shell > .dag-right-panel {
     display: flex !important;
     width: 100%;
   }
@@ -2378,10 +2687,12 @@ h2 {
     margin-left: auto;
   }
 
+  .dag-body.focus-variable-map .mobile-panel-nav,
   .dag-body.focus-dag .mobile-panel-nav {
     display: none;
   }
 
+  .dag-body.focus-variable-map .dag-shell,
   .dag-body.focus-dag .dag-shell {
     height: 100dvh;
   }
@@ -2404,9 +2715,13 @@ h2 {
     font-weight: var(--weight-medium);
   }
 
-  
+  .mobile-variable-tab {
+    display: none;
+  }
 
-  
+  .dag-body.defining-variable .mobile-variable-tab {
+    display: block;
+  }
 
   .dag-body.defining-variable .mobile-panel-tab[data-mobile-panel="dag"] {
     display: none;
@@ -2493,15 +2808,36 @@ h2 {
 }
 
 @media (max-width: 840px) {
-  
+  .dag-body.defining-variable .mobile-definition-map-hint {
+    display: block;
+    position: absolute;
+    z-index: 9;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--overlay);
+    color: var(--text);
+    font-size: var(--text-sm);
+    line-height:  var(--leading-body);
+    pointer-events: none;
+  }
 
   .fullscreen-toggle {
     display: none;
   }
 
-  
+  .dag-map-toolbar {
+    left: 10px;
+    right: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+  }
 
-  
+  .dag-map-toolbar > * { flex-shrink: 0; }
 
   .dag2-mode .dag-shell {
     display: block;
@@ -2661,12 +2997,16 @@ h2 {
     bottom: max(6px, env(safe-area-inset-bottom));
   }
 }
+@media (max-width: 360px) {
+}
 
 /* Establish gesture ownership before the browser begins a graph pinch. */
+.dag-map-panel,
 .dag-svg-wrapper,
 .dag-network-wrapper {
   touch-action: none;
 }
+
 
 .sr-only {
   position: absolute;
@@ -2700,9 +3040,14 @@ h2 {
 .focus-selector-name { flex: 1 1 auto; min-width: 0;    overflow-wrap: anywhere; }
 .focus-selector-chevron { flex: none; color: var(--text-muted); font-size: var(--text-sm); line-height:  var(--leading-body); }
 
+
+
+
+
 /* Explore keeps the sidebar dense: 16px gutters and 8/12px vertical rhythm. */
 .dag-body.task-causes .anchor-bar, .dag-body.task-consequences .anchor-bar { gap: var(--space-2); padding: var(--space-3) var(--space-4) var(--space-2); border-bottom: 0; }
 .dag-body:is(.task-causes, .task-consequences, .task-identify) #exploreView { padding: var(--space-1) var(--space-4) var(--space-4); }
+
 
 /* Keep group paging at the foot of the available inspector space. */
 @media (min-width: 841px) {
@@ -2776,6 +3121,7 @@ h2 {
 .diagnostic-key-instrument { background: var(--diag-instrument); border-radius: 50%; }
 .diagnostic-key-violation { background: var(--danger); }
 .diagnostic-key-path { background: var(--diag-path); height: 3px; border-radius: 0; }
+
 
 .instrument-none-row {
   margin: var(--space-3) 0;
@@ -2875,7 +3221,9 @@ h2 {
 }
 .task-view[hidden] { display: none; }
 .dag-body.task-home .mobile-panel-nav { display: none !important; }
+.dag-body.focus-variable-map .task-bar,
 .dag-body.focus-dag .task-bar { display: none; }
+
 
 /* Explore list: a flat, compact list with a right-aligned paper column.
    Hover is a faint tint; selection is a stronger tint with an accent bar. */
@@ -3034,7 +3382,7 @@ h2 {
 @media (min-width: 841px) {
   .dag-body:is(.task-causes, .task-consequences, .task-identify) .dag-left-panel > #setupSection { display: none; }
 }
-
+.dag-body.task-causes .mobile-variable-tab, .dag-body.task-consequences .mobile-variable-tab { display: none; }
 /* Identification: the Cause, Outcome and Instrument fields and the list under them
    (in #exploreView, shared with Explore) replace the step-by-step setup, the anchor
    bar and the Variables panel. Creating a variable still uses the setup section. */
@@ -3143,10 +3491,16 @@ h2 {
 /* Causes | Consequences sits in the graph header, where Identify has its diagnostic switch. */
 .dag-body:not(.task-causes):not(.task-consequences) #exploreDirection { display: none; }
 
+
+
+
+
 .dag-view-switch { order: 99; }
 .dag-ws-controls > .filter-dropdown { order: 100; }
 /* Explore keeps all its filters in the list's funnel menu, so the graph header has none. */
 .dag-body:is(.task-causes, .task-consequences) .dag-ws-controls > .filter-dropdown { display: none; }
+
+
 
 /* Zoom, fit and full screen float over the graph's bottom-right corner. */
 .dag-overlay-controls {
@@ -3391,6 +3745,8 @@ h2 {
 .setup-group-picker-row .setup-group-variable-match,
 .setup-group-definition summary {
   color: var(--text-muted);
+}
+@media (min-width: 841px) {
 }
 
 /* The group picker fills the rest of the side pane instead of stopping at a
@@ -3742,11 +4098,9 @@ h2 {
     overflow-y: auto;
     background: var(--surface);
   }
-  .dag-body:is(.definition-active,
-.dag-body:is(.definition-active,
-.custom-variables-open) .dag-right-panel,
-.dag-body:is(.definition-active,
-.custom-variables-open) #rightResizer {
+  .dag-body:is(.definition-active, .custom-variables-open) .dag-map-panel,
+  .dag-body:is(.definition-active, .custom-variables-open) .dag-right-panel,
+  .dag-body:is(.definition-active, .custom-variables-open) #rightResizer {
     display: none !important;
   }
 
@@ -4128,6 +4482,8 @@ h2 {
 .definition-save-hint { margin-right: auto; }
 .definition-save-hint:empty { display: none; }
 
+@media (min-width: 1100px) {
+}
 @media (max-width: 640px) {
   .definition-ai-row { grid-template-columns: 1fr; grid-auto-rows: max-content; }
   .definition-side-buttons { justify-self: start; }

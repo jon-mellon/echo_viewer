@@ -12,15 +12,32 @@ import { createDagShellController } from "../site/dag_shell_controller.mjs";
 import { createToolbarPresenter, diagnosticViewTitle } from "../site/toolbar_presenter.mjs";
 import { createRenderCoordinator } from "../site/render_coordinator.mjs";
 
-test("graph-only filters update the controls", () => {
+test("graph-only filters update controls without recomputing assignment coverage", () => {
   const calls = [];
   const view = new Proxy({}, { get: (_, key) => key === "renderMapToolbarToggles"
-    ? () => calls.push("toggles") : () => {} });
+    ? options => calls.push(options) : () => {} });
   createRenderCoordinator(view).updateDagFilters();
-  assert.deepEqual(calls, ["toggles"]);
+  assert.deepEqual(calls, [{ includeCoverage: false }]);
 });
 
-test("fullscreen resizes the existing graph", () => {
+test("assignment coverage skips memberships until variables are loaded and preserves overlap and UOA counts", () => {
+  let variables = [];
+  let membershipReads = 0;
+  const state = { project: { groups: [
+    { get variable_ids() { membershipReads++; return ["a", "b"]; } },
+    { variable_ids: ["a", "c"] },
+  ] }, uoaFilterEnabled: true, selectedUoa: "person" };
+  const presenter = createToolbarPresenter({ state, elements: {}, groupById: () => null,
+    visibleVariables: () => variables, uoaMatches: (a, b) => a === b,
+    clusterRep: id => id === "b" ? "a" : id, rejectedVariableIdSet: () => new Set(["z"]) });
+  assert.deepEqual(presenter.assignmentCoverage(), { assigned: 0, unassigned: 0, total: 0, plottedNodes: 0, rejected: 1, uoaFiltered: true });
+  assert.equal(membershipReads, 0);
+  variables = [{ variable_id: "a", uoa: "person" }, { variable_id: "b", uoa: "person" },
+    { variable_id: "c", uoa: "country" }, { variable_id: "d", uoa: "person" }];
+  assert.deepEqual(presenter.assignmentCoverage(), { assigned: 2, unassigned: 1, total: 3, plottedNodes: 2, rejected: 1, uoaFiltered: true });
+});
+
+test("fullscreen resizes the existing graph and only fits the variable map when shown", () => {
   const original = { document: globalThis.document, requestAnimationFrame: globalThis.requestAnimationFrame, setTimeout: globalThis.setTimeout };
   const calls = [];
   const button = () => ({ classList: { toggle() {} }, setAttribute() {}, textContent: "" });
@@ -29,13 +46,16 @@ test("fullscreen resizes the existing graph", () => {
   globalThis.setTimeout = callback => { callback(); return 0; };
   try {
     const controller = createDagShellController({ state: { fullscreenPanel: null },
-      elements: { fullscreenDag: button() },
+      elements: { fullscreenVariableMap: button(), fullscreenDag: button() },
+      resizeMap: () => calls.push("resize-map"), fitMap: () => calls.push("fit-map"),
       renderDag: () => calls.push("rebuild"),
       getNetwork: () => ({ setSize: (...size) => calls.push(size), fit: () => calls.push("fit-dag") }),
     });
     controller.setFullscreen("dag");
     controller.setFullscreen(null);
     assert.deepEqual(calls, [["100%", "100%"], "fit-dag", ["100%", "100%"], "fit-dag"]);
+    controller.setFullscreen("variable-map");
+    assert.deepEqual(calls.slice(4), ["resize-map", "fit-map", ["100%", "100%"], "fit-dag"]);
   } finally { Object.assign(globalThis, original); }
 });
 
@@ -48,9 +68,9 @@ test("application state instances do not share mutable collections", () => {
   const first = createDagAppState(), second = createDagAppState();
   assert.equal(first.showConfoundersOnly, true);
   assert.equal(first.showCollidersOnly, false);
-  first.seeds.iv.add("v1"); first.visibleCache.variables = [];
+  first.seeds.iv.add("v1"); first.map.transform.scale = 3;
   assert.deepEqual([...second.seeds.iv], []);
-  assert.equal(second.visibleCache.variables, null);
+  assert.equal(second.map.transform.scale, 1);
 });
 
 test("DAG2 anchor picker follows missing anchors even when restored workflow flags are stale", () => {
@@ -160,7 +180,7 @@ test("project controller preserves live group identity and owns history transiti
   let renders = 0;
   const controller = createDagProjectController({
     state, storage: memoryStorage(), storagePrefix: "test", nowIso: () => "2026-09-10T00:00:00Z",
-    invalidateVisibleCaches() {}, renderAll: () => renders++, renderUndoRedo() {}, renderActionHistory() {},
+    invalidateMapCaches() {}, renderAll: () => renders++, renderUndoRedo() {}, renderActionHistory() {},
   });
   controller.initialize();
   const original = { group_id: "g1", label: "Before", variable_ids: ["v1"] };
@@ -181,7 +201,7 @@ test("edge-decision undo and redo refresh only links; group edits still rebuild"
   const calls = [];
   const controller = createDagProjectController({
     state, storage: memoryStorage(), storagePrefix: "test", nowIso: () => "2026-09-10T00:00:00Z",
-    invalidateVisibleCaches: () => calls.push("invalidate"),
+    invalidateMapCaches: () => calls.push("invalidate"),
     renderAll: () => calls.push("full"),
     rebuildLinkDecision: () => calls.push("links"),
     renderUndoRedo() {}, renderActionHistory() {},
@@ -216,7 +236,7 @@ test("autosave coalesces edits and flushes the latest project on page hide", () 
   const controller = createDagProjectController({
     state, storage: { setItem(key, value) { writes.push({ key, value }); } },
     storagePrefix: "test", nowIso: () => "2026-09-10T00:00:00Z",
-    invalidateVisibleCaches() {}, renderAll() {}, renderUndoRedo() {}, renderActionHistory() {},
+    invalidateMapCaches() {}, renderAll() {}, renderUndoRedo() {}, renderActionHistory() {},
     lifecycleTarget,
   });
   controller.initialize();
@@ -344,7 +364,7 @@ test("anchor history composes with membership history and survives serialization
   state.data = { generated_at: "fixture", default_grouping_set_id: "none", grouping_sets: [] };
   let invalidations = 0;
   const controller = createDagProjectController({ state, storage: memoryStorage(), storagePrefix: "anchor-test",
-    nowIso: () => "now", invalidateVisibleCaches: () => invalidations++, renderAll() {}, renderUndoRedo() {}, renderActionHistory() {} });
+    nowIso: () => "now", invalidateMapCaches: () => invalidations++, renderAll() {}, renderUndoRedo() {}, renderActionHistory() {} });
   controller.initialize();
   state.project.groups = [{ group_id: "a", variable_ids: ["v1"] }, { group_id: "b", variable_ids: ["v2"] }];
   const before = controller.snapshot("anchors");

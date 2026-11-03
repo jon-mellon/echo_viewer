@@ -6,7 +6,7 @@ import * as workflow from "./dag_workflow.mjs";
 
 // Owns project lifecycle and the sole in-place mutation adapter used by the UI.
 export function createDagProjectController({
-  state, storage, storagePrefix, nowIso, invalidateVisibleCaches,
+  state, storage, storagePrefix, nowIso, invalidateMapCaches,
   renderAll, rebuildLinkDecision = renderAll, renderUndoRedo, renderActionHistory, warn = console.warn,
   lifecycleTarget = globalThis,
 }) {
@@ -34,6 +34,7 @@ export function createDagProjectController({
       return current;
     });
     Object.assign(state.project, next, { groups });
+    if (state.map && !preserveMembership) state.map._groupRegions = null;
   }
 
   function initialize() {
@@ -46,7 +47,7 @@ export function createDagProjectController({
       project: state.project, seeds: state.seeds, phase: state.phase,
       workflowMode: state.workflowMode, selectedUoa: state.selectedUoa,
     }, currentSchema(), state.clusterOf, state.clusterMembers));
-    invalidateVisibleCaches();
+    invalidateMapCaches();
   }
 
   function applyLoaded(payload) {
@@ -68,7 +69,7 @@ export function createDagProjectController({
       state.showExogeneity = false;
     }
     Object.assign(state, workflow.transition(state, { type: "clear-editor" }));
-    invalidateVisibleCaches();
+    invalidateMapCaches();
   }
 
   function storageKey() {
@@ -134,7 +135,7 @@ export function createDagProjectController({
     const restored = projectOps.restoreSnapshot(state.project, serialized);
     state.project = restored.project;
     state.phase = restored.phase;
-    if (invalidate) invalidateVisibleCaches();
+    if (invalidate) invalidateMapCaches();
   }
 
   function record(description, before, renderKind = "full") {

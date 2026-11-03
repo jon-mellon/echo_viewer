@@ -75,8 +75,12 @@ try {
     await measure('cold definition source', async () => {
       await page.locator('#definitionSourceList input[data-source-id]').first().check();
       await page.locator('#definitionContinue').click();
-      await page.locator('#definitionPartitionStep').waitFor({ state: 'visible' });
+      if (mobile) {
+        await page.locator('button[data-mobile-panel="variables"]').click();
+        await page.locator('#dagZoomIn').waitFor({ state: 'visible' });
+      } else await page.locator('#definitionPartitionStep').waitFor({ state: 'visible' });
     });
+    if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
     await page.locator('.definition-cancel:visible').first().click();
     const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(g => g.variable_ids.length).slice(0, 2).map(g => g.group_id));
     await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();

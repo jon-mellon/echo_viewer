@@ -26,7 +26,7 @@ function anchorHasMembers(state, group) {
 
 export function createDagSetupGroupController({
   state, elements, escapeHtml, normalized, truncate, groupById,
-  assignGroupAsAnchor, assignGroupAsInstrument, renderAll,
+  assignGroupAsAnchor, assignGroupAsInstrument, setMapMode, renderAll,
   roleLabels, dagProjectView, startDefinition, startEditSplit,
   canEditSplit = () => false, searchAnchorGroups = searchModel.searchAnchorGroups,
   beginEditor = () => {},
@@ -557,7 +557,7 @@ export function createDagSetupGroupController({
       if (!group) return;
       beginEditor();
       Object.assign(state, workflow.transition(state, { type: "open-editor", groupId: group.group_id }));
-      renderAll({ rebuild: false, refreshView: true });
+      setMapMode("select"); renderAll({ rebuild: false, refreshView: true });
     }));
   }
 

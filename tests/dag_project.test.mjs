@@ -80,7 +80,7 @@ test('schema refresh retains schema and local rejections and hides their current
   const source = readFileSync(new URL('../site/dag_builder.js', import.meta.url), 'utf8');
   const context = vm.createContext({
     visibility,
-    state: { project: refreshed, visibleCache: { variables: null, clusterReps: null }, clusterOf: new Map([['old', 'new']]),
+    state: { project: refreshed, clusterOf: new Map([['old', 'new']]),
       clusterMembers: new Map([['new', ['new', 'old']]]), variables: [
       { variable_id: 'new', is_cluster_rep: true },
       { variable_id: 'old', is_cluster_rep: false },
@@ -96,7 +96,6 @@ test('schema refresh retains schema and local rejections and hides their current
   assert.equal(context.isRejectedVariable('new'), true);
   assert.equal(context.visibleClusterReps().map(v => v.variable_id).join(','), 'visible');
   context.state.project.rejected_variables = [];
-  context.state.visibleCache = { variables: null, clusterReps: null };
   assert.equal(context.visibleClusterReps().length, 3);
 });
 function fixture() {

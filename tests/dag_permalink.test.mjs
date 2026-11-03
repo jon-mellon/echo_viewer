@@ -16,7 +16,7 @@ test("compact permalink round trip preserves reproducible view settings", () => 
     variableLayoutSource: "corrected", selectedUoa: "person", confounderMaxPathLength: 4,
     filterDagByCausalRelevance: false, showConfoundersOnly: true, showCollidersOnly: false,
     excludeBottleneckedConfounders: true, hideIrrelevantConfounderLinks: true,
-    uoaFilterEnabled: true,
+    showVariableLabels: false, showGroupLabels: true, uoaFilterEnabled: true,
     activeGroupId: "cause", selectedVariableId: "v1" };
   const href = buildPermalink({ location: { href: "http://localhost:8767/?old=1" },
     schemaUrl: "/config/schema/", dataVersion: "snapshot-7", state });

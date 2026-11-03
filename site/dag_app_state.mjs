@@ -43,8 +43,8 @@ export function createDagAppState(interfaceMode = "classic") {
     phase: "select_dv", workflowMode: "setup", changingAnchorSide: null,
     anchorSearchMode: { iv: "existing", dv: "existing", instrument: "existing" }, groupListSort: "relevance",
     undoHistory: [], undoPointer: -1, actionLog: [], showActionHistory: false,
-    definitionDraft: null,
-    variableLayoutSource: "",
+    definitionDraft: null, definitionAiPreviewIds: null,
+    showVariableLabels: true, showGroupLabels: true, variableLayoutSource: "",
     projectStorageVariableCount: null, dagLayoutMode: "auto",
     showConfoundersOnly: true, showCollidersOnly: false,
     showExclusionViolations: false,
@@ -65,6 +65,11 @@ export function createDagAppState(interfaceMode = "classic") {
     colliderPathsByGroup: new Map(), colliderLinkPairKeys: new Set(),
     bottleneckedColliderIds: new Set(),
     fullscreenPanel: null, selectedVariableIds: new Set(),
-    visibleCache: { variables: null, clusterReps: null },
+    mapContextMenu: { variableIds: [], variableId: null, clientX: 0, clientY: 0, query: "" },
+    map: {
+      canvas: null, ctx: null, dpr: 1,
+      transform: { scale: 1, tx: 0, ty: 0 }, fitScale: 1,
+      dragging: false, moved: false, dragStart: null, mode: "select", brush: null,
+    },
   });
 }

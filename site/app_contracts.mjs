@@ -147,9 +147,10 @@
  * @property {string} phase
  * @property {string} workflowMode
  * @property {Set<string>} selectedVariableIds
+ * @property {Set<string> | null} [definitionAiPreviewIds]
  * @property {"identify" | "causes" | "consequences" | null} [task]
  * @property {Record<"causes" | "consequences", ExploreView>} [explore]
- * @property {{ variables: unknown[] | null, clusterReps: unknown[] | null }} visibleCache
+ * @property {Record<string, unknown>} map
  */
 
 /**
