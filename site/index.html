@@ -28,7 +28,7 @@
       </div>
     </div>
     <header id="taskBar" class="task-bar" hidden>
-      <span class="task-bar-brand">ECHO</span>
+      <button id="taskHome" class="task-bar-brand" type="button" title="Back to start" aria-label="ECHO — back to start">ECHO</button>
       <!-- Where the working copy is saved: a quiet note beside the brand, not a panel section. -->
       <span id="localSaveIndicator" class="save-indicator" role="img" data-state="saved" hidden><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle class="save-icon-saved" cx="12" cy="12" r="10"/><path class="save-icon-saved" d="m9 12 2 2 4-4"/><path class="save-icon-saving" d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></span>
       <span id="localSaveStatus" class="task-bar-status" role="status" aria-live="polite"></span>
@@ -234,6 +234,9 @@
             <div id="focusGroupPicker" class="setup-group-picker" hidden></div>
           </div>
           <div id="exploreResultsBlock" class="explore-results-block" hidden>
+            <div id="identifyBrowserIntro" class="identify-browser-intro" hidden>
+              <h2>Variables on map</h2>
+            </div>
             <p id="exploreSummary" class="explore-summary" aria-live="polite" hidden></p>
             <div id="exploreResults" class="explore-results"></div>
           </div>

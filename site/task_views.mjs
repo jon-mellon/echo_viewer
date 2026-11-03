@@ -249,7 +249,19 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     state.selectedEvidenceGroupId = null;
     state.task = next;
     if (next === "identify") Object.assign(state, identifySettings || (previous ? IDENTIFY_DEFAULTS : {}));
-    else adoptViewSettings();
+    else if (next) adoptViewSettings();
+  }
+
+  function showLanding() {
+    if (!state.task) return;
+    const previous = state.task;
+    swapTask(previous, null);
+    changing.causes = false;
+    changing.consequences = false;
+    identifyPicking = null;
+    onTaskChange({ previous, task: null });
+    render();
+    onChange();
   }
 
   function setTask(requested) {
@@ -593,7 +605,11 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   }
   function cancelIdentifyPicking() {
     if (!identifyPicking) return;
+    const side = identifyPicking;
     identifyPicking = null;
+    const id = anchorId(side);
+    const input = identifyInput(side);
+    if (input) input.value = id ? labelFor(id) : "";
     onIdentifyPicking();
   }
   function chooseIdentify(side, groupId) {
@@ -826,6 +842,8 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     // The start page covers the app until a task is chosen.
     if (els.landing) els.landing.hidden = Boolean(task);
     els.explore.hidden = !task;
+    const browserIntro = el("identifyBrowserIntro");
+    if (browserIntro) browserIntro.hidden = !identifying();
     const identifyFields = el("identifyFields");
     if (identifyFields) identifyFields.hidden = !identifying();
     if (!identifying()) identifyPicking = null;
@@ -852,6 +870,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   }
 
   function install() {
+    el("taskHome")?.addEventListener("click", showLanding);
     for (const button of document.querySelectorAll("#taskLanding button[data-task]")) {
       button.addEventListener("click", () => setTask(button.dataset.task));
     }
@@ -942,5 +961,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   }
 
   return { install, render, setTask, setDirection, refreshSelection, highlightRow, neighborhood, exploring, focus, searchFocusGroups,
-    chooseFocus, changeFocus, freshProjectUrl, identifySide, identifyExcluded, chooseIdentify };
+    chooseFocus, changeFocus, freshProjectUrl, identifySide, identifyExcluded, chooseIdentify,
+    cancelIdentify: cancelIdentifyPicking };
 }
