@@ -472,7 +472,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       { key: "builtin", title: "Built-in variables", items: ordered.filter(row => !isCustom(row.groupId)), empty: "None." },
     ];
     // Rows hover their link on the graph; leaving the list clears it.
-    const hover = item => onRowHover(item ? { edgeId: item.edgeId, groupId: item.groupId } : null);
+    const hover = item => onRowHover(item ? { edgeId: item.edgeId, groupId: item.groupId, pathEdgeIds: item.pathEdgeIds } : null);
     replaceChildren(els.results, sections.map(({ key, title, items, empty }, sectionIndex) => {
       const includedCount = items.filter(item => !item.excluded).length;
       const all = h("input", { type: "checkbox", className: "explore-include",

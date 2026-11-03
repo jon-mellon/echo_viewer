@@ -490,7 +490,7 @@ function hoverExploreRow(row) {
   if (_exploreRowHoverNode && _visNodes?.get(_exploreRowHoverNode.id)) _visNodes.update(_exploreRowHoverNode);
   _exploreRowHoverNode = null;
   if (!row) { clearLogicalDagEdgeHover(); return; }
-  highlightLogicalDagEdges([row.edgeId]);
+  highlightLogicalDagEdges(row.pathEdgeIds?.length ? row.pathEdgeIds : [row.edgeId]);
   const node = _visNodes?.get(row.groupId);
   if (!node) return;
   _exploreRowHoverNode = { id: node.id, shadow: node.shadow || false };
@@ -499,6 +499,9 @@ function hoverExploreRow(row) {
 
 function highlightConnectedDagEdges(nodeId) {
   if (!_visNetwork) return;
+  // In Explore a variable beyond the first hop lights its whole route to the focus.
+  const route = exploring() ? exploreRows().find(item => item.groupId === nodeId)?.pathEdgeIds : null;
+  if (route?.length > 1) { highlightLogicalDagEdges(route); return; }
   const logicalIds = _visNetwork.getConnectedEdges(nodeId)
     .map(edgeId => _dagEdgeSegments.get(edgeId) || edgeId);
   highlightLogicalDagEdges(logicalIds);
