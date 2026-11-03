@@ -1,6 +1,7 @@
 import { routeEdges, studyArrowCorridor } from "./dag_router.mjs";
 import { computeDagRender, reuseDagGeometry } from "./dag_render_compute.mjs";
 import { routesToVisData } from "./dag_vis_routing.mjs";
+import { roundedBoxDistance } from "./dag_routing_geometry.mjs";
 import { attachDagInteractions } from "./dag_interactions.mjs";
 import * as dagDisplay from "./dag_display.mjs";
 import { EDGE_HIGHLIGHT_COLOR, PLAIN_EDGE_COLOR, PLAIN_EDGE_OPACITY, mixHex } from "./dag_display.mjs";
@@ -107,6 +108,20 @@ let _exploreRowHoverNode = null;
 
 function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+// vis ends an edge at a box's sharp-cornered rectangle; follow the rounded outline instead
+// so arrowheads reach the node near its corners.
+function patchBoxBorderDistance(network) {
+  const sample = Object.values(network.body?.nodes ?? {}).find(node => node.options?.shape === "box");
+  const proto = sample && Object.getPrototypeOf(sample.shape);
+  if (!proto || proto.__roundedBorderDistance) return;
+  proto.__roundedBorderDistance = true;
+  proto.distanceToBorder = function (ctx, angle) {
+    if (ctx) this.resize(ctx);
+    const radius = this.options.shapeProperties?.borderRadius ?? 0;
+    return roundedBoxDistance(this.width, this.height, radius, angle) + this.options.borderWidth;
+  };
 }
 
 function visNetworkOptions(p = {}) {
@@ -722,6 +737,7 @@ async function applyDagRender(groups, layout, routes) {
     );
     _dagLayoutSignature = layout.signature;
     _visOptionSignature = visOptionSignature(layout.params);
+    patchBoxBorderDistance(_visNetwork);
     attachDagNetworkHandlers(_visNetwork);
     setTimeout(() => _visNetwork?.fit(DAG_FIT_OPTIONS), 80);
   } else {

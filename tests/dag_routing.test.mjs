@@ -250,3 +250,14 @@ test('a slightly sloping run cannot disappear beneath a longer study arrow', () 
     [[{ x: 0, y: 0 }, { x: 1000, y: 0 }]], 1, -1);
   assert.ok(routed.some(p => p.y < -14));
 });
+
+test("rounded box distance follows the corner curve and matches a sharp box elsewhere", async () => {
+  const { roundedBoxDistance } = await import("../site/dag_routing_geometry.mjs");
+  assert.equal(roundedBoxDistance(100, 40, 8, 0), 50);
+  assert.equal(roundedBoxDistance(100, 40, 8, Math.PI / 2), 20);
+  const corner = Math.atan2(20, 50);
+  const sharp = Math.hypot(50, 20);
+  const rounded = roundedBoxDistance(100, 40, 8, corner);
+  assert.ok(rounded < sharp - 2 && rounded > sharp - 4, `${rounded} vs ${sharp}`);
+  assert.ok(Math.abs(roundedBoxDistance(100, 40, 0, corner) - sharp) < 1e-9);
+});

@@ -190,3 +190,21 @@ export class ParallelSegmentIndex {
     return penalty;
   }
 }
+
+/**
+ * Distance from a rounded rectangle's centre to its outline along `angle`.
+ * vis measures a box as a sharp rectangle, so edges aimed near a rounded corner stop short.
+ */
+export function roundedBoxDistance(width, height, radius, angle) {
+  const halfW = width / 2;
+  const halfH = height / 2;
+  const dx = Math.abs(Math.cos(angle));
+  const dy = Math.abs(Math.sin(angle));
+  const rectDistance = Math.min(halfW / dx, halfH / dy);
+  const r = Math.max(0, Math.min(radius, halfW, halfH));
+  const cx = halfW - r;
+  const cy = halfH - r;
+  if (!r || rectDistance * dx <= cx || rectDistance * dy <= cy) return rectDistance;
+  const along = dx * cx + dy * cy;
+  return along + Math.sqrt(Math.max(0, along * along - (cx * cx + cy * cy - r * r)));
+}
