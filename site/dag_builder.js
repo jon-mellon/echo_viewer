@@ -152,7 +152,7 @@ function initElements() {
     // Grouping schema
     "groupingPanel", "groupingSetSelect", "exportGroupingFolder", "publishSchema",
     "copyPermalink", "groupingSummary", "publicationStatus", "schemaPublicationBadge",
-    "publishedSchemaPermalink", "publishSchemaDialog", "importSchemaAction", "importSchemaDialog",
+    "publishedSchemaPermalink", "publishSchemaDialog", "shareUnpublishedDialog", "importSchemaAction", "importSchemaDialog",
     "importSchemaChooseFile",
     // Rejected variables
     "rejectedVariablesPanel", "rejectedVariableSearch", "rejectedVariablesList",
@@ -2118,6 +2118,7 @@ publicationController = createPublicationController({
     get menuButton() { return document.querySelector("#schemaMenu > summary"); },
     get permalink() { return els.publishedSchemaPermalink; },
     get confirmation() { return els.publishSchemaDialog; },
+    get shareWarning() { return els.shareUnpublishedDialog; },
     get share() { return els.copyPermalink; },
   },
   getWorkingSchema: currentWorkingGroupingSchema,

@@ -21,10 +21,11 @@ test("registry insert follows every upload and preserves baseline lineage", () =
   assert.match(core, /parent_schema_id: parentSchemaId/);
 });
 
-test("share refuses to create a permalink while schema changes are unpublished", () => {
+test("share warns when the schema is unpublished and offers to publish first", () => {
   assert.match(source, /canonical\.contentHash !== published\.content_hash/);
-  assert.match(source, /This schema has unpublished changes\. Publish them before creating a permalink\./);
-  assert.match(source, /if \(hasLocalChanges\) \{[\s\S]*?return null;/);
+  assert.match(source, /confirmPublishBeforeShare\(neverPublished\)/);
+  assert.match(source, /published = await publish\(\);/);
+  assert.match(source, /if \(!await confirmPublishBeforeShare\(neverPublished\)\) return null;/);
   assert.doesNotMatch(source, /Copied a view permalink using the last published schema/);
   assert.match(source, /publicationPermalink\(published\.publication_id/);
   assert.match(source, /getPermalinkState\(\)/);

@@ -513,6 +513,18 @@
         </form>
       </dialog>
 
+      <dialog id="shareUnpublishedDialog" class="publication-dialog">
+        <form method="dialog">
+          <h2>Schema is unpublished</h2>
+          <p data-share-warning-message>This schema has unpublished changes.</p>
+          <p>Publish it now to create a public link, or cancel to keep it private.</p>
+          <div class="publication-dialog-actions">
+            <button class="btn" value="cancel" type="submit">Cancel</button>
+            <button class="btn btn--primary" value="publish" type="submit">Publish and share</button>
+          </div>
+        </form>
+      </dialog>
+
       <!-- Drag handle between the left panel and the main area -->
       <div id="leftResizer" class="panel-resizer"></div>
 
