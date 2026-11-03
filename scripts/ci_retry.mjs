@@ -1,7 +1,8 @@
 // Runs a command and, if it fails, runs it once more.
 //   node scripts/ci_retry.mjs <command> [args...]
-// For profile scripts, which exit non-zero on a budget miss or scenario error and
-// have no retry of their own. The first failure is reported as a CI warning so a
+// For profile_viewer.mjs, a single long run whose scenarios build on each other's
+// UI state and so cannot be retried one at a time. The multi-run profile scripts
+// retry a failed run themselves (profile_run_retry.mjs). The first failure is reported as a CI warning so a
 // flaky pass stays visible; the second result decides the exit code.
 import { spawnSync } from "node:child_process";
 

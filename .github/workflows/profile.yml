@@ -34,11 +34,11 @@ jobs:
       - run: PROFILE_SCENARIO=permalink node scripts/ci_retry.mjs npm run profile
       - run: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
       - name: Enforce mobile diagnostic switching budgets
-        run: node scripts/ci_retry.mjs npm run profile:diagnostics
+        run: npm run profile:diagnostics
       - name: Enforce evidence loading budgets on the default snapshot
-        run: node scripts/ci_retry.mjs npm run profile:edge-evidence
+        run: npm run profile:edge-evidence
       - name: Enforce mobile causes and consequences budgets
-        run: node scripts/ci_retry.mjs npm run profile:explore
+        run: npm run profile:explore
       - uses: actions/upload-artifact@v4
         if: always()
         with:
