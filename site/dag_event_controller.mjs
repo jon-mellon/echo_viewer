@@ -272,7 +272,7 @@ function installHandlers() {
   });
 
   // Escape steps back to the previous screen when one exists: the previous step
-  // of the create-a-variable wizard (Choose concepts → Start from → Describe → out),
+  // of the create-a-variable wizard (Choose concepts → Describe → Start from → out),
   // or from evidence back to the graph in Explore. It only acts when nothing else
   // claimed the key: an open menu, dialog, context menu or full-screen panel
   // closes first (checked before their handlers run), and a component that
@@ -280,9 +280,9 @@ function installHandlers() {
   const shown = (/** @type {HTMLElement | null} */ el) => Boolean(el && !el.hidden && el.getClientRects().length);
   const backControls = [
     () => els.definitionBack,
-    () => els.definitionSourcesBack,
+    () => els.definitionDescribeBack,
     // Leaving the wizard from its first step discards nothing typed elsewhere.
-    () => shown(els.definitionDescribeStep) ? els.definitionCancel : null,
+    () => shown(els.definitionSourcesStep) || shown(els.definitionDescribeStep) ? els.definitionCancel : null,
     () => els.customVariablesClose,
     () => els.closeEvidencePane?.getAttribute("aria-label") === "Back to the map" ? els.closeEvidencePane : null,
   ];

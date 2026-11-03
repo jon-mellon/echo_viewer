@@ -3889,12 +3889,12 @@ h2 {
     color: var(--surface);
   }
   /* Finished steps. */
-  .definition-block:has(#definitionSourcesStep:not([hidden])) .definition-stepper li[data-step="describe"],
-  .definition-block:has(#definitionPartitionStep:not([hidden])) .definition-stepper li:is([data-step="describe"], [data-step="sources"]) {
+  .definition-block:has(#definitionDescribeStep:not([hidden])) .definition-stepper li[data-step="sources"],
+  .definition-block:has(#definitionPartitionStep:not([hidden])) .definition-stepper li:is([data-step="sources"], [data-step="describe"]) {
     color: var(--text);
   }
-  .definition-block:has(#definitionSourcesStep:not([hidden])) .definition-stepper li[data-step="describe"]::before,
-  .definition-block:has(#definitionPartitionStep:not([hidden])) .definition-stepper li:is([data-step="describe"], [data-step="sources"])::before {
+  .definition-block:has(#definitionDescribeStep:not([hidden])) .definition-stepper li[data-step="sources"]::before,
+  .definition-block:has(#definitionPartitionStep:not([hidden])) .definition-stepper li:is([data-step="sources"], [data-step="describe"])::before {
     content: "✓";
     border-color: var(--accent);
     color: var(--accent);
@@ -3924,7 +3924,7 @@ h2 {
   #definitionWorkspace .mini-toolbar:last-child { align-items: center; }
   #definitionWorkspace .mini-toolbar:last-child > .btn { margin: 0; }
 
-  /* 1 · Describe: one readable column. */
+  /* 2 · Describe: one readable column. */
   #definitionWorkspace #definitionDescribeStep:not([hidden]) {
     display: grid;
     gap: var(--space-2);
@@ -3934,7 +3934,7 @@ h2 {
     margin-top: var(--space-6);
   }
 
-  /* 2 · Categories: a two-column checklist that uses the width. */
+  /* 1 · Source variables: a two-column checklist that uses the width. */
   #definitionWorkspace #definitionSourcesStep:not([hidden]) {
     display: grid;
     gap: var(--space-2);

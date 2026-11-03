@@ -159,6 +159,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       if (document.activeElement !== els.definitionNewLabel) els.definitionNewLabel.value = draft.new_label || "";
       if (document.activeElement !== els.definitionNewDescription) els.definitionNewDescription.value = draft.new_description || "";
       els.definitionDescribeNext.textContent = "Next";
+      els.definitionDescribeBack.hidden = draft.mode === "edit";
     } else if (draft.step === "sources") {
       const query = normalized(els.definitionSourceSearch.value);
       const selected = new Set(draft.source_group_ids);
@@ -185,14 +186,16 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
         sum + new Set(group.variable_ids.map(clusterRep)).size, 0);
       els.definitionContinue.disabled = !selected.size;
       els.definitionContinue.textContent = selected.size
-        ? `Next: choose from ${count} concepts in ${selected.size} variable${selected.size === 1 ? "" : "s"}` : "Pick at least one variable";
+        ? `Next: name it, using ${count} concepts in ${selected.size} variable${selected.size === 1 ? "" : "s"}` : "Pick at least one variable";
       // Splits others published from the same variables: offered, never required.
-      const showBrowse = Boolean(selected.size) && (browseState.loading || browseState.error || browseState.rows.length);
+      const showBrowse = Boolean(selected.size);
       els.definitionBrowsePanel.hidden = !showBrowse;
       if (showBrowse) {
         els.definitionBrowseStatus.textContent = browseState.error || (browseState.loading
           ? "Looking for variables others made from these…"
-          : "Start from one of these to reuse its choice of concepts. Your name and definition are kept.");
+          : browseState.rows.length
+            ? "Use a published split to fill in the name, definition and concepts. You can edit them next."
+            : "No published splits found for these source variables. You can still create your own.");
         replaceChildren(els.definitionBrowseResults, browseState.rows.map((row, index) =>
           h("article", { className: "definition-browse-card" },
             h("strong", { textContent: row.name }), h("p", { textContent: row.description }),
@@ -230,10 +233,13 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
   function setContinueLoading() {
     els.definitionContinue.disabled = true;
     els.definitionContinue.textContent = "Loading concepts…";
+    els.definitionSourceLoadStatus.hidden = true;
+    els.definitionSourceLoadStatus.textContent = "";
   }
 
   function showLoadError(error) {
-    els.definitionContinue.title = `Could not load variables: ${error?.message || error}`;
+    els.definitionSourceLoadStatus.textContent = `Could not load source concepts: ${error?.message || error}. Try again.`;
+    els.definitionSourceLoadStatus.hidden = false;
   }
 
   /** Saved AI splits offered under the method choice; an empty list hides it. */

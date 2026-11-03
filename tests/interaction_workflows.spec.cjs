@@ -97,19 +97,21 @@ test("definition navigation returns through both Back steps and Cancel", async (
     };
   });
   await startCreate(page, "iv");
-  await describeVariable(page);
   await page.locator("#definitionSourceSearch").fill("education");
   await expect(page.locator("#definitionSourceList input[data-source-id]").first()).toBeVisible();
   await page.locator("#definitionSourceSearch").fill("");
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
+  await describeVariable(page);
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
   // Defining a variable never needs neighbor suggestions: the AI or an existing split supplies the concepts.
   expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:neighbors").length)).toBe(0);
   expect(await page.evaluate(() => window.__neighborQuerySizes)).toEqual([]);
   await page.locator("#definitionBack").click();
+  await page.locator("#definitionDescribeBack").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("sources");
   await page.locator("#definitionContinue").click();
+  await describeVariable(page);
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
   await includeConcepts(page, [variableId]);
@@ -311,13 +313,12 @@ test("mobile definition waits for variable data before showing the concepts", as
     dagDataSource.loadVariableMetadata = async (...args) => { await gate; return load(...args); };
   });
   await startCreate(page, "iv");
-  await describeVariable(page);
   await page.locator('#definitionSourceList input[data-source-id]').first().check();
   await page.locator("#definitionContinue").click();
   await expect(page.locator("#definitionContinue")).toHaveText("Loading concepts…");
-  await expect(page.locator("#definitionPartitionStep")).toBeHidden();
+  await expect(page.locator("#definitionDescribeStep")).toBeHidden();
   await page.evaluate(() => window.__releaseVariableLoad());
-  await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+  await expect(page.locator("#definitionDescribeStep")).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variables.length)).toBeGreaterThan(0);
 });
 

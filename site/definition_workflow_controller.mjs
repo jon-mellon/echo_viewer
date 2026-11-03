@@ -50,9 +50,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       }
       await continueDefinition();
       if (state.definitionDraft !== draft) return;
-      if (draft.step !== "partition") throw new Error("Could not load the current source variables.");
-      // The published split supplies which concepts move; the name and
-      // definition stay the ones the user wrote in the first step.
+      if (draft.step !== "describe") throw new Error("Could not load the current source variables.");
+      // The published split supplies which concepts move and starts the name
+      // and definition, which the next step lets the user rewrite.
+      draft.new_label = row.name;
+      draft.new_description = row.description;
+      // Continue focused the empty name field. Keep its visible value in sync
+      // when adopting a published split, since the presenter preserves focus.
+      els.definitionNewLabel.value = row.name;
+      els.definitionNewDescription.value = row.description;
       draft.new_variable_ids = [...new Set(ids.map(clusterRep))];
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
       draft.published_split = { publication_id: row.publication_id, group_id: row.group_id };
@@ -60,6 +66,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       persistProjectLocally();
       invalidateVisibleCaches();
       renderDraft();
+      els.definitionNewLabel.focus();
     } catch (error) {
       if (state.definitionDraft === draft) {
         browseState.error = `Could not use this split: ${error.message || error}`;
@@ -88,14 +95,14 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     hydrationRevision += 1;
     sourceHydrations.clear();
     state.definitionDraft = {
-      role, step: "describe", source_group_ids: [], source_snapshot: [],
+      role, step: "sources", source_group_ids: [], source_snapshot: [],
       eligible_variable_ids: [], new_variable_ids: [], new_label: "", new_description: "",
       ai_description: "", residual_labels: {}, reviewed_variable_ids: [],
     };
     state.selectedVariableIds.clear();
     invalidateVisibleCaches();
     renderDraft();
-    els.definitionNewLabel.focus();
+    els.definitionSourceSearch.focus();
     void renderSavedRuns();
   }
 
@@ -175,7 +182,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     presenter.setContinueLoading();
     try {
       await Promise.all(sources.map(source => sourceHydrations.get(source.group_id)
-        || hydrateVariableDetails(source.variable_ids)));
+        || hydrateVariableDetails(source.variable_ids, { skipNeighbors: true })));
     } catch (error) {
       if (revision === hydrationRevision && state.definitionDraft === draft) {
         draft.details_loading = false;
@@ -186,9 +193,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     }
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     draft.details_loading = false;
-    draft.step = "partition";
+    draft.step = "describe";
     invalidateVisibleCaches();
     renderDraft();
+    els.definitionNewLabel.focus();
   }
 
   function definitionResidualIds(source) {
@@ -212,7 +220,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (selected && !sourceHydrations.has(sourceId)) {
       const source = groupById(sourceId);
       if (source?.variable_ids?.length) {
-        const loading = hydrateVariableDetails(source.variable_ids);
+        const loading = hydrateVariableDetails(source.variable_ids, { skipNeighbors: true });
         sourceHydrations.set(sourceId, loading);
         // Continue will await this same promise; handle cancellation separately.
         void loading.catch(() => sourceHydrations.delete(sourceId));
@@ -241,7 +249,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   function goToStep(step) {
     const draft = state.definitionDraft;
     if (!draft) return;
-    if (draft.step === "describe" && step !== "describe") {
+    if (draft.step === "describe" && step === "partition") {
       const error = describeError(draft);
       if (error) { presenter.showDescribeError(error); return; }
       draft.new_label = clean(draft.new_label);
@@ -252,8 +260,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         draft.ai_description_source = draft.new_description;
       }
     }
-    if (step === "sources" && draft.mode === "edit") step = "partition";
-    if (step === "partition" && draft.step === "describe" && draft.mode !== "edit") step = "sources";
+    if (step === "sources" && draft.mode === "edit") return;
+    if (step === "partition" && draft.mode !== "edit" && !draft.eligible_variable_ids.length) step = "sources";
     if (step === "sources") {
       state.selectedVariableIds.clear();
       delete draft.published_split;
@@ -360,10 +368,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     els.definitionSourceSearch.addEventListener("input", renderDefinition);
     els.definitionContinue.addEventListener("click", continueDefinition);
     els.definitionDescribeNext.addEventListener("click", () => goToStep("partition"));
-    els.definitionSourcesBack.addEventListener("click", () => goToStep("describe"));
+    els.definitionDescribeBack.addEventListener("click", () => goToStep("sources"));
     presenter.install();
-    els.definitionBack.addEventListener("click", () =>
-      goToStep(state.definitionDraft?.mode === "edit" ? "describe" : "sources"));
+    els.definitionBack.addEventListener("click", () => goToStep("describe"));
     els.definitionNewLabel.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_label = els.definitionNewLabel.value;
       presenter.clearDescriptionValidation();
@@ -429,7 +436,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     let saved = [];
     try { saved = await jevAssist.listSavedRuns(); }
     catch (error) { console.warn("Could not read saved Jev runs.", error); }
-    if (state.definitionDraft !== draft || draft?.step !== "describe") return;
+    if (state.definitionDraft !== draft || draft?.step !== "sources") return;
     // Group memberships may still be loading, which would look like a change.
     const loading = state.publishedSchemaHydrating;
     presenter.showSavedRuns(saved
