@@ -31,17 +31,14 @@ export const softEdge = (hex, strength) => mixHex(DAG_SURFACE, hex, strength);
 const TARGET_EDGE_COLOR = softEdge(OKABE_ITO.blue, 0.85);
 const PLAIN_EDGE_COLOR = softEdge(OKABE_ITO.sky, 0.6);
 
-function isDark(hex) {
-  const [r, g, b] = hexToRgb(hex);
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) < 150;
-}
+/** Node fills are the role colour at 30% over the canvas, pre-blended so edges don't show through. */
+const NODE_FILL_STRENGTH = 0.3;
 
-/** Hovering keeps the node's size: only border colour and fill shift. */
-export function chosenNodeHover(values, _id, selected, hovering) {
-  if (!hovering || selected) return;
-  values.borderColor = OKABE_ITO.blue;
-  values.color = mixHex(values.color, "#ffffff", 0.18);
-}
+/** Hovering keeps the node's size: the (otherwise clear) border turns the node's own colour. */
+export const chosenNodeHover = color => (values, _id, selected, hovering) => {
+  if (hovering && !selected) values.borderColor = color;
+};
+
 export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const isIv = group.type === "iv";
   const isDv = group.type === "dv";
@@ -77,6 +74,8 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     : null;
   const isSelected = group.group_id === view.activeGroupId;
   const color = isViolation ? "#c62828" : isInstrument ? "#166534" : isExogeneityCandidate ? "#c62828" : isConfounder ? "#c62828" : isCollider ? "#801744" : isPathMediator ? "#6b7280" : view.groupColor;
+  const fill = mixHex(DAG_SURFACE, color, NODE_FILL_STRENGTH);
+  const clearBorder = fill;
   const roleTag = view.focusId && group.group_id === view.focusId ? " (focus)" : isIv ? " (Ind var)" : isDv ? " (Dep var)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : isExogeneityCandidate ? " (potential common cause of instrument and Dep var)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
@@ -91,17 +90,16 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     fixed: { x: true, y: true },
     mass: 1 + Math.min(3, Math.sqrt(group.variable_ids.length || group.member_count || 1) / 6),
     color: {
-      background: color,
-      border: overlapBorder || (isSelected ? "#b83b5e" : isViolation ? "#7f1d1d" : isConfounder || isExogeneityCandidate ? "#7f1d1d" : isCollider ? "#550f2d" : isPathMediator ? "#374151" : "#fbfcfa"),
-      highlight: { background: color, border: overlapBorder || (isConfounder || isExogeneityCandidate ? "#4c0d0d" : isCollider ? "#380a1e" : isPathMediator ? "#1f2937" : "#b83b5e") },
-      hover: { background: color, border: overlapBorder || "#ffffff" },
+      background: fill,
+      border: overlapBorder || (isSelected ? "#b83b5e" : clearBorder),
+      highlight: { background: fill, border: overlapBorder || "#b83b5e" },
+      hover: { background: fill, border: overlapBorder || color },
     },
-    font: { color: isDark(color) ? "#ffffff" : "#1b2420" },
-    chosen: { node: chosenNodeHover, label: false },
+    font: { color: "#1b2420" },
+    chosen: { node: chosenNodeHover(color), label: false },
     shape: (isIv || isDv || isInstrument) ? "ellipse" : "box",
     borderWidth: overlapBorder ? 4 : isSelected ? 3 : 2.4,
     ...(overlapBorder ? { borderWidthSelected: 4 } : {}),
-    // Light outline keeps dense links visually separated from node bodies.
     shadow: isSelected
       ? { enabled: true, color: "rgba(184,59,94,0.45)", size: 12, x: 0, y: 0 }
       : isConfounder || isExogeneityCandidate
@@ -110,7 +108,7 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
           ? { enabled: true, color: "rgba(128,23,68,0.34)", size: 11, x: 0, y: 2 }
         : isPathMediator
           ? { enabled: true, color: "rgba(55,65,81,0.28)", size: 9, x: 0, y: 2 }
-      : { enabled: true, color: "rgba(25, 38, 34, 0.14)", size: 7, x: 0, y: 2 },
+      : { enabled: false },
   };
 }
 

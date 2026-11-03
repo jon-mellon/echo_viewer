@@ -42,6 +42,7 @@ test("display records preserve node roles, selection, edge styles and descriptio
       assert.deepEqual(plain(geometry(node)), plain(geometry(legacy.visNodeData(group, point, { nodeMaxWidth: width }))));
       assert.equal(node.chosen.label, false);
       assert.equal(typeof node.chosen.node, "function");
+      assert.equal(node.color.border === node.color.background || node.color.border === "#b83b5e" || /^#(801744|c62828)$/.test(node.color.border), true);
     }
   }
   for (const direction_type of ["A_TO_B", "B_TO_A", "BIDIRECTIONAL"]) {
@@ -112,10 +113,10 @@ test("exogeneity colors common causes while keeping the three study anchors", ()
   const mediator = display.visNodeData(group("via"), null, {}, view);
   const instrument = display.visNodeData(group("z"), null, {}, view);
   const iv = display.visNodeData(group("iv", "iv"), null, {}, view);
-  assert.equal(candidate.color.background, "#c62828");
-  assert.equal(mediator.color.background, "#6b7280");
-  assert.equal(instrument.color.background, "#166534");
-  assert.equal(iv.color.background, "#123456");
+  assert.equal(candidate.color.background, display.mixHex("#f8f8f8", "#c62828", 0.3));
+  assert.equal(mediator.color.background, display.mixHex("#f8f8f8", "#6b7280", 0.3));
+  assert.equal(instrument.color.background, display.mixHex("#f8f8f8", "#166534", 0.3));
+  assert.equal(iv.color.background, display.mixHex("#f8f8f8", "#123456", 0.3));
   assert.equal(instrument.shape, "ellipse");
 });
 
@@ -144,15 +145,19 @@ test("overlapping diagnostic roles retain the opposite role outline", () => {
   }
 });
 
-test("hovering a node recolours its border without changing its size", () => {
-  const values = { borderWidth: 2.4, borderColor: "#fbfcfa", color: "#0072B2" };
-  display.chosenNodeHover(values, "n", false, true);
+test("hovering a node colours its clear border without changing its size", () => {
+  const hover = display.chosenNodeHover("#0072B2");
+  const values = { borderWidth: 2.4, borderColor: "#cce3f0", color: "#cce3f0" };
+  hover(values, "n", false, true);
   assert.equal(values.borderWidth, 2.4);
   assert.equal(values.borderColor, "#0072B2");
-  assert.notEqual(values.color, "#0072B2");
-  const selected = { borderWidth: 3, borderColor: "#E69F00", color: "#0072B2" };
-  display.chosenNodeHover(selected, "n", true, true);
-  assert.equal(selected.borderColor, "#E69F00");
+  assert.equal(values.color, "#cce3f0");
+  const selected = { borderWidth: 3, borderColor: "#b83b5e", color: "#cce3f0" };
+  hover(selected, "n", true, true);
+  assert.equal(selected.borderColor, "#b83b5e");
+  const idle = { borderColor: "#cce3f0" };
+  hover(idle, "n", false, false);
+  assert.equal(idle.borderColor, "#cce3f0");
 });
 
 test("labels break at slashes as well as spaces", () => {

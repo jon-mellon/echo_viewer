@@ -136,7 +136,7 @@ function visNetworkOptions(p = {}) {
       borderWidthSelected: 3,
       margin: { top: vMargin, right: hMargin, bottom: vMargin, left: hMargin },
       widthConstraint: { minimum: 92, maximum: p.nodeMaxWidth || 190 },
-      shapeProperties: { borderRadius: 12 },
+      shapeProperties: { borderRadius: 8 },
     },
     edges: {
       smooth: { type: "cubicBezier", forceDirection: "horizontal", roundness: 0.32 },
