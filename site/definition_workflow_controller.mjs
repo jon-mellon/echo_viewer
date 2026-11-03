@@ -472,8 +472,6 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     };
     els.definitionMethodJev.addEventListener("click", () => chooseMethod("jev"));
     els.definitionMethodManual.addEventListener("click", () => chooseMethod("manual"));
-    // Each step's footer has its own Cancel, beside Next (or Save).
-    for (const button of document.querySelectorAll(".definition-cancel")) button.addEventListener("click", cancelDefinition);
     els.definitionSourceSearch.addEventListener("input", renderDefinition);
     els.definitionContinue.addEventListener("click", continueDefinition);
     els.definitionDescribeNext.addEventListener("click", () => goToStep("partition"));
@@ -584,6 +582,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     clusterDisplayVariable, definitionNeighbors,
     resizeMap, fitMap, onSourceSelection: setSourceSelection,
     onClassify: (id, side) => classifyDefinitionVariables([id], side), onResidualLabel: setResidualLabel,
+    onCancel: cancelDefinition,
     canUndoBatch: () => Boolean(lastBatch),
     browseState, onChoosePublishedSplit: choosePublishedSplit,
   });

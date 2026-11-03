@@ -4,7 +4,7 @@ import { h, replaceChildren } from "./dom_builder.mjs";
 export function createDefinitionWorkflowPresenter({ state, elements: els, normalized, clusterRep, truncate,
   definitionSources, definitionResidualIds, definitionCanReview, searchSourceGroups,
   clusterDisplayVariable, definitionNeighbors, resizeMap, fitMap,
-  onSourceSelection, onClassify, onResidualLabel, canUndoBatch,
+  onSourceSelection, onClassify, onResidualLabel, onCancel, canUndoBatch,
   browseState, onChoosePublishedSplit }) {
   let renderedStep = null;
   let reviewedDraft = null;
@@ -219,6 +219,8 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
   }
 
   function install() {
+    // Each step's footer has its own Cancel, beside Next (or Save).
+    for (const button of document.querySelectorAll(".definition-cancel")) button.addEventListener("click", onCancel);
     els.definitionSourceList.addEventListener("click", event => {
       const target = /** @type {HTMLElement} */ (event.target).closest("button[data-clear-search]");
       if (target) clearSearch(target.dataset.clearSearch);
