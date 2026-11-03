@@ -13,7 +13,7 @@ test('diagnostic controls update the view without rebuilding or saving the proje
     });
     return elements.get(id);
   }
-  const state = createDagAppState(); state.map.canvas = element('canvas');
+  const state = createDagAppState();
   const calls = [];
   globalThis.document = { addEventListener() {}, getElementById() { return null; }, querySelectorAll() { return []; } };
   globalThis.window = { addEventListener() {}, matchMedia: () => ({ matches: false, addEventListener() {} }) };

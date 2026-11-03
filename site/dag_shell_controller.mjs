@@ -1,6 +1,6 @@
 // Owns cross-feature shell layout: fullscreen focus and draggable panel sizes.
 import { DAG_FIT_OPTIONS } from "./dag_network_controller.mjs";
-export function createDagShellController({ state, elements, resizeMap, fitMap, renderDag, getNetwork, isDagFullyVisible, dismissEvidencePane }) {
+export function createDagShellController({ state, elements, renderDag, getNetwork, isDagFullyVisible, dismissEvidencePane }) {
   let showInstalledMobilePanel = null;
   // Set by installResizers; moves the evidence pane to where the current task reads it.
   let placeEvidencePane = () => {};
@@ -25,10 +25,7 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
         tab.setAttribute("aria-pressed", active ? "true" : "false");
       }
       requestAnimationFrame(() => {
-        if (panel === "variables") {
-          resizeMap();
-          fitMap();
-        } else if (panel === "dag") {
+        if (panel === "dag") {
           renderDag();
           setTimeout(() => getNetwork()?.fit(DAG_FIT_OPTIONS), 50);
         }
@@ -41,13 +38,9 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
       if (tab.dataset.mobilePanel === "dag" && !elements.closeEvidencePane.hidden) dismissEvidencePane();
       showPanel(tab.dataset.mobilePanel);
     });
-    if (document.body.dataset.mobilePanel === "variables" && !document.body.classList.contains("defining-variable")) {
-      document.body.dataset.mobilePanel = "controls";
-    }
+    if (document.body.dataset.mobilePanel === "variables") document.body.dataset.mobilePanel = "controls";
     new MutationObserver(() => {
-      if (document.body.dataset.mobilePanel === "variables" && !document.body.classList.contains("defining-variable")) {
-        showPanel("controls");
-      } else if (document.body.dataset.mobilePanel === "dag" && document.body.classList.contains("defining-variable")) {
+      if (document.body.dataset.mobilePanel === "dag" && document.body.classList.contains("defining-variable")) {
         showPanel("controls");
       } else if (document.body.dataset.mobilePanel !== "controls" && document.body.classList.contains("initial-setup")
         && !document.body.classList.contains("defining-variable")) {
@@ -59,13 +52,8 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
   }
 
   function setFullscreen(panel) {
-    const previousPanel = state.fullscreenPanel;
     state.fullscreenPanel = panel;
-    document.body.classList.toggle("focus-variable-map", panel === "variable-map");
     document.body.classList.toggle("focus-dag", panel === "dag");
-    elements.fullscreenVariableMap.classList.toggle("active", panel === "variable-map");
-    elements.fullscreenVariableMap.setAttribute("aria-pressed", panel === "variable-map" ? "true" : "false");
-    elements.fullscreenVariableMap.textContent = panel === "variable-map" ? "Exit full screen" : "Full screen map";
     elements.fullscreenDag.classList.toggle("active", panel === "dag");
     elements.fullscreenDag.setAttribute("aria-pressed", panel === "dag" ? "true" : "false");
     // An icon button: swap its label, while CSS swaps the maximize/minimize icon on aria-pressed.
@@ -73,10 +61,6 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     elements.fullscreenDag.setAttribute("aria-label", dagLabel);
     elements.fullscreenDag.title = panel === "dag" ? "Exit full screen (Escape)" : "Expand the DAG to fill the window; press Escape to exit";
     requestAnimationFrame(() => {
-      if (panel === "variable-map" || previousPanel === "variable-map") {
-        resizeMap();
-        fitMap();
-      }
       const network = getNetwork();
       if (network) network.setSize("100%", "100%");
       else renderDag();
@@ -98,7 +82,7 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     // graph so the results list stays in view. Identify still reads it in the
     // side panel.
     placeEvidencePane = () => {
-      // In every task the evidence takes the map's place; the legacy layout keeps it in the side panel.
+      // In every task the evidence sits under the graph; the legacy layout keeps it in the side panel.
       const parent = mobileLayout.matches || state.task ? workspace : leftPanel;
       if (evidencePane && parent && evidencePane.parentElement !== parent) parent.append(evidencePane);
     };
@@ -124,7 +108,7 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
         ? `${leftWidth}px 5px minmax(0, 1fr)`
         : `${leftWidth}px 5px 1fr 5px ${rightWidth}px`;
     };
-    window._dagPanelSetRight = width => { rightWidth = width; applyWidths(); resizeMap(); };
+    window._dagPanelSetRight = width => { rightWidth = width; applyWidths(); };
     window._dagPanelGetRight = () => rightWidth;
 
     function makeResizer(element, side) {
@@ -147,7 +131,6 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
           element.classList.remove("dragging");
           document.removeEventListener("mousemove", onMove);
           document.removeEventListener("mouseup", onUp);
-          resizeMap();
           if (moved && refitDag) setTimeout(() => getNetwork()?.fit(DAG_FIT_OPTIONS), 50);
         }
         document.addEventListener("mousemove", onMove);

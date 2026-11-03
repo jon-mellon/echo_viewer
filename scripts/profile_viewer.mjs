@@ -26,7 +26,6 @@ const scenarioBudgets = {
   "select definition source": 2500,
   "select definition variable": 1000,
   "incident links (40 variables)": 1000,
-  "variable map zoom": 500,
   "close variable definition": 750,
   "group search": 2000,
   "select IV": 750,
@@ -45,12 +44,6 @@ const scenarioBudgets = {
   "path links filter": 4000,
   "DAG zoom out and fit": 1000,
   "DAG fullscreen and Escape": 1000,
-  "map labels and group regions": 1000,
-  "map zoom out and fit": 1000,
-  "map wheel zoom": 1000,
-  "map drag pan": 1000,
-  "map fullscreen and Escape": 1000,
-  "map mode selection": 1000,
   "history panel": 1000,
   "undo edge decision": 1000,
   "redo edge decision": 1000,
@@ -304,13 +297,7 @@ try {
   await measure("select definition source", async () => {
     await page.locator("#definitionSourceList input[data-source-id]").first().check();
     await page.locator("#definitionContinue").click();
-    // The map is shown while defining only in the narrower layout; the wide one lists concepts instead.
-    if (mobile) {
-      await page.locator('button[data-mobile-panel="variables"]').click();
-      await page.locator("#dagZoomIn").waitFor({ state: "visible" });
-    } else {
-      await page.locator("#definitionPartitionStep").waitFor({ state: "visible" });
-    }
+    await page.locator("#definitionPartitionStep").waitFor({ state: "visible" });
     const loaded = await page.evaluate(groupId => {
       const state = window.__dagBuilderState;
       const ids = state.project.groups.find(group => group.group_id === groupId)?.variable_ids || [];
@@ -319,7 +306,6 @@ try {
     if (!loaded.total || loaded.missing) throw new Error(`Definition metadata missing for ${loaded.missing}/${loaded.total} variables`);
   });
   await measure("select definition variable", async () => {
-    if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
     const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
     // The AI or an existing split supplies the concepts; this stands in for either by including one.
     await page.evaluate(id => {
@@ -330,36 +316,8 @@ try {
       document.getElementById("definitionSourceSearch").dispatchEvent(new Event("input"));
     }, variableId);
     await page.waitForFunction(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), variableId);
-    if (mobile) await page.locator('button[data-mobile-panel="variables"]').click();
   });
-  // The variable map is part of defining only in the narrower layout, so it is profiled there.
-  if (mobile) {
-    await measure("variable map zoom", async () => {
-      await page.locator("#dagZoomIn").click();
-    });
-    await measure("map labels and group regions", async () => {
-      for (const [id, key] of [["toggleVariableLabels", "showVariableLabels"],
-        ["toggleGroupLabels", "showGroupLabels"]]) {
-        const previous = await page.evaluate(stateKey => window.__dagBuilderState[stateKey], key);
-        await page.locator(`#${id}`).click();
-        await page.waitForFunction(({ stateKey, value }) => window.__dagBuilderState[stateKey] !== value,
-          { stateKey: key, value: previous });
-      }
-    });
-    await measure("map zoom out and fit", async () => {
-      await page.locator("#dagZoomOut").click();
-      await page.locator("#dagFitView").click();
-    });
-    await measure("map mode selection", async () => {
-      for (const [id, mode] of [["dagBrushMode", "draw_add"], ["dagEraseMode", "draw_remove"],
-        ["dagSelectMode", "select"]]) {
-        await page.locator(`#${id}`).click();
-        await page.waitForFunction(value => window.__dagBuilderState.map.mode === value, mode);
-      }
-    });
-  }
   await measure("close variable definition", async () => {
-    if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
     await page.locator(".definition-cancel:visible").first().click();
   });
   // The History menu is hidden on a phone while a definition is open, so it is measured after.

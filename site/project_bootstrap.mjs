@@ -8,9 +8,9 @@ import { normalizeLinkDecision } from "./dag_link_aggregation.mjs";
 import { validateGroupingSchema } from "./data_validation.mjs";
 
 export function createProjectBootstrap({ state, initElements, installHandlers, installDefinitionHandlers,
-  resizeMap, initializeProject, loadLatestSchemaGroups,
+  initializeProject, loadLatestSchemaGroups,
   normalizeProjectDuplicateAssignments, publicationController, renderAll,
-  constrainMapTransform, drawMap, fitMap, dagNetworkController, buildDuplicateClusters,
+  dagNetworkController, buildDuplicateClusters,
   linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {},
   onLocalSchemaLoaded = () => {} }) {
   const presenter = createProjectBootstrapPresenter({});
@@ -23,7 +23,6 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     initElements();
     installHandlers();
     installDefinitionHandlers();
-    resizeMap();
     const requested = new URL(window.location.href);
     // A plain ?task= link opens that task directly; permalinks carry their own.
     const requestedTask = requested.searchParams.get("task");
@@ -140,12 +139,6 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     renderAll();
     await dagNetworkController.whenRendered?.();
     performance.measure("echo:startup:graph", { start: renderStart, end: performance.now() });
-    if (state.permalinkMapViewport) {
-      constrainMapTransform();
-      drawMap();
-    } else {
-      fitMap();
-    }
     if (state.permalinkDagViewport) {
       dagNetworkController.getNetwork()?.moveTo({ ...state.permalinkDagViewport, animation: false });
     }
