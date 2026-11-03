@@ -386,8 +386,6 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       && els.definitionAiDescription.value !== (draft.ai_description || "")) {
       els.definitionAiDescription.value = draft.ai_description || "";
     }
-    els.definitionMethodJev.disabled = busy;
-    els.definitionMethodManual.disabled = busy;
     const description = String(draft?.ai_description || "").trim();
     if (active && description) void restoreForDraft().catch(() => {});
     const limitOk = Boolean(key) && keyCheck === "ok";

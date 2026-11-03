@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { readFileSync } from "node:fs";
 import * as candidates from "../site/dag_candidates.mjs";
-import { centroid, distance, worldToScreen } from "../site/map_geometry.mjs";
+const { centroid } = candidates;
+const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const worldToScreen = (x, y, transform) => ({ x: x * transform.scale + transform.tx, y: y * transform.scale + transform.ty });
 import { rawLinksBetween, pairKey, linkKey } from "../site/dag_link_aggregation.mjs";
 
 test("candidate centroids are reused within a calculation and refreshed after edits", () => {
@@ -29,7 +31,7 @@ test("candidate centroids are reused within a calculation and refreshed after ed
   assert.equal(reads, 6);
 });
 
-test("causal candidate roles retain legacy behavior while spatial roles are scale invariant", () => {
+test("causal candidate roles retain legacy behavior and do not depend on the coordinate scale", () => {
   const variables = Array.from({ length: 100 }, (_, i) => ({
     variable_id: "v" + i, map_x: i * 0.02, map_y: i % 3 * 0.02,
   }));
@@ -68,10 +70,6 @@ test("causal candidate roles retain legacy behavior while spatial roles are scal
     assert.deepEqual(plain(causalOnly(current)), plain(causalOnly(state.candidateQueue)));
     assert.deepEqual(plain(project), plain(before));
     if (!missing) {
-      const options = { visibleVariables: variables, transform, width: 200, height: 100,
-        groupId: "density_123", createdAt: "time" };
-      const density = candidates.createDensityCandidateGroup(project, inputs, options);
-      assert.equal(density.variable_ids.length, 10);
       for (const factor of [1e-6, 1e6]) {
         const scaledVariables = variables.map(variable => ({
           ...variable, map_x: variable.map_x * factor, map_y: variable.map_y * factor,
@@ -81,28 +79,7 @@ test("causal candidate roles retain legacy behavior while spatial roles are scal
         const scaledQueue = candidates.buildCandidateQueue(project, scaledInputs);
         assert.deepEqual(current.map(item => [item.group_id, item.roles]),
           scaledQueue.map(item => [item.group_id, item.roles]));
-        const scaledOptions = { ...options, visibleVariables: scaledVariables,
-          transform: { ...transform, scale: transform.scale / factor } };
-        const scaledDensity = candidates.createDensityCandidateGroup(project, scaledInputs, scaledOptions);
-        assert.deepEqual(density.variable_ids, scaledDensity.variable_ids);
       }
     }
   }
-});
-
-test("density selection minimizes the fixed-size nearest-neighbour radius", () => {
-  const variables = [
-    { variable_id: "a", map_x: 0, map_y: 0 },
-    { variable_id: "b", map_x: 0.01, map_y: 0 },
-    { variable_id: "c", map_x: 0, map_y: 0.01 },
-    { variable_id: "d", map_x: 10, map_y: 10 },
-    { variable_id: "e", map_x: -10, map_y: -10 },
-  ];
-  assert.deepEqual(candidates.densestNeighborhood(variables, 3).map(variable => variable.variable_id),
-    ["a", "b", "c"]);
-  const scaled = variables.map(variable => ({
-    ...variable, map_x: variable.map_x * 1e-8, map_y: variable.map_y * 1e-8,
-  }));
-  assert.deepEqual(candidates.densestNeighborhood(scaled, 3).map(variable => variable.variable_id),
-    ["a", "b", "c"]);
 });

@@ -1,27 +1,13 @@
-import { reviewTerms } from "./definition_batch_review.mjs";
 import { h, replaceChildren } from "./dom_builder.mjs";
 
 export function createDefinitionWorkflowPresenter({ state, elements: els, normalized, clusterRep, truncate,
   definitionSources, definitionResidualIds, definitionCanReview, searchSourceGroups,
-  clusterDisplayVariable, definitionNeighbors, resizeMap, fitMap,
-  onSourceSelection, onClassify, onResidualLabel, onCancel, canUndoBatch,
+  clusterDisplayVariable,
+  onSourceSelection, onResidualLabel, onCancel,
   browseState, onChoosePublishedSplit }) {
   let renderedStep = null;
-  let reviewedDraft = null;
-  let statusFilter = "unreviewed";
-  let activeTerm = "";
-  let termPage = 0;
-  let currentTermIds = [];
-  const PAGE_SIZE = 20;
   const INCLUDED_LIST_LIMIT = 300;
-  const RELATED_LIMIT = 8;
   const fmt = value => Number(value || 0).toLocaleString();
-  const STATUSES = [
-    { key: "unreviewed", label: "Unreviewed" },
-    { key: "included", label: "Included" },
-    { key: "excluded", label: "Excluded" },
-    { key: "all", label: "All" },
-  ];
 
   const labelFor = id => {
     const variable = clusterDisplayVariable(id) || state.variableById.get(id);
@@ -38,82 +24,6 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     return { selected, status, counts };
   }
 
-  function sideButtons(id, label, current) {
-    const button = (side, text, verb) => {
-      const active = current === (side === "in" ? "included" : "excluded");
-      return h("button", { type: "button", className: active ? "active" : "",
-        dataset: { classify: active ? "clear" : side, variableId: id },
-        title: active ? "Click again to mark it unreviewed" : "",
-        attrs: { "aria-pressed": active ? "true" : "false", "aria-label": `${verb} “${label}”` }, textContent: text });
-    };
-    return h("div", { className: "definition-side-buttons", role: "group", attrs: { "aria-label": `Classify ${label}` } },
-      button("in", "In", "Include"), button("out", "Out", "Exclude"));
-  }
-
-  function renderBrowse(draft, { status, counts }) {
-    if (reviewedDraft !== draft) {
-      reviewedDraft = draft;
-      statusFilter = draft.mode === "edit" ? "all" : "unreviewed";
-      activeTerm = "";
-      termPage = 0;
-    }
-    const variables = draft.eligible_variable_ids.map(id => ({ id, label: labelFor(id) }));
-    const terms = reviewTerms(variables, draft.new_variable_ids, 40);
-    if (activeTerm && !terms.some(term => term.word === activeTerm)) activeTerm = "";
-    replaceChildren(els.definitionStatusFilter, STATUSES.map(entry => h("button", {
-      type: "button", className: "btn", dataset: { status: entry.key },
-      attrs: { "aria-pressed": String(entry.key === statusFilter) },
-      textContent: `${entry.label} ${fmt(counts[entry.key])}`,
-    })));
-    replaceChildren(els.definitionTermSelect,
-      h("option", { value: "", textContent: terms.length ? "Common terms" : "No common terms" }),
-      terms.map(term => h("option", { value: term.word, selected: term.word === activeTerm,
-        textContent: `${term.word} (${fmt(term.ids.length)})` })));
-    els.definitionTermSelect.disabled = !terms.length;
-    els.definitionTermSelect.value = activeTerm;
-    replaceChildren(els.definitionActiveFilters, activeTerm ? h("button", {
-      type: "button", className: "definition-filter-chip", dataset: { clearTerm: "true" },
-      attrs: { "aria-label": `Remove the common term filter “${activeTerm}”` },
-    }, h("span", { textContent: `Common term: ${activeTerm}` }), h("b", { attrs: { "aria-hidden": "true" }, textContent: "×" })) : null);
-    els.definitionActiveFilters.hidden = !activeTerm;
-
-    const query = normalized(els.definitionConceptSearch.value);
-    const termIds = activeTerm ? new Set(terms.find(term => term.word === activeTerm)?.ids || []) : null;
-    const filtered = variables.filter(variable => (statusFilter === "all" || status(variable.id) === statusFilter)
-      && (!termIds || termIds.has(variable.id))
-      && (!query || normalized(variable.label).includes(query)))
-      .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id));
-    const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-    termPage = Math.max(0, Math.min(termPage, pageCount - 1));
-    const start = termPage * PAGE_SIZE;
-    const shown = filtered.slice(start, start + PAGE_SIZE);
-    currentTermIds = shown.map(variable => variable.id);
-    els.definitionTermSummary.textContent = filtered.length
-      ? `Showing ${fmt(start + 1)}–${fmt(start + shown.length)} of ${fmt(filtered.length)}` : "";
-    const emptyMessage = query || termIds ? "No matching concepts."
-      : statusFilter === "unreviewed" ? "Every concept has been classified."
-        : statusFilter === "included" ? "No concepts included yet."
-          : statusFilter === "excluded" ? "No concepts excluded yet." : "No concepts.";
-    replaceChildren(els.definitionTermItems, shown.length ? shown.map(({ id, label }) =>
-      h("div", { className: `definition-sort-row is-${status(id)}`, role: "listitem", dataset: { termVariableId: id } },
-        h("span", { className: "definition-sort-label", textContent: label }),
-        sideButtons(id, label, status(id))))
-      : h("div", { className: "definition-list-empty" },
-        h("p", { textContent: emptyMessage }),
-        query || termIds ? h("button", { type: "button", className: "btn btn--sm", dataset: { clearFilters: "true" }, textContent: "Clear search and filters" })
-          : statusFilter !== "all" ? h("button", { type: "button", className: "btn btn--sm", dataset: { showAll: "true" }, textContent: "Show all concepts" }) : null));
-    els.definitionTermPage.textContent = `Page ${termPage + 1} of ${pageCount}`;
-    els.definitionTermPrev.disabled = termPage === 0;
-    els.definitionTermNext.disabled = termPage >= pageCount - 1;
-    els.definitionTermPrev.parentElement.hidden = pageCount <= 1;
-    els.definitionTermToNew.textContent = `Include these ${shown.length}`;
-    els.definitionTermToLeftover.textContent = `Exclude these ${shown.length}`;
-    els.definitionTermToNew.hidden = els.definitionTermToLeftover.hidden = !shown.length;
-    els.definitionTermToNew.disabled = shown.every(({ id }) => status(id) === "included");
-    els.definitionTermToLeftover.disabled = shown.every(({ id }) => status(id) === "excluded");
-    els.definitionUndoBatch.hidden = !canUndoBatch();
-  }
-
   function renderIncluded(draft, { counts }) {
     els.definitionSelectedTitle.textContent = `Included concepts (${fmt(counts.included)})`;
     els.definitionIncludedFilter.hidden = counts.included <= 8;
@@ -124,25 +34,13 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     replaceChildren(els.definitionSelectedVariables, !counts.included
       ? h("div", { className: "definition-list-empty" },
         h("p", { textContent: "No concepts included yet." }),
-        h("p", { className: "small-note", textContent: "Choose In next to a concept to add it here." }))
+        h("p", { className: "small-note", textContent: "Use the AI suggestions above to include concepts." }))
       : !rows.length ? h("div", { className: "definition-list-empty" },
         h("p", { textContent: "No included concepts match." }),
         h("button", { type: "button", className: "btn btn--sm", dataset: { clearSearch: "definitionIncludedFilter" }, textContent: "Clear filter" }))
         : [...rows.slice(0, INCLUDED_LIST_LIMIT).map(({ id, label }) => h("div", { className: "definition-included-row", role: "listitem" },
-          h("span", { textContent: label, title: label }),
-          h("button", { type: "button", className: "definition-remove", dataset: { classify: "out", variableId: id },
-            title: "Remove (marks it excluded)", attrs: { "aria-label": `Remove “${label}” from included` }, textContent: "×" }))),
+          h("span", { textContent: label, title: label }))),
         rows.length > INCLUDED_LIST_LIMIT ? h("p", { className: "small-note", textContent: `${fmt(rows.length - INCLUDED_LIST_LIMIT)} more. Filter to find one.` }) : null]);
-    const neighbors = counts.included ? definitionNeighbors().slice(0, RELATED_LIMIT) : [];
-    els.definitionRelated.hidden = !neighbors.length;
-    els.definitionAddNeighbors.textContent = `Include all ${neighbors.length}`;
-    replaceChildren(els.definitionNeighborResults, neighbors.map(neighbor => {
-      const label = labelFor(neighbor.variable_id);
-      return h("div", { className: "definition-related-row", role: "listitem" },
-        h("span", { textContent: label, title: label }),
-        h("button", { type: "button", className: "btn btn--sm", dataset: { classify: "in", variableId: neighbor.variable_id },
-          attrs: { "aria-label": `Include “${label}”` }, textContent: "Include" }));
-    }));
   }
 
   function renderSources(draft, { selected }) {
@@ -181,7 +79,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
 
   function saveHint(draft, counts) {
     if (draft.details_loading) return "Loading concepts…";
-    if (!counts.included) return "Include at least one concept to save.";
+    if (!counts.included) return "Include at least one concept to save: use the AI suggestions or an existing split.";
     const emptied = definitionSources().find(source => !definitionResidualIds(source).length);
     return emptied ? `Leave at least one concept in “${emptied.label}” to save.` : "";
   }
@@ -196,10 +94,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionCountExcluded.textContent = fmt(counts.excluded);
     els.definitionCountUnreviewed.textContent = fmt(counts.unreviewed);
     renderSources(draft, summary);
-    if (state.definitionMethod !== "jev") {
-      renderBrowse(draft, summary);
-      renderIncluded(draft, summary);
-    }
+    renderIncluded(draft, summary);
     const hint = saveHint(draft, counts);
     els.definitionSave.disabled = Boolean(hint) || !definitionCanReview();
     els.definitionSaveHint.textContent = hint;
@@ -213,7 +108,6 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     const input = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
     if (!input) return;
     input.value = "";
-    termPage = 0;
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.focus();
   }
@@ -225,24 +119,10 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       const target = /** @type {HTMLElement} */ (event.target).closest("button[data-clear-search]");
       if (target) clearSearch(target.dataset.clearSearch);
     });
-    els.definitionConceptSearch.addEventListener("input", () => { termPage = 0; render(); });
     els.definitionIncludedFilter.addEventListener("input", render);
-    els.definitionTermSelect.addEventListener("change", () => { activeTerm = els.definitionTermSelect.value; termPage = 0; render(); });
-    els.definitionTermPrev.addEventListener("click", () => { termPage -= 1; render(); els.definitionTermItems.scrollIntoView({ block: "nearest" }); });
-    els.definitionTermNext.addEventListener("click", () => { termPage += 1; render(); els.definitionTermItems.scrollIntoView({ block: "nearest" }); });
-    // One delegated handler for every In / Out / Remove / Include button and filter control.
-    els.definitionManualPanel.addEventListener("click", event => {
+    els.definitionIncludedPanel.addEventListener("click", event => {
       const target = /** @type {HTMLElement} */ (event.target).closest("button");
-      if (!target) return;
-      if (target.dataset.clearSearch) { clearSearch(target.dataset.clearSearch); return; }
-      if (target.dataset.status) { statusFilter = target.dataset.status; termPage = 0; render(); return; }
-      if (target.dataset.clearTerm) { activeTerm = ""; termPage = 0; render(); return; }
-      if (target.dataset.showAll) { statusFilter = "all"; termPage = 0; render(); return; }
-      if (target.dataset.clearFilters) {
-        activeTerm = ""; els.definitionConceptSearch.value = ""; termPage = 0; render();
-        els.definitionConceptSearch.focus(); return;
-      }
-      if (target.dataset.classify && target.dataset.variableId) onClassify(target.dataset.variableId, target.dataset.classify);
+      if (target?.dataset.clearSearch) clearSearch(target.dataset.clearSearch);
     });
   }
 
@@ -250,17 +130,9 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     const draft = state.definitionDraft;
     const stepChanged = draft?.step !== renderedStep;
     renderedStep = draft?.step || null;
-    const wasSpatial = document.body.classList.contains("defining-variable");
     const isSpatial = draft?.step === "partition";
     document.body.classList.toggle("definition-active", Boolean(draft));
     document.body.classList.toggle("defining-variable", isSpatial);
-    // The map is display:none in the normal DAG2 layout, so its initial canvas
-    // backing store is 1x1. Resize only after the browser has laid out the
-    // temporary spatial workspace, including when a saved draft is resumed.
-    if (isSpatial && !wasSpatial) requestAnimationFrame(() => {
-      resizeMap();
-      fitMap(draft.eligible_variable_ids);
-    });
     els.definitionBlock.hidden = !draft;
     if (!draft) return;
     if (stepChanged) {
@@ -283,12 +155,6 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionLoadStatus.textContent = draft.details_error
       ? `Some concept details could not load: ${draft.details_error}. You can still edit this variable.`
       : draft.details_loading ? "Loading concepts…" : "";
-    const jevMode = state.definitionMethod === "jev";
-    els.definitionJevPanel.hidden = !jevMode;
-    els.definitionManualPanel.hidden = jevMode;
-    els.definitionMethodJev.setAttribute("aria-pressed", String(jevMode));
-    els.definitionMethodManual.setAttribute("aria-pressed", String(!jevMode));
-    els.definitionMapPreviewStatus.hidden = !jevMode || !state.definitionAiPreviewIds;
     if (draft.step === "describe") {
       if (document.activeElement !== els.definitionNewLabel) els.definitionNewLabel.value = draft.new_label || "";
       if (document.activeElement !== els.definitionNewDescription) els.definitionNewDescription.value = draft.new_description || "";
@@ -389,12 +255,6 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       })] : []);
   }
 
-  function setJevPreviewStatus(ids, mode) {
-    els.definitionMapPreviewStatus.hidden = !ids || state.definitionMethod === "manual";
-    els.definitionMapPreviewStatus.textContent = ids
-      ? `AI ${mode === "test" ? "sample" : "full"} preview only · ${ids.length} suggested for new` : "";
-  }
-
   return { render, install, showDescribeError, showSaveError, clearDescriptionValidation, setContinueLoading, showLoadError,
-    setJevPreviewStatus, showSavedRuns, selectedTermIds: () => [...currentTermIds] };
+    showSavedRuns };
 }

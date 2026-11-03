@@ -77,7 +77,7 @@ export function isDagFullyVisible(network, boxes, viewport) {
 
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, selectEdge, selectGroup, onViewportChange = () => {}, exploreRows = () => [],
+  renderAll, selectEdge, selectGroup, onViewportChange = () => {}, exploreRows = () => [],
   onNodeHover = () => {}, onSetStatus = () => {},
 }) {
   // The causes and consequences views draw a neighborhood of one variable, not
@@ -207,7 +207,6 @@ const tableShown = () => state.dagDisplay === "table";
 
 function openVariable(id) {
   Object.assign(state, workflow.transition(state, { type: "focus-group", groupId: id }));
-  drawMap();
   selectGroup(id);
 }
 
@@ -957,7 +956,6 @@ function attachDagNetworkHandlers(network) {
         return;
       }
       Object.assign(state, workflow.transition(state, { type: "focus-group", groupId: id }));
-      drawMap();
       selectGroup(id);
     },
     openGroup(id) {
@@ -966,7 +964,6 @@ function attachDagNetworkHandlers(network) {
         return;
       }
       Object.assign(state, workflow.transition(state, { type: "review-group", groupId: id }));
-      setMapMode("select");
       renderAll({ rebuild: false, refreshView: true });
     },
     zoomToPoint(position) {
