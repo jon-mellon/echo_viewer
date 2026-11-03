@@ -3013,7 +3013,8 @@ h2 {
 .list-filter-field { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   color: var(--text); font-size: var(--text-md); font-weight: var(--weight-normal); }
 #exploreResults .explore-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--space-1); }
-/* A quiet box: white with a green tick, never a filled green square. */
+/* Two clear states: a filled accent box with a tick is on the map; an empty box is off it
+   (and its row is dimmed and struck through). A dash means only some of a section is on the map. */
 .explore-include {
   appearance: none;
   position: relative;
@@ -3022,19 +3023,21 @@ h2 {
   width: 16px;
   height: 16px;
   margin: 0;
-  border: 1px solid var(--border-strong);
+  border: 1.5px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--surface);
   cursor: pointer;
 }
-.explore-include:hover { border-color: var(--accent); }
+.explore-include:hover:not(:disabled) { border-color: var(--accent); }
 .explore-include:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.explore-include:checked,
+.explore-include:indeterminate { border-color: var(--accent); background: var(--accent); }
 .explore-include:checked::before {
   content: "";
   width: 4px;
   height: 8px;
   margin-top: -2px;
-  border: solid var(--accent);
+  border: solid var(--surface);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -3044,11 +3047,18 @@ h2 {
   height: 2px;
   margin: 0;
   border: 0;
-  background: var(--accent);
+  background: var(--surface);
   transform: none;
 }
+/* Nothing to toggle: clearly inert, never mistaken for an unticked variable. */
+.explore-include:disabled { cursor: not-allowed; opacity: 0.4; background: var(--hover-bg); }
+.explore-row.is-excluded .explore-row-open { opacity: 0.6; }
 .explore-row.is-excluded .explore-row-label,
 .explore-row.is-excluded .explore-row-papers { color: var(--text-muted); text-decoration: line-through; }
+/* A variable left off the map is not "selected", even while its evidence is still open. */
+.explore-row.is-excluded .explore-row-open[aria-pressed="true"],
+.explore-row.is-excluded .explore-row-open:hover { background: none; box-shadow: none; }
+.explore-row.is-excluded .explore-row-open[aria-pressed="true"] .explore-row-label { font-weight: inherit; }
 
 .explore-view[hidden], .explore-results-block[hidden], .explore-summary[hidden] { display: none; }
 .explore-graph-hint {
@@ -3108,6 +3118,20 @@ h2 {
 .identify-field .search-input::-webkit-search-cancel-button { display: none; }
 .identify-field.has-focus .search-input:not(:focus) { font-weight: var(--weight-normal); }
 .identify-fields > #identifyGroupPicker { margin-top: var(--space-3); }
+/* The field whose list is open (focused, or the first one still empty) is plainly marked; the rest sit back. */
+.identify-field.is-picking .search-input,
+.identify-field.is-picking .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); background: var(--surface); }
+.identify-field.is-picking .identify-field-label { color: var(--accent); }
+.identify-field.is-picking .identify-field-label::after {
+  content: "Choose from the list below";
+  margin-left: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+}
+.identify-fields:has(.is-picking) .identify-field:not(.is-picking) { opacity: 0.65; }
+.identify-fields:has(.is-picking) .identify-field:not(.is-picking):hover,
+.identify-fields:has(.is-picking) .identify-field:not(.is-picking):focus-within { opacity: 1; }
 /* The map's filters sit beside the list's first heading, as a quiet icon button. */
 .identify-tools .filter-dropdown { position: relative; }
 .identify-tools .filter-dropdown > summary { border-color: transparent; background: transparent; color: var(--text-muted); }
