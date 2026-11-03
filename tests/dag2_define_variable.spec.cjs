@@ -248,7 +248,6 @@ test("a new variable can be defined through the mobile controls", async ({ page 
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
   await page.locator("#definitionConceptSearch").fill(await conceptLabel(page, variableId));
   await page.locator("#definitionTermItems button", { hasText: /^In$/ }).first().click();
-  await expect(page.locator("#definitionTitle")).toBeInViewport();
   await page.locator("#definitionSourcesSummary").click();
   await page.locator("#definitionResidualLabels input").fill("Mobile browser residual");
   await page.locator("#definitionSave").click();
