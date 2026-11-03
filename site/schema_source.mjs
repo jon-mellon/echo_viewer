@@ -1,14 +1,13 @@
 import { PUBLISHED_SCHEMA_BUCKET } from "./publication_constants.mjs";
 import { SUPABASE_URL } from "./supabase_config.mjs";
 
-// Where published schema files are read from. Supabase Storage is the default;
-// `?schema_source=cloudflare` reads the same files, byte for byte, from the R2
-// bucket behind data.epistemicinfra.org (see harvest_abstracts
-// mirror_published_schemas_r2.py). Publishing still writes to Supabase, and the
-// registry stays there. When Cloudflare is ready to be the default, change
-// DEFAULT_SCHEMA_SOURCE; Supabase support can then be removed.
+// Where published schema files are read from. The R2 bucket behind data.epistemicinfra.org
+// (see harvest_abstracts mirror_published_schemas_r2.py) is the default, so loading a page
+// makes no Supabase requests; `?schema_source=supabase` reads the same files, byte for byte,
+// from Supabase Storage. Publishing still writes to Supabase. Once nothing needs the opt-in,
+// Supabase support can be removed.
 export const SCHEMA_SOURCES = ["supabase", "cloudflare"];
-export const DEFAULT_SCHEMA_SOURCE = "supabase";
+export const DEFAULT_SCHEMA_SOURCE = "cloudflare";
 export const SCHEMA_SOURCE_PARAM = "schema_source";
 
 const CLOUDFLARE_ORIGIN = "https://data.epistemicinfra.org";

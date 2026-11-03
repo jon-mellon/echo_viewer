@@ -6,17 +6,18 @@ const { withTestDefault, isSchemaSource, testDefaultSource } = createRequire(imp
 const SUPABASE = 'export const DEFAULT_SCHEMA_SOURCE = "supabase";';
 const CLOUDFLARE = 'export const DEFAULT_SCHEMA_SOURCE = "cloudflare";';
 
-test("the tests run the viewer on Cloudflare, by rewriting the one default line, unless asked not to", () => {
+test("the tests run the viewer on Cloudflare, the repo default, unless asked to rewrite the one default line to Supabase", () => {
   const saved = process.env.ECHO_TEST_DEFAULT_SOURCE;
   try {
     delete process.env.ECHO_TEST_DEFAULT_SOURCE;
     assert.equal(testDefaultSource(), "cloudflare");
-    assert.equal(withTestDefault(`a\n${SUPABASE}\nb`), `a\n${CLOUDFLARE}\nb`);
-    assert.equal(withTestDefault(CLOUDFLARE), CLOUDFLARE, "a staging build, already on Cloudflare, is left alone");
+    assert.equal(withTestDefault(`a\n${CLOUDFLARE}\nb`), `a\n${CLOUDFLARE}\nb`);
+    assert.equal(withTestDefault(SUPABASE), CLOUDFLARE, "an older build still on Supabase is rewritten");
     assert.throws(() => withTestDefault("export const OTHER = 1;"), /schema_source\.mjs changed/, "a changed file fails loudly, not silently");
     process.env.ECHO_TEST_DEFAULT_SOURCE = "supabase";
     assert.equal(testDefaultSource(), "supabase");
-    assert.equal(withTestDefault(SUPABASE), SUPABASE, "ECHO_TEST_DEFAULT_SOURCE=supabase runs on the repo's own default");
+    assert.equal(withTestDefault(CLOUDFLARE), SUPABASE, "ECHO_TEST_DEFAULT_SOURCE=supabase rewrites the default line to Supabase");
+    assert.equal(withTestDefault(SUPABASE), SUPABASE);
   } finally {
     if (saved === undefined) delete process.env.ECHO_TEST_DEFAULT_SOURCE; else process.env.ECHO_TEST_DEFAULT_SOURCE = saved;
   }

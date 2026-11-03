@@ -24,7 +24,7 @@ test("publication reuses unchanged memberships, writes changed ones, and reconst
     storage: { from: () => ({ getPublicUrl: path => ({ data: { publicUrl: root + path } }),
       upload: async (path, body) => { const bytes = new Uint8Array(await body.arrayBuffer()); uploads.set(path, bytes); objects.set(root + path, bytes); return { error: null }; } }) },
   };
-  const result = await publishWorkingSchema({ schema: changed, previousPublication: { publication_id: "old", storage_prefix: "old" }, client, fetchImpl, compileInput: { rawLinks: [] } });
+  const result = await publishWorkingSchema({ schema: changed, previousPublication: { publication_id: "old", storage_prefix: "old" }, client, fetchImpl, source: "supabase", compileInput: { rawLinks: [] } });
   const prefix = `owner/${result.publicationId}/`;
   const manifest = JSON.parse(new TextDecoder().decode(uploads.get(prefix + "manifest.json")));
   assert.equal(manifest.group_membership_references.health, root + "old/memberships/health.tsv");

@@ -96,7 +96,7 @@ export async function clonePublication(options = {}) {
   const { publicationId, snapshotId } = agentDataSelection(options);
   if (!ID.test(publicationId)) throw new Error("Invalid publication ID.");
   const client = publicClient();
-  const publication = await lookupPublishedSchema(publicationId, client);
+  const publication = await lookupPublishedSchema(publicationId, client, { source: "supabase" });
   // Publication evidence_snapshot can be a logical record signature, so the
   // physical retrieval layout is independently selectable and then validated.
   const selectedId = snapshotId || evidenceSnapshotIdFromManifestUrl(PRODUCTION_EVIDENCE_MANIFEST);
@@ -128,7 +128,7 @@ export async function clonePublication(options = {}) {
     expectedRecordSignature: publication.evidence_snapshot });
 
   const publicationDir = join(home, "publications", publicationId);
-  const baseUrl = publicSchemaBaseUrl(client, publication.storage_prefix);
+  const baseUrl = publicSchemaBaseUrl(client, publication.storage_prefix, "supabase");
   const publicUrl = path => new URL(path, baseUrl).href;
   const schemaManifestResponse = await fetchPublishedFile(publicUrl("manifest.json"), undefined, fetch);
   if (!schemaManifestResponse.ok) throw new Error("Could not download publication manifest.");

@@ -30,9 +30,9 @@ export async function browsePublishedSplits(sourceGroupIds, client = supabase,
   return [...unique.values()].sort((a, b) => b.published_at.localeCompare(a.published_at));
 }
 
-export async function loadPublishedSplitMembership(row, client = supabase, fetchImpl = fetch) {
-  if (!client) throw new Error("Supabase is not configured.");
-  const base = publicSchemaBaseUrl(client, row.storage_prefix);
+export async function loadPublishedSplitMembership(row, client = supabase, fetchImpl = fetch, source = schemaSource()) {
+  if (!client && source !== "cloudflare") throw new Error("Supabase is not configured.");
+  const base = publicSchemaBaseUrl(client, row.storage_prefix, source);
   const staged = await loadGroupingSchemaStructure(base, fetchImpl);
   if (staged.manifest.group_membership_files[row.group_id] !== row.membership_path) {
     throw new Error("The published split pointer no longer matches its schema.");
