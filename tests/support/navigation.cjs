@@ -13,11 +13,17 @@ async function closeNav(page, { tap = false } = {}) {
   await (tap ? toggle.tap() : toggle.click());
 }
 
-/** Chooses a view from the task menu. "causes" and "consequences" are the two directions of Exploration. */
+/** Chooses a view from the start page or the task menu. "causes" and "consequences" are the two directions of Exploration. */
 async function chooseTask(page, task, { tap = false } = {}) {
   const press = locator => (tap ? locator.tap() : locator.click());
   const exploring = task === "causes" || task === "consequences";
   const target = exploring ? "explore" : task;
+  // Before any task is chosen the start page is the way in.
+  if (await page.locator("#taskLanding").isVisible()) {
+    await press(page.locator(`#taskLanding button[data-task=${target}]`));
+    if (exploring) await chooseDirection(page, task, { tap });
+    return;
+  }
   await openNav(page, { tap });
   if (!(await page.locator("#taskMenu").evaluate(menu => menu.open))) await press(page.locator("#taskMenuToggle"));
   await press(page.locator(`#taskMenu .task-tab[data-task=${target}]`));

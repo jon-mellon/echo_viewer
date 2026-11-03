@@ -115,8 +115,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       applyPermalink(permalink, state);
       if (state.project.iv_group_id && state.project.dv_group_id) state.phase = "build";
     } else if (TASKS.includes(requestedTask)) state.task = requestedTask;
-    // There is no start page: a new project, or an old link to it, opens Exploration.
-    if (!state.task) state.task = "causes";
+    // A new project, or a link that names no task, opens the start page (state.task stays null).
     if (state.data.publication_source && !state.project.publication) {
       state.project.publication = {
         ...state.data.publication_source,

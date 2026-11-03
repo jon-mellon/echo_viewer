@@ -41,14 +41,22 @@ test("tabs start unconfigured views at setup and reopen configured views", async
 
 test("the start page leads to causes and consequences views that behave like Identify with one variable", async ({ page }) => {
   await open(page);
-  // There is no start page: the app opens in Exploration, asking for its variable.
-  await expect(page.locator("#taskMenuValue")).toHaveText("Exploration");
-  await expect(page.locator("#exploreView")).toBeVisible();
-  await expect(page.locator("#focusInput")).toHaveValue("");
+  // The start page asks what to do, and explains both choices.
+  await expect(page.locator("#taskLanding")).toBeVisible();
+  await expect(page.locator("#taskLanding h1")).toHaveText("What would you like to do?");
+  await expect(page.locator("#taskLanding .task-choice")).toHaveCount(2);
+  await expect(page.locator("#taskLanding .task-choice").nth(0)).toContainText("Identify a causal estimate");
+  await expect(page.locator("#taskLanding .task-choice").nth(1)).toContainText("Explore a variable");
+  await expect(page.locator("#taskLanding .task-choice-example")).toHaveCount(2);
+  await expect(page.locator("#taskReset")).toBeHidden();
+  await expect(page.locator("#exploreView")).toBeHidden();
   expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
 
-  // The same picker as Identify, offering the one anchor.
-  await chooseTask(page, "causes");
+  // Exploring opens the picker for its variable.
+  await page.locator("#taskLanding .task-choice[data-task=explore]").click();
+  await expect(page.locator("#taskLanding")).toBeHidden();
+  await expect(page.locator("#taskMenuValue")).toHaveText("Exploration");
+  await expect(page.locator("#focusInput")).toHaveValue("");
   await expect(page.locator("#exploreView")).toBeVisible();
   await expect(page.locator("#focusInput")).toHaveAttribute("placeholder", "Search group or constituent variable");
   await expect(pick(page, "category-sleep")).toContainText("sleep");
@@ -140,6 +148,36 @@ test("the start page leads to causes and consequences views that behave like Ide
   expect(await page.evaluate(() => window.__dagBuilderState.explore.causes.focusId)).toBe(target);
 });
 
+test("the start page opens Identification from the keyboard, is skipped by task links, and a reload stays in the task", async ({ page }) => {
+  await open(page);
+  await expect(page.locator("#taskLanding")).toBeVisible();
+  await expect(page.locator("#taskLanding .task-choice[data-task=identify]")).toContainText("Identify a causal estimate");
+  // Both choices can be reached and chosen without a mouse.
+  await page.locator("#taskLanding .task-choice[data-task=identify]").focus();
+  await page.keyboard.press("Tab");
+  await expect(page.locator("#taskLanding .task-choice[data-task=explore]")).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#taskLanding")).toBeHidden();
+  await expect(page.locator("#taskMenuValue")).toHaveText("Identification");
+  await expect(page.locator("#identifyFields")).toBeVisible();
+  await expect(page.locator("#identify-iv-input")).toHaveValue("");
+  expect(await page.evaluate(() => window.__dagBuilderState.task)).toBe("identify");
+  // The choice is in the address, so a reload goes back into it rather than to the start page.
+  await expect.poll(() => new URL(page.url()).searchParams.get("task")).toBe("identify");
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100
+    && document.getElementById("startupLoading")?.hidden);
+  await expect(page.locator("#taskLanding")).toBeHidden();
+  await expect(page.locator("#identifyFields")).toBeVisible();
+  // A link that names a task skips the start page.
+  await page.goto(`${viewer}?task=causes`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100
+    && document.getElementById("startupLoading")?.hidden);
+  await expect(page.locator("#taskLanding")).toBeHidden();
+  await expect(page.locator("#exploreView")).toBeVisible();
+});
+
 test("the graph puts the chosen variable in the middle with its causes and consequences around it", async ({ page }) => {
   await open(page, `${viewer}?task=causes`);
   await pick(page, "category-sleep").click();
@@ -217,8 +255,7 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await dialog.getByRole("button", { name: "Reset in current tab" }).click();
   await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100
     && document.getElementById("startupLoading")?.hidden);
-  await expect(page.locator("#exploreView")).toBeVisible();
-  await expect(page.locator("#focusInput")).toHaveValue("");
+  await expect(page.locator("#taskLanding")).toBeVisible();
   expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
   await chooseTask(page, "causes");
   await expect(page.locator("#focusSearchBlock")).toBeVisible();
@@ -236,7 +273,7 @@ test("mobile reset keeps the previous project after navigating", async ({ browse
     await page.locator("#historyToggle").tap();
     await page.locator("#taskReset").tap();
     await page.locator("#resetHere").tap();
-    await expect(page.locator("#focusInput")).toHaveValue("", { timeout: 60000 });
+    await expect(page.locator("#taskLanding")).toBeVisible({ timeout: 60000 });
     await expect(page.locator("#resetError")).toBeHidden();
     expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
     await expect.poll(() => page.evaluate(async () => {
@@ -302,15 +339,15 @@ test("on a phone Exploration opens its picker first, keeps its variable when fli
   }
 });
 
-test("the app preloads the search catalog and query engine at startup", async ({ page }) => {
+test("the start page preloads the search catalog and query engine", async ({ page }) => {
   await open(page);
-  await expect(page.locator("#exploreView")).toBeVisible();
-  // Nothing has chosen a variable or run a search, yet both arrive in the background.
+  await expect(page.locator("#taskLanding")).toBeVisible();
+  // Nothing has opened a task or a search, yet both arrive in the background.
   await page.waitForFunction(() => window.__dagBuilderState.variableSearchStatus === "ready"
     && performance.getEntriesByName("echo:evidence:engine").length, null, { timeout: 90000 });
 });
 
-test("mobile start stays on one document while evidence warms in the background", async ({ browser }) => {
+test("mobile home stays on one document while evidence warms in the background", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
@@ -318,14 +355,14 @@ test("mobile start stays on one document while evidence warms in the background"
       String(Number(sessionStorage.getItem("echo-home-loads") || 0) + 1)));
     await open(page);
     await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated);
-    await expect(page.locator("#exploreView")).toBeVisible();
+    await expect(page.locator("#taskLanding")).toBeVisible();
     expect(new URL(page.url()).pathname).toBe("/");
     expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
     await page.waitForFunction(() => performance.getEntriesByName("echo:evidence:engine").length > 0);
     expect(new URL(page.url()).pathname).toBe("/");
     expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
     await expect(page.locator("#startupLoading")).toBeHidden();
-    await expect(page.locator("#exploreView")).toBeVisible();
+    await expect(page.locator("#taskLanding")).toBeVisible();
     await chooseTask(page, "causes", { tap: true });
     await expect(page.locator("#exploreView")).toBeVisible();
   } finally {

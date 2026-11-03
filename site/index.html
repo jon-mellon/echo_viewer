@@ -128,7 +128,7 @@
     </header>
     <dialog id="resetDialog" class="publication-dialog reset-dialog" aria-labelledby="resetDialogTitle">
       <h2 id="resetDialogTitle">Reset this project?</h2>
-      <p>Resetting clears the variables chosen in all three views and opens a fresh project in Exploration. The current project stays available under History › Earlier sessions.</p>
+      <p>Resetting clears the variables chosen in all three views and returns to the start page. The current project stays available under History › Earlier sessions.</p>
       <p id="resetError" role="alert" hidden></p>
       <div class="reset-dialog-actions">
         <button id="resetContinue" class="btn btn--primary" type="button" autofocus>Continue working on this project</button>
@@ -136,6 +136,28 @@
         <button id="resetHere" class="btn reset-here" type="button">Reset in current tab</button>
       </div>
     </dialog>
+    <!-- The first screen: pick what to do. It covers the app until a task is chosen (task_views.mjs). -->
+    <section id="taskLanding" class="task-view task-landing" aria-labelledby="taskLandingTitle" hidden>
+      <div class="task-landing-inner">
+        <h1 id="taskLandingTitle">What would you like to do?</h1>
+        <p class="task-landing-lead">ECHO shows what the research literature says about cause and effect. Choose how you want to start; you can switch at any time from the Task menu.</p>
+        <div class="task-choices">
+          <button class="task-choice" type="button" data-task="identify">
+            <strong>Identify a causal estimate</strong>
+            <span class="task-choice-text">Pick a cause and an outcome, then see what the literature says could bias the link: confounders to account for, colliders to avoid, and problems with an instrument.</span>
+            <span class="task-choice-example">For example: does education raise income, and what else would I need to account for?</span>
+            <span class="task-choice-go" aria-hidden="true">Start identifying →</span>
+          </button>
+          <button class="task-choice" type="button" data-task="explore">
+            <strong>Explore a variable</strong>
+            <span class="task-choice-text">Pick one variable and see what the literature links to it, either as a cause or as a consequence, directly or through other variables.</span>
+            <span class="task-choice-example">For example: what causes poor sleep, and what does low income lead to?</span>
+            <span class="task-choice-go" aria-hidden="true">Start exploring →</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
     <main class="dag-shell">
 
       <!-- LEFT PANEL: Navigation + mode-specific content -->
