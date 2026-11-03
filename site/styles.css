@@ -3101,8 +3101,8 @@ h2 {
 #dagTable:not([hidden]) ~ .diagnostic-overlap-key { display: none; }
 .diagnostic-key-item { display: inline-flex; align-items: center; gap: var(--space-1); }
 .diagnostic-key-swatch { width: 15px; height: 15px; border-radius: var(--radius-sm); }
-.collider-key .diagnostic-key-fill, .collider-key .diagnostic-key-outline { background: color-mix(in srgb, var(--dag-confounder) 60%, white); }
-.confounder-key .diagnostic-key-fill, .confounder-key .diagnostic-key-outline { background: color-mix(in srgb, var(--dag-collider) 60%, white); }
+.collider-key .diagnostic-key-fill, .collider-key .diagnostic-key-outline { background: color-mix(in srgb, var(--dag-confounder) 60%, var(--surface)); }
+.confounder-key .diagnostic-key-fill, .confounder-key .diagnostic-key-outline { background: color-mix(in srgb, var(--dag-collider) 60%, var(--surface)); }
 .collider-key .diagnostic-key-outline { border: 3px dashed var(--dag-collider-deep); }
 .confounder-key .diagnostic-key-outline { border: 3px dashed var(--dag-confounder-deep); }
 
