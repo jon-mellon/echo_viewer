@@ -580,8 +580,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
 
   function showProgress(value) {
     message = value;
-    const statusText = els.definitionAiStatus.querySelector("span");
-    if (statusText) statusText.textContent = value;
+    // The status is plain text that render() shows or hides, so progress must render it.
+    render();
   }
 
   function stopRun() {

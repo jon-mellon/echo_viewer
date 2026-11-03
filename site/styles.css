@@ -2569,11 +2569,15 @@ h2 {
     display: none;
   }
 
-  .dag-body.definition-active #definitionContinue,
-  .dag-body.definition-active #definitionSave {
+  /* The action row sticks, not the button: a sticky button cannot leave its own row, so Next and Save
+     sat below the fold, under the Setup and Map tabs. */
+  .dag-body.definition-active *:has(> #definitionContinue),
+  .dag-body.definition-active *:has(> #definitionSave) {
     position: sticky;
-    bottom: 8px;
+    bottom: 0;
     z-index: 2;
+    padding-block: var(--space-2);
+    background: var(--surface);
   }
 
   .dag-network .vis-tooltip {
@@ -4335,7 +4339,7 @@ h2 {
 .definition-ai-review-tools[hidden] { display: none; }
 .definition-ai-review-tools .btn { width: auto; }
 .definition-ai-review-tools .btn[hidden] { display: none; }
-.definition-ai-rows { display: grid; max-height: min(55vh, 560px); overflow-y: auto; border-top: 1px solid var(--border); }
+.definition-ai-rows { display: grid; grid-auto-rows: max-content; align-content: start; max-height: min(55vh, 560px); overflow-y: auto; border-top: 1px solid var(--border); }
 .definition-ai-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -4359,7 +4363,7 @@ h2 {
   .definition-sort-side { position: sticky; top: 96px; padding-left: var(--space-8); border-left: 1px solid var(--border); }
 }
 @media (max-width: 640px) {
-  .definition-sort-row, .definition-ai-row { grid-template-columns: 1fr; }
+  .definition-sort-row, .definition-ai-row { grid-template-columns: 1fr; grid-auto-rows: max-content; }
   .definition-side-buttons { justify-self: start; }
   .definition-browse-controls .select-input-sm { margin-left: 0; max-width: none; width: 100%; }
   .definition-status-filter { display: flex; width: 100%; }
