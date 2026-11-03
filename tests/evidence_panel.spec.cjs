@@ -1,4 +1,6 @@
 const { test, expect } = require("./fixtures.cjs");
+const { chooseAnchor, chooseAnchors, startCreate } = require("./support/identify.cjs");
+const { openNav, closeNav } = require("./support/navigation.cjs");
 const base = process.env.DAG_VIEWER_URL || "http://127.0.0.1:8767";
 const snapshot = "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b";
 const publication = "c221423a-9470-4c82-8a3d-8bcf4a01ef7c";
@@ -8,10 +10,7 @@ async function completeSetup(page) {
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   expect(anchors).toHaveLength(2);
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
-  await expect(page.locator('body')).not.toHaveClass(/initial-setup/);
+  await chooseAnchors(page, anchors[0], anchors[1]);
 }
 
 for (const corrupt of [false, true]) {
@@ -92,14 +91,24 @@ test("a newer path filter supersedes a dense graph while installation is pending
   await page.locator('button[data-mobile-panel="dag"]').click();
   const settled = () => page.evaluate(async () => (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).whenDagRendered());
   await settled();
-  const dropdown = page.locator("details.filter-dropdown");
+  // The filters sit in the variable list's header, on the controls tab.
+  await page.locator('button[data-mobile-panel="controls"]').click();
+  const dropdown = page.locator("details.filter-dropdown:visible");
   for (const id of ["toggleCollidersOnly", "toggleConfoundersOnly", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks"]) {
-    // The Filters dropdown closes on an outside click, and some of these toggles sit outside it.
-    if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
-    await page.locator(`#${id}`).click();
+    if (id.endsWith("Only")) {
+      // The diagnostic switch is in the top bar, behind the menu button on a phone.
+      await openNav(page);
+      await page.locator(`#${id}`).click();
+      await closeNav(page);
+    } else {
+      // The Filters dropdown closes on an outside click.
+      if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
+      await page.locator(`#${id}`).click();
+    }
     await settled();
   }
   await page.evaluate(() => { window.__supersedeDenseGraph = true; });
+  if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
   await page.locator("#confounderPathLength").fill("2");
   await page.waitForFunction(() => window.__supersededDenseGraph, null, { timeout: 30000 });
   await settled();

@@ -1,4 +1,5 @@
 const { test, expect } = require("./fixtures.cjs");
+const { chooseAnchor, chooseAnchors, startCreate } = require("./support/identify.cjs");
 const { chooseTask, chooseDirection, chooseFocus } = require("./support/navigation.cjs");
 
 const viewer = "http://127.0.0.1:8767/";
@@ -451,9 +452,7 @@ test("the table also covers Identify and works from the keyboard", async ({ page
       && state.project.groups.some(group => group.group_id === item.group_b && group.variable_ids?.length));
     return [link.group_a, link.group_b];
   });
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await expect(page.locator("#dagViewTable")).toBeVisible();
   await page.locator("#dagViewTable").focus();
   await page.keyboard.press("Enter");
@@ -598,9 +597,7 @@ test("in Identify each row is a confounder path with an arrow per link that open
     return null;
   });
   expect(anchors).not.toBeNull();
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await expect(page.locator("#diagnosticOverlapKey")).toBeVisible();
   await page.locator("#dagViewTable").click();
   await expect(page.locator("#diagnosticOverlapKey")).toBeHidden();
@@ -677,9 +674,7 @@ test("links the view implies beyond the paths are listed too, as many as the gra
     }
     return null;
   });
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator(".filter-dropdown > summary").click();
   const drawnLinks = () => page.evaluate(async () => {
     const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);

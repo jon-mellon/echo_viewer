@@ -1,6 +1,7 @@
 const { test, expect } = require("./fixtures.cjs");
+const { chooseAnchor, chooseAnchors, startCreate } = require("./support/identify.cjs");
 const { describeVariable, conceptLabel } = require("./support/definition.cjs");
-const { chooseTask } = require("./support/navigation.cjs");
+const { chooseTask, openNav, closeNav } = require("./support/navigation.cjs");
 const { readFile } = require("node:fs/promises");
 
 const viewer = "http://127.0.0.1:8767/?task=identify";
@@ -21,33 +22,19 @@ async function completeSetup(page) {
       .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id);
   });
   expect(anchors).toHaveLength(2);
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await expect(page.locator('#instrumentGroupPicker button[data-select-none]')).toBeVisible();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
-  await expect(page.locator('body')).not.toHaveClass(/initial-setup/);
+  await chooseAnchors(page, anchors[0], anchors[1]);
   return anchors;
 }
 
-test("privacy policy opens without resetting the viewer", async ({ page }) => {
+test("the privacy policy is linked and served", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(new URL("/", viewer).href);
+  await page.goto(viewer);
   await ready(page);
-  // The Privacy link is shown on the start page only.
-  await expect(page.locator("#taskLanding")).toBeVisible();
-  await page.evaluate(() => { window.__privacyViewerState = window.__dagBuilderState; });
-
-  const [policy] = await Promise.all([
-    page.waitForEvent("popup"),
-    page.locator(".legal-link").click(),
-  ]);
-  await expect(policy).toHaveURL(new URL("privacy.html", viewer).href);
-  await expect(policy.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
-  expect(await page.evaluate(() => window.__dagBuilderState === window.__privacyViewerState)).toBe(true);
-  await policy.close();
-  await expect(page.locator("#taskLanding")).toBeVisible();
-  await chooseTask(page, "identify");
-  await expect(page.locator(".legal-link")).toBeHidden();
+  // The link is in the page but not shown in any view since the start page went away.
+  await expect(page.locator(".legal-link")).toHaveAttribute("href", "/privacy.html");
+  await expect(page.locator(".legal-link")).toHaveAttribute("target", "_blank");
+  await page.goto(new URL("privacy.html", viewer).href);
+  await expect(page.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
 });
 
 test("selecting evidence in full screen returns to the standard layout", async ({ page }) => {
@@ -57,9 +44,7 @@ test("selecting evidence in full screen returns to the standard layout", async (
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   expect(anchors).toHaveLength(2);
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
 
   await page.locator("#fullscreenDag").click();
   await expect(page.locator("#fullscreenDag")).toHaveAttribute("aria-pressed", "true");
@@ -101,7 +86,7 @@ test("definition navigation returns through both Back steps and Cancel", async (
       return loadNeighbors(ids);
     };
   });
-  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await startCreate(page, "iv");
   await describeVariable(page);
   await page.locator("#definitionSourceSearch").fill("education");
   await expect(page.locator("#definitionSourceList input[data-source-id]").first()).toBeVisible();
@@ -133,11 +118,11 @@ test("definition navigation returns through both Back steps and Cancel", async (
   }
   await page.locator(".definition-cancel:visible").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft)).toBeNull();
-  await expect(page.locator("#ivGroupPicker")).toBeVisible();
+  await expect(page.locator("#identify-iv-input")).toBeVisible();
   const iv = await page.evaluate(() => window.__dagBuilderState.project.groups
     .find(group => group.variable_ids?.length)?.group_id);
-  await page.locator(`#ivGroupPicker button[data-group-id="${iv}"]`).click();
-  await page.locator('#dvGroupPicker button[data-define-side="dv"]').click();
+  await chooseAnchor(page, "iv", iv);
+  await startCreate(page, "dv");
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.role)).toBe("dv");
   await page.locator(".definition-cancel:visible").click();
 });
@@ -152,15 +137,15 @@ test("variable search catalog preloads once and serves anchor search", async ({ 
   await ready(page);
   // Setup preloads the catalog; focusing search must reuse it, not fetch it again.
   expect(["loading", "ready"]).toContain(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus));
-  await page.locator("#ivInput").focus();
+  await page.locator("#identify-iv-input").focus();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("ready");
   const hasStaticCatalog = await page.evaluate(async () => {
     const { SNAPSHOT_SEARCH_CATALOGS } = await import('/variable_search_catalog.mjs');
     return Boolean(SNAPSHOT_SEARCH_CATALOGS[new URL(location.href).searchParams.get('data_version')]);
   });
   expect(catalogRequests).toHaveLength(hasStaticCatalog ? 1 : 0);
-  await page.locator("#ivInput").fill("education");
-  await expect(page.locator("#ivGroupPicker button[data-group-id]").first()).toBeVisible();
+  await page.locator("#identify-iv-input").fill("education");
+  await expect(page.locator("#identifyGroupPicker button[data-group-id]").first()).toBeVisible();
 });
 
 test("map context menu changes a definition selection and closes with Escape", async ({ page }) => {
@@ -169,7 +154,7 @@ test("map context menu changes a definition selection and closes with Escape", a
   await page.setViewportSize({ width: 820, height: 900 });
   await page.goto(viewer);
   await ready(page);
-  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await startCreate(page, "iv");
   await describeVariable(page);
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
@@ -252,14 +237,14 @@ test("evidence keeps available fields visible while concept labels load", async 
   await expect(page.locator("#provenancePanel .concept-loading")).toHaveCount(0);
 });
 
-test("evidence replaces the desktop sidebar and closing it restores navigation", async ({ page }) => {
+test("evidence replaces the map, the fields and list stay, and Back to map restores the graph", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(viewer);
   await ready(page);
   await completeSetup(page);
   const pane = page.locator(".dag-ws-footer");
-  await expect(page.locator("#variablePanel")).toBeVisible();
+  await expect(page.locator("#identifyFields")).toBeVisible();
   await expect(pane).toBeHidden();
   await page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
@@ -267,11 +252,12 @@ test("evidence replaces the desktop sidebar and closing it restores navigation",
     inspectDagEdge(renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__"));
   });
   await expect(pane).toBeVisible();
-  await expect(page.locator("#variablePanel")).toBeHidden();
-  expect(await pane.evaluate(node => node.parentElement.className)).toContain("dag-left-panel");
-  expect((await page.locator(".dag-network-wrapper").boundingBox()).height).toBeGreaterThan(600);
+  await expect(page.locator("#dagNetwork")).toBeHidden();
+  await expect(page.locator("#identifyFields")).toBeVisible();
+  await expect(page.locator("#closeEvidencePane")).toHaveText("Back to map");
   await page.locator("#closeEvidencePane").click();
-  await expect(page.locator("#variablePanel")).toBeVisible();
+  await expect(page.locator("#dagNetwork")).toBeVisible();
+  expect((await page.locator(".dag-network-wrapper").boundingBox()).height).toBeGreaterThan(600);
   await expect(pane).toBeHidden();
 
   await page.setViewportSize({ width: 390, height: 800 });
@@ -349,7 +335,7 @@ test("pinching the mobile variable map zooms the map without selecting a variabl
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(viewer);
   await ready(page);
-  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await startCreate(page, "iv");
   await describeVariable(page);
   await expect(page.locator('#definitionSourceList input[data-source-id]').first()).toBeVisible();
   await page.locator('#definitionSourceList input[data-source-id]').first().check();
@@ -395,7 +381,7 @@ test("mobile definition waits for variable data before opening the map", async (
     const gate = new Promise(resolve => { window.__releaseVariableLoad = resolve; });
     dagDataSource.loadVariableMetadata = async (...args) => { await gate; return load(...args); };
   });
-  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+  await startCreate(page, "iv");
   await describeVariable(page);
   await page.locator('#definitionSourceList input[data-source-id]').first().check();
   await page.locator("#definitionContinue").click();
@@ -414,9 +400,7 @@ test("project export can be imported with its anchors intact", async ({ page }) 
   await ready(page);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator("#exportToggleBtn").click();
   const downloadPromise = page.waitForEvent("download");
   await page.locator("#exportProject").click();
@@ -439,9 +423,7 @@ test("Share view copies the selected public permalink", async ({ page, context }
   await ready(page);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator("#copyPermalink").click();
   await expect(page.locator("#copyPermalink")).toHaveAttribute("aria-label", "Copied");
   const copied = new URL(await page.evaluate(() => navigator.clipboard.readText()));
@@ -460,9 +442,7 @@ test("mobile map controls accept taps and sharing falls back when clipboard acce
   await ready(page);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator('[data-mobile-panel="dag"]').last().tap();
   // Fit does nothing until the graph has been drawn, so wait for it rather than racing the render.
   await page.evaluate(async () => {
@@ -514,7 +494,7 @@ test("mobile map controls accept taps and sharing falls back when clipboard acce
   await context.close();
 });
 
-test("mobile map toolbar and footer stay within their panels", async ({ browser }) => {
+test("mobile top bar, map and menu stay on screen", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   try {
@@ -525,48 +505,38 @@ test("mobile map toolbar and footer stay within their panels", async ({ browser 
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
     await expect(page.locator("#dagNetwork")).toBeVisible();
     const layout = await page.evaluate(() => {
-      const header = document.querySelector(".dag-ws-header").getBoundingClientRect();
-      const controls = document.querySelector(".dag-ws-controls");
-      const buttons = [...controls.children].filter(node => getComputedStyle(node).display !== "none")
-        .map(node => node.getBoundingClientRect());
-      const filter = controls.querySelector(".filter-dropdown > summary");
-      const filterBox = filter.getBoundingClientRect();
-      const textBox = filter.querySelector("svg").getBoundingClientRect();
+      const bar = document.querySelector("#taskBar").getBoundingClientRect();
       const shell = document.querySelector(".dag-shell").getBoundingClientRect();
-      const nav = document.querySelector(".mobile-panel-nav").getBoundingClientRect();
       return {
-        top: header.top,
-        taskBottom: document.querySelector("#taskBar").getBoundingClientRect().bottom,
-        overflow: getComputedStyle(document.querySelector(".dag-right-panel")).overflowY,
-        rows: new Set(buttons.map(rect => Math.round(rect.top))).size,
-        inside: buttons.every(rect => rect.left >= header.left - 1 && rect.right <= header.right + 1),
-        filterTextOffset: Math.abs((textBox.top + textBox.bottom) / 2 - (filterBox.top + filterBox.bottom) / 2),
-        footerGap: Math.abs(nav.top - shell.bottom),
+        page: document.documentElement.scrollWidth,
+        barOverflow: document.querySelector("#taskBar").scrollWidth - document.querySelector("#taskBar").clientWidth,
+        shellTop: shell.top, barBottom: bar.bottom, shellBottom: shell.bottom, viewport: window.innerHeight,
       };
     });
-    expect(layout.top).toBeGreaterThanOrEqual(layout.taskBottom - 1);
-    expect(layout.overflow).toBe("hidden");
-    expect(layout.rows).toBeGreaterThan(1);
-    expect(layout.inside).toBe(true);
-    expect(layout.filterTextOffset).toBeLessThan(2);
-    expect(layout.footerGap).toBeLessThan(2);
-    // The Privacy link is on the start page only, so it is not over the map or the footer.
-    await expect(page.locator(".legal-link")).toBeHidden();
+    expect(layout.page).toBeLessThanOrEqual(390);
+    expect(layout.barOverflow).toBe(0);
+    // The map starts under the top bar and fills the rest of the screen.
+    expect(layout.shellTop).toBeGreaterThanOrEqual(layout.barBottom - 1);
+    expect(layout.shellBottom).toBeGreaterThan(layout.viewport - 2);
+    // The diagnostic switch and the other controls sit behind the menu button.
+    await expect(page.locator(".dag-diagnostic-switch")).toBeHidden();
+    await openNav(page, { tap: true });
     await expect(page.locator(".dag-diagnostic-switch")).toBeVisible();
     await expect(page.locator(".filter-dropdown-panel #toggleConfoundersOnly")).toHaveCount(0);
     await expect(page.locator("#toggleConfoundersOnly")).toHaveAttribute("aria-pressed", "true");
+    await openNav(page, { tap: true });
     await page.locator("#toggleCollidersOnly").tap();
     await expect(page.locator("#toggleCollidersOnly")).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#toggleConfoundersOnly")).toHaveAttribute("aria-pressed", "false");
+    await openNav(page, { tap: true });
     await page.locator("#toggleConfoundersOnly").tap();
     await expect(page.locator("#toggleConfoundersOnly")).toHaveAttribute("aria-pressed", "true");
+    await closeNav(page, { tap: true });
     await page.setViewportSize({ width: 320, height: 700 });
-    const narrowFooter = await page.evaluate(() => {
-      const shell = document.querySelector(".dag-shell").getBoundingClientRect();
-      const nav = document.querySelector(".mobile-panel-nav").getBoundingClientRect();
-      return { gap: Math.abs(nav.top - shell.bottom) };
-    });
-    expect(narrowFooter.gap).toBeLessThan(2);
+    const narrow = await page.evaluate(() => ({ page: document.documentElement.scrollWidth,
+      barOverflow: document.querySelector("#taskBar").scrollWidth - document.querySelector("#taskBar").clientWidth }));
+    expect(narrow.page).toBeLessThanOrEqual(320);
+    expect(narrow.barOverflow).toBe(0);
   } finally {
     await context.close();
   }
@@ -581,19 +551,23 @@ test("instrument diagnostics use the same mobile view switch", async ({ browser 
     await ready(page);
     const [iv, dv, instrument] = await page.evaluate(() => window.__dagBuilderState.project.groups
       .filter(group => group.variable_ids?.length).slice(0, 3).map(group => group.group_id));
-    await page.locator(`#ivGroupPicker button[data-group-id="${iv}"]`).tap();
-    await page.locator(`#dvGroupPicker button[data-group-id="${dv}"]`).tap();
-    await page.locator(`#instrumentGroupPicker button[data-group-id="${instrument}"]`).tap();
+    await chooseAnchor(page, "iv", iv, { tap: true });
+    await chooseAnchor(page, "dv", dv, { tap: true });
+    await chooseAnchor(page, "instrument", instrument, { tap: true });
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
+    await openNav(page, { tap: true });
     await expect(page.locator("#toggleConfoundersOnly")).toBeHidden();
     await expect(page.locator("#toggleCollidersOnly")).toBeHidden();
     await expect(page.locator("#toggleExclusionViolations")).toBeVisible();
     await expect(page.locator("#toggleExogeneity")).toBeVisible();
+    await openNav(page, { tap: true });
     await page.locator("#toggleExogeneity").tap();
     await expect(page.locator("#toggleExogeneity")).toHaveAttribute("aria-pressed", "true");
+    await openNav(page, { tap: true });
     await page.locator("#toggleExclusionViolations").tap();
     await expect(page.locator("#toggleExclusionViolations")).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#toggleExogeneity")).toHaveAttribute("aria-pressed", "false");
+    await openNav(page, { tap: true });
     const switchBox = await page.locator(".dag-diagnostic-switch").boundingBox();
     expect(switchBox.x).toBeGreaterThanOrEqual(0);
     expect(switchBox.x + switchBox.width).toBeLessThanOrEqual(390);
@@ -612,9 +586,7 @@ test("bibliography, Markdown, and LaTeX export controls produce downloads", asyn
   await ready(page);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator("#exportToggleBtn").click();
   for (const [button, filename] of [
     ["#exportBib", "references.bib"],

@@ -1,26 +1,36 @@
-/** Chooses a view from the start page or the task menu. "causes" and "consequences" are the two directions of Exploration. */
+/** On a phone the top bar's controls sit behind a hamburger button; elsewhere this does nothing. */
+async function openNav(page, { tap = false } = {}) {
+  const toggle = page.locator("#navToggle");
+  if (!(await toggle.isVisible())) return;
+  if ((await toggle.getAttribute("aria-expanded")) === "true") return;
+  await (tap ? toggle.tap() : toggle.click());
+}
+
+async function closeNav(page, { tap = false } = {}) {
+  const toggle = page.locator("#navToggle");
+  if (!(await toggle.isVisible())) return;
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") return;
+  await (tap ? toggle.tap() : toggle.click());
+}
+
+/** Chooses a view from the task menu. "causes" and "consequences" are the two directions of Exploration. */
 async function chooseTask(page, task, { tap = false } = {}) {
   const press = locator => (tap ? locator.tap() : locator.click());
   const exploring = task === "causes" || task === "consequences";
   const target = exploring ? "explore" : task;
-  if (await page.locator("#taskLanding").isVisible()) {
-    await press(page.locator(`#taskLanding .task-choice[data-task=${target}]`));
-  } else {
-    if (!(await page.locator("#taskMenu").evaluate(menu => menu.open))) await press(page.locator("#taskMenuToggle"));
-    await press(page.locator(`#taskMenu .task-tab[data-task=${target}]`));
-  }
+  await openNav(page, { tap });
+  if (!(await page.locator("#taskMenu").evaluate(menu => menu.open))) await press(page.locator("#taskMenuToggle"));
+  await press(page.locator(`#taskMenu .task-tab[data-task=${target}]`));
   if (exploring) await chooseDirection(page, task, { tap });
+  await closeNav(page, { tap });
 }
 
 async function chooseDirection(page, direction, { tap = false } = {}) {
   const button = page.locator(`#exploreDirection button[data-direction=${direction}]`);
   if ((await button.getAttribute("aria-pressed")) === "true") return;
-  // On a phone the direction toggle sits in the map's panel; go there and come back.
-  const before = await page.evaluate(() => document.body.dataset.mobilePanel || null);
-  const moved = !(await button.isVisible());
-  if (moved) await showPanel(page, "dag", { tap });
+  await openNav(page, { tap });
   await (tap ? button.tap() : button.click());
-  if (moved && before) await showPanel(page, before, { tap });
+  await closeNav(page, { tap });
 }
 
 /** Shows a phone panel ("controls" or "dag"); a no-op where there are no panel tabs. */
@@ -38,4 +48,4 @@ async function chooseFocus(page, groupId, { tap = false } = {}) {
   await (tap ? option.tap() : option.click());
 }
 
-module.exports = { chooseTask, chooseDirection, chooseFocus };
+module.exports = { openNav, closeNav, chooseTask, chooseDirection, showPanel, chooseFocus };
