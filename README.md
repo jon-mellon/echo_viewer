@@ -72,14 +72,15 @@ python3 -m http.server --directory site
 
 ### Browse published user splits
 
-The **Browse user splits** choice lists approved splits for the selected source
+The **Browse user splits** choice lists public splits for the selected source
 category or categories. The index stores a name, description, source IDs, and
 an immutable Storage pointer; it does not copy variable assignments. Choosing
 a split loads its one membership file and opens an editable draft. Source
 assignments must still match the current schema. New and edited split
 descriptions must contain at least 20 characters.
 
-To enable browsing in Supabase, apply
+Cloudflare pages read the public Worker index, which includes splits from every
+finished Cloudflare publication. To enable browsing in Supabase, apply
 `supabase/migrations/202610150001_public_split_index.sql`. The scan and Jev
 quality checker live in `harvest_abstracts/analysis/10k/echo_viewer_bundle/`
 on the `junk_causal` branch. Run its `index_published_splits.py` with
