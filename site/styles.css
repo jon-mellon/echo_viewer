@@ -3264,7 +3264,6 @@ h2 {
   font-size: var(--text-md);
   line-height: var(--leading-body);
 }
-.task-choice-go { margin-top: auto; padding-top: var(--space-2); color: var(--accent); font-size: var(--text-md); font-weight: var(--weight-medium); }
 .task-choice:hover { border-color: var(--accent); box-shadow: var(--shadow-sm); }
 .task-choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 720px) {
