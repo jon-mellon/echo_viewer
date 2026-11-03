@@ -9,7 +9,7 @@ export function createDagEventController({
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, applyProjectOperation,
   saveProjectLocally, applyActiveGroupingSet, rebuildProject, updateDagFilters, exportGroupingFolder,
-  copyPermalink, loadDagData, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber,
+  copyPermalink, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber,
   undo, redo, renderActionHistory, renderDag, setFullscreenPanel,
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,
   exportTex, installDagHandlers, initPanelResizers, takeSnapshot,

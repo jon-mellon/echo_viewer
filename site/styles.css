@@ -3188,9 +3188,9 @@ h2 {
   /* Phones have no full screen DAG. */
   .dag-overlay-controls .fullscreen-toggle { display: none; }
 }
-.dag-workspace:has(#dagViewTable.active) #dagSvgZoomIn,
-.dag-workspace:has(#dagViewTable.active) #dagSvgZoomOut,
-.dag-workspace:has(#dagViewTable.active) #dagSvgFit {
+.dag-body:has(#dagViewTable.active) #dagSvgZoomIn,
+.dag-body:has(#dagViewTable.active) #dagSvgZoomOut,
+.dag-body:has(#dagViewTable.active) #dagSvgFit {
   display: none;
 }
 .dag-table-view {

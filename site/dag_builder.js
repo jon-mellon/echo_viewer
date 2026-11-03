@@ -2181,7 +2181,7 @@ const eventController = createDagEventController({
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
   renderGroupSeedSearch, renderRejectedVariablesPanel, applyProjectOperation,
   saveProjectLocally, applyActiveGroupingSet, rebuildProject, updateDagFilters, exportGroupingFolder,
-  copyPermalink, toggleFullscreenPanel, renderMapToolbarToggles,
+  copyPermalink, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber,
   undo, redo, renderActionHistory, renderDag, setFullscreenPanel,
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,
   exportTex, installDagHandlers, initPanelResizers, takeSnapshot,
