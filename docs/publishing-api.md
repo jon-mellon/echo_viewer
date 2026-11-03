@@ -31,4 +31,6 @@ rate limited, `507` storage full).
   in local storage.
 - **Split discovery.** Every visitor can browse user splits from finished public schemas. The Worker indexes a new
   Cloudflare split when its publication finishes and keeps only metadata and a pointer to its immutable membership file.
+- **Owner lookup.** The authenticated publication listing remains available to the client for future owner-specific features;
+  public split browsing does not call it.
 - **Integrity** is checked by the viewer when it reads: file bytes against the row's `content_hash`.
