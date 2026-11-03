@@ -67,8 +67,8 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
       elements.diagnosticOverlapKey.classList.toggle("confounder-key", !state.showExclusionViolations && state.showCollidersOnly);
       const keyItem = (swatchClass, label) => h("span", { className: "diagnostic-key-item" },
         h("span", { className: `diagnostic-key-swatch ${swatchClass}`, attrs: { "aria-hidden": "true" } }), label);
-      const anchorItems = [keyItem("diagnostic-key-iv", "Independent variable"),
-        keyItem("diagnostic-key-dv", "Dependent variable")];
+      const anchorItems = [keyItem("diagnostic-key-iv", "Cause"),
+        keyItem("diagnostic-key-dv", "Outcome")];
       replaceChildren(elements.diagnosticOverlapKey, state.showExogeneity
         ? [...anchorItems, keyItem("diagnostic-key-instrument", "Instrument"),
           keyItem("diagnostic-key-cause", "Potential common cause"),
