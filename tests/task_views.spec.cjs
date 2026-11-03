@@ -695,7 +695,9 @@ test("links the view implies beyond the paths are listed too, as many as the gra
   if ((await pathOnly.getAttribute("aria-pressed")) !== "true") await pathOnly.click();
   await page.locator("#dagViewTable").click();
   await expect(page.locator("#dagPathsTable tbody tr:not(.dag-table-section)").first()).toBeVisible();
-  expect(await tabled()).toEqual(await drawnLinks());
+  // The table is built a screenful at a time, so wait for the last rows.
+  const drawnNow = await drawnLinks();
+  await expect.poll(tabled).toEqual(drawnNow);
   await expect(page.locator("#dagOtherLinksTable")).toHaveCount(0);
   // With "Path links only" off the graph also draws links no confounder path uses; the table lists them after the paths.
   // Choosing the Table view closed the Filters dropdown; reopen it for the toggle.
