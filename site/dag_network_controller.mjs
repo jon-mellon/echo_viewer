@@ -3,6 +3,7 @@ import { computeDagRender, reuseDagGeometry } from "./dag_render_compute.mjs";
 import { routesToVisData } from "./dag_vis_routing.mjs";
 import { attachDagInteractions } from "./dag_interactions.mjs";
 import * as dagDisplay from "./dag_display.mjs";
+import { OKABE_ITO, softEdge } from "./dag_display.mjs";
 import * as workflow from "./dag_workflow.mjs";
 import * as dagPathHighlights from "./dag_path_highlights.mjs";
 import { STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "./dag_inspector_controller.mjs";
@@ -25,7 +26,7 @@ export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId
 
 export function applyLogicalEdgeHover(edges, visEdges) {
   if (!edges.length) return;
-  const hoverColor = "#9a5a0a";
+  const hoverColor = OKABE_ITO.orange;
   visEdges.update(edges.map(edge => ({
     id: edge.id,
     color: {
@@ -36,7 +37,7 @@ export function applyLogicalEdgeHover(edges, visEdges) {
       opacity: 1,
     },
     width: Math.max(3.4, Number(edge.width || 1) + 2.2),
-    shadow: { enabled: true, color: "rgba(154,90,10,0.32)", size: 7, x: 0, y: 0 },
+    shadow: { enabled: true, color: "rgba(230,159,0,0.35)", size: 7, x: 0, y: 0 },
   })));
 }
 
@@ -142,7 +143,7 @@ function visNetworkOptions(p = {}) {
       width: edgeWidth,
       selectionWidth: 3.5,
       arrows: { to: { enabled: true, scaleFactor: Math.max(0.45, 0.7 * (fontSize / 14)) } },
-      color: { color: "#7ba096", highlight: "#b83b5e", hover: "#805214", inherit: false, opacity: 0.48 },
+      color: { color: softEdge(OKABE_ITO.sky, 0.6), highlight: OKABE_ITO.vermillion, hover: OKABE_ITO.orange, inherit: false, opacity: 1 },
     },
   };
 }
@@ -314,6 +315,28 @@ function dagVisibleGroups() {
     && isDagDisplayGroup(group));
 }
 
+// vis draws each routed segment with butt caps, leaving a notch at every bend;
+// a round dab of the segment's own colour closes it.
+function drawRouteJoins(context) {
+  if (!_visEdges || !_visNodes) return;
+  context.save();
+  for (const [segmentId] of _dagEdgeSegments) {
+    const match = /::seg(\d+)$/.exec(segmentId);
+    if (!match || match[1] === "0") continue;
+    const edge = _visEdges.get(segmentId);
+    const bend = edge && _visNodes.get(edge.from);
+    if (!bend || !String(bend.id).startsWith("__route__")) continue;
+    const opacity = edge.color?.opacity ?? 1;
+    if (opacity <= 0) continue;
+    context.globalAlpha = opacity;
+    context.fillStyle = edge.color?.color || "#999999";
+    context.beginPath();
+    context.arc(bend.x, bend.y, Math.max(0.5, Number(edge.width || 1) / 2), 0, Math.PI * 2);
+    context.fill();
+  }
+  context.restore();
+}
+
 function drawConfounderPathLanes(context) {
   if (!_dagPathLaneSegments.length || !_visNetwork) return;
   const scale = Math.max(0.01, _visNetwork.getScale());
@@ -395,7 +418,7 @@ function hoverExploreRow(row) {
   const node = _visNodes?.get(row.groupId);
   if (!node) return;
   _exploreRowHoverNode = { id: node.id, shadow: node.shadow || false };
-  _visNodes.update({ id: node.id, shadow: { enabled: true, color: "rgba(154,90,10,0.45)", size: 12, x: 0, y: 0 } });
+  _visNodes.update({ id: node.id, shadow: { enabled: true, color: "rgba(230,159,0,0.5)", size: 12, x: 0, y: 0 } });
 }
 
 function highlightConnectedDagEdges(nodeId) {
@@ -835,6 +858,7 @@ function attachDagNetworkHandlers(network) {
     minimumScale: minimumDagScale,
     contentBounds: () => dagBounds()?.contentBounds || null,
     drawPathLanes: drawConfounderPathLanes,
+    drawRouteJoins,
     highlightEdge: highlightLogicalDagEdge,
     highlightNodeEdges: highlightConnectedDagEdges,
     onNodeHover: id => { if (exploring()) onNodeHover(id); },

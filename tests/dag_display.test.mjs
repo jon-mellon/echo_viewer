@@ -27,6 +27,8 @@ test("display records preserve node roles, selection, edge styles and descriptio
   });
   vm.runInContext(readFileSync(new URL("./fixtures/legacy_dag_display.js", import.meta.url), "utf8"), legacy);
   const plain = value => JSON.parse(JSON.stringify(value));
+  // Colours, fonts, hover behaviour and shadows are restyled; geometry and text are not.
+  const geometry = ({ color, font, chosen, shadow, ...rest }) => rest;
   const before = structuredClone(groups);
   for (const mode of ["normal", "confounder", "collider"]) for (const selected of [null, "candidate", "iv"]) {
     state.showCollidersOnly = mode === "collider";
@@ -36,8 +38,10 @@ test("display records preserve node roles, selection, edge styles and descriptio
     if (mode === "confounder") view.colliderGroupIds = new Set();
     if (mode === "collider") view.confounderGroupIds = new Set();
     for (const group of groups) for (const width of [160, 220]) for (const point of [undefined, { x: 20, y: -10 }]) {
-      assert.deepEqual(plain(display.visNodeData(group, point, { nodeMaxWidth: width }, view)),
-        plain(legacy.visNodeData(group, point, { nodeMaxWidth: width })));
+      const node = display.visNodeData(group, point, { nodeMaxWidth: width }, view);
+      assert.deepEqual(plain(geometry(node)), plain(geometry(legacy.visNodeData(group, point, { nodeMaxWidth: width }))));
+      assert.equal(node.chosen.label, false);
+      assert.equal(typeof node.chosen.node, "function");
     }
   }
   for (const direction_type of ["A_TO_B", "B_TO_A", "BIDIRECTIONAL"]) {
@@ -48,7 +52,11 @@ test("display records preserve node roles, selection, edge styles and descriptio
         a_to_b_paper_table_keys: ["p1", "p2"], b_to_a_paper_table_keys: ["p2"] };
       for (const selected of [null, "edge"]) {
         state.selectedEdgeId = selected;
-        assert.deepEqual(plain(display.edgeVisualData(link, selected)), plain(legacy.edgeVisualData(link)));
+        const visual = display.edgeVisualData(link, selected);
+        const old = legacy.edgeVisualData(link);
+        assert.equal(visual.width, old.width);
+        assert.equal(visual.dashes, old.dashes);
+        assert.equal(visual.color.opacity, 1);
       }
       const hover = display.edgeHoverText(link, groups);
       assert.match(hover, /Supporting tests: 3$/);
@@ -104,9 +112,9 @@ test("exogeneity colors common causes while keeping the three study anchors", ()
   const mediator = display.visNodeData(group("via"), null, {}, view);
   const instrument = display.visNodeData(group("z"), null, {}, view);
   const iv = display.visNodeData(group("iv", "iv"), null, {}, view);
-  assert.equal(candidate.color.background, "#c62828");
-  assert.equal(mediator.color.background, "#6b7280");
-  assert.equal(instrument.color.background, "#166534");
+  assert.equal(candidate.color.background, "#D55E00");
+  assert.equal(mediator.color.background, "#999999");
+  assert.equal(instrument.color.background, "#009E73");
   assert.equal(iv.color.background, "#123456");
   assert.equal(instrument.shape, "ellipse");
 });
@@ -127,11 +135,27 @@ test("overlapping diagnostic roles retain the opposite role outline", () => {
   const group = { group_id: "both", label: "Both", variable_ids: [] };
   const base = { confounderGroupIds: new Set(["both"]), colliderGroupIds: new Set(["both"]),
     confounderPathGroupIds: new Set(), colliderPathGroupIds: new Set(), groupColor: "#123456" };
-  for (const [mode, color] of [["showConfoundersOnly", "#801744"], ["showCollidersOnly", "#c62828"]]) {
+  for (const [mode, color] of [["showConfoundersOnly", "#CC79A7"], ["showCollidersOnly", "#D55E00"]]) {
     const node = display.visNodeData(group, null, {}, { ...base, [mode]: true, activeGroupId: "both" });
     assert.equal(node.color.border, color);
     assert.equal(node.color.highlight.border, color);
     assert.equal(node.color.hover.border, color);
     assert.equal(node.borderWidth, 4);
   }
+});
+
+test("hovering a node recolours its border without changing its size", () => {
+  const values = { borderWidth: 2.4, borderColor: "#fbfcfa", color: "#0072B2" };
+  display.chosenNodeHover(values, "n", false, true);
+  assert.equal(values.borderWidth, 2.4);
+  assert.equal(values.borderColor, "#0072B2");
+  assert.notEqual(values.color, "#0072B2");
+  const selected = { borderWidth: 3, borderColor: "#E69F00", color: "#0072B2" };
+  display.chosenNodeHover(selected, "n", true, true);
+  assert.equal(selected.borderColor, "#E69F00");
+});
+
+test("labels break at slashes as well as spaces", () => {
+  assert.equal(wrapDagLabel("Alpha/Beta gamma", 8), "Alpha /\nBeta\ngamma");
+  assert.equal(wrapDagLabel("Income / wealth", 40), "Income / wealth");
 });

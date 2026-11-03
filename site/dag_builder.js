@@ -56,20 +56,27 @@ const ROLE_LABELS = {
 };
 
 const GROUP_COLORS = {
-  iv: "#315f9d",
-  dv: "#9b5c2e",
-  assigned: "#1f7a67",
-  active: "#b83b5e",
+  iv: "#0072B2",
+  dv: "#D55E00",
+  assigned: "#009E73",
+  active: "#E69F00",
 };
 
-// Distinct colors for groups (Ind var and Dep var use GROUP_COLORS above).
-const GROUP_PALETTE = [
-  "#0f766e", "#9f1239", "#1d4ed8", "#b45309", "#4d7c0f",
-  "#176b80", "#be123c", "#0369a1", "#92400e", "#047857",
-  "#4338ca", "#c2410c", "#166534", "#a21caf", "#7e22ce",
-  "#b91c1c", "#1e40af", "#a16207", "#065f46", "#6d28d9",
-  "#0ea5e9", "#ca8a04", "#15803d", "#db2777",
-];
+// Distinct colors for groups (Ind var and Dep var use GROUP_COLORS above):
+// the Okabe-Ito hues, then deeper and lighter variants of each.
+const GROUP_PALETTE = (() => {
+  const base = ["#009E73", "#CC79A7", "#56B4E9", "#E69F00", "#0072B2", "#D55E00", "#999999"];
+  const mix = (hex, target, t) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = shift => {
+      const from = (n >> shift) & 255;
+      const to = (parseInt(target.slice(1), 16) >> shift) & 255;
+      return Math.round(from + (to - from) * t).toString(16).padStart(2, "0");
+    };
+    return `#${ch(16)}${ch(8)}${ch(0)}`;
+  };
+  return [...base, ...base.map(c => mix(c, "#000000", 0.35)), ...base.map(c => mix(c, "#ffffff", 0.3))];
+})();
 
 // The current interface has one canonical entry point at the site root.
 const state = createDagAppState("dag2");
