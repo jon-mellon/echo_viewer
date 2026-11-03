@@ -121,7 +121,6 @@
       <!-- On narrow screens: switch between the panels of the current task. -->
       <nav class="mobile-panel-nav" aria-label="Panels in current task">
         <button class="mobile-panel-tab active" type="button" data-mobile-panel="controls" aria-pressed="true">Setup view</button>
-        <button class="mobile-panel-tab mobile-variable-tab" type="button" data-mobile-panel="variables" aria-pressed="false">Variables view</button>
         <button class="mobile-panel-tab" type="button" data-mobile-panel="dag" aria-pressed="false">Map view</button>
       </nav>
       <button id="navToggle" class="btn btn--icon nav-toggle" type="button" aria-label="Menu" title="Menu" aria-expanded="false" aria-controls="taskBarOverflow"><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
@@ -494,42 +493,11 @@
         </form>
       </dialog>
 
-      <!-- Drag handle between left panel and map -->
+      <!-- Drag handle between the left panel and the main area -->
       <div id="leftResizer" class="panel-resizer"></div>
 
-      <!-- CENTER: Semantic variable map -->
-      <section class="dag-map-panel">
-        <div class="map-toolbar dag-map-toolbar">
-          <button id="dagZoomIn" class="btn btn--icon" type="button" title="Zoom in">+</button>
-          <button id="dagZoomOut" class="btn btn--icon" type="button" title="Zoom out">−</button>
-          <button id="dagFitView" class="btn" type="button" title="Fit the central 95% of variables; pan or zoom out to reach distant variables">Fit 95%</button>
-          <button id="dagFitAll" class="btn" type="button" title="Fit every variable, including distant outliers">Fit all</button>
-          <button id="toggleVariableLabels" class="btn active" type="button" aria-pressed="true" title="Toggle variable labels across the whole map">Labels</button>
-          <button id="toggleGroupLabels" class="btn active" type="button" aria-pressed="true" title="Toggle group region labels across the whole map">Groups</button>
-          <div class="toolbar-sep"></div>
-          <button id="dagSelectMode" class="btn active" type="button" aria-pressed="true" title="Inspect variables — click to select, no edits">Inspect</button>
-          <button id="dagBrushMode" class="btn" type="button" aria-pressed="false" title="Draw a boundary to add variables to the active group">Draw +</button>
-          <button id="dagEraseMode" class="btn" type="button" aria-pressed="false" title="Draw a boundary to remove variables from the active group">Draw −</button>
-          <span id="selectionCount" class="badge muted selection-count" hidden>0 selected</span>
-          <div class="toolbar-sep"></div>
-          <button id="fullscreenVariableMap" class="btn fullscreen-toggle" type="button" aria-pressed="false" title="Expand the variable viewer to fill the window; press Escape to exit">Full screen map</button>
-        </div>
-        <div class="map-toolbar variable-layout-control">
-          <label for="variableLayoutSelect">Variable layout</label>
-          <select id="variableLayoutSelect" class="select-input-sm" aria-label="Variable map layout" title="Change the variable embedding layout"></select>
-          <span id="variableAssignmentCounts" class="assignment-coverage" aria-live="polite"></span>
-        </div>
-        <div id="definitionMapPreviewStatus" class="definition-map-preview-status" hidden></div>
-        <canvas id="dagMapCanvas"></canvas>
-        <div class="mobile-definition-map-hint">Tap a point to add or remove it. Use Draw + or Draw − to circle several. Drag in Inspect to move; pinch to zoom.</div>
-        <div id="dagMapLabels" class="dag-map-labels"></div>
-        <div id="dagMapTooltip" class="tooltip" hidden></div>
-        <div id="dagMapContextMenu" class="map-context-menu" hidden></div>
-      </section>
-
-      <!-- Drag handle between map and right panel -->
       <!-- Creating a variable: on a wide screen the creation steps move here and
-           take the map's place (see placeDefinitionBlock in dag_shell_controller). -->
+           take the main area's place (see placeDefinitionBlock in dag_shell_controller). -->
       <section id="definitionWorkspace" class="definition-workspace" aria-label="Custom variables">
         <!-- Custom variables: replaces the graph while open (see custom_variables_presenter). -->
         <div id="customVariablesView" class="custom-variables-view" hidden>

@@ -7,10 +7,10 @@ import { hydrateSearchResult } from "./variable_search_catalog.mjs";
 
 export function createDagGroupEditorController({
   state, elements: els, applyProjectOperation, groupById, takeSnapshot,
-  expandToClusterMembers, nowIso, clean, setMapMode, fitNeighborhood, fitMap,
+  expandToClusterMembers, nowIso, clean,
   addToUndoHistory, renderAll, addDecision, setWorkflowMode, groupedVariableIds,
   searchVariables, clusterMemberIds, rejectedVariableIdSet, uoaMatches,
-  fitSearchContext, applyActiveGroupingSet, rebuildProject, createDensityCandidateGroup,
+  applyActiveGroupingSet, rebuildProject,
   escapeHtml, truncate, hydrateVariableDetails = async () => {}, onAnchorsReady = () => {},
   beginEditor = () => {},
 }) {
@@ -46,8 +46,6 @@ function beginTargetGroup(side) {
   });
   resolveGroupMembershipConflicts(group);
   Object.assign(state, workflow.transition(state, { type: "open-editor", groupId, side }));
-  setMapMode("select");
-  fitNeighborhood(seeds);
   addToUndoHistory("Create target group", before);
   renderAll();
 }
@@ -65,8 +63,6 @@ function assignGroupAsAnchor(side, sourceGroupId) {
   const currentGroupId = side === "dv" ? state.project.dv_group_id : state.project.iv_group_id;
   if (sourceGroupId === currentGroupId) {
     Object.assign(state, workflow.transition(state, { type: "anchor-selected", side, groupId: sourceGroupId, alreadyCurrent: true }));
-    setMapMode("select");
-    fitMap(source.variable_ids);
     renderAll({ rebuild: false });
     notifyWhenAnchorsReady();
     return;
@@ -76,10 +72,8 @@ function assignGroupAsAnchor(side, sourceGroupId) {
   const label = clean(source.label) || (side === "dv" ? "Dependent variable" : "Independent variable");
   if (!promoteGroupToAnchor(side, sourceGroupId)) return;
   Object.assign(state, workflow.transition(state, { type: "anchor-selected", side, groupId: sourceGroupId }));
-  setMapMode("select");
   addDecision(`group_promoted_to_${side}`, { source_group_id: sourceGroupId, target_group_id: sourceGroupId });
   addToUndoHistory(`Use "${label}" as ${side.toUpperCase()}`, before, "anchors");
-  fitMap(variableIds);
   // Anchor roles do not change group membership or aggregated evidence links.
   renderAll({ reuseLinks: true, reuseDagGeometry: true });
   notifyWhenAnchorsReady();
@@ -119,7 +113,6 @@ function createCustomGroup() {
     updated_at: nowIso(),
   });
   Object.assign(state, workflow.transition(state, { type: "open-editor", groupId }));
-  setMapMode("select");
   addToUndoHistory("Create group", before);
   if (state.workflowMode === "setup") setWorkflowMode("group_review");
   renderAll();
@@ -128,7 +121,6 @@ function createCustomGroup() {
 
 function closeGroupEditor() {
   Object.assign(state, workflow.transition(state, { type: "close-editor" }));
-  setMapMode("select");
   renderAll({ rebuild: false, refreshView: true });
 }
 
@@ -208,7 +200,6 @@ function renderGroupSeedSearch() {
       }
       els.groupSeedInput.value = "";
       renderAll();
-      fitNeighborhood([btn.dataset.variableId]);
     });
   });
 }
@@ -306,10 +297,8 @@ function selectActiveAnchor() {
   Object.assign(state, workflow.transition(state, {
     type: "anchor-selected", side, groupId: group.group_id, fromEditor: true,
   }));
-  setMapMode("select");
   if (state.phase === "select_iv") {
     els.ivInput.focus();
-    if (state.searchMatches.iv.length) fitSearchContext("iv");
   }
   addDecision("anchor_selected", { group_id: group.group_id, variable_ids: group.variable_ids.slice() });
   addToUndoHistory(`Use "${group.label}" as ${group.type.toUpperCase()}`, before);
@@ -339,15 +328,6 @@ function finishSchemaChoice(loadSchema) {
     const firstCandidate = state.candidateQueue[0];
     if (firstCandidate) {
       Object.assign(state, workflow.transition(state, { type: "focus-group", groupId: firstCandidate.group_id }));
-      fitMap(groupById(firstCandidate.group_id)?.variable_ids || []);
-    }
-  } else {
-    beginEditor();
-    const group = createDensityCandidateGroup();
-    if (group) {
-      Object.assign(state, workflow.transition(state, { type: "open-editor", groupId: group.group_id }));
-      setMapMode("select");
-      fitMap(group.variable_ids);
     }
   }
   renderAll();

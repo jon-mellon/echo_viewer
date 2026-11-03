@@ -4,10 +4,10 @@ import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
 import { browsePublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
-  invalidateMapCaches, renderAll, drawMap = () => {}, renderAssignmentCoverage = () => {}, setMapMode, fitMap, groupById, persistProjectLocally, getReturnUrl = () => location.href,
+  invalidateVisibleCaches, renderAll, groupById, persistProjectLocally, getReturnUrl = () => location.href,
   visibleVariables, searchVariables, searchSourceGroups = groups => groups.map((group, index) => ({ group, index, variableMatch: "" })),
   clusterDisplayVariable, expandToClusterMembers, nowIso,
-  applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
+  applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate,
   hydrateVariableDetails = async () => {},
   prewarmEvidence = async () => {}, commitSchema = async () => {},
   onCommitFailureRestored = () => {}, onInstrumentReady = () => {}, onFocusDefined = null }) {
@@ -58,8 +58,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       draft.published_split = { publication_id: row.publication_id, group_id: row.group_id };
       state.selectedVariableIds = new Set(draft.new_variable_ids);
       persistProjectLocally();
-      invalidateMapCaches();
-      renderDraft({ redrawMap: true });
+      invalidateVisibleCaches();
+      renderDraft();
     } catch (error) {
       if (state.definitionDraft === draft) {
         browseState.error = `Could not use this split: ${error.message || error}`;
@@ -68,13 +68,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       }
     }
   }
-  const renderDraft = ({ redrawMap = false } = {}) => {
-    // Definition steps change selection and map contents, not the project DAG.
+  const renderDraft = () => {
+    // Definition steps change the draft, not the project DAG.
     // The DAG is hidden until cancel/save, where a full render is performed.
     renderAll({ rebuild: false });
-    renderAssignmentCoverage();
     jevAssist.render();
-    if (redrawMap) drawMap();
   };
 
   function startDefinition(role) {
@@ -95,7 +93,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       ai_description: "", residual_labels: {}, reviewed_variable_ids: [],
     };
     state.selectedVariableIds.clear();
-    invalidateMapCaches();
+    invalidateVisibleCaches();
     renderDraft();
     els.definitionNewLabel.focus();
     void renderSavedRuns();
@@ -127,10 +125,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     };
     state.activeGroupId = null;
     state.selectedVariableIds = new Set(state.definitionDraft.new_variable_ids);
-    invalidateMapCaches();
-    setMapMode("select");
+    invalidateVisibleCaches();
     renderDraft();
-    fitMap(eligible);
     try {
       await hydrateVariableDetails(eligible, { skipNeighbors: true });
     } catch (error) {
@@ -140,9 +136,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     }
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     draft.details_loading = false;
-    invalidateMapCaches();
-    renderDraft({ redrawMap: true });
-    fitMap(eligible);
+    invalidateVisibleCaches();
+    renderDraft();
   }
 
   function cancelDefinition() {
@@ -152,8 +147,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.definitionDraft = null;
     state.selectedVariableIds.clear();
     state.selectedVariableId = null;
-    invalidateMapCaches();
-    setMapMode("select");
+    invalidateVisibleCaches();
     renderAll({ rebuild: false, refreshView: true });
   }
 
@@ -193,10 +187,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     draft.details_loading = false;
     draft.step = "partition";
-    invalidateMapCaches();
-    setMapMode("select");
+    invalidateVisibleCaches();
     renderDraft();
-    fitMap(draft.eligible_variable_ids);
   }
 
   function definitionResidualIds(source) {
@@ -268,8 +260,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     }
     draft.step = step;
     persistProjectLocally();
-    invalidateMapCaches();
-    renderDraft({ redrawMap: step === "partition" });
+    invalidateVisibleCaches();
+    renderDraft();
     if (step === "sources") void refreshBrowse();
     if (step === "describe") els.definitionNewLabel.focus();
   }
@@ -340,11 +332,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         state.workflowMode = state.phase === "build" ? "group_review" : "setup";
       }
       state.changingAnchorSide = null;
-      invalidateMapCaches();
+      invalidateVisibleCaches();
       addToUndoHistory(draft.mode === "edit" ? `Updated split "${draft.new_label}"`
         : draft.role === "candidate" ? `Defined variable "${draft.new_label}"`
           : `Defined "${draft.new_label}" as ${draft.role.toUpperCase()}`, before);
-      setMapMode("select");
       renderAll();
       if (forFocus) onFocusDefined(newGroupId);
       if (draft.role === "instrument") onInstrumentReady();
@@ -354,8 +345,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       state.compiledDagUpdating = false;
       state.project = previousProject;
       onCommitFailureRestored();
-      invalidateMapCaches();
-      renderDraft({ redrawMap: true });
+      invalidateVisibleCaches();
+      renderDraft();
       showSaveError(error);
     }
   }
@@ -409,10 +400,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (draft.step === "sources") { renderDraft(); return; }
     try { await hydrateVariableDetails(draft.eligible_variable_ids); }
     catch (error) { console.warn("Could not reload all split variable details.", error); }
-    invalidateMapCaches();
-    setMapMode("select");
+    invalidateVisibleCaches();
     renderDraft();
-    fitMap(draft.eligible_variable_ids);
     try { await jevAssist.restoreForDraft({ force: true }); }
     catch (error) { console.warn("Could not restore saved Jev progress.", error); }
   }
@@ -468,7 +457,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state, elements: els, normalized, clusterRep, truncate, definitionSources,
     definitionResidualIds, definitionCanReview, searchVariables, searchSourceGroups, visibleVariables,
     clusterDisplayVariable,
-    resizeMap, fitMap, onSourceSelection: setSourceSelection, onResidualLabel: setResidualLabel,
+    onSourceSelection: setSourceSelection, onResidualLabel: setResidualLabel,
     onCancel: cancelDefinition,
     browseState, onChoosePublishedSplit: choosePublishedSplit,
   });
@@ -478,13 +467,6 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     getVariable: id => clusterDisplayVariable(id) || state.variableById.get(id),
     persistDraft: persistProjectLocally, getReturnUrl,
     onConnectionChange: ready => { state.definitionAiReady = ready; if (state.project && state.definitionDraft) renderDraft(); },
-    onPreviewChange: (ids, mode) => {
-      state.definitionAiPreviewIds = ids ? new Set(ids) : null;
-      presenter.setJevPreviewStatus(ids, mode);
-      // The positions and visible variables are unchanged; only group regions move.
-      if (state.map) state.map._groupRegions = null;
-      drawMap();
-    },
     onApply: ids => {
       const draft = state.definitionDraft;
       if (!draft || draft.step !== "partition") return;
@@ -492,9 +474,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
       state.selectedVariableIds = new Set(ids);
       // The suggestions land in the included list, where they can be checked and saved.
-      invalidateMapCaches();
+      invalidateVisibleCaches();
       persistProjectLocally();
-      renderDraft({ redrawMap: true });
+      renderDraft();
     },
   });
 
