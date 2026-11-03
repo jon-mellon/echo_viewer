@@ -300,16 +300,17 @@
               <p class="small-note definition-explainer">Pick every variable the new one should take concepts from. Then name and define it, and choose the exact concepts.</p>
               <label class="dag-label" for="definitionSourceSearch">Search variables</label>
               <input id="definitionSourceSearch" class="search-input" type="search" placeholder="Search variables or the concepts in them">
-              <div id="definitionSourceList" class="setup-group-picker-list"></div>
               <div id="definitionBrowsePanel" hidden>
                 <h3>Previous published splits from these variables</h3>
                 <p id="definitionBrowseStatus" class="small-note" role="status"></p>
                 <div id="definitionBrowseResults" class="definition-browse-results"></div>
               </div>
+              <div id="definitionSourceList" class="setup-group-picker-list"></div>
               <div id="definitionSourceLoadStatus" class="small-note" role="alert" hidden></div>
               <div id="definitionResumeList" class="definition-resume-list" hidden></div>
               <div class="mini-toolbar">
                 <button id="definitionCancel" class="btn definition-cancel" type="button">Cancel</button>
+                <button id="definitionBrowseJump" class="btn" type="button" hidden disabled></button>
                 <button id="definitionContinue" class="btn btn--primary" type="button" disabled>Next</button>
               </div>
             </div>

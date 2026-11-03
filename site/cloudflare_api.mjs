@@ -55,6 +55,23 @@ export async function getSplits(groupId, { apiUrl = CLOUDFLARE_API_URL, fetchImp
   return (await request(apiUrl, fetchImpl, `/v1/splits?group_id=${encodeURIComponent(groupId)}`)).json();
 }
 
+/** Finished publications belonging to the anonymous owner in this browser. */
+export async function getOwnPublications({ apiUrl = CLOUDFLARE_API_URL,
+  fetchImpl = globalThis.fetch.bind(globalThis), storage = globalThis.localStorage } = {}) {
+  let owner = null;
+  try { owner = parseOwnerToken(storage?.getItem(OWNER_KEY)); } catch { /* storage may be blocked */ }
+  if (!owner) return [];
+  try {
+    return (await request(apiUrl, fetchImpl, "/v1/owners/publications", {
+      headers: { "x-owner-token": owner.token }, cache: "no-store",
+    })).json();
+  } catch (error) {
+    // Older Workers do not have this endpoint. Public approved splits still load while it rolls out.
+    if (error.status === 404) return [];
+    throw error;
+  }
+}
+
 /**
  * Reserves the publication, writes each file (create-only), then registers it.
  * `files` is a Map of path to bytes. Returns the registry row, and whether it already existed.

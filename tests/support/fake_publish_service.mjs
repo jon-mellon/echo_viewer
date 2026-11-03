@@ -36,6 +36,11 @@ export function fakePublishService({ now = () => new Date("2026-11-01T12:00:00Z"
     }
     const owner = await ownerOf(request);
     if (!owner) return error(401, "owner_invalid", "The owner token is not valid.");
+    if (request.method === "GET" && parts[1] === "owners" && parts[2] === "publications" && parts.length === 3) {
+      return json([...rows.values()].filter(row => row.owner_id === owner)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .map(({ id, owner_id, storage_prefix, created_at }) => ({ id, owner_id, storage_prefix, created_at })));
+    }
     if (request.method === "POST" && parts[1] === "publications" && parts.length === 2) {
       const body = await request.json();
       if (!UUID.test(body.publication_id || "") || !body.files?.some(file => file.path === "manifest.json")) return error(400, "bad_request", "Invalid publication.");
