@@ -391,7 +391,14 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   // Saved runs are only offered from Define, never restored at startup, so a
   // preview appears only where its controls do. `adopt` makes the draft current.
+  // Group memberships fill in after startup, and a saved draft is compared against them, so wait for them first.
+  async function whenGroupsHydrated() {
+    const deadline = Date.now() + 60_000;
+    while (state.publishedSchemaHydrating && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
   async function resumeJevDraft(draft, { adopt }) {
+    await whenGroupsHydrated();
     if (!sourcesUnchanged(draft)) return;
     if (adopt) {
       state.definitionDraft = draft;
