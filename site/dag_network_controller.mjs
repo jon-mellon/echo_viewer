@@ -142,6 +142,7 @@ function visNetworkOptions(p = {}) {
       smooth: { type: "cubicBezier", forceDirection: "horizontal", roundness: 0.32 },
       width: edgeWidth,
       selectionWidth: 3.5,
+      arrowStrikethrough: false,
       arrows: { to: { enabled: true, scaleFactor: Math.max(0.45, 0.7 * (fontSize / 14)) } },
       color: { color: PLAIN_EDGE_COLOR, highlight: EDGE_HIGHLIGHT_COLOR, hover: EDGE_HIGHLIGHT_COLOR, inherit: false, opacity: PLAIN_EDGE_OPACITY },
     },
@@ -303,6 +304,8 @@ function routedDagDataFromRoutes(groups, routes, layout) {
       },
       ...edgeVisualData(link),
       smooth: { enabled: false },
+      // End the line at the arrowhead's base so a translucent edge never shows its line through the head.
+      arrowStrikethrough: false,
     }),
     edgeTitle: edgeHoverText,
   });
