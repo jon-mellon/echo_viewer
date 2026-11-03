@@ -31,7 +31,7 @@ test("fullscreen resizes the existing graph", () => {
     const controller = createDagShellController({ state: { fullscreenPanel: null },
       elements: { fullscreenDag: button() },
       renderDag: () => calls.push("rebuild"),
-      getNetwork: () => ({ setSize: (...size) => calls.push(size), fit: () => calls.push("fit-dag") }),
+      getNetwork: () => ({ setSize: (...size) => calls.push(size), fit: () => calls.push("fit-dag"), getScale: () => 1 }),
     });
     controller.setFullscreen("dag");
     controller.setFullscreen(null);
