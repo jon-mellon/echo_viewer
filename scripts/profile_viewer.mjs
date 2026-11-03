@@ -283,12 +283,6 @@ try {
   await measure("open variable definition", async () => {
     await page.locator("#identify-iv-input").click();
     await page.locator("#identifyGroupPicker .custom-create").click();
-    await page.locator("#definitionNewLabel").waitFor({ state: "visible" });
-  });
-  await measure("describe definition", async () => {
-    await page.locator("#definitionNewLabel").fill("Profile variable");
-    await page.locator("#definitionNewDescription").fill("A variable made while profiling the viewer.");
-    await page.locator("#definitionDescribeNext").click();
     await page.locator("#definitionSourceList input[data-source-id]").first().waitFor({ state: "visible" });
   });
   if (definitionThinkMs) await page.waitForTimeout(definitionThinkMs);
@@ -297,13 +291,19 @@ try {
   await measure("select definition source", async () => {
     await page.locator("#definitionSourceList input[data-source-id]").first().check();
     await page.locator("#definitionContinue").click();
-    await page.locator("#definitionPartitionStep").waitFor({ state: "visible" });
+    await page.locator("#definitionNewLabel").waitFor({ state: "visible" });
     const loaded = await page.evaluate(groupId => {
       const state = window.__dagBuilderState;
       const ids = state.project.groups.find(group => group.group_id === groupId)?.variable_ids || [];
       return { total: ids.length, missing: ids.filter(id => !state.variableById.has(id)).length };
     }, sourceGroupId);
     if (!loaded.total || loaded.missing) throw new Error(`Definition metadata missing for ${loaded.missing}/${loaded.total} variables`);
+  });
+  await measure("describe definition", async () => {
+    await page.locator("#definitionNewLabel").fill("Profile variable");
+    await page.locator("#definitionNewDescription").fill("A variable made while profiling the viewer.");
+    await page.locator("#definitionDescribeNext").click();
+    await page.locator("#definitionPartitionStep").waitFor({ state: "visible" });
   });
   await measure("select definition variable", async () => {
     const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
