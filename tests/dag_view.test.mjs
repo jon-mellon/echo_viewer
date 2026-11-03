@@ -156,7 +156,7 @@ test("sparse edge filtering counts distinct present papers before finding paths"
   ]);
   const supportedLinks = [
     link("c_iv", "c", "iv", "A_TO_B", { a_to_b_raw_link_ids: ["a", "b", "c"] }),
-    link("c_dv", "c", "dv", "A_TO_B", { a_to_b_raw_link_ids: ["a"], b_to_a_raw_link_ids: ["d"] }),
+    link("c_dv", "c", "dv", "A_TO_B", { a_to_b_raw_link_ids: ["a", "d"] }),
   ];
   const options = { groups, links: supportedLinks, ivId: "iv", dvId: "dv", rawLinksById: evidence };
   assert.equal(deriveDagView(options).visibleLinks.length, 2);
@@ -165,6 +165,24 @@ test("sparse edge filtering counts distinct present papers before finding paths"
   assert.equal(filtered.confounders.confounderIds.size, 0);
   assert.equal(deriveDagView({ ...options, excludeSparseEdges: true, minimumEdgePapers: 1 }).visibleLinks.length, 2);
   assert.equal(deriveDagView({ ...options, excludeSparseEdges: true, minimumEdgePapers: 3 }).visibleLinks.length, 0);
+});
+
+test("sparse edge filtering judges each direction of a link on its own papers", () => {
+  const evidence = new Map([["a", { paper_id: "p1" }], ["b", { paper_id: "p2" }], ["c", { paper_id: "p3" }]]);
+  const edges = [
+    // Two papers for c → iv, one for iv → c: only c → iv survives a minimum of two.
+    link("c_iv", "c", "iv", "BIDIRECTIONAL", { a_to_b_raw_link_ids: ["a", "b"], b_to_a_raw_link_ids: ["c"] }),
+    // One paper each way adds up to two, but neither direction has two on its own.
+    link("c_dv", "c", "dv", "BIDIRECTIONAL", { a_to_b_raw_link_ids: ["a"], b_to_a_raw_link_ids: ["b"] }),
+  ];
+  const view = deriveDagView({ groups, links: edges, ivId: "iv", dvId: "dv", rawLinksById: evidence,
+    excludeSparseEdges: true });
+  assert.deepEqual(view.visibleLinks.map(item => [item.edge_id, item.direction_type]), [["c_iv", "A_TO_B"]]);
+  assert.equal(edges[0].direction_type, "BIDIRECTIONAL");
+  // Paper keys, when the aggregated DAG carries them, are counted per direction without any findings.
+  const keyed = [link("c_iv", "c", "iv", "B_TO_A", { a_to_b_paper_table_keys: ["p1::t1", "p2::t1"],
+    b_to_a_paper_table_keys: ["p1::t1", "p1::t2"] })];
+  assert.equal(deriveDagView({ groups, links: keyed, excludeSparseEdges: true }).visibleLinks.length, 0);
 });
 
 
@@ -180,7 +198,7 @@ test("compact paper support matches full evidence without populating the detail 
     [id, { paper_id: row.paper_id, causal_link_existence: row.causal_link_existence }]));
   const edges = [
     link("sparse", "c", "iv", "A_TO_B", { a_to_b_raw_link_ids: ["a", "b", "c", "d"] }),
-    link("supported", "c", "dv", "A_TO_B", { a_to_b_raw_link_ids: ["a"], b_to_a_raw_link_ids: ["e"] }),
+    link("supported", "c", "dv", "A_TO_B", { a_to_b_raw_link_ids: ["a", "e"] }),
   ];
   const full = deriveDagView({ groups, links: edges, rawLinksById, excludeSparseEdges: true });
   const details = new Map();

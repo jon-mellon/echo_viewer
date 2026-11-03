@@ -189,11 +189,13 @@ function installHandlers() {
   els.minimumEdgePapers.addEventListener("input", () => {
     const requested = Math.trunc(Number(els.minimumEdgePapers.value));
     if (!Number.isSafeInteger(requested) || requested < 1) return;
-    state.minimumEdgePapers = requested;
+    // Typing a minimum applies it; one paper means no minimum, as in Explore's filters.
+    state.excludeSparseEdges = requested > 1;
+    if (requested > 1) state.minimumEdgePapers = requested;
     updateDagFilters();
   });
   els.minimumEdgePapers.addEventListener("change", () => {
-    els.minimumEdgePapers.value = String(state.minimumEdgePapers);
+    els.minimumEdgePapers.value = String(state.excludeSparseEdges ? state.minimumEdgePapers : 1);
   });
   els.toggleBottleneckedConfounders.addEventListener("click", () => {
     state.excludeBottleneckedConfounders = !state.excludeBottleneckedConfounders;
@@ -265,23 +267,60 @@ function installHandlers() {
       if (!item || item.matches("[data-keep-open], .file-button, .edit-history-entry")) return;
       /** @type {HTMLDetailsElement} */ (menu).open = false;
     });
+    // Choosing a file, or a schema in the Schema menu's switcher, also closes it.
     menu.addEventListener("change", (event) => {
-      if (/** @type {HTMLInputElement} */ (event.target).type === "file") /** @type {HTMLDetailsElement} */ (menu).open = false;
+      const target = /** @type {HTMLInputElement} */ (event.target);
+      if (target.type === "file" || target.id === "groupingSetSelect") /** @type {HTMLDetailsElement} */ (menu).open = false;
     });
   }
+
+  // Narrow screens: the hamburger button shows the task switcher, view switches,
+  // undo and redo and the History, Schema, Import and Export menus as one panel,
+  // each menu expanding in place. Choosing an item closes the panel.
+  const navToggle = document.getElementById("navToggle");
+  const navOverflow = document.getElementById("taskBarOverflow");
+  const setNavOpen = (/** @type {boolean} */ open) => {
+    if (!navToggle || !navOverflow) return;
+    navOverflow.classList.toggle("is-open", open);
+    navToggle.setAttribute("aria-expanded", String(open));
+    if (!open) for (const menu of navOverflow.querySelectorAll("details[open]")) /** @type {HTMLDetailsElement} */ (menu).open = false;
+  };
+  const navIsOpen = () => Boolean(navOverflow?.classList.contains("is-open"));
+  navToggle?.addEventListener("click", () => setNavOpen(!navIsOpen()));
+  navOverflow?.addEventListener("click", (event) => {
+    const target = /** @type {Element} */ (event.target);
+    // Switching view (Causes | Consequences, Graph | Table) shows the result at once.
+    if (target.closest?.(".task-bar-view-controls button")) return setNavOpen(false);
+    const item = target.closest?.(".menu-item");
+    if (!item || item.matches("[data-keep-open], .file-button, .edit-history-entry")) return;
+    setNavOpen(false);
+  });
+  navOverflow?.addEventListener("change", (event) => {
+    const target = /** @type {HTMLInputElement} */ (event.target);
+    if (target.type === "file" || target.id === "groupingSetSelect") setNavOpen(false);
+  });
+  window.matchMedia("(min-width: 841px)").addEventListener("change", () => setNavOpen(false));
 
   // Dropdown menus (Filters, task bar menus) close on an outside click or Escape.
   const openMenus = () => document.querySelectorAll("details.filter-dropdown[open], details.nav-menu[open], details.list-filter[open]");
   document.addEventListener("pointerdown", (event) => {
+    const target = /** @type {Node} */ (event.target);
+    if (navIsOpen() && !navOverflow?.contains(target) && !navToggle?.contains(target)) setNavOpen(false);
     for (const menu of openMenus()) {
-      if (!menu.contains(/** @type {Node} */ (event.target))) menu.open = false;
+      if (!menu.contains(target)) menu.open = false;
     }
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    for (const menu of openMenus()) {
+    const menus = openMenus();
+    for (const menu of menus) {
       menu.open = false;
       menu.querySelector("summary")?.focus();
+    }
+    // Escape closes an open menu inside the panel first, then the panel itself.
+    if (!menus.length && navIsOpen()) {
+      setNavOpen(false);
+      navToggle?.focus();
     }
   });
 
@@ -303,7 +342,7 @@ function installHandlers() {
   let escapeClaimed = false;
   window.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
-    escapeClaimed = Boolean(openMenus().length || document.querySelector("dialog[open]")
+    escapeClaimed = Boolean(openMenus().length || navIsOpen() || document.querySelector("dialog[open]")
       || (els.dagMapContextMenu && !els.dagMapContextMenu.hidden) || state.fullscreenPanel);
   }, { capture: true });
   window.addEventListener("keydown", (event) => {

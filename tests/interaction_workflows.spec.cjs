@@ -131,7 +131,7 @@ test("definition navigation returns through both Back steps and Cancel", async (
   if (await page.locator("#definitionAddNeighbors").isEnabled()) {
     await page.locator("#definitionAddNeighbors").click();
   }
-  await page.locator("#definitionCancel").click();
+  await page.locator(".definition-cancel:visible").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft)).toBeNull();
   await expect(page.locator("#ivGroupPicker")).toBeVisible();
   const iv = await page.evaluate(() => window.__dagBuilderState.project.groups
@@ -139,7 +139,7 @@ test("definition navigation returns through both Back steps and Cancel", async (
   await page.locator(`#ivGroupPicker button[data-group-id="${iv}"]`).click();
   await page.locator('#dvGroupPicker button[data-define-side="dv"]').click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.role)).toBe("dv");
-  await page.locator("#definitionCancel").click();
+  await page.locator(".definition-cancel:visible").click();
 });
 
 test("variable search catalog preloads once and serves anchor search", async ({ page }) => {

@@ -25,9 +25,9 @@
   --leading-body: 1.45;
 
   /* Colour, by role. */
-  --bg: #f6f7f4;
+  --bg: #f6f6f6;
   --surface: #ffffff;
-  --surface-sunken: #f8f9f6;
+  --surface-sunken: #f8f8f8;
   --overlay: rgba(255, 255, 255, 0.94);
   --backdrop: rgba(15, 23, 42, 0.48);
   --border: #d8ded6;
@@ -37,15 +37,16 @@
   --on-accent: #ffffff;
   --accent: #1f7a67;
   --accent-hover: #186453;
-  --accent-subtle: #e8f2ee;
+  --accent-subtle: #ececec;  /* neutral: never a green background */
   --accent-border: #9ccbbd;
-  --hover-bg: #eef1ed;
+  --hover-bg: #efefef;
   --focus-ring: #1f7a67;
   --danger: #b42318;
   --danger-subtle: #fce8eb;
   --warn-text: #70401c;
   --warn-bg: #fff6ec;
   --warn-border: #e2b48a;
+  --warn-dot: #d97706;
   --grid-line: rgba(23, 32, 27, 0.045);
 
   /* Graph and role colours (data encodings, not UI chrome). */
@@ -280,8 +281,7 @@ textarea.search-input, .dag-textarea { padding: var(--space-2); line-height: var
 /* ── Type roles: every piece of text is one of these five. Contexts set colour and
    spacing only, never size, weight or case. ── */
 h1,
-.password-gate-card h1,
-.task-landing-inner h1 {
+.password-gate-card h1 {
   font-size: var(--text-xl);
   font-weight: var(--weight-strong);
   line-height: var(--leading-tight);
@@ -294,7 +294,6 @@ h2,
 .publication-dialog h2,
 .explore-group-header h2,
 .detail-title,
-.task-choice strong,
 .startup-loading-card strong,
 .variable-panel > details > summary, .confounder-config > details > summary,
 #focusInputLabel {
@@ -2025,6 +2024,14 @@ h2 {
 }
 .task-bar-sep { width: 1px; height: var(--space-6); margin: 0 var(--space-1); background: var(--border); }
 .dag-body.task-home .task-bar-menus > :not(#historyMenu) { display: none; }
+/* Wide screens: everything sits in the bar (the task switcher beside the brand);
+   the overflow wrapper adds no box and the hamburger doesn't show. */
+.task-bar-overflow { display: contents; }
+.nav-toggle { display: none; }
+@media (min-width: 841px) {
+  .task-bar-brand { order: -2; }
+  .task-menu { order: -1; }
+}
 .dag-body.task-home .task-menu,
 .dag-body.task-home .history-edits { display: none; }
 .history-reset:has(> #taskReset[hidden]) { display: none; }
@@ -2107,6 +2114,36 @@ h2 {
 /* The task switcher sits beside the brand, so its menu opens toward the right. */
 .task-menu-panel { left: 0; right: auto; width: min(200px, calc(100vw - 16px)); }
 .task-menu-panel .menu-item { padding-block: var(--space-2); }
+
+/* Schema menu: which schema is active, its publication status, and what can be
+   done with it. Right-aligned under its button; never wider than the viewport
+   and never scrolls sideways. */
+.schema-menu-panel {
+  width: min(360px, calc(100vw - 16px));
+  padding: var(--space-2);
+  overflow-x: hidden;
+}
+.schema-menu-panel > * { min-width: 0; }
+.schema-menu-header { padding: var(--space-1) var(--space-2); }
+.schema-menu-header .badge { margin-top: 0; }
+.schema-menu-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.schema-menu-panel .menu-field { padding-bottom: var(--space-1); }
+.schema-menu-panel .select-input { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.schema-menu-panel .publication-status { min-height: 0; overflow-wrap: anywhere; }
+.schema-menu-panel .menu-item { min-height: 38px; }
+.schema-menu-panel .menu-item:focus-visible { outline-offset: -2px; }
+.schema-menu-panel .menu-item > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.menu-icon { flex: none; width: 16px; height: 16px; color: var(--text-muted); }
+.menu-item:hover:not(:disabled) .menu-icon { color: var(--accent); }
 
 /* History lists: edit steps and earlier sessions. */
 .edit-history-entry.undone { color: var(--text-muted); text-decoration: line-through; }
@@ -2585,7 +2622,7 @@ h2 {
   }
 
   .dag-body {
-    --mobile-nav-height: 56px;
+    --mobile-nav-height: 0px; /* the panel switch lives in the top bar */
   }
 
   .app-shell {
@@ -2642,19 +2679,12 @@ h2 {
     display: block !important;
   }
 
+  /* The panel switch sits in the top bar, beside the hamburger. */
   .mobile-panel-nav {
-    position: fixed;
-    inset: auto 0 0;
-    z-index: 110;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 112px));
-    justify-content: center;
-    gap: var(--space-2);
-    min-height: var(--mobile-nav-height);
-    padding: var(--space-1) var(--space-2) calc(var(--space-1) + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--border);
-    background: var(--overlay);
-    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex: none;
+    gap: var(--space-1);
+    margin-left: auto;
   }
 
   .dag-body.focus-variable-map .mobile-panel-nav,
@@ -2668,21 +2698,21 @@ h2 {
   }
 
   .mobile-panel-tab {
-    
+    height: var(--control-md);
+    padding: 0 var(--space-2);
     border: 1px solid var(--border);
-    
+    border-radius: var(--radius-md);
     background: transparent;
     color: var(--text-muted);
     font: inherit;
-    
-    
+    font-size: var(--text-sm);
+    white-space: nowrap;
   }
 
   .mobile-panel-tab.active {
-    border-color: var(--border);
-    border-bottom: 3px solid var(--accent);
-    background: var(--accent-subtle);
+    border-color: var(--accent);
     color: var(--accent);
+    font-weight: var(--weight-medium);
   }
 
   .mobile-variable-tab {
@@ -2968,7 +2998,6 @@ h2 {
   }
 }
 @media (max-width: 360px) {
-  .mobile-panel-nav { grid-template-columns: repeat(2, minmax(0, 96px)); }
 }
 
 /* Establish gesture ownership before the browser begins a graph pinch. */
@@ -3017,7 +3046,7 @@ h2 {
 
 /* Explore keeps the sidebar dense: 16px gutters and 8/12px vertical rhythm. */
 .dag-body.task-causes .anchor-bar, .dag-body.task-consequences .anchor-bar { gap: var(--space-2); padding: var(--space-3) var(--space-4) var(--space-2); border-bottom: 0; }
-.dag-body.task-causes #exploreView, .dag-body.task-consequences #exploreView { padding: var(--space-1) var(--space-4) var(--space-4); }
+.dag-body:is(.task-causes, .task-consequences, .task-identify) #exploreView { padding: var(--space-1) var(--space-4) var(--space-4); }
 
 
 /* Keep group paging at the foot of the available inspector space. */
@@ -3081,7 +3110,7 @@ h2 {
 .dag2-mode.initial-setup:not(.definition-active) .dag-left-panel {
   width: 100%;
   height: 100%;
-  padding: 0 max(var(--space-6), calc((100vw - 760px) / 2)); /* token-exempt: 760px content width, matches .task-landing-inner */
+  padding: 0 max(var(--space-6), calc((100vw - 760px) / 2)); /* token-exempt: 760px content width */
 }
 .dag2-mode.initial-setup:not(.definition-active) #leftResizer,
 .dag2-mode.initial-setup:not(.definition-active) .dag-right-panel,
@@ -3117,6 +3146,29 @@ h2 {
 }
 .task-bar[hidden] { display: none; }
 .task-bar-brand { font-weight: var(--weight-strong); letter-spacing: 0.02em; }
+/* Task selector: "Task" label, current task and chevron form one compact,
+   bordered control, quieter than the Causes / Consequences switch. */
+.task-selector {
+  display: inline-flex;
+  gap: var(--space-2);
+  height: var(--control-md);
+  align-items: center;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+.menu > summary.task-selector::after { content: none; }
+.task-selector:hover,
+.menu[open] > summary.task-selector { background: var(--hover-bg); }
+.task-selector-label { color: var(--text-muted); font-size: var(--text-sm); }
+.task-selector-value { font-weight: var(--weight-medium); }
+.task-selector-chevron { flex: none; margin-left: calc(-1 * var(--space-1)); color: var(--text-muted); transition: transform 0.15s; }
+.menu[open] > summary .task-selector-chevron { transform: rotate(180deg); }
 .task-bar-status {
   flex: 0 1 auto;
   min-width: 0;
@@ -3127,6 +3179,38 @@ h2 {
   text-overflow: ellipsis;
 }
 .task-bar-status:empty { display: none; }
+/* Routine local saves: a quiet icon (check when saved, spinner while saving); the tooltip says where. */
+.save-indicator { display: inline-grid; place-items: center; flex: none; color: var(--text-muted); }
+.save-indicator[hidden] { display: none; }
+.save-indicator[data-state="saved"] .save-icon-saving,
+.save-indicator[data-state="saving"] .save-icon-saved { display: none; }
+.save-indicator[data-state="saving"] svg { animation: startup-spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .save-indicator[data-state="saving"] svg { animation: none; } }
+/* Unpublished schema changes: an amber dot on the Schema button. */
+#schemaMenu > summary.has-unpublished { position: relative; }
+#schemaMenu > summary.has-unpublished::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn-dot);
+}
+/* Exploration: Causes | Consequences and Graph | Table live in the top bar
+   (moved in by task_views.mjs), so nothing sits between the bar and the map. */
+.task-bar-view-controls { display: none; align-items: center; gap: var(--space-2); flex: none; }
+.task-bar-view-controls .segmented > .btn { white-space: nowrap; }
+.dag-body:is(.task-causes, .task-consequences, .task-identify) .task-bar-view-controls { display: flex; }
+.task-bar-view-controls:empty,
+.dag-body.definition-active .task-bar-view-controls,
+.dag-body:has(#closeEvidencePane:not([hidden])) .task-bar-view-controls { display: none !important; }
+.dag-body:is(.task-causes, .task-consequences, .task-identify) .dag-ws-header { display: none; }
+@media (max-width: 640px) {
+  .task-bar-view-controls { gap: var(--space-1); }
+  .task-bar-view-controls .segmented > .btn { padding-inline: var(--space-2); font-size: var(--text-sm); }
+}
 
 .task-view {
   position: fixed;
@@ -3140,26 +3224,6 @@ h2 {
 .dag-body.focus-variable-map .task-bar,
 .dag-body.focus-dag .task-bar { display: none; }
 
-.task-landing-inner {
-  width: min(760px, 100%);
-  margin: 0 auto;
-  padding: var(--space-8) var(--space-4) var(--space-12);
-}
-.task-landing-inner h1 { margin: 0 0 var(--space-4);  }
-.task-choices { display: grid; gap: var(--space-3); }
-.task-choice {
-  display: grid;
-  gap: var(--space-1);
-  padding: var(--space-4) var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-.task-choice span { color: var(--text-muted); line-height:  var(--leading-body); }
-.task-choice:hover, .task-choice:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); }
 
 /* Explore list: a flat, compact list with a right-aligned paper column.
    Hover is a faint tint; selection is a stronger tint with an accent bar. */
@@ -3312,15 +3376,31 @@ h2 {
    screen the definition takes the map's place instead, and the side panel
    keeps showing the Explore list. */
 @media (max-width: 840px) {
-  .dag-body.task-causes.definition-active .dag-left-panel > #exploreView,
-  .dag-body.task-consequences.definition-active .dag-left-panel > #exploreView,
-  .dag-body.task-causes.definition-active #setupSection > :not(#definitionBlock),
-  .dag-body.task-consequences.definition-active #setupSection > :not(#definitionBlock) { display: none; }
+  .dag-body:is(.task-causes, .task-consequences, .task-identify).definition-active .dag-left-panel > #exploreView,
+  .dag-body:is(.task-causes, .task-consequences, .task-identify).definition-active #setupSection > :not(#definitionBlock) { display: none; }
 }
 @media (min-width: 841px) {
-  .dag-body:is(.task-causes, .task-consequences) .dag-left-panel > #setupSection { display: none; }
+  .dag-body:is(.task-causes, .task-consequences, .task-identify) .dag-left-panel > #setupSection { display: none; }
 }
 .dag-body.task-causes .mobile-variable-tab, .dag-body.task-consequences .mobile-variable-tab { display: none; }
+/* Identification: the Cause, Outcome and Instrument fields and the list under them
+   (in #exploreView, shared with Explore) replace the step-by-step setup, the anchor
+   bar and the Variables panel. Creating a variable still uses the setup section. */
+.dag-body.task-identify:not(.definition-active) .dag-left-panel > #setupSection,
+.dag-body.task-identify .dag-left-panel > #variablePanel,
+.dag-body.task-identify .dag-left-panel > #anchorBar { display: none; }
+.identify-fields[hidden], .identify-fields .setup-group-picker[hidden] { display: none; }
+.identify-fields { display: grid; gap: var(--space-3); margin-bottom: var(--space-6); }
+.identify-field-label { display: block; margin: 0 0 var(--space-1); color: var(--text); font-weight: var(--weight-strong); }
+.identify-field .search-input { width: 100%; margin-bottom: 0; padding-right: var(--control-md); }
+.identify-field .search-input::-webkit-search-cancel-button { display: none; }
+.identify-field.has-focus .search-input:not(:focus) { font-weight: var(--weight-normal); }
+.identify-fields > #identifyGroupPicker { margin-top: var(--space-3); }
+/* The map's filters sit beside the list's first heading, as a quiet icon button. */
+.identify-tools .filter-dropdown { position: relative; }
+.identify-tools .filter-dropdown > summary { border-color: transparent; background: transparent; color: var(--text-muted); }
+.identify-tools .filter-dropdown > summary:hover,
+.identify-tools .filter-dropdown[open] > summary { background: var(--hover-bg); color: var(--text); }
 
 .reset-dialog-actions { display: grid; gap: var(--space-2); margin-top: var(--space-4); }
 .reset-dialog-actions button { width: 100%; }
@@ -3329,21 +3409,75 @@ h2 {
 @media (max-width: 840px) {
   .dag-body { --app-top: 52px; }
   .task-bar { gap: var(--space-2); padding: 0 var(--space-2); }
-  .task-landing-inner { padding: var(--space-6) var(--space-4) var(--space-12); }
   .nav-menu-panel,
   .task-menu .nav-menu-panel { position: fixed; top: calc(var(--app-top) + 4px); left: 8px; right: 8px; width: auto; }
   .dag-body.definition-active .task-bar-menus { display: none; }
+  /* Narrow screens: the bar keeps the brand, save status, panel switch and a
+     hamburger; everything else collapses into one panel under the bar, where
+     each menu expands in place as an accordion. */
+  .nav-toggle { display: inline-flex; flex: none; }
+  .nav-toggle[aria-expanded="true"] { background: var(--hover-bg); color: var(--accent); }
+  .task-bar-status { flex: 1 1 auto; }
+  .task-bar-overflow {
+    position: fixed;
+    top: calc(var(--app-top) + 4px);
+    left: 8px;
+    right: 8px;
+    z-index: 96;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+    max-height: calc(100dvh - var(--app-top) - 16px);
+    overflow-y: auto;
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+  }
+  .task-bar-overflow.is-open { display: flex; }
+  .task-bar-overflow .task-bar-sep { display: none; }
+  .task-bar-overflow .task-selector { width: 100%; }
+  .task-bar-overflow .task-selector-chevron { margin-left: auto; }
+  .task-bar-overflow .task-selector-label { display: inline; }
+  .task-bar-overflow .task-bar-view-controls { flex-wrap: wrap; padding: var(--space-1) 0; }
+  .task-bar-overflow .task-bar-menus {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1px;
+    margin-left: 0;
+    padding-top: var(--space-1);
+    border-top: 1px solid var(--border);
+  }
+  .task-bar-overflow .undo-group { display: flex; gap: var(--space-1); }
+  .task-bar-overflow .menu > summary.btn {
+    display: flex;
+    justify-content: flex-start;
+    gap: var(--space-2);
+    width: 100%;
+    padding: 0 var(--space-2);
+  }
+  .task-bar-overflow .menu > summary.btn::after { display: block; margin-left: auto; }
+  .task-bar-overflow .menu[open] > summary.btn::after { transform: rotate(180deg); }
+  .task-bar-overflow .nav-icon { display: block; }
+  .task-bar-overflow .nav-label { display: inline; }
+  .task-bar-overflow .nav-menu-panel,
+  .task-bar-overflow .nav-menu-panel.menu-panel {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin: 0 0 var(--space-1) var(--space-6);
+    padding: var(--space-1);
+    border: 0;
+    border-left: 1px solid var(--border);
+    border-radius: 0;
+    box-shadow: none;
+  }
 }
 /* Narrow screens: the right-hand menus collapse to icons. */
 @media (max-width: 640px) {
-  .dag-body:not(.task-home) .task-bar-brand, .task-bar-sep { display: none; }
-  .task-bar-menus .nav-icon { display: block; }
-  .task-bar-menus .nav-label { display: none; }
-  .task-bar-menus .menu > summary.btn { width: var(--control-md); padding: 0; }
-  .task-bar-menus .menu > summary.btn::after { display: none; }
-}
-@media (max-width: 640px) and (pointer: coarse) {
-  .task-bar-menus .menu > summary.btn { width: var(--control-touch); }
+  .task-bar-sep, .task-selector-label { display: none; }
 }
 /* Six touch-sized icons plus the task menu are wider than a 375px phone, which clipped Export. */
 @media (max-width: 400px) and (pointer: coarse) {
@@ -3418,7 +3552,7 @@ h2 {
   inset: 0;
   overflow: auto;
   padding: var(--space-2) var(--space-3) var(--space-4);
-  background: var(--surface-sunken);
+  background: var(--surface);
   touch-action: pan-x pan-y;
 }
 .dag-table-view[hidden] { display: none; }
@@ -3442,7 +3576,7 @@ h2 {
 .dag-table thead th {
   position: sticky;
   top: 0;
-  background: var(--surface-sunken);
+  background: var(--surface);
   font-size: var(--text-sm);
 }
 .dag-table tr.selected { background: var(--selection-subtle); }
@@ -3451,9 +3585,9 @@ h2 {
 .dag-table-action:focus-visible { outline: 2px solid var(--role-iv); outline-offset: 2px; }
 .dag-table-summary, .dag-table-more { margin: 0 0 var(--space-2); font-size: var(--text-sm); color: var(--text-muted); }
 @media (max-width: 760px) {
-  .dag-diagnostic-switch, .explore-direction { order: -2; width: 100%; }
+  .dag-ws-controls > :is(.dag-diagnostic-switch, .explore-direction) { order: -2; width: 100%; }
   .dag-diagnostic-switch .btn { flex: 1 1 0; min-width: 0; }
-  .dag-view-switch { order: -1; }
+  .dag-ws-controls > .dag-view-switch { order: -1; }
   .dag-ws-controls > .filter-dropdown { order: -1; }
   .dag-table th, .dag-table td { padding: var(--space-1) var(--space-1); position: relative; }
   #dagLinksTable th:nth-child(2) { font-size: 0; width: 1.4em; }
@@ -3481,7 +3615,50 @@ h2 {
   font-size: var(--text-lg);
   font-weight: var(--weight-normal);
 }
+/* Explore's table: a variable per row and one link that opens that link's evidence. */
+.dag-table-explore caption strong { font-weight: var(--weight-medium); }
+/* The chosen variable's definition, at the top of the table view. */
+.dag-table-definition { margin: 0 0 var(--space-4); padding-bottom: var(--space-3); border-bottom: 1px solid var(--border); }
+.dag-table-definition h2 { margin: 0 0 var(--space-1); }
+.dag-table-definition p { margin: 0; max-width: 75ch; line-height: var(--leading-body); white-space: pre-line; }
+.dag-table-definition p.is-empty { color: var(--text-muted); font-style: italic; }
+.dag-table-caption-note { color: var(--text-muted); font-size: var(--text-sm); }
+.dag-table-explore th.dag-table-variable { font-weight: var(--weight-normal); }
+.dag-table-explore .dag-table-node:hover { text-decoration: underline; }
+.dag-table-explore td, .dag-table-explore th { vertical-align: middle; }
+.dag-table-explore thead th.dag-table-number { text-align: right; }
+.dag-table-sort { font-size: inherit; font-weight: inherit; color: inherit; }
+.dag-table-sort:hover { text-decoration: underline; }
+.dag-table tr.dag-table-section > th {
+  padding-top: var(--space-3);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  color: var(--text-muted);
+}
+.dag-table-link { font-weight: var(--weight-normal); white-space: normal; text-align: left; }
+/* Identify's table: each path is a line of quiet "→ variable" steps; several paths stack. */
+.dag-table-diagnostic .dag-table-routes { line-height: var(--leading-body); }
+.dag-table-diagnostic td, .dag-table-diagnostic th { vertical-align: top; }
+.dag-table-diagnostic .dag-table-link { white-space: nowrap; }
+.dag-table-more-routes { color: var(--text-muted); font-size: var(--text-sm); }
+/* Status: a compact menu in the row; "Unaddressed" stays muted so recorded choices stand out. */
+.dag-table-status-cell { width: 15rem; }
+.dag-table .dag-table-status { width: 100%; height: auto; min-height: 0; margin: 0; padding: 2px var(--space-1); font-size: var(--text-md); }
+.dag-table .dag-table-status.is-unaddressed { color: var(--text-muted); }
+.dag-table .dag-table-status-note { width: 100%; margin: var(--space-1) 0 0; padding: 2px var(--space-1); font-size: var(--text-md); }
+.dag-table .dag-table-status-note[hidden] { display: none; }
+.dag-table-more-routes:hover { color: var(--text); text-decoration: underline; }
+.dag-table-route { display: flex; flex-wrap: wrap; column-gap: var(--space-2); }
+.dag-table-route + .dag-table-route { margin-top: 2px; }
+.dag-table-route-start { color: var(--text); }
+.dag-table-empty { color: var(--text-muted); }
+.dag-table-study { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); margin: 0 0 var(--space-3); }
+.dag-table-link:hover { text-decoration: underline; }
+.dag-table-link.selected { color: var(--accent); font-weight: var(--weight-medium); }
 /* With nothing chosen yet the hint ("Choose a variable...") is the whole view, as it is for the graph. */
+.dag-network-wrapper:has(.explore-graph-hint:not([hidden])) .dag-network,
+.dag-network-wrapper:has(.explore-graph-hint:not([hidden])) #diagnosticOverlapKey,
 .dag-network-wrapper:has(.explore-graph-hint:not([hidden])) .dag-table-view {
   visibility: hidden;
 }
@@ -3605,6 +3782,18 @@ h2 {
 #focusSearchBlock .search-input {
   margin-bottom: 0;
 }
+/* A faint × over the Primary variable field's right edge clears it. */
+.focus-input-wrap { position: relative; }
+#focusSearchBlock .focus-input-wrap .search-input { width: 100%; padding-right: var(--control-md); }
+#focusInput::-webkit-search-cancel-button { display: none; }
+.focus-clear {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  display: grid; place-items: center; width: var(--control-md);
+  border: 0; background: transparent; color: var(--text); opacity: 0.4;
+  font-size: var(--text-lg); line-height: 1; cursor: pointer;
+}
+.focus-clear:hover, .focus-clear:focus-visible { opacity: 0.85; }
+.focus-clear[hidden] { display: none; }
 #focusSearchBlock.has-focus .search-input:not(:focus) {
   font-weight: var(--weight-normal);
 }
@@ -3621,10 +3810,10 @@ h2 {
 /* Explore: the evidence for a clicked link replaces the map, with a
    "Back to map" button at the top left; the results list stays in view. */
 @media (min-width: 841px) {
-  .dag-body:is(.task-causes, .task-consequences) .dag-workspace:has(#closeEvidencePane:not([hidden])) > :is(.dag-ws-header, .dag-network-wrapper) {
+  .dag-body:is(.task-causes, .task-consequences, .task-identify) .dag-workspace:has(#closeEvidencePane:not([hidden])) > :is(.dag-ws-header, .dag-network-wrapper) {
     display: none;
   }
-  .dag-body:is(.task-causes, .task-consequences) .dag-workspace > .dag-ws-footer {
+  .dag-body:is(.task-causes, .task-consequences, .task-identify) .dag-workspace > .dag-ws-footer {
     flex: 1 1 auto;
     max-height: none;
     min-width: 0;
@@ -3634,13 +3823,13 @@ h2 {
     overscroll-behavior: contain;
   }
 }
-.dag-body:is(.task-causes, .task-consequences) .dag-workspace > .dag-ws-footer .evidence-pane-header {
+.dag-body:is(.task-causes, .task-consequences, .task-identify) .dag-workspace > .dag-ws-footer .evidence-pane-header {
   justify-content: flex-start;
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border);
   margin-bottom: var(--space-3);
 }
-.dag-body:is(.task-causes, .task-consequences) .dag-workspace > .dag-ws-footer .evidence-close {
+.dag-body:is(.task-causes, .task-consequences, .task-identify) .dag-workspace > .dag-ws-footer .evidence-close {
   margin: 0;
   font-weight: var(--weight-normal);
 }
@@ -3729,7 +3918,7 @@ h2 {
 }
 /* Explore's panel starts with the "Variable" heading, 16px from the top in
    every state (the anchor bar is empty and hidden there). */
-.dag-body.task-causes #exploreView, .dag-body.task-consequences #exploreView {
+.dag-body:is(.task-causes, .task-consequences, .task-identify) #exploreView {
   padding-top: var(--space-4);
 }
 
@@ -3853,9 +4042,22 @@ h2 {
 }
 
 /* Explore side panel hierarchy:
-   section (Primary variable, Direct causes)  text-lg strong
-     subsection (Custom / Built-in variables)  text-base strong + muted count
-       rows                                     text-base normal */
+   section (Primary variable, Custom variables, Built-in variables)  text-lg strong
+     rows                                                              text-base normal */
+.explore-picker-section { margin-top: var(--space-4); }
+.explore-picker-section .explore-group-header { grid-template-columns: minmax(0, 1fr) auto; }
+/* Create a variable lives in the Custom variables heading. */
+.explore-group-tools { display: flex; align-items: center; gap: var(--space-1); }
+.custom-create { display: inline-flex; align-items: center; gap: var(--space-1); width: auto; margin: 0; }
+/* Custom variable rows end with edit (pencil) and delete (trash) icons. */
+.explore-row.has-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-1); }
+#exploreResults .explore-row.has-actions { grid-template-columns: auto minmax(0, 1fr) auto; }
+.custom-row-actions { display: flex; align-items: center; gap: 2px; }
+.custom-row-actions .btn--icon { display: grid; place-items: center; border-color: transparent; background: transparent; color: var(--text-muted); }
+.custom-row-actions .btn--icon:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }
+.custom-row-actions .custom-row-delete:hover:not(:disabled) { color: var(--danger); }
+.custom-row-actions .btn--sm { width: auto; margin: 0; }
+#exploreResults .list-filter-empty { margin: var(--space-2) 0 0; }
 .explore-subsection + .explore-subsection {
   margin-top: var(--space-6);
 }
@@ -3909,13 +4111,13 @@ h2 {
     padding: 0 var(--space-8) var(--space-8);
   }
 
-  /* Header: title, steps, cancel — pinned while the step scrolls. */
+  /* Header: title and steps, pinned while the step scrolls. Cancel sits in each step's footer. */
   #definitionWorkspace .definition-heading {
     position: sticky;
     top: 0;
     z-index: 3;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr;
     align-items: center;
     gap: var(--space-6);
     margin: 0 0 var(--space-6);
@@ -4108,16 +4310,8 @@ h2 {
 .custom-variables-confirm td { background: var(--danger-subtle); }
 .custom-variables-confirm-body { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .custom-variables-confirm-body > span { flex: 1 1 320px; }
-.custom-variables-view .btn--danger { border-color: var(--danger); background: var(--danger); color: var(--surface); }
+.custom-variables-view .btn--danger, .custom-row-actions .btn--danger { border-color: var(--danger); background: var(--danger); color: var(--surface); }
 /* Outlined like the segmented switches beside it, not like the borderless toolbar actions. */
-.dag-ws-controls > #openCustomVariables {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  font-weight: var(--weight-normal);
-}
-.dag-ws-controls > #openCustomVariables:hover { border-color: var(--border); background: var(--hover-bg); }
-.dag-ws-controls > #openCustomVariables[aria-pressed="true"] { background: var(--accent-subtle); color: var(--accent); }
 .explore-row-tag {
   margin-left: var(--space-2);
   color: var(--text-muted);
@@ -4164,24 +4358,21 @@ h2 {
   color: var(--text-muted);
 }
 .definition-progress-item strong { color: var(--text); font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; }
-.definition-sources-details { margin-left: auto; position: relative; }
-.definition-sources-details > summary { cursor: pointer; color: var(--accent); }
-.definition-sources-panel {
-  position: absolute;
-  right: 0;
-  z-index: 5;
-  width: min(480px, 90vw);
-  margin-top: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-lg);
+/* What stays in the original variables: a plain section above the footer. */
+.definition-sources { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.definition-sources h3 { margin: 0; }
+.definition-sources > p { margin: var(--space-1) 0 var(--space-3); }
+.definition-sources-grid { width: 100%; border-collapse: collapse; }
+.definition-sources-grid th, .definition-sources-grid td {
+  padding: var(--space-2); border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle;
 }
-.definition-sources-panel > p { margin: 0 0 var(--space-3); }
-.definition-sources-table { display: grid; gap: var(--space-3); }
-.definition-source-name-row { display: grid; gap: var(--space-1); }
-.definition-source-name-label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); }
+.definition-sources-grid thead th { color: var(--text-muted); font-size: var(--text-sm); font-weight: var(--weight-normal); }
+.definition-sources-grid tbody th { font-weight: var(--weight-normal); }
+.definition-sources-grid .num { width: 6ch; text-align: right; font-variant-numeric: tabular-nums; }
+.definition-sources-grid td:last-child { width: 45%; }
+.definition-sources-grid .search-input { width: 100%; margin: 0; }
+.definition-source-total { display: block; }
+.definition-sources-grid tr.is-emptied td:nth-child(3) { color: var(--danger); font-weight: var(--weight-medium); }
 .definition-save-status { margin: var(--space-3) 0 0; }
 
 /* Manual: browse on the left, what is included on the right. */
@@ -4289,9 +4480,7 @@ h2 {
 .definition-ai[hidden] { display: none; }
 .definition-ai-intro h3 { margin: 0 0 var(--space-1); font-size: var(--text-md); font-weight: var(--weight-medium); }
 .definition-ai-intro > p { margin: 0; color: var(--text-muted); font-size: var(--text-md); max-width: 68ch; }
-.definition-ai-privacy { margin-top: var(--space-2); }
-.definition-ai-privacy > summary { cursor: pointer; color: var(--accent); font-size: var(--text-sm); }
-.definition-ai-privacy p { margin-top: var(--space-2); font-size: var(--text-sm); }
+.definition-ai-privacy { margin-top: var(--space-2); font-size: var(--text-sm); }
 .definition-ai-steps { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
 .definition-ai-step { position: relative; padding: var(--space-4) 0; border-bottom: 1px solid var(--border); }
 .definition-ai-step-head { display: flex; align-items: center; gap: var(--space-3); }
@@ -4368,9 +4557,12 @@ h2 {
   .definition-browse-controls .select-input-sm { margin-left: 0; max-width: none; width: 100%; }
   .definition-status-filter { display: flex; width: 100%; }
   .definition-status-filter > .btn { flex: 1 1 0; padding: 0 var(--space-1); }
-  .definition-sources-details { margin-left: 0; }
-  .definition-sources-panel { position: static; width: auto; }
+  .definition-sources-grid td:last-child { width: auto; }
 }
 /* Empty search results offer a way back. */
 div.explore-subsection-empty p, .custom-variables-empty p { margin: 0 0 var(--space-2); }
 .explore-subsection-empty .btn, .custom-variables-empty .btn { width: auto; margin: 0; }
+
+/* Identify's panel filter: every variable, or only the confounders or colliders. */
+.identify-kind { display: flex; width: 100%; margin-bottom: var(--space-2); }
+.identify-kind > .btn { flex: 1 1 0; }

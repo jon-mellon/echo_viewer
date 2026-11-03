@@ -21,7 +21,7 @@ export function createProject({ projectId, groupingSetId }) {
     project_id: projectId, active_grouping_set_id: groupingSetId,
     iv_group_id: 'g_iv', dv_group_id: 'g_dv', instrument_group_id: null, groups: [], links: [],
     decisions: [], filters: {}, grouping_imports: [],
-    grouping_exports: [], carve_outs: [], link_decisions: {}, finding_decisions: {}, confounder_statuses: {},
+    grouping_exports: [], carve_outs: [], link_decisions: {}, finding_decisions: {}, confounder_statuses: {}, collider_statuses: {},
     rejected_variables: [], publication: null,
   };
 }
@@ -48,6 +48,15 @@ export function promoteAnchor(project, side, groupId, timestamp) {
     if (group.group_id === project[key]) return { ...group, type: null };
     return group;
   }) };
+}
+
+/** Leave the cause (iv) or outcome (dv) unchosen; the group stays, as an ordinary variable. */
+export function clearAnchor(project, side) {
+  if (!['iv', 'dv'].includes(side)) return project;
+  const key = `${side}_group_id`;
+  if (!project[key]) return project;
+  return { ...project, [key]: '',
+    groups: project.groups.map(group => group.group_id === project[key] ? { ...group, type: null } : group) };
 }
 
 export function addMembers(project, groupId, memberIds, timestamp) {
@@ -96,6 +105,7 @@ export function removeMembersEverywhere(project, memberIds) {
 export function snapshotProject(project, phase) {
   return JSON.stringify({ groups: project.groups, link_decisions: project.link_decisions,
     finding_decisions: project.finding_decisions, confounder_statuses: project.confounder_statuses,
+    collider_statuses: project.collider_statuses,
     rejected_variables: project.rejected_variables,
     restored_variable_ids: project.restored_variable_ids, decisions: project.decisions,
     iv_group_id: project.iv_group_id, dv_group_id: project.dv_group_id,
@@ -130,6 +140,7 @@ export function restoreSnapshot(project, json) {
     link_decisions: snap.link_decisions,
     finding_decisions: snap.finding_decisions || {},
     confounder_statuses: snap.confounder_statuses || {},
+    collider_statuses: snap.collider_statuses || {},
     rejected_variables: snap.rejected_variables || [],
     restored_variable_ids: snap.restored_variable_ids || [],
     decisions: snap.decisions || [],

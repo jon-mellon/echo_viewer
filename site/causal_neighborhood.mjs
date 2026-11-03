@@ -2,26 +2,11 @@
 // evidence in each direction; a hop counts when that direction is supported by
 // at least `minPapers` distinct papers and the link is traversable by the same
 // rule the identification diagrams use.
-import { excludedForConnectivity, presentPaperIds } from "./dag_view.mjs";
+import { directionalPaperCounter, excludedForConnectivity } from "./dag_view.mjs";
+
+export { directionalPaperCounter };
 
 export const MAX_NEIGHBORHOOD_DEPTH = 4;
-
-/**
- * Papers behind one direction of a link. The aggregated DAG already carries
- * them per direction (distinct papers among its paper/table keys), so nothing
- * is counted. An edge that a local edit touched carries no keys, because they
- * cannot be kept in step with its findings; those are counted exactly from
- * per-finding support records, when given.
- */
-export function directionalPaperCounter(edgeSupportById = null, rawLinksById = edgeSupportById) {
-  return (link, forward) => {
-    const keys = forward ? link.a_to_b_paper_table_keys : link.b_to_a_paper_table_keys;
-    if (Array.isArray(keys)) return new Set(keys.map(key => String(key).split("::")[0])).size;
-    if (!edgeSupportById) return 0;
-    return presentPaperIds(forward ? link.a_to_b_raw_link_ids : link.b_to_a_raw_link_ids,
-      edgeSupportById, rawLinksById).size;
-  };
-}
 
 /** Links whose paper keys an edit dropped; only these need per-finding records. */
 export function linksNeedingExactCounts(links = []) {

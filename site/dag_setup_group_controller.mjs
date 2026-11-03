@@ -3,6 +3,7 @@ import * as groupListModel from "./dag_group_list.mjs";
 import * as searchModel from "./dag_search.mjs";
 import * as workflow from "./dag_workflow.mjs";
 import { h, replaceChildren } from "./dom_builder.mjs";
+import { createVariableButton, customVariableActions } from "./custom_variable_actions.mjs";
 
 export function dag2AnchorPickerIsActive(state, side, groupById) {
   const iv = groupById(state.project?.iv_group_id);
@@ -33,6 +34,9 @@ export function createDagSetupGroupController({
   excludeConcept = () => {},
   // Causes and consequences reuse the anchor bar and picker for their one variable.
   exploreFocus = () => ({ active: false }), searchFocusGroups = () => [], onChooseFocus = () => {},
+  // Identify's Cause, Outcome and Instrument fields share the Explore picker list.
+  identifyPicking = () => null, onChooseIdentify = () => {},
+  canChangeCustom = () => true, deleteCustom = async () => {},
 }) {
   const variablePageSize = 10;
   let variablePage = 0;
@@ -52,8 +56,8 @@ export function createDagSetupGroupController({
     if (state.interfaceMode === "dag2") {
       const iv = groupById(state.project?.iv_group_id);
       const dv = groupById(state.project?.dv_group_id);
-      const exploring = state.task === "causes" || state.task === "consequences";
-      document.body.classList.toggle("initial-setup", !exploring
+      // Every task opens on its map and side panel; only the legacy flow takes the whole page.
+      document.body.classList.toggle("initial-setup", !state.task
         && (!(anchorHasMembers(state, iv) && anchorHasMembers(state, dv)) || state.phase === "select_instrument" && !state.changingAnchorSide));
       elements.setupSection.hidden = anchorHasMembers(state, iv) && anchorHasMembers(state, dv)
         && state.phase !== "select_instrument" && !state.changingAnchorSide && !state.definitionDraft;
@@ -84,6 +88,11 @@ export function createDagSetupGroupController({
       if (elements.editSplitIv) elements.editSplitIv.hidden = true;
       if (elements.editSplitDv) elements.editSplitDv.hidden = true;
       if (elements.instrumentRow) elements.instrumentRow.hidden = true;
+      return;
+    }
+    if (state.task === "identify") {
+      // The Cause, Outcome and Instrument fields in the side panel replace the anchor bar.
+      elements.anchorBar.hidden = true;
       return;
     }
     for (const row of anchorRows) row.hidden = false;
@@ -458,39 +467,69 @@ export function createDagSetupGroupController({
     if (chosen && !picking && document.activeElement !== elements.focusInput) elements.focusInput.value = focus.label;
     if (!picking) { container.hidden = true; container.replaceChildren(); elements.focusPickerCancel.hidden = true; return; }
     elements.focusPickerCancel.hidden = !focus.groupId;
-    const query = normalized(elements.focusInput.value);
-    const groups = searchFocusGroups(query);
+    renderPickerList(container, { query: normalized(elements.focusInput.value), input: elements.focusInput,
+      onChoose: onChooseFocus, onCreate: () => startDefinition?.("candidate") });
+  }
+
+  /** The Custom and Built-in variable lists a search field opens, in the Explore row style. */
+  function renderPickerList(container, { query, input, onChoose, onCreate, exclude = new Set() }) {
+    const groups = searchFocusGroups(query).filter(({ group }) => !exclude.has(group.group_id));
     container.hidden = false;
     const row = ({ group, variableMatch }) => {
       const label = group.label || group.group_id;
       const count = group.variable_ids?.length || Number(group.member_count) || 0;
-      return h("li", { className: "explore-row" },
+      const custom = group.source === "user_split";
+      return h("li", { className: `explore-row${custom ? " has-actions" : ""}` },
         h("button", { type: "button", className: "explore-row-open", dataset: { groupId: group.group_id },
           title: group.description || "", attrs: { "aria-label": `${label}, ${count} variables` } },
         h("span", { className: "explore-row-text" },
-          h("span", { className: "explore-row-label", textContent: label },
-            group.source === "user_split" ? h("span", { className: "explore-row-tag", textContent: "custom" }) : null),
+          h("span", { className: "explore-row-label", textContent: label }),
           variableMatch ? h("span", { className: "explore-row-path", textContent: `matches ${truncate(variableMatch, 70)}` }) : null),
-        h("span", { className: "explore-row-papers", textContent: String(count) })));
+        h("span", { className: "explore-row-papers", textContent: String(count) })),
+        custom ? customVariableActions({ group, canChange: canChangeCustom,
+          onEdit: id => startEditSplit?.(id), onDelete: deleteCustom }) : null);
     };
-    // One list under "Primary variable", filtered by the search box. Custom
-    // variables are listed with the rest and managed from the Custom variables page.
+    // Under "Primary variable": Custom variables, then Built-in variables. The
+    // search box above filters both.
     const status = query && state.variableSearchStatus === "loading" ? "Variable search is loading; matching names only for now."
       : query && state.publishedSchemaHydrating ? "Loading group memberships…"
         : query && state.variableSearchStatus === "error" ? "Variable search is unavailable; matching names only." : "";
+    const clearButton = () => h("button", { className: "btn btn--sm", type: "button", dataset: { clearFocusSearch: "true" }, textContent: "Clear search" });
+    const section = (title, items, emptyText, tools = null) => h("section", { className: "explore-group explore-picker-section" },
+      h("div", { className: "explore-group-header" },
+        h("h2", {}, title, " ", h("span", { className: "explore-subsection-count", textContent: `(${items.length})` })),
+        tools),
+      items.length ? h("ol", { className: "explore-list" }, items.map(row))
+        : h("p", { className: "explore-subsection-empty", textContent: emptyText }));
+    const custom = groups.filter(({ group }) => group.source === "user_split");
+    const builtIn = groups.filter(({ group }) => group.source !== "user_split");
     replaceChildren(container,
       status ? h("p", { className: "explore-subsection-empty", role: "status", textContent: status }) : null,
-      groups.length ? h("ol", { className: "explore-list" }, groups.map(row))
-        : h("div", { className: "explore-subsection-empty" },
-          h("p", { textContent: query ? "No matching variables." : "None available." }),
-          query ? h("button", { className: "btn btn--sm", type: "button", dataset: { clearFocusSearch: "true" }, textContent: "Clear search" }) : null));
+      section("Custom variables", custom, query ? "No custom variable matches." : "You have not made any custom variables yet.",
+        createVariableButton(onCreate)),
+      section("Built-in variables", builtIn, query ? "No built-in variable matches." : "None available."),
+      query && !groups.length ? h("div", { className: "explore-subsection-empty" }, clearButton()) : null);
     container.querySelectorAll("button[data-group-id]").forEach(button =>
-      button.addEventListener("click", () => onChooseFocus(button.dataset.groupId)));
+      button.addEventListener("click", () => onChoose(button.dataset.groupId)));
     container.querySelector("button[data-clear-focus-search]")?.addEventListener("click", () => {
-      elements.focusInput.value = "";
-      elements.focusInput.dispatchEvent(new Event("input", { bubbles: true }));
-      elements.focusInput.focus();
+      input.value = "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
     });
+  }
+
+  /** Identify: the list under the Cause, Outcome and Instrument fields while one is being searched. */
+  function renderIdentifyPicker() {
+    const container = document.getElementById("identifyGroupPicker");
+    if (!container) return;
+    const side = identifyPicking();
+    if (!side || state.definitionDraft) { container.hidden = true; container.replaceChildren(); return; }
+    const input = document.getElementById(`identify-${side}-input`);
+    // A variable can play one role at a time, so the other roles' variables are left out.
+    const exclude = new Set(["iv", "dv", "instrument"].filter(other => other !== side)
+      .map(other => state.project?.[`${other}_group_id`]).filter(Boolean));
+    renderPickerList(container, { query: normalized(input?.value || ""), input, exclude,
+      onChoose: groupId => onChooseIdentify(side, groupId), onCreate: () => startDefinition?.(side) });
   }
 
   function renderGroupList() {
@@ -523,19 +562,22 @@ export function createDagSetupGroupController({
   }
 
   function renderGroupingControls() {
+    // A human-readable label is the primary name; the identifier is only a fallback.
+    const setName = set => set.label || set.grouping_set_id;
     replaceChildren(elements.groupingSetSelect, (state.data.grouping_sets || []).map(set =>
-      h("option", { value: set.grouping_set_id, textContent: set.label || set.grouping_set_id })));
+      h("option", { value: set.grouping_set_id, textContent: setName(set), title: setName(set) })));
     elements.groupingSetSelect.value = state.project.active_grouping_set_id;
     const active = (state.data.grouping_sets || []).find(set => set.grouping_set_id === state.project.active_grouping_set_id) || (state.data.grouping_sets || [])[0];
+    // The closed select truncates long names; its tooltip carries the full one.
+    elements.groupingSetSelect.title = active ? setName(active) : "";
+    const count = active?.groups?.length || 0;
     elements.groupingSummary.textContent = active
-      ? state.interfaceMode === "dag2"
-        ? `${active.groups?.length || 0} groups. Import a schema draft to replace it.`
-        : `${active.groups?.length || 0} groups available; import to view all groups, or load the groups relevant to an Ind var/Dep var setup.`
-      : "No schema loaded. Import a schema or create groups manually.";
+      ? `${count} variable ${count === 1 ? "group" : "groups"}`
+      : "No schema loaded";
   }
 
   return { renderMode, renderAnchorBar, renderRightPanel, renderVariablePanel, hint, renderStatus, renderSetupPicker,
-    renderSetupPickers() { renderSetupPicker("dv"); renderSetupPicker("iv"); renderSetupPicker("instrument"); renderFocusPicker(); },
-    renderFocusPicker,
+    renderSetupPickers() { renderSetupPicker("dv"); renderSetupPicker("iv"); renderSetupPicker("instrument"); renderFocusPicker(); renderIdentifyPicker(); },
+    renderFocusPicker, renderIdentifyPicker,
     renderGroupList, renderGroupingControls };
 }

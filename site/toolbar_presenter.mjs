@@ -45,7 +45,8 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     if (elements.toggleSparseEdges) {
       elements.toggleSparseEdges.classList.toggle("active", state.excludeSparseEdges);
       elements.toggleSparseEdges.setAttribute("aria-pressed", state.excludeSparseEdges ? "true" : "false");
-      elements.minimumEdgePapers.value = String(state.minimumEdgePapers ?? 2);
+      // Off, no minimum applies, so the field reads 1 rather than the minimum the toggle would restore.
+      elements.minimumEdgePapers.value = String(state.excludeSparseEdges ? state.minimumEdgePapers ?? 2 : 1);
     }
     const layoutSources = state.data?.layout?.sources || [];
     replaceChildren(elements.variableLayoutSelect, layoutSources.map(source =>

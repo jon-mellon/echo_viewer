@@ -98,8 +98,8 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     // graph so the results list stays in view. Identify still reads it in the
     // side panel.
     placeEvidencePane = () => {
-      const exploring = state.task === "causes" || state.task === "consequences";
-      const parent = mobileLayout.matches || exploring ? workspace : leftPanel;
+      // In every task the evidence takes the map's place; the legacy layout keeps it in the side panel.
+      const parent = mobileLayout.matches || state.task ? workspace : leftPanel;
       if (evidencePane && parent && evidencePane.parentElement !== parent) parent.append(evidencePane);
     };
     mobileLayout.addEventListener("change", placeEvidencePane);

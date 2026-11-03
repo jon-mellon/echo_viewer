@@ -125,7 +125,7 @@ export function createDagInspectorController({
     replaceChildren(elements.edgeInspector,
       h("section", { className: "provenance-direction group-definition-section" },
         h("h3", {}, `${group.label || group.group_id} `,
-          h("span", { className: "provenance-count", textContent: "Group definition" })),
+          h("span", { className: "provenance-count", textContent: "Definition" })),
         h("p", { className: "group-definition-text", textContent: group.description || (state.publishedSchemaHydrating
           ? "Definition loading…" : "No definition available for this group.") })),
       h("section", { className: "provenance-direction group-concepts" },

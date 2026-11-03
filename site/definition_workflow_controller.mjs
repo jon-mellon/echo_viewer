@@ -472,7 +472,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     };
     els.definitionMethodJev.addEventListener("click", () => chooseMethod("jev"));
     els.definitionMethodManual.addEventListener("click", () => chooseMethod("manual"));
-    els.definitionCancel.addEventListener("click", cancelDefinition);
+    // Each step's footer has its own Cancel, beside Next (or Save).
+    for (const button of document.querySelectorAll(".definition-cancel")) button.addEventListener("click", cancelDefinition);
     els.definitionSourceSearch.addEventListener("input", renderDefinition);
     els.definitionContinue.addEventListener("click", continueDefinition);
     els.definitionDescribeNext.addEventListener("click", () => goToStep("partition"));

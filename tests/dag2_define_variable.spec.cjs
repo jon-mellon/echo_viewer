@@ -173,7 +173,7 @@ test("Variables list definition and split editing are reachable on desktop and m
   await expect(page.locator("#variableDefineNew")).toBeVisible();
   await page.locator("#variableDefineNew").click();
   await expect(page.locator("#definitionTitle")).toHaveText("Create a variable");
-  await page.locator("#definitionCancel").click();
+  await page.locator(".definition-cancel:visible").click();
   await splitRow.getByRole("button", { name: "Edit split" }).click();
   await expect(page.locator("#definitionTitle")).toHaveText("Edit “Browser list variable”");
   await page.locator("#definitionCancel").click();

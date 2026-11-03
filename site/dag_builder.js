@@ -41,7 +41,7 @@ import { importDraftFile, makeDraftExport } from "/draft_exchange.mjs";
 import { listPreviousSessions } from "/local_schema_store.mjs";
 import { escapeHtml } from "/text_utils.mjs";
 import { relevantExclusions } from "/dag_export_relevance.mjs";
-import { CONFOUNDER_STATUSES, confounderRows } from "/confounder_status.mjs";
+import { DIAGNOSTIC_STATUSES, STATUS_MENU_LABELS, diagnosticStatusRows } from "/confounder_status.mjs";
 import { h, replaceChildren, safeUrl, setSafeUrl } from "/dom_builder.mjs";
 import { hydrateSearchResult, variableSearchCatalog } from "/variable_search_catalog.mjs";
 
@@ -126,7 +126,7 @@ function initElements() {
     "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults",
     "definitionPartitionStep", "definitionMethodJev", "definitionMethodManual", "definitionLoadStatus", "definitionJevPanel", "definitionManualPanel",
     "definitionConceptsIntro", "definitionCountIncluded", "definitionCountExcluded", "definitionCountUnreviewed",
-    "definitionSourcesDetails", "definitionSourcesSummary", "definitionTermSummary",
+    "definitionSourcesSummary", "definitionTermSummary",
     "definitionConceptSearch", "definitionStatusFilter", "definitionTermSelect", "definitionActiveFilters",
     "definitionIncludedFilter", "definitionRelated", "definitionSaveHint",
     "definitionAiStepConnect", "definitionAiStepLimit", "definitionAiStepSample", "definitionAiStepFull",
@@ -143,7 +143,7 @@ function initElements() {
     "definitionBack", "definitionSelectedTitle", "definitionSaveStatus",
     "definitionNewLabel", "definitionNewDescription", "definitionResidualLabels",
     "definitionValidation", "definitionSave",
-    "openCustomVariables", "customVariablesView", "customVariablesTitle", "customVariablesCreate", "customVariablesClose",
+    "customVariablesView", "customVariablesTitle", "customVariablesCreate", "customVariablesClose",
     "customVariablesFilter", "customVariablesStatus", "customVariablesTable",
     "workflowHint", "dagStatusBadge",
     "variablePanel", "variableDefineNew", "variablePanelDisclosure", "variablePanelCount", "variablePanelList", "variablePanelPagination",
@@ -153,7 +153,8 @@ function initElements() {
     // Grouping schema
     "groupingPanel", "groupingSetSelect", "exportGroupingFolder", "publishSchema",
     "copyPermalink", "groupingSummary", "publicationStatus", "schemaPublicationBadge",
-    "publishedSchemaPermalink", "publishSchemaDialog",
+    "publishedSchemaPermalink", "publishSchemaDialog", "importSchemaAction", "importSchemaDialog",
+    "importSchemaChooseFile",
     // Rejected variables
     "rejectedVariablesPanel", "rejectedVariableSearch", "rejectedVariablesList",
     // Map
@@ -233,6 +234,16 @@ function initElements() {
       if (editorWasOpen) groupEditorController.closeGroupEditor();
       publicationController.workingCopyChanged();
     } catch (error) { els.localSaveStatus.textContent = `Not saved — ${error.message}`; }
+  });
+  // Schema menu → Import schema…: the dialog explains what importing replaces,
+  // then opens the same file picker as Import → Schema draft.
+  els.importSchemaAction?.addEventListener("click", () => {
+    if (els.importSchemaDialog?.showModal) els.importSchemaDialog.showModal();
+    else els.importLocalDraft?.click();
+  });
+  els.importSchemaChooseFile?.addEventListener("click", () => {
+    els.importSchemaDialog?.close("import");
+    els.importLocalDraft?.click();
   });
   els.importLocalDraft?.addEventListener("change", async event => {
     const file = event.target.files?.[0];
@@ -558,54 +569,66 @@ function renderRightPanel() {
   renderConfounderStatuses();
 }
 
+/** Which status list applies: confounders or colliders, in the view that shows them. */
+function statusKind() {
+  return state.showConfoundersOnly ? "confounders" : state.showCollidersOnly ? "colliders" : null;
+}
+
+/** Record how a confounder or collider is handled; shared by the side panel and the table. Undoable. */
+function setDiagnosticStatus(kind, groupId, status, text = "") {
+  const spec = DIAGNOSTIC_STATUSES[kind];
+  const row = diagnosticStatusRows(state.project, [groupId], kind)[0];
+  if (!spec || !row || !Object.hasOwn(spec.statuses, status)) return;
+  const note = status === "other" ? text.trim() : "";
+  if (row.status === status && row.text === note) return;
+  const before = takeSnapshot();
+  state.project[spec.field] = { ...(state.project[spec.field] || {}),
+    [row.key]: { status, ...(note ? { text: note } : {}) } };
+  projectController.record(`Set ${spec.noun} status: ${row.label}`, before);
+  publicationController.workingCopyChanged();
+  void persistentViewer.commitDecision().catch(error => console.error(`Could not save ${spec.noun} status`, error));
+  renderConfounderStatuses();
+  if (dagNetworkController.dagDisplay() === "table") void dagNetworkController.renderDag({ reuseGeometry: true });
+}
+
 function renderConfounderStatuses() {
-  const visible = state.interfaceMode === "dag2" && state.showConfoundersOnly
+  const kind = statusKind();
+  const visible = state.interfaceMode === "dag2" && Boolean(kind)
     && !els.dagWorkspaceSection.hidden && !state.project.instrument_group_id
     && Boolean(groupById(state.project.iv_group_id)?.variable_ids?.length)
     && Boolean(groupById(state.project.dv_group_id)?.variable_ids?.length);
   els.confounderConfig.hidden = !visible;
   if (!visible) return;
-  const rows = confounderRows(state.project, state.confounderGroupIds);
-  els.confounderSummary.textContent = `Confounder status (${rows.length})`;
+  const spec = DIAGNOSTIC_STATUSES[kind];
+  const rows = diagnosticStatusRows(state.project, kind === "confounders" ? state.confounderGroupIds : state.colliderGroupIds, kind);
+  const title = kind === "confounders" ? "Confounder" : "Collider";
+  els.confounderSummary.textContent = `${title} status (${rows.length})`;
+  const note = els.confounderDisclosure.querySelector(".small-note");
+  if (note) note.textContent = `Record how each potential ${spec.noun} is handled in this study.`;
   if (!els.confounderDisclosure.open) {
     els.confounderStatusList.replaceChildren();
     return;
   }
   if (!rows.length) {
     replaceChildren(els.confounderStatusList,
-      h("p", { className: "small-note", textContent: "No potential confounders in this view." }));
+      h("p", { className: "small-note", textContent: `No potential ${spec.noun}s in this view.` }));
     return;
   }
   replaceChildren(els.confounderStatusList, rows.map(row => {
     const select = h("select", { className: "select-input", attrs: { "aria-label": `Status for ${row.label}` } },
-      Object.entries(CONFOUNDER_STATUSES).map(([value, label]) =>
-        h("option", { value, textContent: value === "accounted_for_by_design"
-          ? "Accounted for by design" : label })));
+      Object.entries(spec.statuses).map(([value, label]) =>
+        h("option", { value, textContent: STATUS_MENU_LABELS[value] || label })));
     select.value = row.status;
-    select.title = CONFOUNDER_STATUSES[row.status];
+    select.title = spec.statuses[row.status];
     const explanation = h("input", { className: "search-input", type: "text",
-      value: row.text, placeholder: "Describe how this confounder is handled",
+      value: row.text, placeholder: `Describe how this ${spec.noun} is handled`,
       attrs: { "aria-label": `Other status for ${row.label}` } });
     explanation.hidden = row.status !== "other";
-    const save = () => {
-      const before = takeSnapshot();
-      state.project.confounder_statuses ||= {};
-      state.project.confounder_statuses[row.key] = {
-        status: select.value,
-        ...(select.value === "other" && explanation.value.trim()
-          ? { text: explanation.value.trim() } : {}),
-      };
-      projectController.record(`Set confounder status: ${row.label}`, before);
-      publicationController.workingCopyChanged();
-      void persistentViewer.commitDecision().catch(error =>
-        console.error("Could not save confounder status", error));
-    };
     select.addEventListener("change", () => {
-      select.title = CONFOUNDER_STATUSES[select.value];
       explanation.hidden = select.value !== "other";
-      save();
+      setDiagnosticStatus(kind, row.groupId, select.value, explanation.value);
     });
-    explanation.addEventListener("change", save);
+    explanation.addEventListener("change", () => setDiagnosticStatus(kind, row.groupId, select.value, explanation.value));
     return h("div", { className: "confounder-status-row" },
       h("label", { textContent: row.label }, select), explanation);
   }));
@@ -905,6 +928,49 @@ function renderSeedRows() {
 function beginTargetGroup(side) { return groupEditorController.beginTargetGroup(side); }
 function promoteGroupToAnchor(side, groupId) { return groupEditorController.promoteGroupToAnchor(side, groupId); }
 function assignGroupAsAnchor(side, groupId) { return groupEditorController.assignGroupAsAnchor(side, groupId); }
+
+/**
+ * Identify's Cause, Outcome and Instrument fields. Each choice replaces that role
+ * directly, so there is no step-by-step setup: the map appears as soon as both
+ * a cause and an outcome are chosen.
+ */
+function chooseIdentifyVariable(side, groupId) {
+  if (side === "instrument") {
+    assignGroupAsInstrument(groupId);
+    // Choosing an instrument ends setup; with the cause or outcome still empty it has not ended.
+    if (!state.project.iv_group_id || !state.project.dv_group_id) {
+      state.workflowMode = "setup";
+      state.phase = state.project.iv_group_id ? "select_dv" : "select_iv";
+      persistentViewer.viewerChanged();
+    }
+    return;
+  }
+  if (!groupId) {
+    // The × in a Cause or Outcome field: the role is left empty until another variable is chosen.
+    const label = groupById(state.project?.[`${side}_group_id`])?.label;
+    const before = takeSnapshot("anchors");
+    if (!applyProjectOperation(projectOps.clearAnchor(state.project, side))) return;
+    state.identifyExclusion = null;
+    // A link with a role missing must say it is mid-setup, or reopening it is refused.
+    state.workflowMode = "setup";
+    state.phase = state.project.iv_group_id ? "select_dv" : "select_iv";
+    state.selectedEdgeId = null;
+    state.selectedEvidenceGroupId = null;
+    addToUndoHistory(`Remove "${label || side}" as ${side === "iv" ? "cause" : "outcome"}`, before, "anchors");
+    renderAll({ reuseLinks: true });
+    setupGroupController.renderIdentifyPicker();
+    return;
+  }
+  if (groupId === state.project?.[`${side}_group_id`] && groupById(groupId)?.variable_ids?.length) {
+    renderAll({ rebuild: false });
+    return;
+  }
+  // Replacing a role, rather than stepping through setup, goes straight to the map.
+  state.changingAnchorSide = side;
+  assignGroupAsAnchor(side, groupId);
+  state.changingAnchorSide = null;
+  setupGroupController.renderIdentifyPicker();
+}
 function seedLabel(side) { return groupEditorController.seedLabel(side); }
 // Event handlers retain group references through edits. Apply pure results while
 // preserving those identities; snapshots deliberately replace them on undo.
@@ -1181,6 +1247,19 @@ function activeGroupingSet() { return groupingSetController.active(); }
 
 function copyPermalink() { return groupingSetController.copyPermalink(); }
 
+// A temporary note beside the brand for completed operations. It clears itself
+// unless something else has written to the status in the meantime.
+let briefNoticeTimer = null;
+function notifyBriefly(message) {
+  const status = els.localSaveStatus;
+  if (!status) return;
+  clearTimeout(briefNoticeTimer);
+  status.textContent = message;
+  briefNoticeTimer = setTimeout(() => {
+    if (status.textContent === message) status.textContent = "";
+  }, 5000);
+}
+
 function currentWorkingGroupingSchema() { return groupingSetController.workingSchema(); }
 
 const persistentViewer = createPersistentViewer({
@@ -1195,7 +1274,18 @@ const persistentViewer = createPersistentViewer({
       ? { scale, position: network.getViewPosition() } : null;
   },
   status: message => {
-    if (els.localSaveStatus) els.localSaveStatus.textContent = message;
+    // Routine saves show as a small icon; anything else (errors, editing, notices) as text.
+    const saving = message.startsWith("Saving");
+    const saved = message.startsWith("Saved");
+    const indicator = document.getElementById("localSaveIndicator");
+    if (indicator) {
+      indicator.hidden = !saving && !saved;
+      indicator.dataset.state = saving ? "saving" : "saved";
+      const label = saving ? "Saving in this browser…" : "Saved in this browser";
+      indicator.title = label;
+      indicator.setAttribute("aria-label", label);
+    }
+    if (els.localSaveStatus) els.localSaveStatus.textContent = saving || saved || message === "Published schema" ? "" : message;
     if (els.retryLocalSave) els.retryLocalSave.hidden = !message.startsWith("Not saved");
     if (els.saveIndependentCopy) els.saveIndependentCopy.hidden =
       !message.includes("Schema revision changed");
@@ -1222,6 +1312,27 @@ const taskViews = createTaskViews({
   },
   openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
   onRowHover: row => dagNetworkController.hoverExploreRow(row),
+  onChooseIdentify: (side, groupId) => chooseIdentifyVariable(side, groupId),
+  onIdentifyPicking: () => { setupGroupController.renderIdentifyPicker(); taskViews.render(); },
+  onIdentifyRowHover: groupId => groupId ? dagNetworkController.highlightConfounderPaths(groupId)
+    : dagNetworkController.clearConfounderPathHover(),
+  onIdentifyExcludedChange: () => updateDagFilters(),
+  // A row opens the variable's definition and concepts in the evidence pane, as clicking its node does.
+  onOpenIdentifyVariable: groupId => {
+    if (state.fullscreenPanel) setFullscreenPanel(null);
+    state.selectedEdgeId = null;
+    state.comparisonVariableIds = [];
+    state.selectedEvidenceGroupId = groupId;
+    renderCoordinator.selectEdge();
+    taskViews.refreshSelection();
+    persistentViewer.viewerChanged();
+    shellController.showMobilePanel("dag");
+  },
+  canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
+  onEditCustom: groupId => startEditSplit(groupId),
+  onDeleteCustom: deleteCustomVariable,
+  onCreateCustom: () => startDefinition("candidate"),
+
   placeEvidencePane: () => shellController.placeEvidencePane(),
   onChange: () => persistentViewer.viewerChanged(), prepareReset: () => persistentViewer.prepareReset(), whenReady: () => persistentViewer.whenReady(),
 });
@@ -1440,10 +1551,13 @@ function computeExploreLinks() {
 function computeVisibleLinks() {
   if (taskViews.exploring()) { computeExploreLinks(); return; }
   ensureDiagnosticFilter(state);
-  const missingSparseEvidence = state.excludeSparseEdges ? missingLinkSupportIds() : [];
+  // Links carry their papers per direction; only those an edit stripped of
+  // paper keys need their findings fetched before sparse edges can be judged.
+  const sparseNeeding = state.excludeSparseEdges ? linksNeedingExactCounts(state.project?.links || []) : [];
+  const missingSparseEvidence = sparseNeeding.length ? missingLinkSupportIds(sparseNeeding) : [];
   if (missingSparseEvidence.length && !sparseWaitingForSupport) {
     sparseWaitingForSupport = true;
-    void loadLinkSupport(state.project?.links).then(loaded => {
+    void loadLinkSupport(sparseNeeding).then(loaded => {
       sparseWaitingForSupport = false;
       if (!loaded && linkSupportFailed) state.excludeSparseEdges = false;
       updateDagFilters();
@@ -1464,9 +1578,14 @@ function computeVisibleLinks() {
   const excludedFindingCount = Object.keys(state.project.finding_decisions || {}).length;
   els.showExcludedFindings.hidden = excludedFindingCount === 0;
   els.showExcludedFindings.textContent = `Excluded findings (${excludedFindingCount})`;
+  // Variables unticked in Identify's list are left off the map, and no path runs through them.
+  const studyIds = new Set([state.project.iv_group_id, state.project.dv_group_id, state.project.instrument_group_id]);
+  const identifyExcluded = new Set([...taskViews.identifyExcluded()].filter(id => !studyIds.has(id)));
   const view = deriveDagView({
-    groups: dagGroups(),
-    links: state.project.links,
+    groups: identifyExcluded.size
+      ? dagGroups().filter(group => !identifyExcluded.has(group.group_id)) : dagGroups(),
+    links: identifyExcluded.size ? state.project.links.filter(link =>
+      !identifyExcluded.has(link.group_a) && !identifyExcluded.has(link.group_b)) : state.project.links,
     ivId: state.project.iv_group_id,
     dvId: state.project.dv_group_id,
     instrumentId: state.project.instrument_group_id,
@@ -2026,6 +2145,9 @@ const setupGroupController = createDagSetupGroupController({
   searchAnchorGroups, beginEditor: () => persistentViewer.beginEditor(),
   exploreFocus: () => taskViews.focus(), searchFocusGroups: query => taskViews.searchFocusGroups(query),
   onChooseFocus: groupId => taskViews.chooseFocus(groupId),
+  identifyPicking: () => taskViews.identifySide(), onChooseIdentify: (side, groupId) => taskViews.chooseIdentify(side, groupId),
+  canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
+  deleteCustom: deleteCustomVariable,
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
   excludeConcept: excludeGroupConcept,
@@ -2035,6 +2157,7 @@ const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
   drawMap, setMapMode, renderAll, exploreRows: () => taskViews.neighborhood().included,
   onNodeHover: id => taskViews.highlightRow(id),
+  onSetStatus: (kind, groupId, status, text) => setDiagnosticStatus(kind, groupId, status, text),
   onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
   selectEdge: () => {
     if (state.fullscreenPanel) setFullscreenPanel(null);
@@ -2143,6 +2266,7 @@ publicationController = createPublicationController({
     get publish() { return els.publishSchema; },
     get status() { return els.publicationStatus; },
     get badge() { return els.schemaPublicationBadge; },
+    get menuButton() { return document.querySelector("#schemaMenu > summary"); },
     get permalink() { return els.publishedSchemaPermalink; },
     get confirmation() { return els.publishSchemaDialog; },
     get share() { return els.copyPermalink; },
@@ -2151,6 +2275,7 @@ publicationController = createPublicationController({
   getCompiledDag: () => state.compiledDagValid && !state.compiledDagUpdating ? state.compiledDag : null,
   canPublish: () => !state.publishedSchemaHydrating && !state.publishedSchemaLoadFailed
     && persistentViewer.canPublish,
+  notify: notifyBriefly,
   getCompileInput: async () => {
     if (state.compiledDagValid && !state.compiledDagUpdating) {
       return { project: dagProjectView(), linkLookup: state.linkLookup, rawLinksById: state.rawLinksById };

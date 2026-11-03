@@ -147,23 +147,34 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
 
   function renderSources(draft, { selected }) {
     const sources = definitionSources();
-    els.definitionSourcesSummary.textContent = `Source variables (${sources.length})`;
+    els.definitionSourcesSummary.textContent = sources.length === 1 ? "What stays in the original variable"
+      : `What stays in the ${fmt(sources.length)} original variables`;
     const focused = [...els.definitionResidualLabels.querySelectorAll("input[data-residual-id]")]
       .includes(/** @type {any} */ (document.activeElement));
     if (focused) return;
-    replaceChildren(els.definitionResidualLabels, sources.map(source => {
-      const inputId = `residual_${source.group_id}`;
-      const total = new Set(source.variable_ids.map(clusterRep));
-      const included = [...total].filter(id => selected.has(id)).length;
-      const stays = definitionResidualIds(source).length;
-      return h("div", { className: "definition-source-name-row" },
-        h("label", { htmlFor: inputId, className: "definition-source-name-label" },
-          h("strong", { textContent: source.label || source.group_id }),
-          h("span", { className: "small-note", textContent: `${fmt(total.size)} concepts · ${fmt(included)} included · ${fmt(stays)} stay` })),
-        h("input", { id: inputId, className: "search-input", dataset: { residualId: source.group_id },
-          value: draft.residual_labels[source.group_id] || "", placeholder: source.label || "",
-          attrs: { "aria-label": `Name for what stays in ${source.label || source.group_id}` } }));
-    }));
+    // One row per original variable: how many of its concepts move, how many
+    // stay, and the name what stays will have. Nothing left blocks Save.
+    replaceChildren(els.definitionResidualLabels, h("table", { className: "definition-sources-grid" },
+      h("thead", {}, h("tr", {},
+        h("th", { scope: "col", textContent: "Original variable" }),
+        h("th", { scope: "col", className: "num", textContent: "Moving" }),
+        h("th", { scope: "col", className: "num", textContent: "Staying" }),
+        h("th", { scope: "col", textContent: "Name after the move" }))),
+      h("tbody", {}, sources.map(source => {
+        const label = source.label || source.group_id;
+        const total = new Set(source.variable_ids.map(clusterRep));
+        const included = [...total].filter(id => selected.has(id)).length;
+        const stays = definitionResidualIds(source).length;
+        return h("tr", { className: stays ? "" : "is-emptied" },
+          h("th", { scope: "row" }, h("span", { textContent: label, title: label }),
+            h("span", { className: "small-note definition-source-total", textContent: `${fmt(total.size)} concepts` })),
+          h("td", { className: "num", textContent: fmt(included) }),
+          h("td", { className: "num", textContent: fmt(stays),
+            title: stays ? "" : "At least one concept must stay; exclude one to save." }),
+          h("td", {}, h("input", { className: "search-input", dataset: { residualId: source.group_id },
+            value: draft.residual_labels[source.group_id] || "", placeholder: `${label} (unchanged)`,
+            attrs: { "aria-label": `Name for what stays in ${label}` } })));
+      }))));
     els.definitionResidualLabels.querySelectorAll("input[data-residual-id]").forEach(input =>
       input.addEventListener("input", () => onResidualLabel(input.dataset.residualId, input.value)));
   }
