@@ -335,6 +335,50 @@ function drawRouteJoins(context) {
     context.fill();
   }
   context.restore();
+  drawEmphasizedRoutes(context);
+}
+
+// Edges are opaque, so a hovered or selected route would be painted over by any
+// edge vis draws after it. Redraw those routes on top as one polyline, kept out
+// of the node boxes so they never cover a node or its arrowhead.
+function drawEmphasizedRoutes(context) {
+  if (!_visNetwork) return;
+  const emphasized = new Set(_dagHoveredLogicalEdgeIds);
+  if (_renderedSelectedEdgeId) emphasized.add(_renderedSelectedEdgeId);
+  if (!emphasized.size) return;
+  const routes = new Map();
+  for (const [segmentId, logicalId] of _dagEdgeSegments) {
+    const match = /::seg(\d+)$/.exec(segmentId);
+    if (!match || !emphasized.has(logicalId)) continue;
+    if (!routes.has(logicalId)) routes.set(logicalId, []);
+    routes.get(logicalId).push({ index: Number(match[1]), segmentId });
+  }
+  if (!routes.size) return;
+  const boxes = (_visNodes?.getIds() || []).filter(id => !String(id).startsWith("__route__")).map(id => {
+    const b = _visNetwork.getBoundingBox(id);
+    return [b.left, b.top, b.right - b.left, b.bottom - b.top];
+  });
+  context.save();
+  context.beginPath();
+  context.rect(-1e6, -1e6, 2e6, 2e6);
+  for (const [x, y, w, h] of boxes) context.rect(x, y, w, h);
+  context.clip("evenodd");
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  for (const segments of routes.values()) {
+    segments.sort((a, b) => a.index - b.index);
+    const edges = segments.map(({ segmentId }) => _visEdges.get(segmentId)).filter(Boolean);
+    if (!edges.length) continue;
+    const ids = [edges[0].from, ...edges.map(edge => edge.to)];
+    const points = _visNetwork.getPositions(ids);
+    context.globalAlpha = edges[0].color?.opacity ?? 1;
+    context.strokeStyle = edges[0].color?.color || "#999999";
+    context.lineWidth = Number(edges[0].width || 1);
+    context.beginPath();
+    ids.forEach((id, i) => (i ? context.lineTo(points[id].x, points[id].y) : context.moveTo(points[id].x, points[id].y)));
+    context.stroke();
+  }
+  context.restore();
 }
 
 function drawConfounderPathLanes(context) {
