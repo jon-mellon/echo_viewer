@@ -33,7 +33,7 @@ test("local and browser publication share the same immutable file and registry o
       } };
     } },
   };
-  const result = await publishWorkingSchema({ schema, client,
+  const result = await publishWorkingSchema({ schema, client, source: "supabase",
     previousPublication: { publication_id: "parent" }, compileInput: { rawLinks: [] } });
   assert.equal(result.contentHash, (await canonicalizeWorkingSchema(schema)).contentHash);
   assert.equal(calls.at(-1)[0], "insert");

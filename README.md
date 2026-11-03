@@ -129,7 +129,7 @@ made from that page keep the parameter. On a Cloudflare page a publication's reg
 (its contract is `docs/publishing-api.md`; the Worker itself, its database and its setup live in `harvest_abstracts`,
 `analysis/10k/echo_viewer_bundle/publish_worker`). On the default source, publishing and the registry stay on Supabase. Copy the files to R2 with `mirror_published_schemas_r2.py` in
 harvest_abstracts (`analysis/10k/echo_viewer_bundle`), and rerun it after publishing a
-schema until Cloudflare is the default. The default is `DEFAULT_SCHEMA_SOURCE` in
+schema. The default (Cloudflare) is `DEFAULT_SCHEMA_SOURCE` in
 `site/schema_source.mjs`. Browser tests and the profile scripts run the viewer as staging ships it, on the Cloudflare source
 (`tests/support/default_source.cjs` rewrites the one default line as the page loads; the repo's default stays
 Supabase, and `ECHO_TEST_DEFAULT_SOURCE=supabase` runs the tests on it). They keep published schema files on disk
