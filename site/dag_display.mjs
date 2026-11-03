@@ -1,7 +1,6 @@
 import { confounderPathNodeRole } from "./dag_graph.mjs";
 import { wrapDagLabel } from "./dag_layout.mjs";
 import { directedGroupLabels } from "./dag_exports.mjs";
-import { escapeHtml } from "./text_utils.mjs";
 
 // Display records only: no renderer, DOM or viewer-state access.
 
@@ -91,15 +90,10 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const color = role ? ROLE_COLORS[role] : view.groupColor;
   const fill = mixHex(color, "#ffffff", NODE_FILL_SOFTNESS);
   const roleBorder = deeper(color);
-  const roleTag = view.focusId && group.group_id === view.focusId ? " (focus)" : isIv ? " (Ind var)" : isDv ? " (Dep var)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : isExogeneityCandidate ? " (potential common cause of instrument and Dep var)" : "";
-  const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
   return {
     id: group.group_id,
     label: wrapDagLabel(group.label, maxChars),
-    title: isConfounder || isCollider || isExogeneityCandidate
-      ? undefined
-      : `${escapeHtml(group.label)}${roleTag} · ${group.variable_ids.length || group.member_count || 0} variables${mediatorTag}`,
     x: layoutPoint?.x || 0,
     y: layoutPoint?.y || 0,
     fixed: { x: true, y: true },

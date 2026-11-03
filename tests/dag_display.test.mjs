@@ -28,7 +28,7 @@ test("display records preserve node roles, selection, edge styles and descriptio
   vm.runInContext(readFileSync(new URL("./fixtures/legacy_dag_display.js", import.meta.url), "utf8"), legacy);
   const plain = value => JSON.parse(JSON.stringify(value));
   // Colours, fonts, hover behaviour and shadows are restyled; geometry and text are not.
-  const geometry = ({ color, font, chosen, shadow, shapeProperties, borderWidth, borderWidthSelected, ...rest }) => rest;
+  const geometry = ({ color, font, chosen, shadow, shapeProperties, borderWidth, borderWidthSelected, title, ...rest }) => rest;
   const before = structuredClone(groups);
   for (const mode of ["normal", "confounder", "collider"]) for (const selected of [null, "candidate", "iv"]) {
     state.showCollidersOnly = mode === "collider";
@@ -40,6 +40,7 @@ test("display records preserve node roles, selection, edge styles and descriptio
     for (const group of groups) for (const width of [160, 220]) for (const point of [undefined, { x: 20, y: -10 }]) {
       const node = display.visNodeData(group, point, { nodeMaxWidth: width }, view);
       assert.deepEqual(plain(geometry(node)), plain(geometry(legacy.visNodeData(group, point, { nodeMaxWidth: width }))));
+      assert.equal(node.title, undefined);
       assert.equal(node.chosen.label, false);
       assert.equal(typeof node.chosen.node, "function");
     }
