@@ -3,6 +3,7 @@
 import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { routeProfileSite } from './profile_site_route.mjs';
+import { noteRetry, runRetries } from './profile_run_retry.mjs';
 import { resolve } from 'node:path';
 
 const url = new URL(process.env.PROFILE_URL || 'https://www.jonathanmellon.com/echo_viewer_staging/');
@@ -30,93 +31,107 @@ const browser = await chromium.launch({ headless: true });
 let activePage, activeCdp, profiling = false;
 try {
   for (let run = 0; run < runs; run++) {
-    const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1365, height: 900 }, isMobile: mobile, hasTouch: mobile });
-    if (!remote) await routeProfileSite(context, url.href, root);
-    const page = await context.newPage(); activePage = page;
-    const errors = [];
-    page.on('pageerror', error => { errors.push(error.message); console.error(error.message); });
-    page.on('requestfailed', request => console.error('Request failed:', request.url(), request.failure()?.errorText));
-    await page.addInitScript(() => {
-      sessionStorage.setItem('echo-viewer-password-accepted', 'yes');
-      window.__diagnosticTasks = [];
-      window.__diagnosticObserver = new PerformanceObserver(list => window.__diagnosticTasks.push(...list.getEntries().map(e => ({ start: e.startTime, ms: e.duration }))));
-      window.__diagnosticObserver.observe({ type: 'longtask', buffered: true });
-    });
-    const cdp = await context.newCDPSession(page); activeCdp = cdp;
-    if (mobile) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-    page.setDefaultTimeout(30000);
-    await page.goto(url.href);
-    await page.waitForFunction(() => {
-      const s = window.__dagBuilderState;
-      if (document.body.innerText.startsWith('Local schema unavailable')) throw new Error('Local draft unavailable');
-      return s?.compiledDag && !s.compiledDagUpdating && s.publishedSchemaHydrated && !s.publishedSchemaHydrating && document.getElementById('startupLoading')?.hidden;
-    }, null, { timeout: 120000 });
-    const apiUrl = await page.locator('script[src*="dag_builder.js"]').getAttribute('src');
-    async function settled() {
-      await page.waitForFunction(() => !window.__dagBuilderState.compiledDagUpdating);
-      await page.evaluate(async src => {
-        await (await import(src)).whenDagRendered();
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      }, apiUrl);
+    for (let attempt = 0; ; attempt++) {
+      let context;
+      try {
+        context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1365, height: 900 }, isMobile: mobile, hasTouch: mobile });
+        if (!remote) await routeProfileSite(context, url.href, root);
+        const page = await context.newPage(); activePage = page;
+        const errors = [];
+        page.on('pageerror', error => { errors.push(error.message); console.error(error.message); });
+        page.on('requestfailed', request => console.error('Request failed:', request.url(), request.failure()?.errorText));
+        await page.addInitScript(() => {
+          sessionStorage.setItem('echo-viewer-password-accepted', 'yes');
+          window.__diagnosticTasks = [];
+          window.__diagnosticObserver = new PerformanceObserver(list => window.__diagnosticTasks.push(...list.getEntries().map(e => ({ start: e.startTime, ms: e.duration }))));
+          window.__diagnosticObserver.observe({ type: 'longtask', buffered: true });
+        });
+        const cdp = await context.newCDPSession(page); activeCdp = cdp;
+        if (mobile) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+        page.setDefaultTimeout(30000);
+        await page.goto(url.href);
+        await page.waitForFunction(() => {
+          const s = window.__dagBuilderState;
+          if (document.body.innerText.startsWith('Local schema unavailable')) throw new Error('Local draft unavailable');
+          return s?.compiledDag && !s.compiledDagUpdating && s.publishedSchemaHydrated && !s.publishedSchemaHydrating && document.getElementById('startupLoading')?.hidden;
+        }, null, { timeout: 120000 });
+        const apiUrl = await page.locator('script[src*="dag_builder.js"]').getAttribute('src');
+        async function settled() {
+          await page.waitForFunction(() => !window.__dagBuilderState.compiledDagUpdating);
+          await page.evaluate(async src => {
+            await (await import(src)).whenDagRendered();
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+          }, apiUrl);
+        }
+        if (mobile) await page.locator('[data-mobile-panel="dag"]').click();
+        await settled();
+        await page.evaluate(() => {
+          const s = window.__dagBuilderState;
+          window.__diagnosticBaseline = { compiled: s.compiledDag, links: s.project.links, groups: s.project.groups, evidence: s.rawLinksById.size };
+        });
+        const result = { timings: [], errors };
+        report.runs.push(result);
+        await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); profiling = true;
+        async function measure(name, id, expectedMode) {
+          // The Filters dropdown is in the variable list's header (the list tab on a phone) and closes on an outside click;
+          // the view switches are in the top bar, behind a menu button on a phone.
+          const navToggle = page.locator('#navToggle');
+          const navOpen = async () => (await navToggle.isVisible()) && (await navToggle.getAttribute('aria-expanded')) === 'true';
+          if (await navOpen()) await navToggle.click();
+          if (await page.locator(`details.filter-dropdown #${id}`).count()) {
+            if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+            const dropdown = page.locator('details.filter-dropdown:visible');
+            if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator('summary').click();
+          } else if (await navToggle.isVisible()) await navToggle.click();
+          const start = await page.evaluate(() => performance.now());
+          await page.locator(`#${id}`).click();
+          await settled();
+          const timing = await page.evaluate(async ({ start, name, apiUrl, expectedMode }) => {
+            const s = window.__dagBuilderState, baseline = window.__diagnosticBaseline;
+            if (s.compiledDag !== baseline.compiled || s.project.links !== baseline.links || s.project.groups !== baseline.groups) throw new Error('View filter rebuilt the project');
+            if (s.rawLinksById.size !== baseline.evidence) throw new Error('View switch loaded raw evidence');
+            if (expectedMode && !s[expectedMode]) throw new Error(`Wrong diagnostic mode: ${expectedMode}`);
+            const api = await import(apiUrl), rendered = new Set(api.renderedDagEdgeIds());
+            const expected = s.visibleLinks.filter(link => !link.is_target_relation && s.componentGroupIds.has(link.group_a) && s.componentGroupIds.has(link.group_b)).map(link => link.edge_id);
+            if (!expected.length) throw new Error('Expected a nonempty diagnostic graph');
+            if (expected.some(id => !rendered.has(id))) throw new Error('Visible evidence missing from rendered graph');
+            const projectIds = new Set(s.project.links.filter(l => !l.is_target_relation).map(l => l.edge_id));
+            const expectedIds = new Set(expected);
+            if ([...rendered].some(id => projectIds.has(id) && !expectedIds.has(id))) throw new Error('Stale evidence remains rendered');
+            // Drain pending observer records after the two paint frames.
+            window.__diagnosticTasks.push(...window.__diagnosticObserver.takeRecords().map(e => ({ start: e.startTime, ms: e.duration })));
+            const tasks = window.__diagnosticTasks.filter(t => t.start >= start);
+            return { name, ms: performance.now() - start, longestTaskMs: Math.max(0, ...tasks.map(t => t.ms)), totalLongTaskMs: tasks.reduce((n, t) => n + t.ms, 0), visibleEdges: expected.length };
+          }, { start, name, apiUrl, expectedMode });
+          result.timings.push(timing);
+          console.log(JSON.stringify({ run: run + 1, ...timing }));
+          if (process.env.PROFILE_DISABLE_BUDGETS !== '1' && (timing.ms > budgets.wallMs || timing.longestTaskMs > budgets.longestTaskMs)) throw new Error(`Performance budget exceeded: ${name}`);
+        }
+        // First switch exercises cold geometry; later switches exercise both cached views.
+        for (let cycle = 0; cycle < 3; cycle++) {
+          await measure(`exclusion ${cycle + 1}`, 'toggleExclusionViolations', 'showExclusionViolations');
+          await measure(`exogeneity ${cycle + 1}`, 'toggleExogeneity', 'showExogeneity');
+        }
+        await measure('bottleneck filter', 'toggleBottleneckedConfounders', 'showExogeneity');
+        await measure('path links filter', 'toggleIrrelevantConfounderLinks', 'showExogeneity');
+        await measure('return to exclusion', 'toggleExclusionViolations', 'showExclusionViolations');
+        await measure('all exclusion links', 'toggleAllExclusionLinks', 'showExclusionViolations');
+        if (errors.length) throw new Error(errors.join('; '));
+        const { profile } = await cdp.send('Profiler.stop'); profiling = false;
+        await writeFile(`${output}/cpu-${run}.cpuprofile`, JSON.stringify(profile));
+        await writeFile(`${output}/summary.json`, JSON.stringify(report, null, 2));
+        await context.close(); activePage = null;
+        break;
+      } catch (error) {
+        // The last attempt keeps its page open so the failure handler below can capture it.
+        if (attempt >= runRetries) throw error;
+        noteRetry(report, run, error);
+        report.runs.length = run;
+        activePage = null;
+        profiling = false;
+        await context?.close().catch(() => {});
+      }
     }
-    if (mobile) await page.locator('[data-mobile-panel="dag"]').click();
-    await settled();
-    await page.evaluate(() => {
-      const s = window.__dagBuilderState;
-      window.__diagnosticBaseline = { compiled: s.compiledDag, links: s.project.links, groups: s.project.groups, evidence: s.rawLinksById.size };
-    });
-    const result = { timings: [], errors };
-    report.runs.push(result);
-    await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); profiling = true;
-    async function measure(name, id, expectedMode) {
-      // The Filters dropdown is in the variable list's header (the list tab on a phone) and closes on an outside click;
-      // the view switches are in the top bar, behind a menu button on a phone.
-      const navToggle = page.locator('#navToggle');
-      const navOpen = async () => (await navToggle.isVisible()) && (await navToggle.getAttribute('aria-expanded')) === 'true';
-      if (await navOpen()) await navToggle.click();
-      if (await page.locator(`details.filter-dropdown #${id}`).count()) {
-        if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
-        const dropdown = page.locator('details.filter-dropdown:visible');
-        if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator('summary').click();
-      } else if (await navToggle.isVisible()) await navToggle.click();
-      const start = await page.evaluate(() => performance.now());
-      await page.locator(`#${id}`).click();
-      await settled();
-      const timing = await page.evaluate(async ({ start, name, apiUrl, expectedMode }) => {
-        const s = window.__dagBuilderState, baseline = window.__diagnosticBaseline;
-        if (s.compiledDag !== baseline.compiled || s.project.links !== baseline.links || s.project.groups !== baseline.groups) throw new Error('View filter rebuilt the project');
-        if (s.rawLinksById.size !== baseline.evidence) throw new Error('View switch loaded raw evidence');
-        if (expectedMode && !s[expectedMode]) throw new Error(`Wrong diagnostic mode: ${expectedMode}`);
-        const api = await import(apiUrl), rendered = new Set(api.renderedDagEdgeIds());
-        const expected = s.visibleLinks.filter(link => !link.is_target_relation && s.componentGroupIds.has(link.group_a) && s.componentGroupIds.has(link.group_b)).map(link => link.edge_id);
-        if (!expected.length) throw new Error('Expected a nonempty diagnostic graph');
-        if (expected.some(id => !rendered.has(id))) throw new Error('Visible evidence missing from rendered graph');
-        const projectIds = new Set(s.project.links.filter(l => !l.is_target_relation).map(l => l.edge_id));
-        const expectedIds = new Set(expected);
-        if ([...rendered].some(id => projectIds.has(id) && !expectedIds.has(id))) throw new Error('Stale evidence remains rendered');
-        // Drain pending observer records after the two paint frames.
-        window.__diagnosticTasks.push(...window.__diagnosticObserver.takeRecords().map(e => ({ start: e.startTime, ms: e.duration })));
-        const tasks = window.__diagnosticTasks.filter(t => t.start >= start);
-        return { name, ms: performance.now() - start, longestTaskMs: Math.max(0, ...tasks.map(t => t.ms)), totalLongTaskMs: tasks.reduce((n, t) => n + t.ms, 0), visibleEdges: expected.length };
-      }, { start, name, apiUrl, expectedMode });
-      result.timings.push(timing);
-      console.log(JSON.stringify({ run: run + 1, ...timing }));
-      if (process.env.PROFILE_DISABLE_BUDGETS !== '1' && (timing.ms > budgets.wallMs || timing.longestTaskMs > budgets.longestTaskMs)) throw new Error(`Performance budget exceeded: ${name}`);
-    }
-    // First switch exercises cold geometry; later switches exercise both cached views.
-    for (let cycle = 0; cycle < 3; cycle++) {
-      await measure(`exclusion ${cycle + 1}`, 'toggleExclusionViolations', 'showExclusionViolations');
-      await measure(`exogeneity ${cycle + 1}`, 'toggleExogeneity', 'showExogeneity');
-    }
-    await measure('bottleneck filter', 'toggleBottleneckedConfounders', 'showExogeneity');
-    await measure('path links filter', 'toggleIrrelevantConfounderLinks', 'showExogeneity');
-    await measure('return to exclusion', 'toggleExclusionViolations', 'showExclusionViolations');
-    await measure('all exclusion links', 'toggleAllExclusionLinks', 'showExclusionViolations');
-    if (errors.length) throw new Error(errors.join('; '));
-    const { profile } = await cdp.send('Profiler.stop'); profiling = false;
-    await writeFile(`${output}/cpu-${run}.cpuprofile`, JSON.stringify(profile));
-    await writeFile(`${output}/summary.json`, JSON.stringify(report, null, 2));
-    await context.close(); activePage = null;
   }
 } catch (error) {
   report.error = String(error);
