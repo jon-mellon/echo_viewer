@@ -19,9 +19,9 @@ test("browse keeps approved splits, including the viewer's own, matching the exa
     select() { return this; }, eq() { return this; }, contains(_column, [id]) { this.id = id; return this; },
     order() { return this; }, async limit() { return { data: rows.filter(row => row.source_group_ids.includes(this.id)), error: null }; },
   }) };
-  assert.deepEqual((await browsePublishedSplits(["a"], client)).map(row => row.group_id), ["own", "g1"]);
-  assert.deepEqual((await browsePublishedSplits(["a"], client)).map(row => row.publication_id), ["mine", "later"]);
-  assert.deepEqual((await browsePublishedSplits(["a", "b"], client)).map(row => row.group_id), ["g2"]);
+  assert.deepEqual((await browsePublishedSplits(["a"], client, { source: "supabase" })).map(row => row.group_id), ["own", "g1"]);
+  assert.deepEqual((await browsePublishedSplits(["a"], client, { source: "supabase" })).map(row => row.publication_id), ["mine", "later"]);
+  assert.deepEqual((await browsePublishedSplits(["a", "b"], client, { source: "supabase" })).map(row => row.group_id), ["g2"]);
 });
 
 test("loading a split fetches its membership file and rejects a changed pointer", async () => {
@@ -40,8 +40,8 @@ test("loading a split fetches its membership file and rejects a changed pointer"
   const client = { storage: { from: () => ({ getPublicUrl: path => ({ data: { publicUrl: `https://example.test/published/${path}` } }) }) } };
   const row = { storage_prefix: "owner/pub", group_id: "new", name: group.label,
     description: group.description, membership_path: "memberships/new.tsv" };
-  assert.deepEqual(await loadPublishedSplitMembership(row, client, fetchImpl), ["v1", "v2"]);
+  assert.deepEqual(await loadPublishedSplitMembership(row, client, fetchImpl, "supabase"), ["v1", "v2"]);
   assert.deepEqual(fetched, ["manifest.json", "schema.yaml", "groups.tsv", "memberships/new.tsv"]);
-  await assert.rejects(loadPublishedSplitMembership({ ...row, membership_path: "memberships/other.tsv" }, client, fetchImpl),
+  await assert.rejects(loadPublishedSplitMembership({ ...row, membership_path: "memberships/other.tsv" }, client, fetchImpl, "supabase"),
     /pointer no longer matches/);
 });

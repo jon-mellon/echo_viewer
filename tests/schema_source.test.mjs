@@ -13,13 +13,13 @@ const SUPABASE_FILE = `${SUPABASE_URL}/storage/v1/object/public/published-schema
 const CLOUDFLARE_FILE = `https://data.epistemicinfra.org/published-schemas/${KEY}`;
 const at = href => ({ href });
 
-test("Supabase stays the default until it is changed on purpose", () => {
-  assert.equal(DEFAULT_SCHEMA_SOURCE, "supabase");
-  assert.equal(schemaSource(at("https://echo.example/?p=1")), "supabase");
-  assert.equal(schemaSource(undefined), "supabase");
+test("Cloudflare is the default; ?schema_source=supabase opts a page back", () => {
+  assert.equal(DEFAULT_SCHEMA_SOURCE, "cloudflare");
+  assert.equal(schemaSource(at("https://echo.example/?p=1")), "cloudflare");
+  assert.equal(schemaSource(undefined), "cloudflare");
   assert.equal(schemaSource(at("https://echo.example/?schema_source=cloudflare")), "cloudflare");
   assert.equal(schemaSource(at("https://echo.example/?schema_source=supabase")), "supabase");
-  assert.equal(schemaSource(at("https://echo.example/?schema_source=elsewhere")), "supabase", "an unknown source falls back to the default");
+  assert.equal(schemaSource(at("https://echo.example/?schema_source=elsewhere")), "cloudflare", "an unknown source falls back to the default");
 });
 
 test("a page that names a source is the only one that keeps naming it", () => {
@@ -71,7 +71,7 @@ test("the schema folder comes from the page's source", () => {
   assert.equal(publicSchemaBaseUrl(client, "o/p", "supabase"), `${SUPABASE_URL}/storage/v1/object/public/published-schemas/o/p/`);
   assert.equal(publicSchemaBaseUrl(client, "o/p", "cloudflare"), "https://data.epistemicinfra.org/published-schemas/o/p/");
   // Without a browser location the default applies, and Cloudflare needs no Supabase client at all.
-  assert.equal(publicSchemaBaseUrl(client, "o/p"), `${SUPABASE_URL}/storage/v1/object/public/published-schemas/o/p/`);
+  assert.equal(publicSchemaBaseUrl(client, "o/p"), "https://data.epistemicinfra.org/published-schemas/o/p/");
   assert.equal(publicSchemaBaseUrl(null, "o/p", "cloudflare"), "https://data.epistemicinfra.org/published-schemas/o/p/");
 });
 
