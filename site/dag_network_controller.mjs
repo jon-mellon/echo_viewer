@@ -94,6 +94,8 @@ let _visEdges = null;
 let _dagLayoutSignature = "";
 let _visOptionSignature = "";
 const DAG_INSTALL_SLICE = 1000;
+// Exploration views show one fixed pastel per task instead of the per-group palette.
+const EXPLORATION_NODE_COLORS = { causes: dagDisplay.OKABE_ITO.sky, consequences: dagDisplay.OKABE_ITO.purple };
 let _dagGeometry = null;
 let _dagBoundsCache = null;
 let _dagEdgeSegments = new Map();
@@ -191,7 +193,8 @@ function visNodeData(group, layoutPoint, layoutParams = {}) {
     colliderGroupIds: state.colliderGroupIds, colliderPathGroupIds: state.colliderPathGroupIds,
     confounderGroupIds: state.confounderGroupIds, confounderPathGroupIds: state.confounderPathGroupIds,
     ivId: studyAnchors().ivId, dvId: studyAnchors().dvId,
-    activeGroupId: state.activeGroupId, groupColor: groupColor(group),
+    activeGroupId: state.activeGroupId,
+    groupColor: exploring() && group.type === "candidate" ? EXPLORATION_NODE_COLORS[state.task] || groupColor(group) : groupColor(group),
   });
 }
 
