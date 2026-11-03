@@ -28,6 +28,8 @@ export function mixHex(a, b, t) {
 // Edges are drawn opaque, pre-blended with the canvas, so the arrowhead hides
 // the line under it and segments of one routed edge never darken where they meet.
 export const softEdge = (hex, strength) => mixHex(DAG_SURFACE, hex, strength);
+const TARGET_EDGE_COLOR = softEdge(OKABE_ITO.blue, 0.85);
+const PLAIN_EDGE_COLOR = softEdge(OKABE_ITO.sky, 0.6);
 
 function isDark(hex) {
   const [r, g, b] = hexToRgb(hex);
@@ -117,7 +119,7 @@ export function edgeVisualData(link, selectedEdgeId) {
   const isTarget = link.is_target_relation;
   return {
     color: {
-      color: isSelected ? OKABE_ITO.vermillion : isTarget ? softEdge(OKABE_ITO.blue, 0.85) : softEdge(OKABE_ITO.sky, 0.6),
+      color: isSelected ? OKABE_ITO.vermillion : isTarget ? TARGET_EDGE_COLOR : PLAIN_EDGE_COLOR,
       highlight: OKABE_ITO.vermillion,
       hover: OKABE_ITO.orange,
       inherit: false,
