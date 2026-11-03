@@ -113,10 +113,10 @@ test("exogeneity colors common causes while keeping the three study anchors", ()
   const mediator = display.visNodeData(group("via"), null, {}, view);
   const instrument = display.visNodeData(group("z"), null, {}, view);
   const iv = display.visNodeData(group("iv", "iv"), null, {}, view);
-  assert.equal(candidate.color.background, display.mixHex("#f8f8f8", "#c62828", 0.3));
-  assert.equal(mediator.color.background, display.mixHex("#f8f8f8", "#6b7280", 0.3));
-  assert.equal(instrument.color.background, display.mixHex("#f8f8f8", "#166534", 0.3));
-  assert.equal(iv.color.background, display.mixHex("#f8f8f8", "#123456", 0.3));
+  assert.equal(candidate.color.background, display.mixHex("#f8f8f8", "#c62828", 0.6));
+  assert.equal(mediator.color.background, display.mixHex("#f8f8f8", "#6b7280", 0.6));
+  assert.equal(instrument.color.background, display.mixHex("#f8f8f8", "#166534", 0.6));
+  assert.equal(iv.color.background, display.mixHex("#f8f8f8", "#123456", 0.6));
   assert.equal(instrument.shape, "ellipse");
 });
 

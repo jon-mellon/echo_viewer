@@ -31,8 +31,8 @@ export const softEdge = (hex, strength) => mixHex(DAG_SURFACE, hex, strength);
 const TARGET_EDGE_COLOR = softEdge(OKABE_ITO.blue, 0.85);
 const PLAIN_EDGE_COLOR = softEdge(OKABE_ITO.sky, 0.6);
 
-/** Node fills are the role colour at 30% over the canvas, pre-blended so edges don't show through. */
-const NODE_FILL_STRENGTH = 0.3;
+/** Node fills are the role colour at 60% over the canvas, pre-blended so edges don't show through. */
+const NODE_FILL_STRENGTH = 0.6;
 
 /** Hovering keeps the node's size: the (otherwise clear) border turns the node's own colour. */
 export const chosenNodeHover = color => (values, _id, selected, hovering) => {
