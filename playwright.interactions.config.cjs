@@ -11,8 +11,8 @@ module.exports = {
   expect: { timeout: 15_000 },
   use: { browserName: "chromium", acceptDownloads: true },
   webServer: {
-    command: "python3 -m http.server 8767 --directory site",
-    url: "http://127.0.0.1:8767/",
+    command: `python3 -m http.server ${process.env.ECHO_TEST_PORT || 8767} --directory site`,
+    url: `http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
   },

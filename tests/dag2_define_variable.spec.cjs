@@ -576,7 +576,7 @@ test("a published split appears after source selection and fills the editable de
     }
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto(`http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/?task=identify`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
     && window.__dagBuilderState.publishedSchemaHydrated);
 
@@ -632,12 +632,16 @@ test("a published split appears after source selection and fills the editable de
   await page.locator(`#definitionSourceList input[data-source-id="${sourceId}"]`).check();
   await expect(page.locator("#definitionBrowsePanel")).toBeVisible();
   await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
+  await expect(page.locator("#definitionBrowseJump")).toHaveText("View 1 previous split");
+  await page.locator("#definitionBrowseJump").click();
+  await expect(page.locator("#definitionBrowseResults button[data-split-index]")).toBeFocused();
   // A different exact set has no published split, but the browse area remains findable.
   const otherId = await page.evaluate(id => window.__dagBuilderState.project.groups
     .find(group => group.group_id !== id && group.variable_ids?.length >= 2)?.group_id, sourceId);
   await page.locator(`#definitionSourceList input[data-source-id="${otherId}"]`).check();
   await expect(page.locator("#definitionBrowsePanel")).toBeVisible();
   await expect(page.locator("#definitionBrowseStatus")).toContainText("No published splits found");
+  await expect(page.locator("#definitionBrowseJump")).toHaveText("No previous splits found");
   await page.locator(`#definitionSourceList input[data-source-id="${otherId}"]`).uncheck();
   await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
   await page.locator("#definitionBrowseResults button[data-split-index]").click();

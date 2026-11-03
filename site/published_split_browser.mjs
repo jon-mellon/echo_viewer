@@ -1,12 +1,12 @@
 import { supabase } from "./supabase_client.mjs";
 import { schemaSource } from "./schema_source.mjs";
 import { CLOUDFLARE_API_URL, cloudflareApiConfigured } from "./cloudflare_config.mjs";
-import { getSplits } from "./cloudflare_api.mjs";
+import { getOwnPublications, getSplits } from "./cloudflare_api.mjs";
 import { publicSchemaBaseUrl } from "./publication_access.mjs";
 import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
 
 export async function browsePublishedSplits(sourceGroupIds, client = supabase,
-  { source = schemaSource(), apiUrl = CLOUDFLARE_API_URL, fetchImpl } = {}) {
+  { source = schemaSource(), apiUrl = CLOUDFLARE_API_URL, fetchImpl, storage } = {}) {
   const viaWorker = source === "cloudflare" && cloudflareApiConfigured(apiUrl);
   if (!client && !viaWorker) throw new Error("Supabase is not configured.");
   const ids = [...new Set(sourceGroupIds)].filter(Boolean);
@@ -20,12 +20,35 @@ export async function browsePublishedSplits(sourceGroupIds, client = supabase,
     if (error) throw error;
     return data || [];
   }));
+  if (viaWorker) {
+    const own = await getOwnPublications({ apiUrl, ...(fetchImpl ? { fetchImpl } : {}),
+      ...(storage ? { storage } : {}) });
+    const ownRows = await Promise.all(own.map(async publication => {
+      const base = publicSchemaBaseUrl(client, publication.storage_prefix, "cloudflare");
+      const staged = await loadGroupingSchemaStructure(base, fetchImpl || fetch);
+      return staged.schema.groups.filter(group => group.source === "user_split"
+        && group.provenance?.operation === "split_categories"
+        && Array.isArray(group.provenance.source_group_ids)
+        && staged.manifest.group_membership_files[group.group_id]).map(group => ({
+          publication_id: publication.id, group_id: group.group_id,
+          split_id: group.provenance.split_id || group.group_id,
+          source_group_ids: group.provenance.source_group_ids,
+          name: group.label, description: group.description,
+          storage_prefix: publication.storage_prefix,
+          membership_path: staged.manifest.group_membership_files[group.group_id],
+          owner_id: publication.owner_id,
+          published_at: publication.created_at, is_own: true,
+        }));
+    }));
+    pages.push(ownRows.flat());
+  }
   const unique = new Map();
   for (const row of pages.flat()) {
     if (row.source_group_ids?.length !== ids.length
       || !row.source_group_ids.every(id => ids.includes(id))) continue;
     const key = `${row.owner_id}:${row.split_id || row.group_id}`;
-    if (!unique.has(key) || row.published_at > unique.get(key).published_at) unique.set(key, row);
+    if (!unique.has(key) || row.published_at > unique.get(key).published_at
+      || row.published_at === unique.get(key).published_at && row.is_own) unique.set(key, row);
   }
   return [...unique.values()].sort((a, b) => b.published_at.localeCompare(a.published_at));
 }

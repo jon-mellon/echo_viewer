@@ -125,7 +125,7 @@ function initElements() {
     "schemaChoice", "loadSchema", "skipSchema",
     "definitionBlock", "definitionTitle", "definitionCancel", "definitionDescribeStep", "definitionDescribeNext", "definitionResumeList",
     "definitionAiWork", "definitionSourcesStep", "definitionDescribeBack",
-    "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionSourceLoadStatus", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults",
+    "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionSourceLoadStatus", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults", "definitionBrowseJump",
     "definitionPartitionStep", "definitionLoadStatus", "definitionJevPanel", "definitionIncludedPanel",
     "definitionConceptsIntro", "definitionCountIncluded", "definitionCountExcluded", "definitionCountUnreviewed",
     "definitionSourcesSummary",

@@ -115,6 +115,10 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
   function install() {
     // Each step's footer has its own Cancel, beside Next (or Save).
     for (const button of document.querySelectorAll(".definition-cancel")) button.addEventListener("click", onCancel);
+    els.definitionBrowseJump.addEventListener("click", () => {
+      els.definitionBrowsePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      els.definitionBrowseResults.querySelector("button[data-split-index]")?.focus({ preventScroll: true });
+    });
     els.definitionSourceList.addEventListener("click", event => {
       const target = /** @type {HTMLElement} */ (event.target).closest("button[data-clear-search]");
       if (target) clearSearch(target.dataset.clearSearch);
@@ -190,6 +194,13 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       // Splits others published from the same variables: offered, never required.
       const showBrowse = Boolean(selected.size);
       els.definitionBrowsePanel.hidden = !showBrowse;
+      els.definitionBrowseJump.hidden = !showBrowse;
+      els.definitionBrowseJump.disabled = browseState.loading || !browseState.rows.length;
+      els.definitionBrowseJump.textContent = browseState.error ? "Previous splits unavailable"
+        : browseState.loading ? "Checking previous splits…"
+          : browseState.rows.length
+            ? `View ${browseState.rows.length} previous split${browseState.rows.length === 1 ? "" : "s"}`
+            : "No previous splits found";
       if (showBrowse) {
         els.definitionBrowseStatus.textContent = browseState.error || (browseState.loading
           ? "Looking for variables others made from these…"
@@ -198,7 +209,9 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
             : "No published splits found for these source variables. You can still create your own.");
         replaceChildren(els.definitionBrowseResults, browseState.rows.map((row, index) =>
           h("article", { className: "definition-browse-card" },
-            h("strong", { textContent: row.name }), h("p", { textContent: row.description }),
+            h("strong", { textContent: row.name }),
+            ...(row.is_own ? [h("span", { className: "small-note", textContent: "Your published split" })] : []),
+            h("p", { textContent: row.description }),
             h("button", { type: "button", className: "btn", dataset: { splitIndex: String(index) },
               textContent: "Start from this", disabled: browseState.loading }))));
         els.definitionBrowseResults.querySelectorAll("button[data-split-index]").forEach(button =>
