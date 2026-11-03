@@ -228,6 +228,83 @@ function prepareDagNodeGeometry(groups, params) {
   return { width, height, halfW, halfH, hashes, hubDamping };
 }
 
+/**
+ * One variable in the middle, the variables around it by distance. `focus` is
+ * `{ id, order, distance: [[id, steps]], parent: [[id, next toward the focus]] }`.
+ * Each distance gets its own columns on each side; a first-ring variable takes
+ * the side with room and farther ones stay on their parent's side, so routes
+ * run outward from the centre without crossing it.
+ */
+export function computeFocusLayout({ groups, links = [], width: containerW, height: containerH, focus,
+  viewSignature = "all" }) {
+  const n = groups.length;
+  const present = new Set(groups.map(group => group.group_id));
+  const distanceOf = new Map(focus.distance), parentOf = new Map(focus.parent);
+  const fontSize = n > 42 ? 11 : n > 30 ? 12 : 13;
+  // Narrow screens get narrower nodes and columns, so more of the graph fits at a readable size.
+  const narrow = (containerW || 900) < 600;
+  const nodeMaxWidth = narrow ? 128 : n > 30 ? 185 : 170;
+  const params = {
+    fontSize, vMargin: n > 34 ? 6 : 8, hMargin: n > 34 ? 10 : 13, nodeMaxWidth,
+    edgeWidth: n > 34 ? 1.1 : 1.25, rowGap: narrow ? 66 : 72, columnGap: narrow ? nodeMaxWidth + 44 : 230,
+  };
+  const { rowGap, columnGap } = params;
+  // Choose the columns so the graph is about as wide as the screen is: a graph
+  // much wider than the screen shrinks to a strip when fitted, much taller than
+  // it shrinks the same way. With N variables over C columns the shape is
+  // (C * columnGap) by (N / C * rowGap), so C = sqrt(aspect * N * rowGap / columnGap).
+  const aspect = (containerW || 900) / (containerH || 720);
+  const sideColumns = Math.max(1, Math.round(Math.sqrt(aspect * focus.order.filter(id => present.has(id) && id !== focus.id).length
+    * rowGap / columnGap) / 2));
+  const capacity = Math.max(4, Math.ceil(focus.order.filter(id => present.has(id) && id !== focus.id).length / 2 / sideColumns));
+  const positions = new Map([[focus.id, { x: 0, y: 0, column: 0, row: 0 }]]);
+  const sideOf = new Map([[focus.id, 0]]);
+  const rings = new Map();
+  for (const id of focus.order) {
+    if (!present.has(id) || id === focus.id) continue;
+    const distance = distanceOf.get(id) || 1;
+    if (!rings.has(distance)) rings.set(distance, []);
+    rings.get(distance).push(id);
+  }
+  let outwardColumns = 0, maxRows = 1, firstRing = 0;
+  for (const distance of [...rings.keys()].sort((a, b) => a - b)) {
+    const sides = { [-1]: [], [1]: [] };
+    for (const id of rings.get(distance)) {
+      const parentSide = sideOf.get(parentOf.get(id));
+      // First-ring variables alternate, strongest first, so both sides stay balanced.
+      const side = distance === 1 || !parentSide ? (firstRing++ % 2 ? 1 : -1) : parentSide;
+      sideOf.set(id, side);
+      sides[side].push(id);
+    }
+    const yOf = id => positions.get(parentOf.get(id))?.y ?? 0;
+    for (const side of [-1, 1]) if (distance > 1) sides[side].sort((a, b) => yOf(a) - yOf(b));
+    // Both sides use the same number of columns so the picture stays symmetric.
+    const columns = Math.max(1, Math.ceil(Math.max(sides[-1].length, sides[1].length) / capacity));
+    for (const side of [-1, 1]) {
+      // Balanced columns: never a column of one or two after full ones.
+      const list = sides[side], base = Math.floor(list.length / columns), extra = list.length % columns;
+      let start = 0;
+      for (let column = 0; column < columns; column++) {
+        const items = list.slice(start, start += base + (column < extra ? 1 : 0));
+        maxRows = Math.max(maxRows, items.length);
+        items.forEach((id, row) => positions.set(id, {
+          x: side * (outwardColumns + column + 1) * columnGap,
+          y: (row - (items.length - 1) / 2) * rowGap,
+          column: side * (outwardColumns + column + 1), row,
+        }));
+      }
+    }
+    outwardColumns += columns;
+  }
+  return {
+    positions, boxes: dagNodeBoxes(groups, { positions, params }), params,
+    signature: ["focus", focus.id, n, links.length, Math.round(containerW || 0), Math.round(containerH || 0),
+      viewSignature].join(":"),
+    graphWidth: Math.max((2 * outwardColumns) * columnGap + params.nodeMaxWidth + 80, (containerW || 900) * 0.92),
+    graphHeight: Math.max((maxRows + 1) * rowGap, (containerH || 720) * 0.92),
+  };
+}
+
 function computeDagLayoutUncached({
   groups,
   links,
@@ -239,7 +316,11 @@ function computeDagLayoutUncached({
   width: containerW,
   height: containerH,
   viewSignature = "all",
+  focus = null,
 }) {
+  if (focus?.id && groups.some(group => group.group_id === focus.id)) {
+    return computeFocusLayout({ groups, links, width: containerW, height: containerH, focus, viewSignature });
+  }
   const n = groups.length;
   const edges = layoutDirectedEdges(groups, links);
   const scores = softCausalRanks(groups, edges);
@@ -1601,6 +1682,7 @@ export function computeDagLayout(args) {
     cache.dvId === args.dvId &&
     cache.instrumentId === args.instrumentId &&
     cache.mode === mode &&
+    cache.focus === (args.focus ?? null) &&
     cache.width === width &&
     cache.height === height &&
     cache.viewSignature === viewSignature
@@ -1621,6 +1703,7 @@ export function computeDagLayout(args) {
     dvId: args.dvId,
     instrumentId: args.instrumentId,
     mode,
+    focus: args.focus ?? null,
     width,
     height,
     viewSignature,

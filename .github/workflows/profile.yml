@@ -20,6 +20,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npx playwright install --with-deps chromium
+      # Published schema files are immutable; keep them between runs instead of
+      # downloading about 5 MB per test every time; a miss is fetched from the Cloudflare mirror, never Supabase.
+      - name: Restore published schema cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/supabase-published
+          key: supabase-published-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/supabase_cache.cjs') }}
+          restore-keys: supabase-published-
       - run: npm run test:browser
       - run: npm run profile
       - run: PROFILE_DEVICE=mobile npm run profile
@@ -29,6 +37,8 @@ jobs:
         run: npm run profile:diagnostics
       - name: Enforce evidence loading budgets on the default snapshot
         run: npm run profile:edge-evidence
+      - name: Enforce mobile causes and consequences budgets
+        run: npm run profile:explore
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -40,4 +50,5 @@ jobs:
             profile-results-permalink-mobile/
             profile-results-diagnostics-mobile/
             profile-results-edge-evidence/
+            profile-results-explore-mobile/
           retention-days: 1

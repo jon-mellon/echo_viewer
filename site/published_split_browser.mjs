@@ -1,12 +1,18 @@
 import { supabase } from "./supabase_client.mjs";
+import { schemaSource } from "./schema_source.mjs";
+import { CLOUDFLARE_API_URL, cloudflareApiConfigured } from "./cloudflare_config.mjs";
+import { getSplits } from "./cloudflare_api.mjs";
 import { publicSchemaBaseUrl } from "./publication_access.mjs";
 import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
 
-export async function browsePublishedSplits(sourceGroupIds, client = supabase) {
-  if (!client) throw new Error("Supabase is not configured.");
+export async function browsePublishedSplits(sourceGroupIds, client = supabase,
+  { source = schemaSource(), apiUrl = CLOUDFLARE_API_URL, fetchImpl } = {}) {
+  const viaWorker = source === "cloudflare" && cloudflareApiConfigured(apiUrl);
+  if (!client && !viaWorker) throw new Error("Supabase is not configured.");
   const ids = [...new Set(sourceGroupIds)].filter(Boolean);
   if (!ids.length) return [];
   const pages = await Promise.all(ids.map(async id => {
+    if (viaWorker) return getSplits(id, { apiUrl, ...(fetchImpl ? { fetchImpl } : {}) });
     const { data, error } = await client.from("published_split_index")
       .select("publication_id,group_id,split_id,source_group_ids,name,description,storage_prefix,membership_path,owner_id,published_at")
       .eq("quality_status", "approved").contains("source_group_ids", [id])
@@ -24,9 +30,9 @@ export async function browsePublishedSplits(sourceGroupIds, client = supabase) {
   return [...unique.values()].sort((a, b) => b.published_at.localeCompare(a.published_at));
 }
 
-export async function loadPublishedSplitMembership(row, client = supabase, fetchImpl = fetch) {
-  if (!client) throw new Error("Supabase is not configured.");
-  const base = publicSchemaBaseUrl(client, row.storage_prefix);
+export async function loadPublishedSplitMembership(row, client = supabase, fetchImpl = fetch, source = schemaSource()) {
+  if (!client && source !== "cloudflare") throw new Error("Supabase is not configured.");
+  const base = publicSchemaBaseUrl(client, row.storage_prefix, source);
   const staged = await loadGroupingSchemaStructure(base, fetchImpl);
   if (staged.manifest.group_membership_files[row.group_id] !== row.membership_path) {
     throw new Error("The published split pointer no longer matches its schema.");

@@ -122,7 +122,7 @@ export function createPublicationController({
     button.classList.add("share-copied");
     button.setAttribute("aria-label", "View link copied to clipboard");
     shareFeedbackTimer = setTimeout(() => {
-      button.textContent = "Share view";
+      button.textContent = "Share";
       button.classList.remove("share-copied");
       button.removeAttribute("aria-label");
     }, 2400);

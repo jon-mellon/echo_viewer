@@ -1,4 +1,4 @@
-const { test, expect } = require("playwright/test");
+const { test, expect } = require("./fixtures.cjs");
 const base = process.env.DAG_VIEWER_URL || "http://127.0.0.1:8767";
 const snapshot = "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b";
 const publication = "c221423a-9470-4c82-8a3d-8bcf4a01ef7c";
@@ -22,7 +22,7 @@ for (const corrupt of [false, true]) {
       if (route.request().url().endsWith("index.json.gz")) return route.continue();
       return route.fulfill({ status: 200, body: "corrupt" });
     });
-    await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}`);
+    await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}&task=identify`);
     await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
       && document.getElementById("startupLoading")?.hidden);
     await completeSetup(page);
@@ -102,15 +102,17 @@ test("a newer path filter supersedes a dense graph while installation is pending
       }
     };
   });
-  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}`);
+  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}&task=identify`);
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
     && window.__dagBuilderState?.project && document.getElementById("startupLoading")?.hidden);
   await completeSetup(page);
   await page.locator('button[data-mobile-panel="dag"]').click();
   const settled = () => page.evaluate(async () => (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).whenDagRendered());
   await settled();
-  await page.locator('.filter-dropdown > summary').click();
+  const dropdown = page.locator("details.filter-dropdown");
   for (const id of ["toggleCollidersOnly", "toggleConfoundersOnly", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks"]) {
+    // The Filters dropdown closes on an outside click, and some of these toggles sit outside it.
+    if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
     await page.locator(`#${id}`).click();
     await settled();
   }
@@ -135,7 +137,7 @@ test("a newer path filter supersedes a dense graph while installation is pending
 test("a reason being typed survives the inspector rebuilding as sources arrive", async ({ page }) => {
   test.setTimeout(90000);
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}`);
+  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}&task=identify`);
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
     && window.__dagBuilderState?.project && document.getElementById("startupLoading")?.hidden);
   await completeSetup(page);

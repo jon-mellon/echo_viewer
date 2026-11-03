@@ -146,3 +146,27 @@ test("compiled binding rejects snapshot and compiler mismatches", async () => {
   await assert.rejects(validateCompiledArtifact({ publication, manifest: { ...artifacts.manifest,
     compiler_version: `${DAG_COMPILER_VERSION}-wrong` }, dag: artifacts.dag }), /compiler_version mismatch/);
 });
+
+test("an edit drops the paper keys it can no longer keep correct, and leaves untouched edges' keys", () => {
+  // One edge with two papers, one with one; excluding a finding on the first changes its papers.
+  const findings = [{ ...link("one", "v1", "v3", "P1") }, { ...link("two", "v1", "v3", "P2") },
+    { ...link("three", "v1", "v4", "P3") }];
+  const groups = [group("a", ["v1"]), group("b", ["v3"]), group("c", ["v4"])];
+  const before = { groups, finding_decisions: {} };
+  const after = { groups, finding_decisions: { one: { display_status: "excluded" } } };
+  const original = fullCompileDag({ schema: before, rawLinks: findings });
+  const updated = incrementCompiledDag({ compiledDag: original, oldSchema: before, newSchema: after,
+    incidentRawLinks: [findings[0]] });
+  const touched = updated.edges.find(edge => edge.group_b === "b");
+  const untouched = updated.edges.find(edge => edge.group_b === "c");
+  // The findings moved on, so the old keys (P1 and P2) would be wrong: they are gone, not stale.
+  assert.deepEqual(touched.a_to_b_raw_link_ids, ["two"]);
+  assert.equal("a_to_b_paper_table_keys" in touched, false);
+  assert.equal("b_to_a_paper_table_keys" in touched, false);
+  assert.equal("distinct_paper_count" in touched, false);
+  // An edge the edit did not touch keeps exactly the keys a full compile gives it.
+  const full = fullCompileDag({ schema: after, rawLinks: findings });
+  assert.deepEqual(untouched.a_to_b_paper_table_keys, full.edges.find(edge => edge.group_b === "c").a_to_b_paper_table_keys);
+  // Apart from those keys the incremental result is identical to a full compile.
+  assert.ok(dagEquals(updated, full, { ignorePaperCounts: true }));
+});

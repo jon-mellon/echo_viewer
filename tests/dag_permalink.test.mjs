@@ -131,3 +131,31 @@ test("a fresh published setup URL restores without selected anchors", () => {
   assert.equal(state.project.dv_group_id, "");
   assert.equal(state.phase, "select_iv");
 });
+
+test("the task and each explore view round-trip, and pre-task links open identification", () => {
+  const state = { project: structuredClone(project), workflowMode: "setup", task: "causes",
+    explore: { causes: { focusId: "outcome", depth: 3, minPapers: 4 },
+      consequences: { focusId: "cause", depth: 2, minPapers: 1 } } };
+  const params = new URL(buildPermalink({ location: { href: "http://localhost:8767/" },
+    schemaUrl: "", dataVersion: "snapshot-7", state })).searchParams;
+  assert.equal(params.get("task"), "causes");
+  const restored = { project: structuredClone(project), seeds: { iv: new Set(), dv: new Set() },
+    explore: { causes: {}, consequences: {} } };
+  applyPermalink(params, restored);
+  assert.equal(restored.task, "causes");
+  assert.deepEqual(restored.explore.causes, { focusId: "outcome", depth: 3, minPapers: 4 });
+  assert.deepEqual(restored.explore.consequences, { focusId: "cause", depth: 2, minPapers: 1 });
+
+  const home = new URL(buildPermalink({ location: { href: "http://localhost:8767/" }, schemaUrl: "",
+    dataVersion: "s", state: { ...state, task: null, explore: { causes: {}, consequences: {} } } })).searchParams;
+  assert.equal(home.get("task"), "home");
+  assert.equal(home.has("causes_of"), false);
+  const atHome = { project: structuredClone(project), seeds: { iv: new Set(), dv: new Set() }, explore: {} };
+  applyPermalink(home, atHome);
+  assert.equal(atHome.task, null);
+
+  const legacy = { project: structuredClone(project), seeds: { iv: new Set(), dv: new Set() }, explore: {} };
+  applyPermalink(new URLSearchParams("p=1&iv=cause&dv=outcome&mode=dag&causes_depth=99"), legacy);
+  assert.equal(legacy.task, "identify");
+  assert.deepEqual(legacy.explore.causes, { focusId: null, depth: 1, minPapers: 2 });
+});

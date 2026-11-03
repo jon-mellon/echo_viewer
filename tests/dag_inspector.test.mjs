@@ -35,6 +35,18 @@ test("inspectors deduplicate evidence and preserve direction", () => {
   assert.equal(inspector.studyInspector({ links: [] }, rawById), null);
 });
 
+test("provenance puts the selected causal direction first", () => {
+  const link = { edge_id: "e", group_a: "a", group_b: "b", direction_type: "BIDIRECTIONAL",
+    a_to_b_raw_link_ids: ["forward"], b_to_a_raw_link_ids: [] };
+  const project = { groups: [{ group_id: "a", label: "A" }, { group_id: "b", label: "B" }],
+    links: [link], link_decisions: {}, finding_decisions: {} };
+  const raw = new Map([["forward", { raw_causal_link_id: "forward", source_variable_id: "x", target_variable_id: "y" }]]);
+  assert.deepEqual(inspector.provenanceModel(link, project, raw, new Map(),
+    { preferredEvidenceDirection: "A_TO_B" }).sections.map(section => section.direction), ["A_TO_B", "B_TO_A"]);
+  assert.deepEqual(inspector.provenanceModel(link, project, raw, new Map(),
+    { preferredEvidenceDirection: "B_TO_A" }).sections.map(section => section.direction), ["B_TO_A", "A_TO_B"]);
+});
+
 test("provenance classifications follow schema order across overlapping groups", () => {
   const labels = inspector.groupLabelsByVariable([
     { group_id: "b", label: "B", variable_ids: ["x", "x"] },

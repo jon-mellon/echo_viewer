@@ -234,6 +234,9 @@ function installHandlers() {
     dagNetwork.fit();
   });
   els.fullscreenDag.addEventListener("click", () => toggleFullscreenPanel("dag"));
+  for (const [button, mode] of [[els.dagViewGraph, "graph"], [els.dagViewTable, "table"]]) {
+    button.addEventListener("click", () => dagNetwork.setDagDisplay(mode));
+  }
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && state.fullscreenPanel) setFullscreenPanel(null);
@@ -291,6 +294,15 @@ function installMapHandlers() {
     if (els.dagMapContextMenu.contains(event.target)) return;
     if (event.target === canvas && event.button === 2) return;
     hideMapContextMenu();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    for (const dropdown of document.querySelectorAll("details.filter-dropdown[open]")) {
+      if (!dropdown.contains(event.target)) dropdown.open = false;
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    for (const dropdown of document.querySelectorAll("details.filter-dropdown[open]")) dropdown.open = false;
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;

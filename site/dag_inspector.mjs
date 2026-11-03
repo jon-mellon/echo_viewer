@@ -123,7 +123,7 @@ export function provenanceModel(link, project, rawLinksById, variables, diagnost
     { direction: "B_TO_A", sourceLabel: groupLabel(link.group_b), targetLabel: groupLabel(link.group_a),
       rawIds: [...(link.b_to_a_raw_link_ids || []), ...excludedFor(link.group_b, link.group_a)] },
   ];
-  if (diagnosticEvidenceDirection(link, diagnosticView) === "B_TO_A") sections.reverse();
+  if ((diagnosticView.preferredEvidenceDirection || diagnosticEvidenceDirection(link, diagnosticView)) === "B_TO_A") sections.reverse();
   const seen = new Set();
   const endpoints = new Set(sections.flatMap(section => section.rawIds.flatMap(id => {
     const raw = rawLinksById.get(id);

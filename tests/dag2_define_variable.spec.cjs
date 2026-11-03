@@ -1,4 +1,4 @@
-const { test, expect } = require("playwright/test");
+const { test, expect } = require("./fixtures.cjs");
 const { watchBrowserErrors } = require("./browser_errors.cjs");
 
 test("DAG2 defines a canonical variable from per-source residual slices", async ({ page }) => {
@@ -10,7 +10,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
     }
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
 
   await expect(page.locator("#ivGroupPicker [data-define-side=iv]")).toBeVisible();
@@ -126,7 +126,7 @@ test("Variables list definition and split editing are reachable on desktop and m
     localStorage.clear();
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
     && window.__dagBuilderState?.publishedSchemaHydrated
     && !window.__dagBuilderState?.publishedSchemaHydrating);
@@ -190,7 +190,7 @@ test("OpenRouter returns to the variable picker with the current anchors", async
     await route.fulfill({ headers, contentType: "application/json", body: JSON.stringify(body) });
   });
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20 && window.__dagBuilderState?.publishedSchemaHydrated);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
@@ -209,7 +209,7 @@ test("a new variable can be defined through the mobile controls", async ({ page 
     localStorage.clear();
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
     && window.__dagBuilderState?.publishedSchemaHydrated
     && !window.__dagBuilderState?.publishedSchemaHydrating);
@@ -258,7 +258,7 @@ test("mobile spatial editor adds and removes a variable with a tap", async ({ br
       localStorage.clear();
       sessionStorage.setItem("echo-viewer-password-accepted", "yes");
     });
-    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated
       && !window.__dagBuilderState?.publishedSchemaHydrating);
@@ -394,7 +394,7 @@ for (const device of [
       await page.addInitScript(() => {
         sessionStorage.setItem("echo-viewer-password-accepted", "yes");
       });
-      await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+      await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
         && window.__dagBuilderState?.publishedSchemaHydrated);
       await page.locator("#ivGroupPicker [data-define-side=iv]").click();
@@ -565,7 +565,7 @@ test("Jev test and full split resume saved batches after failure and reload", as
   });
   try {
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();
@@ -582,6 +582,11 @@ test("Jev test and full split resume saved batches after failure and reload", as
     await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/50 saved)");
     const failedTestBatch = requestedBatches[1];
     await page.reload({ waitUntil: "domcontentloaded" });
+    // Nothing is restored on load; the saved run is offered from Define.
+    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+    await expect(page.locator("#definitionPartitionStep")).toBeHidden();
+    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionResumeList button", { hasText: "Resume" }).click();
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
     await page.locator("#definitionAiConnect").click();
     await expect(page.locator("#definitionAiRun")).toContainText("Resume test (16/50 saved)");
@@ -606,6 +611,9 @@ test("Jev test and full split resume saved batches after failure and reload", as
     const failedBatch = requestedBatches[6];
     expect(decisions).toBe(7);
     await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+    await page.locator("#ivGroupPicker [data-define-side=iv]").click();
+    await page.locator("#definitionResumeList button", { hasText: "Resume" }).click();
     await expect(page.locator("#definitionPartitionStep")).toBeVisible();
     await page.locator("#definitionAiConnect").click();
     await expect(page.locator("#definitionAiFullRun")).toContainText("Resume full split (16/");
@@ -667,7 +675,7 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
   });
   try {
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();
@@ -701,7 +709,7 @@ test("a published split is reviewed on the map and used without a naming step", 
     }
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
 
   await page.locator("#ivGroupPicker [data-define-side=iv]").click();
@@ -728,11 +736,21 @@ test("a published split is reviewed on the map and used without a naming step", 
       split_id: "published_new", source_group_ids: [fixture.sourceId], name: "Published fixture split",
       description: "A published fixture split taken from one source category.", storage_prefix: "fixture-owner/fixture-pub",
       membership_path: fixture.membershipPath, owner_id: "someone", published_at: "2026-10-15T00:00:00Z" }]) }));
-  await page.route("**/storage/v1/object/public/published-schemas/fixture-owner/fixture-pub/**", route => {
+  // The viewer runs on the Cloudflare source in tests (as staging ships it): the splits list comes from the worker and
+  // the publication's files from the Cloudflare address. Both sources are answered, so the test stands on either.
+  await page.route("**/echo-api.epistemicinfra.org/v1/splits**", route => route.fulfill({ contentType: "application/json",
+    headers: { "access-control-allow-origin": "*" },
+    body: JSON.stringify([{ publication_id: "00000000-0000-0000-0000-000000000001", group_id: "published_new",
+      split_id: "published_new", source_group_ids: [fixture.sourceId], name: "Published fixture split",
+      description: "A published fixture split taken from one source category.", storage_prefix: "fixture-owner/fixture-pub",
+      membership_path: fixture.membershipPath, owner_id: "someone", published_at: "2026-10-15T00:00:00Z" }]) }));
+  const serveFixtureFile = route => {
     const path = new URL(route.request().url()).pathname.split("/fixture-pub/")[1];
     return fixture.files[path] === undefined ? route.fulfill({ status: 404, body: "" })
-      : route.fulfill({ body: fixture.files[path] });
-  });
+      : route.fulfill({ body: fixture.files[path], headers: { "access-control-allow-origin": "*" } });
+  };
+  await page.route("**/storage/v1/object/public/published-schemas/fixture-owner/fixture-pub/**", serveFixtureFile);
+  await page.route("**/data.epistemicinfra.org/published-schemas/fixture-owner/fixture-pub/**", serveFixtureFile);
   await page.locator(`#definitionSourceList input[data-source-id="${sourceId}"]`).check();
   await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
   await page.locator("#definitionBrowseResults button[data-split-index]").click();
@@ -765,7 +783,7 @@ test("definition source search matches constituent variables, not only category 
     localStorage.clear();
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
   await page.waitForFunction(() => window.__dagBuilderState.publishedSchemaHydrated && !window.__dagBuilderState.publishedSchemaHydrating);
   // Pick a variable whose own label is not part of its category's name.
@@ -833,7 +851,7 @@ test("Label 50 more appends to the list, sorts new first, and Name and review sk
   });
   try {
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-    await page.goto("http://127.0.0.1:8767/", { waitUntil: "domcontentloaded" });
+    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await page.locator("#ivGroupPicker [data-define-side=iv]").click();
@@ -888,4 +906,85 @@ test("Label 50 more appends to the list, sorts new first, and Name and review sk
   } finally {
     await context.close();
   }
+});
+
+test("Causes offers Define a variable and the new variable becomes the focus without changing the anchors", async ({ page }) => {
+  const browserErrors = watchBrowserErrors(page, { warnings: true });
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem("dag2-test-initialized")) {
+      localStorage.clear();
+      sessionStorage.setItem("dag2-test-initialized", "1");
+    }
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+  });
+  await page.goto("http://127.0.0.1:8767/?task=causes", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+
+  const define = page.locator("#focusGroupPicker [data-define-focus]");
+  await expect(define).toBeVisible();
+  const anchorsBefore = await page.evaluate(() => {
+    const { iv_group_id, dv_group_id } = window.__dagBuilderState.project;
+    return { iv_group_id, dv_group_id };
+  });
+  await define.click();
+  await page.locator("#definitionChooseManual").click();
+  const usable = page.locator("#definitionSourceList input[data-source-id]");
+  await expect(usable.nth(0)).toBeVisible();
+  await usable.nth(0).check();
+  await page.locator("#definitionContinue").click();
+  await expect(page.locator("body"), browserErrors.errors.join("\n")).toHaveClass(/defining-variable/);
+  await page.locator("#definitionMethodManual").click();
+  const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
+  await page.locator("#definitionVariableSearch").fill(variableId);
+  await page.locator("#definitionVariableResults .result-button").first().click();
+  await page.locator("#definitionReview").click();
+  await page.locator("#definitionNewLabel").fill("Browser focus construct");
+  await page.locator("#definitionNewDescription").fill("A browser test construct defined from the causes view.");
+  const residuals = page.locator("#definitionResidualLabels input[data-residual-id]");
+  for (let i = 0; i < await residuals.count(); i++) await residuals.nth(i).fill(`Browser residual ${i}`);
+  await page.locator("#definitionSave").click();
+
+  await expect(page.locator("body")).not.toHaveClass(/defining-variable/);
+  const result = await page.evaluate(() => {
+    const state = window.__dagBuilderState;
+    const group = state.project.groups.find(candidate => candidate.label === "Browser focus construct");
+    return { task: state.task, groupId: group?.group_id, anchors: { iv_group_id: state.project.iv_group_id,
+      dv_group_id: state.project.dv_group_id }, title: document.querySelector("#dagViewTitle")?.textContent };
+  });
+  expect(result.task).toBe("causes");
+  expect(result.anchors).toEqual(anchorsBefore);
+  expect(result.title).toContain("Browser focus construct");
+  expect(browserErrors.errors).toEqual([]);
+});
+
+test("a saved AI split is not restored on load; Define offers it in Causes and resumes it", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  const ready = () => page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState.publishedSchemaHydrated);
+  await page.goto("http://127.0.0.1:8767/?task=causes", { waitUntil: "domcontentloaded" });
+  await ready();
+  await page.evaluate(async () => {
+    const { saveJevRun } = await import("/definition_jev_checkpoint.mjs");
+    const group = window.__dagBuilderState.project.groups.find(candidate => candidate.variable_ids?.length > 3);
+    await saveJevRun({ id: "seeded-run", sampleIds: [], createdAt: Date.now(), draft: {
+      role: "iv", step: "partition", source_group_ids: [group.group_id],
+      source_snapshot: [{ group_id: group.group_id, label: group.label, variable_ids: [...group.variable_ids] }],
+      eligible_variable_ids: [...group.variable_ids], new_variable_ids: [], new_label: "", new_description: "",
+      residual_labels: {}, reviewed_variable_ids: [], ai_description: "Seeded saved split" } });
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await ready();
+  expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft)).toBeNull();
+  await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
+
+  await page.locator("#focusGroupPicker [data-define-focus]").click();
+  const row = page.locator("#definitionResumeList .definition-resume-row");
+  await expect(row).toContainText("Seeded saved split");
+  await row.getByRole("button", { name: "Resume" }).click();
+  await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+  expect(await page.evaluate(() => {
+    const draft = window.__dagBuilderState.definitionDraft;
+    return { step: draft.step, role: draft.role, description: draft.ai_description };
+  })).toEqual({ step: "partition", role: "candidate", description: "Seeded saved split" });
+  await page.evaluate(async () => (await import("/definition_jev_checkpoint.mjs")).deleteJevRun("seeded-run"));
 });

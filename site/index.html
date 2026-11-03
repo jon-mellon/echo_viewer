@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ECHO</title>
-    <link rel="stylesheet" href="/styles.css?v=sidebar-evidence-v1">
+    <link rel="stylesheet" href="/styles.css?v=resume-saved-split-v1">
   </head>
   <body class="dag-body dag2-mode viewer-loading password-locked">
     <div id="passwordGate" class="password-gate" role="dialog" aria-modal="true" aria-labelledby="passwordGateTitle">
@@ -27,6 +27,44 @@
         </div>
       </div>
     </div>
+    <header id="taskBar" class="task-bar" hidden>
+      <span class="task-bar-brand">ECHO</span>
+      <nav class="task-tabs" aria-label="Choose what to do">
+        <button class="task-tab" type="button" data-task="identify" aria-pressed="false"><span class="task-tab-long">Identify an estimate</span><span class="task-tab-short">Identify</span></button>
+        <button class="task-tab" type="button" data-task="causes" aria-pressed="false"><span class="task-tab-long">Causes of a variable</span><span class="task-tab-short">Causes</span></button>
+        <button class="task-tab" type="button" data-task="consequences" aria-pressed="false"><span class="task-tab-long">Consequences of a variable</span><span class="task-tab-short">Consequences</span></button>
+      </nav>
+      <button id="taskReset" class="toolbar-button task-reset" type="button" hidden>Reset</button>
+    </header>
+    <section id="taskLanding" class="task-view task-landing" aria-labelledby="taskLandingTitle" hidden>
+      <div class="task-landing-inner">
+        <h1 id="taskLandingTitle">What do you want to do?</h1>
+        <div class="task-choices">
+          <button class="task-choice" type="button" data-task="identify">
+            <strong>Help causally identify an estimate</strong>
+            <span>Find confounders, colliders, and exclusion restriction violations from the literature.</span>
+          </button>
+          <button class="task-choice" type="button" data-task="causes">
+            <strong>Find causes of a variable</strong>
+            <span>See the variables that the literature links as causes of a variable, directly or through others.</span>
+          </button>
+          <button class="task-choice" type="button" data-task="consequences">
+            <strong>Find consequences of a variable</strong>
+            <span>See the variables that the literature links as effects of a variable, directly or through others.</span>
+          </button>
+        </div>
+      </div>
+    </section>
+    <dialog id="resetDialog" class="publication-dialog reset-dialog" aria-labelledby="resetDialogTitle">
+      <h2 id="resetDialogTitle">Reset this project?</h2>
+      <p>Resetting clears the variables chosen in all three views and returns to the start page. The current project is kept in Previous Sessions in this browser.</p>
+      <p id="resetError" role="alert" hidden></p>
+      <div class="reset-dialog-actions">
+        <button id="resetContinue" class="primary-button" type="button" autofocus>Continue working on this project</button>
+        <button id="resetNewTab" class="toolbar-button" type="button">Open new project in a new tab</button>
+        <button id="resetHere" class="toolbar-button reset-here" type="button">Reset in current tab</button>
+      </div>
+    </dialog>
     <main class="dag-shell">
 
       <!-- LEFT PANEL: Navigation + mode-specific content -->
@@ -104,6 +142,21 @@
           </div>
         </div>
 
+        <section id="exploreView" class="panel-section explore-view" aria-label="Causes or consequences of a variable" hidden>
+          <div id="focusSearchBlock" class="search-block">
+            <div class="anchor-source-header">
+              <label id="focusInputLabel" class="dag-label" for="focusInput">Search existing groups</label>
+              <button id="focusPickerCancel" class="text-button" type="button" hidden>Cancel</button>
+            </div>
+            <input id="focusInput" class="search-input" type="search" placeholder="Search group or constituent variable" autocomplete="off">
+            <div id="focusGroupPicker" class="setup-group-picker" hidden></div>
+          </div>
+          <div id="exploreResultsBlock" class="explore-results-block" hidden>
+            <p id="exploreSummary" class="explore-summary" aria-live="polite" hidden></p>
+            <div id="exploreResults" class="explore-results"></div>
+          </div>
+        </section>
+
         <!-- SETUP mode: Ind var/Dep var selection and schema choice -->
         <section id="setupSection" class="panel-section">
           <div class="section-title">
@@ -164,6 +217,7 @@
                   <strong>Browse user splits</strong><span>Find published splits for these variables, inspect their names and descriptions, and adapt one.</span>
                 </button>
               </div>
+              <div id="definitionResumeList" class="definition-resume-list" hidden></div>
             </div>
             <div id="definitionAiSetupStep" hidden><div class="definition-chosen-method"><span>Classify with AI</span><button id="definitionAiChangeMethod" class="text-button" type="button">Change method</button></div><div id="definitionAiSetupHost"></div></div>
             <div id="definitionSourcesStep" hidden>
@@ -425,15 +479,17 @@
           <div class="dag-ws-header section-title">
             <h2 id="dagViewTitle">Working map</h2>
             <div class="dag-ws-controls">
+              <div class="dag-diagnostic-switch" role="group" aria-label="Diagnostic view">
+                <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that could point into both; bidirectional edges count in either direction">Confounders</button>
+                <button id="toggleCollidersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that both could point into; bidirectional edges count in either direction">Colliders</button>
+                <button id="toggleExclusionViolations" class="toolbar-button" type="button" aria-pressed="false" aria-label="Exclusion restriction violations" hidden>Exclusion</button>
+                <button id="toggleExogeneity" class="toolbar-button" type="button" aria-pressed="false" hidden>Exogeneity</button>
+              </div>
               <details class="filter-dropdown">
                 <summary class="toolbar-button">Filters</summary>
                 <div class="filter-dropdown-panel" aria-label="Diagram filters">
-              <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that could point into both; bidirectional edges count in either direction">Confounders</button>
-              <button id="toggleCollidersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that both could point into; bidirectional edges count in either direction">Colliders</button>
-              <button id="toggleExclusionViolations" class="toolbar-button" type="button" aria-pressed="false" hidden>Exclusion restriction violations</button>
-              <button id="toggleExogeneity" class="toolbar-button" type="button" aria-pressed="false" hidden>Exogeneity</button>
               <label class="path-length-control" for="confounderPathLength" title="Maximum number of directed edges allowed on each path from a confounder to the Ind var and Dep var">
-                <span>Max path</span>
+                <span id="confounderPathLengthLabel">Max path</span>
                 <input id="confounderPathLength" class="path-length-input" type="number" min="1" max="99" step="1" value="1" inputmode="numeric" aria-label="Maximum confounder path length">
               </label>
               <button id="toggleSparseEdges" class="toolbar-button" type="button" aria-pressed="false" title="Hide edges supported by fewer than the minimum number of distinct papers">Exclude sparse edges</button>
@@ -452,11 +508,17 @@
               <button id="dagSvgZoomOut" class="icon-button" type="button" title="Zoom out">−</button>
               <button id="dagSvgFit" class="toolbar-button" type="button" title="Reset zoom">Fit</button>
               <button id="fullscreenDag" class="toolbar-button fullscreen-toggle" type="button" aria-pressed="false" title="Expand the DAG to fill the window; press Escape to exit">Full screen DAG</button>
-              <button id="copyPermalink" class="toolbar-button" type="button" title="Copy a link to this view of the public schema">Share view</button>
+              <button id="copyPermalink" class="toolbar-button" type="button" title="Copy a link to this view of the public schema">Share</button>
+              <div class="dag-view-switch" role="group" aria-label="Show the data as">
+                <button id="dagViewGraph" class="toolbar-button active" type="button" aria-pressed="true" title="Show the diagram">Graph</button>
+                <button id="dagViewTable" class="toolbar-button" type="button" aria-pressed="false" title="Show the same variables and links as tables">Table</button>
+              </div>
             </div>
           </div>
           <div class="dag-network-wrapper">
             <div id="dagNetwork" class="dag-network"></div>
+            <div id="dagTable" class="dag-table-view" hidden tabindex="-1" aria-label="Variables and links as tables"></div>
+            <p id="exploreGraphHint" class="explore-graph-hint" hidden></p>
             <div id="diagnosticOverlapKey" class="diagnostic-overlap-key" hidden></div>
           </div>
           <div class="dag-ws-footer">
@@ -500,10 +562,10 @@
       </aside>
 
     </main>
-    <nav class="mobile-panel-nav" aria-label="Viewer panels">
-      <button class="mobile-panel-tab active" type="button" data-mobile-panel="controls" aria-pressed="true">Setup</button>
-      <button class="mobile-panel-tab mobile-variable-tab" type="button" data-mobile-panel="variables" aria-pressed="false">Variables</button>
-      <button class="mobile-panel-tab" type="button" data-mobile-panel="dag" aria-pressed="false">Map</button>
+    <nav class="mobile-panel-nav" aria-label="Panels in current task">
+      <button class="mobile-panel-tab active" type="button" data-mobile-panel="controls" aria-pressed="true">Setup view</button>
+      <button class="mobile-panel-tab mobile-variable-tab" type="button" data-mobile-panel="variables" aria-pressed="false">Variables view</button>
+      <button class="mobile-panel-tab" type="button" data-mobile-panel="dag" aria-pressed="false">Map view</button>
     </nav>
     <a class="legal-link" href="/privacy.html" target="_blank" rel="noopener">Privacy</a>
     <script src="/password_gate.js"></script>

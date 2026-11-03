@@ -23,11 +23,13 @@ import { createDagMapUiController } from "/dag_map_ui_controller.mjs";
 import { createDagSetupGroupController } from "/dag_setup_group_controller.mjs";
 import { createDagGroupEditorController } from "/dag_group_editor_controller.mjs";
 import { deriveDagView, excludedForConnectivity } from "/dag_view.mjs";
-import { createDagNetworkController } from "/dag_network_controller.mjs?v=compiled-first-v2";
+import { createDagNetworkController, isDagDisplayGroup } from "/dag_network_controller.mjs?v=compiled-first-v2";
 import { createDagEventController } from "/dag_event_controller.mjs";
 import { createUoaController } from "/uoa_controller.mjs";
 import { createToolbarController } from "/toolbar_controller.mjs";
 import { createDefinitionWorkflowController } from "/definition_workflow_controller.mjs";
+import { createTaskViews } from "/task_views.mjs";
+import { directionalPaperCounter, linksNeedingExactCounts } from "/causal_neighborhood.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
 import { createGroupingSetController } from "/grouping_set_controller.mjs";
 import { createProjectBootstrap } from "/project_bootstrap.mjs?v=compiled-first-v2";
@@ -118,7 +120,7 @@ function initElements() {
     "ivInput", "ivInputLabel", "ivDefineNew", "ivSeeds", "ivResults", "ivGroupPicker",
     "instrumentInput", "instrumentDefineNew", "instrumentGroupPicker",
     "schemaChoice", "loadSchema", "skipSchema",
-    "definitionBlock", "definitionTitle", "definitionCancel", "definitionMethodStep", "definitionChooseManual", "definitionChooseJev", "definitionChooseBrowse",
+    "definitionBlock", "definitionTitle", "definitionCancel", "definitionMethodStep", "definitionResumeList", "definitionChooseManual", "definitionChooseJev", "definitionChooseBrowse",
     "definitionAiSetupStep", "definitionAiSetupHost", "definitionAiChangeMethod", "definitionAiSetup", "definitionAiWork", "definitionAiResults", "definitionSourcesStep", "definitionChosenMethod", "definitionChangeMethod",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults",
     "definitionPartitionStep", "definitionMethodJev", "definitionMethodManual", "definitionLoadStatus", "definitionJevPanel", "definitionManualPanel",
@@ -162,8 +164,9 @@ function initElements() {
     "groupSeedInput", "groupSeedResults",
     "includedVariables", "neighborSuggestions",
     // Right: DAG workspace
+    "focusSearchBlock", "focusInput", "focusInputLabel", "focusGroupPicker", "focusPickerCancel",
     "dagWorkspaceSection", "dagNetwork", "dagViewTitle", "diagnosticOverlapKey", "confounderConfig", "confounderDisclosure", "confounderSummary", "confounderStatusList",
-    "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag",
+    "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag", "dagTable", "dagViewGraph", "dagViewTable",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
     "exportProject", "exportWorkingMap", "projectImport", "strictDagStatus",
@@ -461,6 +464,7 @@ const renderCoordinator = createRenderCoordinator({
 
 function renderAll(options) {
   renderCoordinator.renderAll(options);
+  taskViews.render();
   persistentViewer.viewerChanged();
 }
 
@@ -468,8 +472,15 @@ function rebuildProject(options) {
   renderCoordinator.rebuildProject(options);
 }
 
+function renderExploreFocus() {
+  renderAnchorBar();
+  setupGroupController.renderFocusPicker();
+  updateDagFilters();
+}
+
 function updateDagFilters() {
   renderCoordinator.updateDagFilters();
+  taskViews.render();
   persistentViewer.viewerChanged();
 }
 
@@ -496,6 +507,7 @@ function renderAnchorBar() {
 }
 
 function changeAnchor(side) {
+  if (taskViews.exploring()) { taskViews.changeFocus(); return; }
   const gid = side === "dv" ? state.project?.dv_group_id
     : side === "instrument" ? state.project?.instrument_group_id : state.project?.iv_group_id;
   const group = groupById(gid);
@@ -721,8 +733,24 @@ function searchDefinitionSourceGroups(groups, query, limit = 60) {
     state.variableSearchStatus === "ready" ? variableSearchCatalog : null, limit);
 }
 
-async function loadVariableSearchCatalog() {
-  if (state.variableSearchStatus === "loading" || state.variableSearchStatus === "ready") return;
+const exploreSearchIndex = new searchModel.AnchorGroupSearchIndex();
+function searchExploreGroups(groups, query, limit = 200) {
+  if (normalized(query) && state.variableSearchStatus === "idle") void loadVariableSearchCatalog();
+  return exploreSearchIndex.searchGroups(groups, state.project.groups, query, state.variableById,
+    state.variableSearchStatus === "ready" ? variableSearchCatalog : null, limit);
+}
+
+// Callers may wait on an in-flight load (later preloads queue behind it).
+let variableSearchCatalogLoad = null;
+function loadVariableSearchCatalog() {
+  if (state.variableSearchStatus === "loading" || state.variableSearchStatus === "ready") {
+    return variableSearchCatalogLoad || Promise.resolve();
+  }
+  variableSearchCatalogLoad = startVariableSearchCatalogLoad();
+  return variableSearchCatalogLoad;
+}
+
+async function startVariableSearchCatalogLoad() {
   state.variableSearchStatus = "loading";
   state.variableSearchError = null;
   try {
@@ -739,7 +767,9 @@ async function loadVariableSearchCatalog() {
   renderSearch("iv");
   renderSearch("dv");
   renderSetupGroupPicker("instrument");
+  setupGroupController.renderFocusPicker();
   if (state.definitionDraft?.step === "sources") renderDefinition();
+  taskViews.render();
 }
 
 function groupedVariableIds(excludeGroupId = null) {
@@ -1103,8 +1133,11 @@ const persistentViewer = createPersistentViewer({
   getSchema: currentWorkingGroupingSchema,
   getViewport: () => {
     const network = dagNetworkController.getNetwork();
-    state.dagViewport = network
-      ? { scale: network.getScale(), position: network.getViewPosition() } : null;
+    // An empty or unsized graph reports a meaningless scale; saving it would
+    // make a reopened link zoom to nothing.
+    const scale = network?.getScale();
+    state.dagViewport = network && Number.isFinite(scale) && scale > 0 && scale < 1e4
+      ? { scale, position: network.getViewPosition() } : null;
   },
   status: message => {
     if (els.localSaveStatus) els.localSaveStatus.textContent = message;
@@ -1114,6 +1147,28 @@ const persistentViewer = createPersistentViewer({
   },
   onDiscard: invalidateMapCaches,
 });
+
+const taskViews = createTaskViews({
+  state, searchGroups: searchExploreGroups, searchStatus: () => state.variableSearchStatus,
+  paperSupport: linkPaperSupport, loadPaperSupport: () => void loadLinkSupport(linkPaperSupport().links),
+  isDisplayGroup: isDagDisplayGroup,
+  // A new variable updates the anchor bar, picker and graph, like a distance change,
+  // instead of re-rendering all of Identify's setup.
+  onExploreChange: () => renderExploreFocus(),
+  onFocusPicking: () => { renderAnchorBar(); setupGroupController.renderFocusPicker(); taskViews.render(); },
+  onPickerInput: () => setupGroupController.renderFocusPicker(),
+  onSetupNeeded: () => shellController.showMobilePanel("controls"),
+  // Each task shows its own graph, so rebuild it from the project's links.
+  // Between causes and consequences only the anchor bar, picker and graph change.
+  onTaskChange: ({ previous, task }) => {
+    dismissEvidenceForTask();
+    const bothExplore = [previous, task].every(name => name === "causes" || name === "consequences");
+    if (bothExplore) renderExploreFocus(); else renderAll({ reuseLinks: true });
+  },
+  openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
+  onChange: () => persistentViewer.viewerChanged(), prepareReset: () => persistentViewer.prepareReset(), whenReady: () => persistentViewer.whenReady(),
+});
+taskViews.install();
 
 function exportLocalDraft() {
   const schema = currentWorkingGroupingSchema();
@@ -1162,6 +1217,8 @@ function createDensityCandidateGroup() {
 // ─── Candidate queue ──────────────────────────────────────────────────────────
 
 function buildCandidateQueue() {
+  // Only Identify's setup uses the queue; it is rebuilt when switching back.
+  if (taskViews.exploring()) return;
   state.candidateQueue = candidates.buildCandidateQueue(state.project, candidateInputs());
 }
 
@@ -1252,29 +1309,86 @@ function hasAnyMapping(sourceIds, targetIds) {
   return rawLinksBetween(sourceIds, targetIds).length > 0;
 }
 
-let sparseEdgeEvidencePromise = null;
+// Per-finding paper support. The sparse-edge filter needs it for every group
+// link. Causes and consequences read the paper counts already in the aggregated
+// DAG, and need it only for links a local edit touched (which carry no keys).
+let linkSupportPromise = null;
+let linkSupportFailed = false;
+let sparseWaitingForSupport = false;
+function missingLinkSupportIds(links = state.project?.links || []) {
+  return [...new Set(links.flatMap(link =>
+    [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))]
+    .filter(id => !state.edgeSupportById.has(id) && !state.rawLinksById.has(id));
+}
+function loadLinkSupport(links) {
+  if (linkSupportPromise) return linkSupportPromise;
+  const missing = missingLinkSupportIds(links);
+  if (!missing.length) return Promise.resolve(true);
+  const supportCache = state.edgeSupportById;
+  linkSupportPromise = dagDataSource.loadRawLinkSupportByIds(missing).then(rows => {
+    if (state.edgeSupportById !== supportCache) return false;
+    const returned = new Set(rows.map(row => row.raw_causal_link_id));
+    if (missing.some(id => !returned.has(id))) {
+      throw new Error("Some sparse edge evidence is unavailable in this snapshot");
+    }
+    for (const row of rows) state.edgeSupportById.set(row.raw_causal_link_id, row);
+    linkSupportFailed = false;
+    return true;
+  }).catch(error => {
+    if (state.edgeSupportById === supportCache) {
+      linkSupportFailed = true;
+      console.error("Could not load sparse edge evidence", error);
+    }
+    return false;
+  }).finally(() => {
+    linkSupportPromise = null;
+    // An explore view waiting on these counts redraws now.
+    if (taskViews.exploring()) updateDagFilters();
+  });
+  return linkSupportPromise;
+}
+// What the causes and consequences views need to count papers: nothing, unless
+// an edit left some links without paper keys, in which case only those links'
+// findings are fetched. Remembered per links array, since it scans every link.
+let exactCountLinks = { links: null, needing: [] };
+function linkPaperSupport() {
+  const links = state.project?.links || [];
+  if (exactCountLinks.links !== links) exactCountLinks = { links, needing: linksNeedingExactCounts(links) };
+  const { needing } = exactCountLinks;
+  if (!needing.length) return { status: "ready", papersFor: directionalPaperCounter() };
+  if (linkSupportFailed) return { status: "failed", papersFor: directionalPaperCounter() };
+  if (missingLinkSupportIds(needing).length) return { status: "loading", papersFor: null, links: needing };
+  return { status: "ready", papersFor: directionalPaperCounter(state.edgeSupportById, state.rawLinksById),
+    cacheKey: state.edgeSupportById };
+}
+
+// Causes and consequences draw one variable's neighborhood through the same
+// graph and evidence pane as Identify; the diagnostics belong to Identify.
+function computeExploreLinks() {
+  const { graph } = taskViews.neighborhood();
+  state.componentGroupIds = graph.groupIds;
+  state.visibleLinks = graph.links;
+  state.exploreLayout = graph.layout;
+  for (const key of ["confounderGroupIds", "confounderPathGroupIds", "bottleneckedConfounderIds",
+    "colliderGroupIds", "colliderPathGroupIds", "bottleneckedColliderIds", "exclusionViolationIds",
+    "exclusionPathIds", "exclusionLinkPairKeys", "exogeneityGroupIds", "exogeneityPathGroupIds",
+    "exogeneityLinkPairKeys", "bottleneckedExogeneityIds", "confounderLinkPairKeys", "colliderLinkPairKeys"]) {
+    state[key] = new Set();
+  }
+  for (const key of ["confounderPathsByGroup", "colliderPathsByGroup", "exclusionPathsByGroup", "exogeneityPathsByGroup"]) {
+    state[key] = new Map();
+  }
+}
+
 function computeVisibleLinks() {
+  if (taskViews.exploring()) { computeExploreLinks(); return; }
   ensureDiagnosticFilter(state);
-  const missingSparseEvidence = state.excludeSparseEdges
-    ? [...new Set((state.project?.links || []).flatMap(link =>
-      [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]))]
-      .filter(id => !state.edgeSupportById.has(id) && !state.rawLinksById.has(id)) : [];
-  if (missingSparseEvidence.length && !sparseEdgeEvidencePromise) {
-    const supportCache = state.edgeSupportById;
-    sparseEdgeEvidencePromise = dagDataSource.loadRawLinkSupportByIds(missingSparseEvidence).then(rows => {
-      if (state.edgeSupportById !== supportCache) return;
-      const returned = new Set(rows.map(row => row.raw_causal_link_id));
-      if (missingSparseEvidence.some(id => !returned.has(id))) {
-        throw new Error("Some sparse edge evidence is unavailable in this snapshot");
-      }
-      for (const row of rows) state.edgeSupportById.set(row.raw_causal_link_id, row);
-    }).catch(error => {
-      if (state.edgeSupportById === supportCache) {
-        state.excludeSparseEdges = false;
-        console.error("Could not load sparse edge evidence", error);
-      }
-    }).finally(() => {
-      sparseEdgeEvidencePromise = null;
+  const missingSparseEvidence = state.excludeSparseEdges ? missingLinkSupportIds() : [];
+  if (missingSparseEvidence.length && !sparseWaitingForSupport) {
+    sparseWaitingForSupport = true;
+    void loadLinkSupport(state.project?.links).then(loaded => {
+      sparseWaitingForSupport = false;
+      if (!loaded && linkSupportFailed) state.excludeSparseEdges = false;
       updateDagFilters();
     });
   }
@@ -1425,7 +1539,13 @@ function highlightConfounderPaths(id) { return dagNetworkController.highlightCon
 function clearConfounderPathHover() { return dagNetworkController.clearConfounderPathHover(); }
 function clearLogicalDagEdgeHover() { return dagNetworkController.clearLogicalDagEdgeHover(); }
 function renderDag(options) { return dagNetworkController.renderDag(options); }
-function refreshDagEdgeSelection(options) { return dagNetworkController.refreshEdgeSelection(options); }
+function refreshDagEdgeSelection(options) {
+  const refreshed = dagNetworkController.refreshEdgeSelection(options);
+  taskViews.refreshSelection();
+  // The open link is part of the permalink, however it was selected.
+  persistentViewer.viewerChanged();
+  return refreshed;
+}
 function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 
 // ─── Edge inspector + provenance ──────────────────────────────────────────────
@@ -1520,6 +1640,19 @@ function renderSelectedEdge() {
     pendingEdgeEvidencePromise = load;
   }
   renderSelectedEdgePanels();
+}
+
+// The open evidence is per task; clear what the old task showed so the pane
+// matches the new task's selection (restored by the task views).
+function dismissEvidenceForTask() {
+  inspectorController.clearPendingExclude();
+  state.selectedVariableIds.clear();
+  state.comparisonVariableIds = [];
+  if (!state.selectedEdgeId) {
+    els.edgeInspector.hidden = true;
+    els.provenancePanel.hidden = true;
+    els.closeEvidencePane.hidden = true;
+  }
 }
 
 function dismissEvidencePane() {
@@ -1695,6 +1828,8 @@ function scheduleSettledMapDraw(delayMs = 100) {
 }
 
 function drawMap(options) {
+  // The variable map is not shown in the causes and consequences views.
+  if (taskViews.exploring()) return undefined;
   const result = mapUiController.drawMap(options);
   persistentViewer.viewerChanged(true);
   return result;
@@ -1759,6 +1894,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
     publicationController.workingCopyChanged();
   },
   onCommitFailureRestored: () => persistentViewer.clearSaveFailure(),
+  onFocusDefined: groupId => taskViews.chooseFocus(groupId),
   onInstrumentReady: () => shellController.showMobilePanel("dag"),
   prewarmEvidence: async () => {
     if (await dagDataSource.prewarmVariableMap(state.variableLayoutSource)) return;
@@ -1819,6 +1955,8 @@ const setupGroupController = createDagSetupGroupController({
   roleLabels: ROLE_LABELS, dagProjectView, startDefinition, startEditSplit,
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
   searchAnchorGroups, beginEditor: () => persistentViewer.beginEditor(),
+  exploreFocus: () => taskViews.focus(), searchFocusGroups: query => taskViews.searchFocusGroups(query),
+  onChooseFocus: groupId => taskViews.chooseFocus(groupId),
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
   excludeConcept: excludeGroupConcept,
@@ -1826,7 +1964,7 @@ const setupGroupController = createDagSetupGroupController({
 
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll,
+  drawMap, setMapMode, renderAll, exploreRows: () => taskViews.neighborhood().rows,
   onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
   selectEdge: () => {
     if (state.fullscreenPanel) setFullscreenPanel(null);
@@ -2029,5 +2167,5 @@ init().catch((error) => {
     h("main", { className: "panel-section" }, h("h1", { textContent: missing ? "Local schema unavailable" : "Echo could not open this view" }),
       h("p", { textContent: error?.message || error }),
       missing ? h("label", { textContent: "Import draft" }, input) : null,
-      missing ? h("a", { href: "/?new=1", textContent: "Start new view" }) : null));
+      missing ? h("a", { href: "?new=1", textContent: "Start new view" }) : null));
 });

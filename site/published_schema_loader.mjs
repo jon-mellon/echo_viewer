@@ -1,3 +1,4 @@
+import { SCHEMA_SOURCE_PARAM, publishedReferenceUrl, schemaSource, schemaSourceRequested } from "./schema_source.mjs";
 import { supabase } from "./supabase_client.mjs";
 import { PRODUCTION_APP_ORIGIN } from "./dag_data_config.mjs";
 import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
@@ -35,19 +36,23 @@ export async function fetchPublishedFile(url, options, fetchImpl, sleep = ms => 
 
 export function publicationPermalink(publicationId, location = globalThis.location, state = null) {
   const origin = location?.origin || PRODUCTION_APP_ORIGIN;
+  // The app may be served below the domain root (staging), so keep its path.
+  const base = new URL(location?.origin ? location.pathname || "/" : "/", origin);
   const groups = state?.project?.groups || [];
   const anchor = side => groups.find(group => group.group_id === state?.project?.[`${side}_group_id`]);
   const hasView = Boolean(anchor("iv")?.variable_ids?.length && anchor("dv")?.variable_ids?.length
     && state.project.iv_group_id !== state.project.dv_group_id);
   const url = hasView
     ? new URL(buildPermalink({
-        location: new URL("/", origin),
+        location: base,
         schemaUrl: "",
         dataVersion: state.data?.snapshot?.snapshot_id || "",
         state,
       }))
-    : new URL("/", origin);
+    : new URL(base);
   url.searchParams.delete("schema_url");
+  // A page that named its schema source keeps naming it in the links it shares.
+  if (schemaSourceRequested(location)) url.searchParams.set(SCHEMA_SOURCE_PARAM, schemaSource(location));
   url.searchParams.set("schema", publicationId);
   return url.href;
 }
@@ -134,9 +139,12 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
     const schemaFiles = new Map();
     const schemaFetch = async (url, options) => {
       const response = await cachingFetch(url, options);
-      if (response.ok) {
-        const relative = new URL(url).href.slice(new URL(baseUrl).href.length);
-        schemaFiles.set(relative, new Uint8Array(await response.clone().arrayBuffer()));
+      // Only this publication's own files are recorded here; a parent's file that a membership reference points at is
+      // added at its logical path below. (Recording it under a slice of its address collided with the real path
+      // whenever the two folder names were the same length, and the later clean-up then deleted the real file.)
+      const href = new URL(url).href, base = new URL(baseUrl).href;
+      if (response.ok && href.startsWith(base)) {
+        schemaFiles.set(href.slice(base.length), new Uint8Array(await response.clone().arrayBuffer()));
       }
       return response;
     };
@@ -185,10 +193,11 @@ export async function loadPublishedSchema(publicationId, client = supabase, fetc
       delete logicalManifest.group_membership_references;
       schemaFiles.set("manifest.json", new TextEncoder().encode(stableJson(logicalManifest)));
       for (const [groupId, reference] of Object.entries(references)) {
-        const bytes = memory.get(new URL(reference, baseUrl).href);
+        // Manifests name a parent's file by its Supabase address; it was fetched (and remembered) under the page's source.
+        const referenceUrl = publishedReferenceUrl(reference, baseUrl)?.href;
+        const bytes = referenceUrl && memory.get(referenceUrl);
         if (!bytes || !staged.manifest.group_membership_files[groupId]) throw new Error(`Missing referenced membership for ${groupId}.`);
         schemaFiles.set(staged.manifest.group_membership_files[groupId], bytes);
-        schemaFiles.delete(new URL(reference, baseUrl).href.slice(new URL(baseUrl).href.length));
       }
     }
     const downloadedHash = await canonicalFolderHash(schemaFiles);

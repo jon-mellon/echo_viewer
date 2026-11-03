@@ -86,7 +86,7 @@ export class EchoAgentSession {
         refresh_token: process.env.ECHO_SUPABASE_REFRESH_TOKEN });
       if (error) throw error;
     }
-    return browsePublishedSplits(ids, client);
+    return browsePublishedSplits(ids, client, { source: "supabase" });
   }
   async applyPublishedSplit({ sourceGroupIds, publicationId, groupId, newGroupId, residualLabels,
     role = "candidate", edit = false }) {
@@ -94,7 +94,7 @@ export class EchoAgentSession {
     const rows = await this.browseSplits({ sourceGroupIds });
     const row = rows.find(candidate => candidate.publication_id === publicationId && candidate.group_id === groupId);
     if (!row) throw new Error("The selected approved split is not available for these source groups.");
-    const ids = await loadPublishedSplitMembership(row, this.publishedSplitClient(), this.publishedSplitFetch || fetch);
+    const ids = await loadPublishedSplitMembership(row, this.publishedSplitClient(), this.publishedSplitFetch || fetch, "supabase");
     const sources = sourceGroupIds.map(id => ownGroup(this.schema, id));
     const eligible = new Set(sources.flatMap(group => group.variable_ids));
     if (!ids.length || ids.some(id => !eligible.has(id))
@@ -461,7 +461,7 @@ export class EchoAgentSession {
     this.record.status = "publishing";
     await this.save();
     try {
-      const result = await publishWorkingSchema({ schema: this.schema, client,
+      const result = await publishWorkingSchema({ schema: this.schema, client, source: "supabase",
         previousPublication: { publication_id: this.record.sourcePublication.id },
         compileInput: { project: projectFromSchema(this.schema, this.record.anchors), rawLinks } });
       this.record.status = "published";

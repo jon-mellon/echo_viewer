@@ -7,6 +7,7 @@ import * as workflow from "./dag_workflow.mjs";
 import * as dagPathHighlights from "./dag_path_highlights.mjs";
 import { STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "./dag_inspector_controller.mjs";
 import { studyDesignEdgeData } from "./dag_study_edges.mjs";
+import { createDagTable, dagTableModel, pathView } from "./dag_table.mjs";
 
 export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId, links, visualData) {
   if (previousId === selectedId) return [];
@@ -73,8 +74,14 @@ export function isDagFullyVisible(network, boxes, viewport) {
 
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, selectEdge, selectGroup, onViewportChange = () => {},
+  drawMap, setMapMode, renderAll, selectEdge, selectGroup, onViewportChange = () => {}, exploreRows = () => [],
 }) {
+  // The causes and consequences views draw a neighborhood of one variable, not
+  // a study design, so there are no IV, DV or instrument anchors to pin or style.
+  const exploring = () => state.task === "causes" || state.task === "consequences";
+  const studyAnchors = () => exploring() ? { ivId: null, dvId: null, instrumentId: null }
+    : { ivId: state.project?.iv_group_id, dvId: state.project?.dv_group_id, instrumentId: state.project?.instrument_group_id };
+  const exploreFocusId = () => exploring() ? state.explore?.[state.task]?.focusId || null : null;
 // ─── DAG visApi.js rendering ─────────────────────────────────────────────────────
 
 let _visNetwork = null;
@@ -147,17 +154,22 @@ function dagStudyArrowCorridor({ ivId, dvId, positions, boxes, fontSize = 12 }) 
 
 
 function visNodeData(group, layoutPoint, layoutParams = {}) {
+  const focusId = exploreFocusId();
+  // The focus is drawn like an anchor (the outcome when exploring causes, the
+  // exposure when exploring consequences); everything else is a plain node.
+  if (exploring()) group = { ...group, type: group.group_id === focusId ? (state.task === "causes" ? "dv" : "iv") : "candidate" };
   return dagDisplay.visNodeData(group, layoutPoint, layoutParams, {
+    focusId,
     showCollidersOnly: state.showCollidersOnly, showConfoundersOnly: state.showConfoundersOnly,
     showExclusionViolations: state.showExclusionViolations,
     showExogeneity: state.showExogeneity,
     exclusionViolationIds: state.exclusionViolationIds,
     exogeneityGroupIds: state.exogeneityGroupIds,
     exogeneityPathGroupIds: state.exogeneityPathGroupIds,
-    instrumentId: state.project?.instrument_group_id,
+    instrumentId: studyAnchors().instrumentId,
     colliderGroupIds: state.colliderGroupIds, colliderPathGroupIds: state.colliderPathGroupIds,
     confounderGroupIds: state.confounderGroupIds, confounderPathGroupIds: state.confounderPathGroupIds,
-    ivId: state.project?.iv_group_id, dvId: state.project?.dv_group_id,
+    ivId: studyAnchors().ivId, dvId: studyAnchors().dvId,
     activeGroupId: state.activeGroupId, groupColor: groupColor(group),
   });
 }
@@ -166,14 +178,83 @@ function edgeVisualData(link) {
   return dagDisplay.edgeVisualData(link, state.selectedEdgeId);
 }
 
+// The table is another view of the same nodes and links the graph draws; it
+// is rebuilt from them on every render while shown, and the graph is rebuilt
+// from them when it is shown again.
+let _dagTable = null;
+const tableShown = () => state.dagDisplay === "table";
+
+function openVariable(id) {
+  Object.assign(state, workflow.transition(state, { type: "focus-group", groupId: id }));
+  drawMap();
+  selectGroup(id);
+}
+
+function openEvidence(edgeId) {
+  state.selectedEdgeId = edgeId;
+  selectEdge();
+}
+
+function tableRole(group) {
+  const id = group.group_id;
+  const anchors = studyAnchors();
+  if (id === exploreFocusId()) return "Focus";
+  if (id === anchors.ivId) return "Ind var";
+  if (id === anchors.dvId) return "Dep var";
+  if (id === anchors.instrumentId) return "Instrument";
+  if (state.showExogeneity && state.exogeneityGroupIds?.has(id)) return "Common cause of instrument and Dep var";
+  if (state.showExclusionViolations && state.exclusionViolationIds?.has(id)) return "Exclusion restriction violation";
+  if (state.showCollidersOnly && state.colliderGroupIds?.has(id)) return "Collider";
+  if (state.showConfoundersOnly && state.confounderGroupIds?.has(id)) return "Confounder";
+  return "";
+}
+
+async function renderDagTable(groups, links) {
+  _dagTable ||= createDagTable({ container: els.dagTable, onOpenVariable: openVariable, onOpenEvidence: openEvidence });
+  const studyLinks = studyDesignEdgeData(groups, state.project, state.task).map(edge => ({
+    edgeId: edge.id, sourceId: edge.from, targetId: edge.to,
+    note: edge.id === STUDY_DESIGN_EDGE_ID ? "Study relationship" : "Study instrument",
+  }));
+  const view = pathView({ ...state, exploring: exploring() });
+  const pathsByGroup = { exogeneity: state.exogeneityPathsByGroup, exclusion: state.exclusionPathsByGroup,
+    colliders: state.colliderPathsByGroup, confounders: state.confounderPathsByGroup }[view];
+  const built = _dagTable.update(dagTableModel({ view, groups, links, pathsByGroup, exploreRows: view === "explore" ? exploreRows() : [],
+    anchors: studyAnchors(), maxPathLength: view === "exclusion" ? state.exclusionMaxPathLength : state.confounderMaxPathLength,
+    roleFor: tableRole, studyLinks }));
+  _dagTable.select({ edgeId: state.selectedEdgeId, groupId: state.selectedEvidenceGroupId });
+  // The table builds in chunks; the render is done when every row is in.
+  await built;
+}
+
+function showDagDisplay() {
+  const table = tableShown();
+  els.dagTable.hidden = !table;
+  els.dagNetwork.hidden = table;
+  for (const [button, active] of [[els.dagViewGraph, !table], [els.dagViewTable, table]]) {
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+}
+
+async function setDagDisplay(mode) {
+  const next = mode === "table" ? "table" : "graph";
+  if (state.dagDisplay === next) return;
+  state.dagDisplay = next;
+  showDagDisplay();
+  onViewportChange(false);
+  await renderDag();
+  if (next === "graph") _visNetwork?.redraw();
+}
+
 function refreshEdgeSelection({ redraw = true } = {}) {
+  _dagTable?.select({ edgeId: state.selectedEdgeId, groupId: state.selectedEvidenceGroupId });
   if (!_visEdges) return;
   // Selecting an edge only changes its presentation. Recomputing and reapplying
   // the full layout here can make vis.js move nodes while it is still completing
   // the click event, especially for routed edges with synthetic bend nodes.
   clearLogicalDagEdgeHover();
   const updates = selectionUpdatesForSegments(_dagEdgeSegments, _renderedSelectedEdgeId,
-    state.selectedEdgeId, state.project?.links || [], edgeVisualData);
+    state.selectedEdgeId, (exploring() ? state.visibleLinks : state.project?.links) || [], edgeVisualData);
   _renderedSelectedEdgeId = state.selectedEdgeId;
   if (updates.length) _visEdges.update(updates);
   // DataSet updates already request a frame from vis. A synchronous redraw here
@@ -183,8 +264,8 @@ function refreshEdgeSelection({ redraw = true } = {}) {
 function routedDagData(groups, links, layout) {
   const boxes = layout.boxes;
   const corridor = dagStudyArrowCorridor({
-    ivId: state.project?.instrument_group_id || state.project?.iv_group_id,
-    dvId: state.project?.dv_group_id,
+    ivId: studyAnchors().instrumentId || studyAnchors().ivId,
+    dvId: studyAnchors().dvId,
     positions: layout.positions,
     boxes,
     fontSize: layout.params.fontSize,
@@ -232,9 +313,9 @@ function drawConfounderPathLanes(context) {
     positions,
     boxes,
     scale,
-    ivId: state.project?.iv_group_id,
-    dvId: state.project?.dv_group_id,
-    instrumentId: state.project?.instrument_group_id,
+    ivId: studyAnchors().ivId,
+    dvId: studyAnchors().dvId,
+    instrumentId: studyAnchors().instrumentId,
   });
 }
 
@@ -331,8 +412,8 @@ function highlightConfounderPaths(groupId) {
     studyDesignEdgeId: STUDY_DESIGN_EDGE_ID,
     instrumentDesignEdgeId: STUDY_INSTRUMENT_EDGE_ID,
     groupId,
-    ivId: state.showExogeneity ? state.project?.instrument_group_id : state.project?.iv_group_id,
-    dvId: state.project?.dv_group_id,
+    ivId: state.showExogeneity ? studyAnchors().instrumentId : studyAnchors().ivId,
+    dvId: studyAnchors().dvId,
     showConfoundersOnly: state.showConfoundersOnly,
     showExogeneity: state.showExogeneity,
     showExclusionViolations: state.showExclusionViolations,
@@ -348,6 +429,7 @@ let _dagRenderWorker = null;
 let _dagRenderRequest = 0;
 let _dagApplyingRequest = null;
 let _dagRenderedPromise = Promise.resolve();
+let _resolveRendered = null;
 const _dagGeometryCache = new Map();
 
 function rememberGeometry(key, geometry) {
@@ -364,11 +446,16 @@ async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } =
     return Boolean(group?.variable_ids?.length
       || (state.publishedSchemaHydrating && Number(group?.member_count) > 0));
   };
-  if (state.interfaceMode === "dag2"
+  if (state.interfaceMode === "dag2" && !exploring()
     && (!hasAnchor(state.project?.iv_group_id) || !hasAnchor(state.project?.dv_group_id)
       || (state.phase === "select_instrument" && !state.changingAnchorSide))) return;
+  // A render that a newer one supersedes never finishes, so anyone already waiting on it is released when the newer one does.
   let resolveRendered;
-  _dagRenderedPromise = new Promise(resolve => { resolveRendered = resolve; });
+  let supersededResolve = _resolveRendered;
+  _dagRenderedPromise = new Promise(resolve => {
+    resolveRendered = () => { resolve(); supersededResolve?.(); supersededResolve = null; };
+  });
+  _resolveRendered = resolveRendered;
   clearLogicalDagEdgeHover();
   clearConfounderPathHover({ redraw: false });
   const groups = dagVisibleGroups();
@@ -385,6 +472,13 @@ async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } =
 
   const links = state.visibleLinks.filter((link) => !link.is_target_relation
     && nextGroupIds.has(link.group_a) && nextGroupIds.has(link.group_b));
+  if (els.dagTable.hidden === tableShown()) showDagDisplay();
+  if (tableShown()) {
+    // No layout: the graph is rebuilt from the same groups and links when it is shown again.
+    await renderDagTable(groups, links);
+    resolveRendered();
+    return;
+  }
   if (reuseGeometry && !_dagRenderWorker && _dagApplyingRequest === null && _visNetwork) {
     const reused = reuseDagGeometry(_dagGeometry, groups, links, { allowRemovedGroups });
     if (reused) {
@@ -401,13 +495,15 @@ async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } =
     links: links.map(({ edge_id, group_a, group_b, direction_type }) =>
       ({ edge_id, group_a, group_b, direction_type })),
     centroids: groups.map(group => [group.group_id, groupMapCentroid(group)]),
-    ivId: state.project?.iv_group_id,
-    dvId: state.project?.dv_group_id,
-    instrumentId: state.project?.instrument_group_id,
+    ivId: studyAnchors().ivId,
+    dvId: studyAnchors().dvId,
+    instrumentId: studyAnchors().instrumentId,
+    focus: exploring() ? state.exploreLayout || null : null,
     mode: state.dagLayoutMode,
     width: els.dagNetwork.clientWidth || 630,
     height: els.dagNetwork.clientHeight || 700,
-    viewSignature: state.showConfoundersOnly
+    viewSignature: exploring() ? `explore:${state.task}:${exploreFocusId()}`
+      : state.showConfoundersOnly
       ? `confounders:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
       : state.showExogeneity
         ? `exogeneity:${state.project?.instrument_group_id}:${state.confounderMaxPathLength}:bottlenecked:${state.excludeBottleneckedConfounders}:path-links:${state.hideIrrelevantConfounderLinks}`
@@ -502,7 +598,7 @@ async function applyDagRender(groups, layout, routes) {
   _dagBoundsCache = null;
   const previousNodeData = _dagNodeDataById;
   _dagNodeDataById = new Map(nodeData.map(node => [node.id, node]));
-  edgeData.push(...studyDesignEdgeData(groups, state.project));
+  edgeData.push(...studyDesignEdgeData(groups, state.project, state.task));
   _dagEdgeSegments = edgeSegments;
   _renderedSelectedEdgeId = state.selectedEdgeId;
 
@@ -755,7 +851,8 @@ function edgeHoverText(link) {
   return {
     clampNumber, visNetworkOptions, dagStudyArrowCorridor, routedDagData,
     routedDagDataFromRoutes, dagVisibleGroups, renderDag, minimumDagScale,
-    refreshEdgeSelection,
+    refreshEdgeSelection, setDagDisplay,
+    dagDisplay: () => state.dagDisplay,
     highlightConfounderPaths, clearConfounderPathHover, clearLogicalDagEdgeHover,
     highlightConnectedDagEdges,
     whenRendered: () => _dagRenderedPromise,

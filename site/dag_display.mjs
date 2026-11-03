@@ -39,7 +39,7 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     : null;
   const isSelected = group.group_id === view.activeGroupId;
   const color = isViolation ? "#c62828" : isInstrument ? "#166534" : isExogeneityCandidate ? "#c62828" : isConfounder ? "#c62828" : isCollider ? "#801744" : isPathMediator ? "#6b7280" : view.groupColor;
-  const roleTag = isIv ? " (Ind var)" : isDv ? " (Dep var)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : isExogeneityCandidate ? " (potential common cause of instrument and Dep var)" : "";
+  const roleTag = view.focusId && group.group_id === view.focusId ? " (focus)" : isIv ? " (Ind var)" : isDv ? " (Dep var)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : isExogeneityCandidate ? " (potential common cause of instrument and Dep var)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
   return {

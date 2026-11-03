@@ -116,9 +116,13 @@ export async function validateCompiledArtifact({ publication, manifest, dag, cry
   return dag;
 }
 
-export function dagEquals(left, right) {
-  return JSON.stringify(stableValue({ nodes: left.nodes, edges: left.edges }))
-    === JSON.stringify(stableValue({ nodes: right.nodes, edges: right.edges }));
+// `ignorePaperCounts` compares an incrementally updated DAG with a full compile:
+// edges an edit touched deliberately carry no paper keys (see incrementCompiledDag).
+export function dagEquals(left, right, { ignorePaperCounts = false } = {}) {
+  const strip = edges => ignorePaperCounts ? edges.map(({ a_to_b_paper_table_keys, b_to_a_paper_table_keys,
+    distinct_paper_count, ...rest }) => rest) : edges;
+  return JSON.stringify(stableValue({ nodes: left.nodes, edges: strip(left.edges) }))
+    === JSON.stringify(stableValue({ nodes: right.nodes, edges: strip(right.edges) }));
 }
 
 function membership(schema) {
@@ -155,6 +159,14 @@ export function incrementCompiledDag({ compiledDag, oldSchema, newSchema, incide
   const incidentIds = new Set(incident.map(link => link.raw_causal_link_id));
   const edgesById = new Map((compiledDag.edges || []).map(edge => {
     const { manual_edge_ids, manual_a_to_b_exists, manual_b_to_a_exists, is_manual, ...evidenceEdge } = edge;
+    // The paper keys cannot be updated from the findings that remain (their papers
+    // are not loaded), so an edge this edit touches drops them instead of keeping
+    // numbers that no longer match its findings. Readers count those edges exactly.
+    if ([...(edge.a_to_b_raw_link_ids || []), ...(edge.b_to_a_raw_link_ids || [])].some(id => incidentIds.has(id))) {
+      delete evidenceEdge.a_to_b_paper_table_keys;
+      delete evidenceEdge.b_to_a_paper_table_keys;
+      delete evidenceEdge.distinct_paper_count;
+    }
     return [edge.edge_id, {
       ...evidenceEdge,
       a_to_b_raw_link_ids: (edge.a_to_b_raw_link_ids || []).filter(id => !incidentIds.has(id)),
@@ -173,6 +185,9 @@ export function incrementCompiledDag({ compiledDag, oldSchema, newSchema, incide
     const current = edgesById.get(addition.edge_id);
     if (!current) edgesById.set(addition.edge_id, addition);
     else {
+      delete current.a_to_b_paper_table_keys;
+      delete current.b_to_a_paper_table_keys;
+      delete current.distinct_paper_count;
       current.a_to_b_raw_link_ids.push(...addition.a_to_b_raw_link_ids);
       current.b_to_a_raw_link_ids.push(...addition.b_to_a_raw_link_ids);
       current.a_to_b_present_raw_link_ids.push(...addition.a_to_b_present_raw_link_ids);
