@@ -3742,11 +3742,8 @@ h2 {
     overflow-y: auto;
     background: var(--surface);
   }
-  .dag-body:is(.definition-active,
-.dag-body:is(.definition-active,
-.custom-variables-open) .dag-right-panel,
-.dag-body:is(.definition-active,
-.custom-variables-open) #rightResizer {
+  .dag-body:is(.definition-active, .custom-variables-open) .dag-right-panel,
+  .dag-body:is(.definition-active, .custom-variables-open) #rightResizer {
     display: none !important;
   }
 
