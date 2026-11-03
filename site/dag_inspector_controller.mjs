@@ -305,8 +305,10 @@ export function createDagInspectorController({
           ? "Concept miscategorized" : decision?.reason_code === "other" ? "Other" : "";
       const canDecide = Boolean((raw.paper_title || raw.paper_id)
         && loadedConceptLabel(raw.source_variable_id) && loadedConceptLabel(raw.target_variable_id));
-      const action = canDecide ? h("button", { className: "btn btn--ghost btn--sm finding-decision-button",
-        type: "button", textContent: excluded ? "Restore" : "Exclude",
+      const action = canDecide ? h("button", { className: excluded
+        ? "btn btn--ghost btn--sm finding-decision-button finding-decision-button--restore"
+        : "btn btn--sm btn--icon finding-decision-button finding-decision-button--exclude",
+        type: "button", textContent: excluded ? "Restore" : "×",
         title: excluded ? "Restore finding" : "Exclude finding",
         attrs: { "aria-label": `${excluded ? "Restore" : "Exclude"} finding ${id}` } }) : null;
       action?.addEventListener("click", () => {

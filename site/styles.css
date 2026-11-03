@@ -3738,14 +3738,28 @@ h2 {
 .finding-reason-row .exclude-reason-row select { min-height: var(--control-md); }
 .exclude-reason-row .exclude-reason-actions .btn { flex: none; width: auto; }
 
-/* Per-finding decision: a quiet text button rather than a bare red cross. */
-.provenance-table .finding-decision-button {
+/* The red cross is an explicit per-finding action; restore remains a text action. */
+.provenance-table .finding-decision-button--restore {
   min-height: 0;
   padding: 0;
   color: var(--text-muted);
 }
-.provenance-table .finding-decision-button:hover { color: var(--danger); }
-.finding-excluded .finding-decision-button:hover { color: var(--accent); }
+.provenance-table .finding-decision-button--restore:hover { color: var(--accent); }
+.provenance-table .finding-decision-button--exclude {
+  min-height: var(--control-sm);
+  border-color: var(--danger);
+  color: var(--danger);
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+.provenance-table .finding-decision-button--exclude:hover {
+  border-color: var(--danger);
+  background: var(--danger-subtle);
+  color: var(--danger);
+}
+@media (pointer: coarse) {
+  .provenance-table .finding-decision-button--exclude { min-height: var(--control-touch); }
+}
 .finding-excluded-label { display: block; color: var(--warn-text); }
 
 /* A menu divider shows only when something visible follows it. */

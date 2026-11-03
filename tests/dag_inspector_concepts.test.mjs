@@ -157,8 +157,11 @@ test("a finding's exclude control waits for both concept labels", () => {
     assert.equal(elements.provenancePanel.findAll("button").length, 0);
     state.variableById.set("v2", { concept_label: "Target" });
     controller.renderProvenance();
-    assert.equal(elements.provenancePanel.findAll("button")[0].textContent, "Exclude");
-    elements.provenancePanel.findAll("button")[0].click();
+    const exclude = elements.provenancePanel.findAll("button")[0];
+    assert.equal(exclude.textContent, "×");
+    assert.equal(exclude["aria-label"], "Exclude finding r1");
+    assert.match(exclude.className, /finding-decision-button--exclude/);
+    exclude.click();
     assert.ok(elements.provenancePanel.findAll("option")
       .some(option => option.textContent === "Concept miscategorized"));
     elements.provenancePanel.findAll("select")[0].value = "concept_miscategorized";
