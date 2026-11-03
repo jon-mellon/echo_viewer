@@ -540,6 +540,7 @@ function highlightConfounderPaths(groupId) {
     groupId,
     ivId: state.showExogeneity ? studyAnchors().instrumentId : studyAnchors().ivId,
     dvId: studyAnchors().dvId,
+    studyAnchorIds: Object.values(studyAnchors()).filter(Boolean),
     showConfoundersOnly: state.showConfoundersOnly,
     showExogeneity: state.showExogeneity,
     showExclusionViolations: state.showExclusionViolations,

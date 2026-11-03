@@ -51,6 +51,7 @@ export function buildPathHighlightModel({
   showExogeneity = false,
   showExclusionViolations = false,
   confounderGroupIds = new Set(),
+  studyAnchorIds = [],
 }) {
   const ivPairKeys = pathPairKeys(paths.toIv);
   const dvPairKeys = pathPairKeys(paths.toDv);
@@ -109,10 +110,12 @@ export function buildPathHighlightModel({
   }
 
   const nodeUpdates = [];
+  const studyAnchors = new Set(studyAnchorIds);
   for (const node of nodes) {
     if (String(node.id).startsWith("__route__")) continue;
     if (!highlightedNodeIds.has(node.id)) {
-      nodeUpdates.push({ id: node.id, opacity: 0.16 });
+      // The study arrows stay opaque, so a faded anchor would show them running through its body.
+      nodeUpdates.push({ id: node.id, opacity: studyAnchors.has(node.id) ? 1 : 0.16 });
       continue;
     }
     const toIv = ivNodeIds.has(node.id);
