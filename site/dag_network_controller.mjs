@@ -318,14 +318,15 @@ function dagVisibleGroups() {
 // vis draws each routed segment with butt caps, leaving a notch at every bend;
 // a round dab of the segment's own colour closes it.
 function drawRouteJoins(context) {
-  if (!_visEdges || !_visNodes) return;
+  if (!_visEdges || !_visNodes || !_visNetwork) return;
   context.save();
   for (const [segmentId] of _dagEdgeSegments) {
     const match = /::seg(\d+)$/.exec(segmentId);
     if (!match || match[1] === "0") continue;
     const edge = _visEdges.get(segmentId);
-    const bend = edge && _visNodes.get(edge.from);
-    if (!bend || !String(bend.id).startsWith("__route__")) continue;
+    if (!edge || !String(edge.from).startsWith("__route__")) continue;
+    // vis rounds node positions, so read the live one rather than the dataset's.
+    const bend = _visNetwork.getPosition(edge.from);
     const opacity = edge.color?.opacity ?? 1;
     if (opacity <= 0) continue;
     context.globalAlpha = opacity;
