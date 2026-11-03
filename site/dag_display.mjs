@@ -29,7 +29,9 @@ export function mixHex(a, b, t) {
 // the line under it and segments of one routed edge never darken where they meet.
 export const softEdge = (hex, strength) => mixHex(DAG_SURFACE, hex, strength);
 const TARGET_EDGE_COLOR = softEdge(OKABE_ITO.blue, 0.85);
-const PLAIN_EDGE_COLOR = softEdge(OKABE_ITO.grey, 0.8);
+// Ordinary edges stay translucent so overlapping ones darken and show density.
+export const PLAIN_EDGE_COLOR = "#666666";
+export const PLAIN_EDGE_OPACITY = 0.55;
 /** Hovered and selected edges are drawn black. */
 export const EDGE_HIGHLIGHT_COLOR = "#000000";
 
@@ -137,7 +139,7 @@ export function edgeVisualData(link, selectedEdgeId) {
       highlight: EDGE_HIGHLIGHT_COLOR,
       hover: EDGE_HIGHLIGHT_COLOR,
       inherit: false,
-      opacity: 1,
+      opacity: isSelected || isTarget ? 1 : PLAIN_EDGE_OPACITY,
     },
     dashes: false,
     width: isSelected ? 3.6 : isTarget ? 2.6 : 1.0,

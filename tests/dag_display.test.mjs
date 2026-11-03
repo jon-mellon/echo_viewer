@@ -56,7 +56,7 @@ test("display records preserve node roles, selection, edge styles and descriptio
         const old = legacy.edgeVisualData(link);
         assert.equal(visual.width, old.width);
         assert.equal(visual.dashes, old.dashes);
-        assert.equal(visual.color.opacity, 1);
+        assert.equal(visual.color.opacity, selected || link.is_target_relation ? 1 : display.PLAIN_EDGE_OPACITY);
       }
       const hover = display.edgeHoverText(link, groups);
       assert.match(hover, /Supporting tests: 3$/);

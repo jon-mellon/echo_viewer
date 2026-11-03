@@ -3,7 +3,7 @@ import { computeDagRender, reuseDagGeometry } from "./dag_render_compute.mjs";
 import { routesToVisData } from "./dag_vis_routing.mjs";
 import { attachDagInteractions } from "./dag_interactions.mjs";
 import * as dagDisplay from "./dag_display.mjs";
-import { OKABE_ITO, EDGE_HIGHLIGHT_COLOR, softEdge } from "./dag_display.mjs";
+import { EDGE_HIGHLIGHT_COLOR, PLAIN_EDGE_COLOR, PLAIN_EDGE_OPACITY, mixHex } from "./dag_display.mjs";
 import * as workflow from "./dag_workflow.mjs";
 import * as dagPathHighlights from "./dag_path_highlights.mjs";
 import { STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "./dag_inspector_controller.mjs";
@@ -143,7 +143,7 @@ function visNetworkOptions(p = {}) {
       width: edgeWidth,
       selectionWidth: 3.5,
       arrows: { to: { enabled: true, scaleFactor: Math.max(0.45, 0.7 * (fontSize / 14)) } },
-      color: { color: softEdge(OKABE_ITO.grey, 0.8), highlight: EDGE_HIGHLIGHT_COLOR, hover: EDGE_HIGHLIGHT_COLOR, inherit: false, opacity: 1 },
+      color: { color: PLAIN_EDGE_COLOR, highlight: EDGE_HIGHLIGHT_COLOR, hover: EDGE_HIGHLIGHT_COLOR, inherit: false, opacity: PLAIN_EDGE_OPACITY },
     },
   };
 }
@@ -315,6 +315,8 @@ function dagVisibleGroups() {
     && isDagDisplayGroup(group));
 }
 
+const CANVAS_COLOR = "#f8f8f8";
+
 // vis draws each routed segment with butt caps, leaving a notch at every bend;
 // a round dab of the segment's own colour closes it.
 function drawRouteJoins(context) {
@@ -329,8 +331,16 @@ function drawRouteJoins(context) {
     const bend = _visNetwork.getPosition(edge.from);
     const opacity = edge.color?.opacity ?? 1;
     if (opacity <= 0) continue;
-    context.globalAlpha = opacity;
-    context.fillStyle = edge.color?.color || "#999999";
+    // Fill with the colour a lone segment shows (colour over canvas) so the join
+    // isn't darker than the line, however translucent the edge is.
+    const base = edge.color?.color || "#999999";
+    if (/^#[0-9a-f]{6}$/i.test(base)) {
+      context.globalAlpha = 1;
+      context.fillStyle = mixHex(CANVAS_COLOR, base, opacity);
+    } else {
+      context.globalAlpha = opacity;
+      context.fillStyle = base;
+    }
     context.beginPath();
     context.arc(bend.x, bend.y, Math.max(0.5, Number(edge.width || 1) / 2), 0, Math.PI * 2);
     context.fill();
