@@ -68,10 +68,9 @@ const GROUP_PALETTE = [
   "#0ea5e9", "#ca8a04", "#15803d", "#db2777",
 ];
 
-const groupPalette = createGroupPalette({ state, colors: GROUP_COLORS, palette: GROUP_PALETTE });
-
 // The current interface has one canonical entry point at the site root.
 const state = createDagAppState("dag2");
+const groupPalette = createGroupPalette({ state, colors: GROUP_COLORS, palette: GROUP_PALETTE });
 let schemaBatchDepth = 0;
 let schemaCommitQueued = false;
 const PROJECT_STORAGE_PREFIX = state.interfaceMode === "dag2" ? "dag2-project-v1" : "dag-builder-project-v2";
