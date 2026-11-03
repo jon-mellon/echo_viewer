@@ -3,7 +3,7 @@ import { computeDagRender, reuseDagGeometry } from "./dag_render_compute.mjs";
 import { routesToVisData } from "./dag_vis_routing.mjs";
 import { attachDagInteractions } from "./dag_interactions.mjs";
 import * as dagDisplay from "./dag_display.mjs";
-import { OKABE_ITO, softEdge } from "./dag_display.mjs";
+import { OKABE_ITO, EDGE_HIGHLIGHT_COLOR, softEdge } from "./dag_display.mjs";
 import * as workflow from "./dag_workflow.mjs";
 import * as dagPathHighlights from "./dag_path_highlights.mjs";
 import { STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "./dag_inspector_controller.mjs";
@@ -26,7 +26,7 @@ export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId
 
 export function applyLogicalEdgeHover(edges, visEdges) {
   if (!edges.length) return;
-  const hoverColor = OKABE_ITO.orange;
+  const hoverColor = EDGE_HIGHLIGHT_COLOR;
   visEdges.update(edges.map(edge => ({
     id: edge.id,
     color: {
@@ -37,7 +37,7 @@ export function applyLogicalEdgeHover(edges, visEdges) {
       opacity: 1,
     },
     width: Math.max(3.4, Number(edge.width || 1) + 2.2),
-    shadow: { enabled: true, color: "rgba(230,159,0,0.35)", size: 7, x: 0, y: 0 },
+    shadow: { enabled: true, color: "rgba(0,0,0,0.25)", size: 7, x: 0, y: 0 },
   })));
 }
 
@@ -143,7 +143,7 @@ function visNetworkOptions(p = {}) {
       width: edgeWidth,
       selectionWidth: 3.5,
       arrows: { to: { enabled: true, scaleFactor: Math.max(0.45, 0.7 * (fontSize / 14)) } },
-      color: { color: softEdge(OKABE_ITO.sky, 0.6), highlight: OKABE_ITO.vermillion, hover: OKABE_ITO.orange, inherit: false, opacity: 1 },
+      color: { color: softEdge(OKABE_ITO.grey, 0.8), highlight: EDGE_HIGHLIGHT_COLOR, hover: EDGE_HIGHLIGHT_COLOR, inherit: false, opacity: 1 },
     },
   };
 }

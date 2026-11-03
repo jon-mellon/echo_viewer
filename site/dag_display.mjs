@@ -29,7 +29,9 @@ export function mixHex(a, b, t) {
 // the line under it and segments of one routed edge never darken where they meet.
 export const softEdge = (hex, strength) => mixHex(DAG_SURFACE, hex, strength);
 const TARGET_EDGE_COLOR = softEdge(OKABE_ITO.blue, 0.85);
-const PLAIN_EDGE_COLOR = softEdge(OKABE_ITO.sky, 0.6);
+const PLAIN_EDGE_COLOR = softEdge(OKABE_ITO.grey, 0.8);
+/** Hovered and selected edges are drawn black. */
+export const EDGE_HIGHLIGHT_COLOR = "#000000";
 
 // Node fills are the Okabe-Ito role colours softened toward white; hover and overlap
 // borders are deeper shades of the same hue.
@@ -131,9 +133,9 @@ export function edgeVisualData(link, selectedEdgeId) {
   const isTarget = link.is_target_relation;
   return {
     color: {
-      color: isSelected ? OKABE_ITO.vermillion : isTarget ? TARGET_EDGE_COLOR : PLAIN_EDGE_COLOR,
-      highlight: OKABE_ITO.vermillion,
-      hover: OKABE_ITO.orange,
+      color: isSelected ? EDGE_HIGHLIGHT_COLOR : isTarget ? TARGET_EDGE_COLOR : PLAIN_EDGE_COLOR,
+      highlight: EDGE_HIGHLIGHT_COLOR,
+      hover: EDGE_HIGHLIGHT_COLOR,
       inherit: false,
       opacity: 1,
     },
