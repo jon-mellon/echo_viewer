@@ -2,6 +2,8 @@
 import { DAG_FIT_OPTIONS } from "./dag_network_controller.mjs";
 export function createDagShellController({ state, elements, resizeMap, fitMap, renderDag, getNetwork, isDagFullyVisible, dismissEvidencePane }) {
   let showInstalledMobilePanel = null;
+  // Set by installResizers; moves the evidence pane to where the current task reads it.
+  let placeEvidencePane = () => {};
 
   function showMobilePanel(panel) {
     if (!window.matchMedia?.("(max-width: 840px)").matches || !showInstalledMobilePanel) return false;
@@ -66,7 +68,10 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     elements.fullscreenVariableMap.textContent = panel === "variable-map" ? "Exit full screen" : "Full screen map";
     elements.fullscreenDag.classList.toggle("active", panel === "dag");
     elements.fullscreenDag.setAttribute("aria-pressed", panel === "dag" ? "true" : "false");
-    elements.fullscreenDag.textContent = panel === "dag" ? "Exit full screen" : "Full screen DAG";
+    // An icon button: swap its label, while CSS swaps the maximize/minimize icon on aria-pressed.
+    const dagLabel = panel === "dag" ? "Exit full screen" : "Full screen DAG";
+    elements.fullscreenDag.setAttribute("aria-label", dagLabel);
+    elements.fullscreenDag.title = panel === "dag" ? "Exit full screen (Escape)" : "Expand the DAG to fill the window; press Escape to exit";
     requestAnimationFrame(() => {
       if (panel === "variable-map" || previousPanel === "variable-map") {
         resizeMap();
@@ -89,12 +94,30 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     const evidencePane = document.querySelector(".dag-ws-footer");
     const leftPanel = document.querySelector(".dag-left-panel");
     const mobileLayout = window.matchMedia("(max-width: 840px)");
-    const placeEvidencePane = () => {
-      const parent = mobileLayout.matches ? workspace : leftPanel;
+    // On a phone, and in Explore on any screen, the evidence opens under the
+    // graph so the results list stays in view. Identify still reads it in the
+    // side panel.
+    placeEvidencePane = () => {
+      // In every task the evidence takes the map's place; the legacy layout keeps it in the side panel.
+      const parent = mobileLayout.matches || state.task ? workspace : leftPanel;
       if (evidencePane && parent && evidencePane.parentElement !== parent) parent.append(evidencePane);
     };
     mobileLayout.addEventListener("change", placeEvidencePane);
     placeEvidencePane();
+    // Creating a variable: on a wide screen the creation steps take the map's
+    // place; on a phone they stay in the side panel where they were written.
+    const definitionBlock = elements.definitionBlock || document.getElementById("definitionBlock");
+    const definitionWorkspace = document.getElementById("definitionWorkspace");
+    const definitionHome = definitionBlock && document.createComment("definition block home");
+    definitionBlock?.before(definitionHome);
+    const placeDefinitionBlock = () => {
+      if (!definitionBlock || !definitionWorkspace) return;
+      const wide = !mobileLayout.matches;
+      if (wide && definitionBlock.parentElement !== definitionWorkspace) definitionWorkspace.append(definitionBlock);
+      else if (!wide && definitionBlock.previousSibling !== definitionHome) definitionHome.after(definitionBlock);
+    };
+    mobileLayout.addEventListener("change", placeDefinitionBlock);
+    placeDefinitionBlock();
     let leftWidth = 370, rightWidth = 450;
     const applyWidths = () => {
       shell.style.gridTemplateColumns = state.interfaceMode === "dag2"
@@ -138,5 +161,5 @@ export function createDagShellController({ state, elements, resizeMap, fitMap, r
     installMobilePanelNavigation();
   }
 
-  return { setFullscreen, toggleFullscreen, installResizers, showMobilePanel };
+  return { setFullscreen, toggleFullscreen, installResizers, showMobilePanel, placeEvidencePane: () => placeEvidencePane() };
 }

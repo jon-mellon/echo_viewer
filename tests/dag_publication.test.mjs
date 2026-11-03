@@ -40,9 +40,9 @@ test("share rebuilds a published permalink from the current view state", () => {
 });
 
 test("successful sharing gives visible feedback on the share button", () => {
-  assert.match(source, /button\.textContent = "✓ Copied"/);
+  assert.match(source, /button\.setAttribute\("aria-label", "Copied"\)/);
   assert.match(source, /button\.classList\.add\("share-copied"\)/);
-  assert.match(source, /button\.textContent = "Share"/);
+  assert.match(source, /button\.setAttribute\("aria-label", "Share view"\)/);
   assert.match(source, /showShareCopied\(\)/);
 });
 
@@ -59,8 +59,10 @@ test("publication requests authentication only after immutable-public confirmati
 });
 
 test("published state distinguishes private working-copy changes", () => {
-  assert.match(source, /Public schema · Unpublished local changes/);
-  assert.match(source, /Private working copy/);
+  assert.match(source, /label: "Unpublished changes"/);
+  assert.match(source, /label: "Local draft"/);
+  assert.match(source, /label: "Published"/);
+  assert.match(source, /setBadge\(publicationStatus\(published, hasLocalChanges\)\)/);
   assert.match(source, /workingCopyChanged/);
   assert.match(source, /hasPublishableChanges = !published\?\.publication_id \|\| hasLocalChanges/);
   assert.match(source, /elements\.publish\.hidden = !client \|\| !hasPublishableChanges/);
@@ -68,6 +70,9 @@ test("published state distinguishes private working-copy changes", () => {
   assert.match(source, /elements\.permalink\.removeAttribute\("href"\)/);
 });
 
-test("completed schema hydration replaces the loading status", () => {
-  assert.match(source, /Loaded the public schema\. Editing and publishing are ready\./);
+test("completed schema hydration clears the loading status instead of logging success", () => {
+  const ready = source.slice(source.indexOf("function setSchemaReady"), source.indexOf("function setSchemaLoadFailed"));
+  assert.match(ready, /Loading group memberships…/);
+  assert.match(ready, /else clearStatus\(\)/);
+  assert.doesNotMatch(source, /Loaded the public schema/);
 });

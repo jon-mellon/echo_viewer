@@ -49,6 +49,8 @@ function installHandlers() {
   // Change the selected groups.
   els.changeDv.addEventListener("click", () => changeAnchor("dv"));
   els.changeIv.addEventListener("click", () => changeAnchor("iv"));
+  // In Explore the whole selected-variable control reopens the variable picker.
+  els.exploreFocusSelector?.addEventListener("click", () => changeAnchor("iv"));
   els.changeInstrument.addEventListener("click", () => changeAnchor("instrument"));
   els.instrumentDefineNew.addEventListener("click", () => startDefinition("instrument"));
   els.variableDefineNew?.addEventListener("click", () => startDefinition("candidate"));
@@ -187,11 +189,13 @@ function installHandlers() {
   els.minimumEdgePapers.addEventListener("input", () => {
     const requested = Math.trunc(Number(els.minimumEdgePapers.value));
     if (!Number.isSafeInteger(requested) || requested < 1) return;
-    state.minimumEdgePapers = requested;
+    // Typing a minimum applies it; one paper means no minimum, as in Explore's filters.
+    state.excludeSparseEdges = requested > 1;
+    if (requested > 1) state.minimumEdgePapers = requested;
     updateDagFilters();
   });
   els.minimumEdgePapers.addEventListener("change", () => {
-    els.minimumEdgePapers.value = String(state.minimumEdgePapers);
+    els.minimumEdgePapers.value = String(state.excludeSparseEdges ? state.minimumEdgePapers : 1);
   });
   els.toggleBottleneckedConfounders.addEventListener("click", () => {
     state.excludeBottleneckedConfounders = !state.excludeBottleneckedConfounders;
@@ -214,13 +218,22 @@ function installHandlers() {
   // Undo / redo / history
   els.undoBtn.addEventListener("click", undo);
   els.redoBtn.addEventListener("click", redo);
-  els.dag2UndoBtn?.addEventListener("click", undo);
-  els.dag2RedoBtn?.addEventListener("click", redo);
-  els.historyToggle.addEventListener("click", () => {
-    state.showActionHistory = !state.showActionHistory;
-    els.actionHistory.hidden = !state.showActionHistory;
-    els.historyToggle.classList.toggle("active", state.showActionHistory);
+  // The History menu lists undo steps while it is open.
+  const historyMenu = /** @type {HTMLDetailsElement | null} */ (document.getElementById("historyMenu"));
+  historyMenu?.addEventListener("toggle", () => {
+    state.showActionHistory = historyMenu.open;
     renderActionHistory();
+  });
+  // Ctrl/⌘+Z undoes; Ctrl/⌘+Shift+Z or Ctrl+Y redoes. Typing in a field keeps the browser's own undo.
+  document.addEventListener("keydown", (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (key !== "z" && key !== "y") return;
+    const target = /** @type {HTMLElement | null} */ (event.target instanceof HTMLElement ? event.target : null);
+    if (target?.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']")) return;
+    event.preventDefault();
+    if (key === "y" || event.shiftKey) { if (!els.redoBtn.disabled) redo(); }
+    else if (!els.undoBtn.disabled) undo();
   });
 
   // DAG SVG zoom controls
@@ -245,13 +258,100 @@ function installHandlers() {
   // Create custom group
   els.createGroupBtn.addEventListener("click", createCustomGroup);
 
-  // Export section toggle (collapsed by default)
-  const exportToggleBtn = document.getElementById("exportToggleBtn");
-  const exportSection = document.getElementById("exportSection");
-  if (exportToggleBtn && exportSection) {
-    exportToggleBtn.addEventListener("click", () => exportSection.classList.toggle("open"));
-    exportToggleBtn.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") exportSection.classList.toggle("open"); });
+  // Top-bar menus behave like ordinary menus: choosing an item closes the menu,
+  // except items that report progress in place (data-keep-open) and file pickers,
+  // which close once a file has been chosen.
+  for (const menu of document.querySelectorAll("#taskBar details.nav-menu")) {
+    menu.addEventListener("click", (event) => {
+      const item = /** @type {Element} */ (event.target).closest?.(".menu-item");
+      if (!item || item.matches("[data-keep-open], .file-button, .edit-history-entry")) return;
+      /** @type {HTMLDetailsElement} */ (menu).open = false;
+    });
+    // Choosing a file, or a schema in the Schema menu's switcher, also closes it.
+    menu.addEventListener("change", (event) => {
+      const target = /** @type {HTMLInputElement} */ (event.target);
+      if (target.type === "file" || target.id === "groupingSetSelect") /** @type {HTMLDetailsElement} */ (menu).open = false;
+    });
   }
+
+  // Narrow screens: the hamburger button shows the task switcher, view switches,
+  // undo and redo and the History, Schema, Import and Export menus as one panel,
+  // each menu expanding in place. Choosing an item closes the panel.
+  const navToggle = document.getElementById("navToggle");
+  const navOverflow = document.getElementById("taskBarOverflow");
+  const setNavOpen = (/** @type {boolean} */ open) => {
+    if (!navToggle || !navOverflow) return;
+    navOverflow.classList.toggle("is-open", open);
+    navToggle.setAttribute("aria-expanded", String(open));
+    if (!open) for (const menu of navOverflow.querySelectorAll("details[open]")) /** @type {HTMLDetailsElement} */ (menu).open = false;
+  };
+  const navIsOpen = () => Boolean(navOverflow?.classList.contains("is-open"));
+  navToggle?.addEventListener("click", () => setNavOpen(!navIsOpen()));
+  navOverflow?.addEventListener("click", (event) => {
+    const target = /** @type {Element} */ (event.target);
+    // Switching view (Causes | Consequences, Graph | Table) shows the result at once.
+    if (target.closest?.(".task-bar-view-controls button")) return setNavOpen(false);
+    const item = target.closest?.(".menu-item");
+    if (!item || item.matches("[data-keep-open], .file-button, .edit-history-entry")) return;
+    setNavOpen(false);
+  });
+  navOverflow?.addEventListener("change", (event) => {
+    const target = /** @type {HTMLInputElement} */ (event.target);
+    if (target.type === "file" || target.id === "groupingSetSelect") setNavOpen(false);
+  });
+  window.matchMedia("(min-width: 841px)").addEventListener("change", () => setNavOpen(false));
+
+  // Dropdown menus (Filters, task bar menus) close on an outside click or Escape.
+  const openMenus = () => document.querySelectorAll("details.filter-dropdown[open], details.nav-menu[open], details.list-filter[open]");
+  document.addEventListener("pointerdown", (event) => {
+    const target = /** @type {Node} */ (event.target);
+    if (navIsOpen() && !navOverflow?.contains(target) && !navToggle?.contains(target)) setNavOpen(false);
+    for (const menu of openMenus()) {
+      if (!menu.contains(target)) menu.open = false;
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const menus = openMenus();
+    for (const menu of menus) {
+      menu.open = false;
+      menu.querySelector("summary")?.focus();
+    }
+    // Escape closes an open menu inside the panel first, then the panel itself.
+    if (!menus.length && navIsOpen()) {
+      setNavOpen(false);
+      navToggle?.focus();
+    }
+  });
+
+  // Escape steps back to the previous screen when one exists: the previous step
+  // of the create-a-variable wizard (Choose concepts → Start from → Describe → out),
+  // or from evidence back to the map in Explore. It only acts when nothing else
+  // claimed the key: an open menu, dialog, context menu or full-screen panel
+  // closes first (checked before their handlers run), and a component that
+  // handled Escape itself calls preventDefault.
+  const shown = (/** @type {HTMLElement | null} */ el) => Boolean(el && !el.hidden && el.getClientRects().length);
+  const backControls = [
+    () => els.definitionBack,
+    () => els.definitionSourcesBack,
+    // Leaving the wizard from its first step discards nothing typed elsewhere.
+    () => shown(els.definitionDescribeStep) ? els.definitionCancel : null,
+    () => els.customVariablesClose,
+    () => els.closeEvidencePane?.getAttribute("aria-label") === "Back to the map" ? els.closeEvidencePane : null,
+  ];
+  let escapeClaimed = false;
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    escapeClaimed = Boolean(openMenus().length || navIsOpen() || document.querySelector("dialog[open]")
+      || (els.dagMapContextMenu && !els.dagMapContextMenu.hidden) || state.fullscreenPanel);
+  }, { capture: true });
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || escapeClaimed || event.defaultPrevented) return;
+    const back = backControls.map(control => control()).find(shown);
+    if (!back) return;
+    event.preventDefault();
+    back.click();
+  });
 
   // Export / import
   els.exportProject.addEventListener("click", exportProject);

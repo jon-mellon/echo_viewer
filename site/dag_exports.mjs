@@ -1,6 +1,6 @@
 import { PROJECT_FORMAT_VERSION, WORKING_MAP_FORMAT_VERSION } from "./app_contracts.mjs";
 import { escapeHtml } from "./text_utils.mjs";
-import { CONFOUNDER_STATUSES, confounderRows } from "./confounder_status.mjs";
+import { COLLIDER_STATUSES, CONFOUNDER_STATUSES, colliderRows, confounderRows } from "./confounder_status.mjs";
 
 /** @typedef {import("./app_contracts.mjs").SerializedProjectPayload} SerializedProjectPayload */
 
@@ -225,6 +225,21 @@ export function buildConfoundersTable(fmt, { project, confounderGroupIds }) {
       "\\bottomrule", "\\end{longtable}"].join("\n") + "\n";
 }
 
+/** Colliders whose handling was recorded; unaddressed ones are left out, as there are often many. */
+export function buildCollidersTable(fmt, { project, colliderGroupIds }) {
+  const rows = colliderRows(project, colliderGroupIds).filter(row => row.status !== "unaddressed");
+  if (!rows.length) return "";
+  const status = row => row.status === "other" && row.text
+    ? `Other: ${row.text}` : COLLIDER_STATUSES[row.status];
+  return fmt === "md"
+    ? ["| Collider | Status |", "|----------|--------|",
+      ...rows.map(row => `| ${escapeMarkdownCell(row.label)} | ${escapeMarkdownCell(status(row))} |`)].join("\n") + "\n"
+    : ["\\begin{longtable}{@{}p{0.4\\textwidth}p{0.54\\textwidth}@{}}",
+      "\\toprule", "Collider & Status \\\\", "\\midrule", "\\endhead",
+      ...rows.map(row => `  ${texEscape(row.label)} & ${texEscape(status(row))} \\\\`),
+      "\\bottomrule", "\\end{longtable}"].join("\n") + "\n";
+}
+
 const FINDING_REASONS = {
   not_relevant_to_target_population: "Not relevant to target population",
   concept_miscategorized: "Concept miscategorized",
@@ -315,6 +330,9 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, gr
     ...(input.confounderGroupIds ? [
       `## Potential Confounders`, ``, buildConfoundersTable("md", input), ``,
     ] : []),
+    ...(input.colliderGroupIds && buildCollidersTable("md", input) ? [
+      `## Colliders`, ``, buildCollidersTable("md", input), ``,
+    ] : []),
     ...(buildExcludedLinksTable("md", project, input.relevantExcludedLinkIds ?? null) ? [
       `## Excluded Links`,
       ``,
@@ -392,6 +410,9 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     ``,
     ...(input.confounderGroupIds ? [
       `\\section{Potential Confounders}`, ``, buildConfoundersTable("tex", input), ``,
+    ] : []),
+    ...(input.colliderGroupIds && buildCollidersTable("tex", input) ? [
+      `\\section{Colliders}`, ``, buildCollidersTable("tex", input), ``,
     ] : []),
     ...(buildExcludedLinksTable("tex", project, input.relevantExcludedLinkIds ?? null) ? [
       `\\section{Excluded Links}`,

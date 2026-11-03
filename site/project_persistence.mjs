@@ -74,6 +74,7 @@ export function restoreProjectPayload(payload, defaults, currentLayoutSource) {
       link_decisions: serialized.link_decisions || {},
       finding_decisions: serialized.finding_decisions || {},
       confounder_statuses: serialized.confounder_statuses || {},
+      collider_statuses: serialized.collider_statuses || {},
       carve_outs: Array.isArray(serialized.carve_outs) ? serialized.carve_outs : [],
     },
     selectedUoa,

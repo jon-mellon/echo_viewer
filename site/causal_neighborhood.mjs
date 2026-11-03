@@ -2,26 +2,11 @@
 // evidence in each direction; a hop counts when that direction is supported by
 // at least `minPapers` distinct papers and the link is traversable by the same
 // rule the identification diagrams use.
-import { excludedForConnectivity, presentPaperIds } from "./dag_view.mjs";
+import { directionalPaperCounter, excludedForConnectivity } from "./dag_view.mjs";
+
+export { directionalPaperCounter };
 
 export const MAX_NEIGHBORHOOD_DEPTH = 4;
-
-/**
- * Papers behind one direction of a link. The aggregated DAG already carries
- * them per direction (distinct papers among its paper/table keys), so nothing
- * is counted. An edge that a local edit touched carries no keys, because they
- * cannot be kept in step with its findings; those are counted exactly from
- * per-finding support records, when given.
- */
-export function directionalPaperCounter(edgeSupportById = null, rawLinksById = edgeSupportById) {
-  return (link, forward) => {
-    const keys = forward ? link.a_to_b_paper_table_keys : link.b_to_a_paper_table_keys;
-    if (Array.isArray(keys)) return new Set(keys.map(key => String(key).split("::")[0])).size;
-    if (!edgeSupportById) return 0;
-    return presentPaperIds(forward ? link.a_to_b_raw_link_ids : link.b_to_a_raw_link_ids,
-      edgeSupportById, rawLinksById).size;
-  };
-}
 
 /** Links whose paper keys an edit dropped; only these need per-finding records. */
 export function linksNeedingExactCounts(links = []) {
@@ -55,9 +40,11 @@ export function directedHops(links = [], minPapers = 1, papersFor = directionalP
  * and `edgeId` is the link joining the variable to its neighbour toward the
  * focus, which is the evidence for why it belongs in the list.
  * `isNode` lets callers leave out groups that are not drawn (such as "other").
+ * `isPassable` lets callers keep a variable in the results without following
+ * routes through it, as when the user excludes it from the map.
  */
 export function causalNeighborhood({ links = [], focusId, direction = "causes", depth = 1, minPapers = 2,
-  papersFor = directionalPaperCounter(), isNode = () => true } = {}) {
+  papersFor = directionalPaperCounter(), isNode = () => true, isPassable = () => true } = {}) {
   if (!focusId) return [];
   const limit = Math.max(1, Math.min(MAX_NEIGHBORHOOD_DEPTH, Math.trunc(depth) || 1));
   const towardFocus = new Map();
@@ -89,7 +76,7 @@ export function causalNeighborhood({ links = [], focusId, direction = "causes", 
       distance.set(node, level);
       best.set(node, entry);
     }
-    frontier = [...reached.keys()];
+    frontier = [...reached.keys()].filter(isPassable);
   }
   const results = [];
   for (const [node, level] of distance) {

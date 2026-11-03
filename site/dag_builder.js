@@ -28,6 +28,7 @@ import { createDagEventController } from "/dag_event_controller.mjs";
 import { createUoaController } from "/uoa_controller.mjs";
 import { createToolbarController } from "/toolbar_controller.mjs";
 import { createDefinitionWorkflowController } from "/definition_workflow_controller.mjs";
+import { createCustomVariablesPresenter } from "/custom_variables_presenter.mjs";
 import { createTaskViews } from "/task_views.mjs";
 import { directionalPaperCounter, linksNeedingExactCounts } from "/causal_neighborhood.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
@@ -40,7 +41,7 @@ import { importDraftFile, makeDraftExport } from "/draft_exchange.mjs";
 import { listPreviousSessions } from "/local_schema_store.mjs";
 import { escapeHtml } from "/text_utils.mjs";
 import { relevantExclusions } from "/dag_export_relevance.mjs";
-import { CONFOUNDER_STATUSES, confounderRows } from "/confounder_status.mjs";
+import { DIAGNOSTIC_STATUSES, STATUS_MENU_LABELS, diagnosticStatusRows } from "/confounder_status.mjs";
 import { h, replaceChildren, safeUrl, setSafeUrl } from "/dom_builder.mjs";
 import { hydrateSearchResult, variableSearchCatalog } from "/variable_search_catalog.mjs";
 
@@ -120,30 +121,40 @@ function initElements() {
     "ivInput", "ivInputLabel", "ivDefineNew", "ivSeeds", "ivResults", "ivGroupPicker",
     "instrumentInput", "instrumentDefineNew", "instrumentGroupPicker",
     "schemaChoice", "loadSchema", "skipSchema",
-    "definitionBlock", "definitionTitle", "definitionCancel", "definitionMethodStep", "definitionResumeList", "definitionChooseManual", "definitionChooseJev", "definitionChooseBrowse",
-    "definitionAiSetupStep", "definitionAiSetupHost", "definitionAiChangeMethod", "definitionAiSetup", "definitionAiWork", "definitionAiResults", "definitionSourcesStep", "definitionChosenMethod", "definitionChangeMethod",
+    "definitionBlock", "definitionTitle", "definitionCancel", "definitionDescribeStep", "definitionDescribeNext", "definitionResumeList",
+    "definitionAiWork", "definitionSourcesStep", "definitionSourcesBack",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults",
     "definitionPartitionStep", "definitionMethodJev", "definitionMethodManual", "definitionLoadStatus", "definitionJevPanel", "definitionManualPanel",
-    "definitionCounts", "definitionTermChips", "definitionTermSummary",
+    "definitionConceptsIntro", "definitionCountIncluded", "definitionCountExcluded", "definitionCountUnreviewed",
+    "definitionSourcesSummary", "definitionTermSummary",
+    "definitionConceptSearch", "definitionStatusFilter", "definitionTermSelect", "definitionActiveFilters",
+    "definitionIncludedFilter", "definitionRelated", "definitionSaveHint",
+    "definitionAiStepConnect", "definitionAiStepLimit", "definitionAiStepSample", "definitionAiStepFull",
+    "definitionAiConnectSummary", "definitionAiLimitSummary", "definitionAiSampleSummary", "definitionAiFullSummary",
+    "definitionAiLimitText", "definitionAiSettingsLink", "definitionAiSampleHost", "definitionAiFullHost",
+    "definitionAiFullText", "definitionAiApplyNote",
     "definitionAiDescription", "definitionAiConnect", "definitionAiRecheck", "definitionAiDisconnect", "definitionAiStatus", "definitionAiCost",
     "definitionAiRun", "definitionAiPreview", "definitionAiSummary", "definitionAiRows", "definitionAiFullRun", "definitionAiMore",
     "definitionAiReviewTools", "definitionAiReviewFilter", "definitionAiReviewPage", "definitionAiReviewPrev", "definitionAiReviewNext",
     "definitionAiApply", "definitionAiDiscard",
     "definitionTermItems", "definitionTermPrev", "definitionTermPage", "definitionTermNext",
-    "definitionTermToNew", "definitionTermToLeftover", "definitionUndoBatch", "definitionVariableSearch",
-    "definitionVariableResults", "definitionSelectedVariables", "definitionAddNeighbors", "definitionNeighborResults",
-    "definitionBack", "definitionReview",
-    "definitionReviewStep", "definitionNewLabel", "definitionNewDescription", "definitionReviewVariables", "definitionResidualLabels",
-    "definitionManualReview", "definitionValidation", "definitionReviewBack", "definitionSave",
+    "definitionTermToNew", "definitionTermToLeftover", "definitionUndoBatch",
+    "definitionSelectedVariables", "definitionAddNeighbors", "definitionNeighborResults",
+    "definitionBack", "definitionSelectedTitle", "definitionSaveStatus",
+    "definitionNewLabel", "definitionNewDescription", "definitionResidualLabels",
+    "definitionValidation", "definitionSave",
+    "customVariablesView", "customVariablesTitle", "customVariablesCreate", "customVariablesClose",
+    "customVariablesFilter", "customVariablesStatus", "customVariablesTable",
     "workflowHint", "dagStatusBadge",
     "variablePanel", "variableDefineNew", "variablePanelDisclosure", "variablePanelCount", "variablePanelList", "variablePanelPagination",
-    "anchorBar", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn", "dag2HistoryStatus", "historyStatus",
+    "anchorBar", "exploreFocusSelector", "exploreFocusName", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "historyStatus",
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",
     // Grouping schema
     "groupingPanel", "groupingSetSelect", "exportGroupingFolder", "publishSchema",
     "copyPermalink", "groupingSummary", "publicationStatus", "schemaPublicationBadge",
-    "publishedSchemaPermalink", "publishSchemaDialog",
+    "publishedSchemaPermalink", "publishSchemaDialog", "importSchemaAction", "importSchemaDialog",
+    "importSchemaChooseFile",
     // Rejected variables
     "rejectedVariablesPanel", "rejectedVariableSearch", "rejectedVariablesList",
     // Map
@@ -156,7 +167,7 @@ function initElements() {
     // Right: group editor
     "groupEditorSection", "groupEditorTitle", "groupEditorHint", "groupDescription", "cancelGroupEdit",
     "discardGroupEdit", "localSaveStatus", "retryLocalSave", "saveIndependentCopy",
-    "exportLocalDraft", "importLocalDraft", "previousSessions", "previousSessionsPanel",
+    "exportLocalDraft", "importLocalDraft", "previousSessionsPanel",
     "previousSessionsList",
     "groupLabelInput", "groupNotesInput", "useGroupAsAnchor",
     "zoomGroup", "editSplit",
@@ -169,7 +180,7 @@ function initElements() {
     "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag", "dagTable", "dagViewGraph", "dagViewTable",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
-    "exportProject", "exportWorkingMap", "projectImport", "strictDagStatus",
+    "exportProject", "exportWorkingMap", "projectImport",
     "exportBib", "exportMd", "exportTex",
     // Panel resizers
     "leftResizer", "rightResizer",
@@ -180,27 +191,27 @@ function initElements() {
   state.map.ctx = state.map.canvas.getContext("2d");
   els.confounderDisclosure.addEventListener("toggle", renderConfounderStatuses);
   els.exportLocalDraft?.addEventListener("click", exportLocalDraft);
-  els.previousSessions?.addEventListener("click", async () => {
-    const panel = els.previousSessionsPanel;
-    if (!panel.hidden) {
-      panel.hidden = true;
-      els.previousSessions.setAttribute("aria-expanded", "false");
-      return;
-    }
+  // History (previous sessions) is a top-bar menu; its list is rebuilt each time it opens.
+  const historyMenu = /** @type {HTMLDetailsElement | null} */ (document.getElementById("historyMenu"));
+  historyMenu?.addEventListener("toggle", async () => {
+    if (!historyMenu.open) return;
     try {
       await persistentViewer.flushUrl();
       const sessions = (await listPreviousSessions())
         .filter(record => record.id !== persistentViewer.sessionId);
       replaceChildren(els.previousSessionsList);
       if (!sessions.length) replaceChildren(els.previousSessionsList,
-        h("p", { textContent: "No previous views saved in this browser." }));
+        h("p", { className: "menu-note", textContent: "No earlier sessions" }));
       for (const record of sessions) {
         const url = new URL(record.url, window.location.origin);
         if (url.origin !== window.location.origin || url.searchParams.get("p") !== "1") continue;
-        const button = h("button", { type: "button", className: "text-button previous-session-entry" },
-          h("strong", { textContent: record.title || "Untitled view" }),
-          h("span", { className: "previous-session-meta",
-            textContent: `${url.searchParams.has("local_schema") ? "Local draft" : "Published schema"} · ${new Date(record.updatedAt).toLocaleString()}` }));
+        const title = record.title || "Untitled view";
+        const when = formatSessionTime(record.updatedAt);
+        // Only the exception is worth a label: most sessions use the published schema.
+        const meta = url.searchParams.has("local_schema") ? `${when} · Local draft` : when;
+        const button = h("button", { type: "button", className: "menu-item previous-session-entry", title },
+          h("span", { className: "previous-session-title", textContent: title }),
+          h("span", { className: "previous-session-meta", textContent: meta }));
         button.addEventListener("click", () => {
           if ((persistentViewer.editorDirty || state.definitionDraft)
             && !window.confirm("Discard uncommitted changes and open this previous view?")) return;
@@ -210,8 +221,6 @@ function initElements() {
         });
         els.previousSessionsList.append(button);
       }
-      panel.hidden = false;
-      els.previousSessions.setAttribute("aria-expanded", "true");
     } catch (error) { els.localSaveStatus.textContent = `Could not list previous views — ${error.message}`; }
   });
   els.retryLocalSave?.addEventListener("click", () => {
@@ -225,6 +234,16 @@ function initElements() {
       if (editorWasOpen) groupEditorController.closeGroupEditor();
       publicationController.workingCopyChanged();
     } catch (error) { els.localSaveStatus.textContent = `Not saved — ${error.message}`; }
+  });
+  // Schema menu → Import schema…: the dialog explains what importing replaces,
+  // then opens the same file picker as Import → Schema draft.
+  els.importSchemaAction?.addEventListener("click", () => {
+    if (els.importSchemaDialog?.showModal) els.importSchemaDialog.showModal();
+    else els.importLocalDraft?.click();
+  });
+  els.importSchemaChooseFile?.addEventListener("click", () => {
+    els.importSchemaDialog?.close("import");
+    els.importLocalDraft?.click();
   });
   els.importLocalDraft?.addEventListener("change", async event => {
     const file = event.target.files?.[0];
@@ -393,31 +412,55 @@ function renderUndoRedo() {
     ? `Redo: ${state.undoHistory[state.undoPointer + 1]?.description}` : "Nothing to redo";
   const next = state.undoPointer < state.undoHistory.length - 1
     ? state.undoHistory[state.undoPointer + 1]?.description : null;
-  const status = [last && `Undo: ${last}`, next && `Redo: ${next}`].filter(Boolean).join(" · ") || "No edits to undo or redo";
-  for (const element of [els.historyStatus, els.dag2HistoryStatus]) {
-    if (element) element.textContent = status;
-  }
+  if (els.historyStatus) els.historyStatus.textContent = [last && `Undo: ${last}`, next && `Redo: ${next}`].filter(Boolean).join(" · ");
+  const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
+  if (last) els.undoBtn.title = `${els.undoBtn.title} (${shortcut}Z)`;
+  if (next) els.redoBtn.title = `${els.redoBtn.title} (${shortcut}Shift+Z)`;
   els.undoBtn.setAttribute("aria-label", els.undoBtn.title);
   els.redoBtn.setAttribute("aria-label", els.redoBtn.title);
-  if (els.dag2UndoBtn) {
-    els.dag2UndoBtn.disabled = els.undoBtn.disabled;
-    els.dag2UndoBtn.title = els.undoBtn.title;
-    els.dag2RedoBtn.disabled = els.redoBtn.disabled;
-    els.dag2RedoBtn.title = els.redoBtn.title;
-    els.dag2UndoBtn.setAttribute("aria-label", els.undoBtn.title);
-    els.dag2RedoBtn.setAttribute("aria-label", els.redoBtn.title);
-  }
+  if (state.showActionHistory) renderActionHistory();
 }
 
+/** Undo or redo until the given step is the current one (-1 is before any edit). */
+function jumpToHistory(pointer) {
+  let guard = state.undoHistory.length + 1;
+  while (state.undoPointer > pointer && guard-- > 0) projectController.undo();
+  while (state.undoPointer < pointer && guard-- > 0) projectController.redo();
+  void persistentViewer.commitDecision().catch(error => console.error("Could not save history jump", error));
+}
+
+/** "Today, 4:29 PM", "Yesterday, 4:12 PM", "Oct 30, 9:05 AM", or with the year when it isn't this one. */
+function formatSessionTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const daysAgo = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86_400_000);
+  if (daysAgo === 0) return `Today, ${time}`;
+  if (daysAgo === 1) return `Yesterday, ${time}`;
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  const day = date.toLocaleDateString(undefined, sameYear ? { month: "short", day: "numeric" } : { year: "numeric", month: "short", day: "numeric" });
+  return `${day}, ${time}`;
+}
+
+/** The edit-history menu: newest first; steps after the current one are undone and can be redone. */
 function renderActionHistory() {
-  if (!state.showActionHistory) return;
-  if (!state.actionLog.length) {
-    replaceChildren(els.actionHistory, h("div", { className: "ah-empty", textContent: "No actions yet." }));
+  if (!state.showActionHistory || !els.actionHistory) return;
+  if (!state.undoHistory.length) {
+    replaceChildren(els.actionHistory, h("p", { className: "menu-note", textContent: "No edits yet" }));
     return;
   }
-  replaceChildren(els.actionHistory, state.actionLog.map(entry => h("div", { className: "ah-entry" },
-    h("span", { className: "ah-desc", textContent: entry.description }),
-    h("span", { className: "ah-time", textContent: entry.time.slice(11, 19) }))));
+  const entry = (pointer, description) => {
+    const current = pointer === state.undoPointer;
+    return h("li", {},
+      h("button", { type: "button", className: `menu-item edit-history-entry${pointer > state.undoPointer ? " undone" : ""}`,
+        attrs: current ? { "aria-current": "step" } : {},
+        title: current ? "Current state" : pointer > state.undoPointer ? "Redo to here" : "Undo to here",
+        onclick: () => { if (!current) jumpToHistory(pointer); } },
+      h("span", { textContent: description })));
+  };
+  const rows = state.undoHistory.map((item, index) => entry(index, item.description)).reverse();
+  replaceChildren(els.actionHistory, h("ol", { className: "edit-history-steps" }, rows, entry(-1, "Start of this session")));
 }
 
 // ─── Mode management ──────────────────────────────────────────────────────────
@@ -526,54 +569,66 @@ function renderRightPanel() {
   renderConfounderStatuses();
 }
 
+/** Which status list applies: confounders or colliders, in the view that shows them. */
+function statusKind() {
+  return state.showConfoundersOnly ? "confounders" : state.showCollidersOnly ? "colliders" : null;
+}
+
+/** Record how a confounder or collider is handled; shared by the side panel and the table. Undoable. */
+function setDiagnosticStatus(kind, groupId, status, text = "") {
+  const spec = DIAGNOSTIC_STATUSES[kind];
+  const row = diagnosticStatusRows(state.project, [groupId], kind)[0];
+  if (!spec || !row || !Object.hasOwn(spec.statuses, status)) return;
+  const note = status === "other" ? text.trim() : "";
+  if (row.status === status && row.text === note) return;
+  const before = takeSnapshot();
+  state.project[spec.field] = { ...(state.project[spec.field] || {}),
+    [row.key]: { status, ...(note ? { text: note } : {}) } };
+  projectController.record(`Set ${spec.noun} status: ${row.label}`, before);
+  publicationController.workingCopyChanged();
+  void persistentViewer.commitDecision().catch(error => console.error(`Could not save ${spec.noun} status`, error));
+  renderConfounderStatuses();
+  if (dagNetworkController.dagDisplay() === "table") void dagNetworkController.renderDag({ reuseGeometry: true });
+}
+
 function renderConfounderStatuses() {
-  const visible = state.interfaceMode === "dag2" && state.showConfoundersOnly
+  const kind = statusKind();
+  const visible = state.interfaceMode === "dag2" && Boolean(kind)
     && !els.dagWorkspaceSection.hidden && !state.project.instrument_group_id
     && Boolean(groupById(state.project.iv_group_id)?.variable_ids?.length)
     && Boolean(groupById(state.project.dv_group_id)?.variable_ids?.length);
   els.confounderConfig.hidden = !visible;
   if (!visible) return;
-  const rows = confounderRows(state.project, state.confounderGroupIds);
-  els.confounderSummary.textContent = `Confounder status (${rows.length})`;
+  const spec = DIAGNOSTIC_STATUSES[kind];
+  const rows = diagnosticStatusRows(state.project, kind === "confounders" ? state.confounderGroupIds : state.colliderGroupIds, kind);
+  const title = kind === "confounders" ? "Confounder" : "Collider";
+  els.confounderSummary.textContent = `${title} status (${rows.length})`;
+  const note = els.confounderDisclosure.querySelector(".small-note");
+  if (note) note.textContent = `Record how each potential ${spec.noun} is handled in this study.`;
   if (!els.confounderDisclosure.open) {
     els.confounderStatusList.replaceChildren();
     return;
   }
   if (!rows.length) {
     replaceChildren(els.confounderStatusList,
-      h("p", { className: "small-note", textContent: "No potential confounders in this view." }));
+      h("p", { className: "small-note", textContent: `No potential ${spec.noun}s in this view.` }));
     return;
   }
   replaceChildren(els.confounderStatusList, rows.map(row => {
     const select = h("select", { className: "select-input", attrs: { "aria-label": `Status for ${row.label}` } },
-      Object.entries(CONFOUNDER_STATUSES).map(([value, label]) =>
-        h("option", { value, textContent: value === "accounted_for_by_design"
-          ? "Accounted for by design" : label })));
+      Object.entries(spec.statuses).map(([value, label]) =>
+        h("option", { value, textContent: STATUS_MENU_LABELS[value] || label })));
     select.value = row.status;
-    select.title = CONFOUNDER_STATUSES[row.status];
+    select.title = spec.statuses[row.status];
     const explanation = h("input", { className: "search-input", type: "text",
-      value: row.text, placeholder: "Describe how this confounder is handled",
+      value: row.text, placeholder: `Describe how this ${spec.noun} is handled`,
       attrs: { "aria-label": `Other status for ${row.label}` } });
     explanation.hidden = row.status !== "other";
-    const save = () => {
-      const before = takeSnapshot();
-      state.project.confounder_statuses ||= {};
-      state.project.confounder_statuses[row.key] = {
-        status: select.value,
-        ...(select.value === "other" && explanation.value.trim()
-          ? { text: explanation.value.trim() } : {}),
-      };
-      projectController.record(`Set confounder status: ${row.label}`, before);
-      publicationController.workingCopyChanged();
-      void persistentViewer.commitDecision().catch(error =>
-        console.error("Could not save confounder status", error));
-    };
     select.addEventListener("change", () => {
-      select.title = CONFOUNDER_STATUSES[select.value];
       explanation.hidden = select.value !== "other";
-      save();
+      setDiagnosticStatus(kind, row.groupId, select.value, explanation.value);
     });
-    explanation.addEventListener("change", save);
+    explanation.addEventListener("change", () => setDiagnosticStatus(kind, row.groupId, select.value, explanation.value));
     return h("div", { className: "confounder-status-row" },
       h("label", { textContent: row.label }, select), explanation);
   }));
@@ -644,9 +699,31 @@ function definitionResidualIds(source) { return definitionWorkflowController.def
 function toggleDefinitionVariable(variableId, add = null) { return definitionWorkflowController.toggleDefinitionVariable(variableId, add); }
 function definitionCanReview() { return definitionWorkflowController.definitionCanReview(); }
 function definitionNeighbors() { return definitionWorkflowController.definitionNeighbors(); }
-function renderDefinition() { return definitionWorkflowController.renderDefinition(); }
+function renderDefinition() {
+  definitionWorkflowController.renderDefinition();
+  customVariablesPresenter.render();
+}
 function saveDefinition() { return definitionWorkflowController.saveDefinition(); }
-function installDefinitionHandlers() { return definitionWorkflowController.installDefinitionHandlers(); }
+function installDefinitionHandlers() {
+  definitionWorkflowController.installDefinitionHandlers();
+  customVariablesPresenter.install();
+}
+
+/** Delete a custom variable: its concepts return to where they came from. Undoable. */
+async function deleteCustomVariable(groupId) {
+  const group = groupById(groupId);
+  const before = takeSnapshot();
+  const next = projectOps.deleteSplitCategories(state.project, { groupId, timestamp: nowIso() });
+  if (applyProjectOperation(next) === false) throw new Error("Variable memberships are still loading. Try again in a moment.");
+  for (const key of ["focusedGroupId", "activeGroupId", "selectedEvidenceGroupId"]) {
+    if (state[key] === groupId) state[key] = null;
+  }
+  addToUndoHistory(`Deleted variable "${group?.label || groupId}"`, before);
+  invalidateMapCaches();
+  renderAll();
+  await persistentViewer.commitDecision();
+  publicationController.workingCopyChanged();
+}
 
 // ─── Search ───────────────────────────────────────────────────────────────────
 
@@ -802,7 +879,7 @@ function renderRejectedVariablesPanel() {
         h("span", { className: "group-row-meta", textContent: `${entry.member_variable_ids?.length || 1} vars` })),
       h("span", { textContent: entry.reason || "low_quality" }), h("div", { className: "group-row-footer" },
         h("span", { className: "group-status-label rejected", textContent: "rejected variable" }),
-        h("button", { className: "action-button", type: "button", dataset: { action: "restore" }, textContent: "Restore" }))))
+        h("button", { className: "btn btn--sm", type: "button", dataset: { action: "restore" }, textContent: "Restore" }))))
     : h("div", { className: "small-note", textContent: "No rejected variables match this search." }));
   els.rejectedVariablesList.querySelectorAll("button[data-action='restore']").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -851,6 +928,49 @@ function renderSeedRows() {
 function beginTargetGroup(side) { return groupEditorController.beginTargetGroup(side); }
 function promoteGroupToAnchor(side, groupId) { return groupEditorController.promoteGroupToAnchor(side, groupId); }
 function assignGroupAsAnchor(side, groupId) { return groupEditorController.assignGroupAsAnchor(side, groupId); }
+
+/**
+ * Identify's Cause, Outcome and Instrument fields. Each choice replaces that role
+ * directly, so there is no step-by-step setup: the map appears as soon as both
+ * a cause and an outcome are chosen.
+ */
+function chooseIdentifyVariable(side, groupId) {
+  if (side === "instrument") {
+    assignGroupAsInstrument(groupId);
+    // Choosing an instrument ends setup; with the cause or outcome still empty it has not ended.
+    if (!state.project.iv_group_id || !state.project.dv_group_id) {
+      state.workflowMode = "setup";
+      state.phase = state.project.iv_group_id ? "select_dv" : "select_iv";
+      persistentViewer.viewerChanged();
+    }
+    return;
+  }
+  if (!groupId) {
+    // The × in a Cause or Outcome field: the role is left empty until another variable is chosen.
+    const label = groupById(state.project?.[`${side}_group_id`])?.label;
+    const before = takeSnapshot("anchors");
+    if (!applyProjectOperation(projectOps.clearAnchor(state.project, side))) return;
+    state.identifyExclusion = null;
+    // A link with a role missing must say it is mid-setup, or reopening it is refused.
+    state.workflowMode = "setup";
+    state.phase = state.project.iv_group_id ? "select_dv" : "select_iv";
+    state.selectedEdgeId = null;
+    state.selectedEvidenceGroupId = null;
+    addToUndoHistory(`Remove "${label || side}" as ${side === "iv" ? "cause" : "outcome"}`, before, "anchors");
+    renderAll({ reuseLinks: true });
+    setupGroupController.renderIdentifyPicker();
+    return;
+  }
+  if (groupId === state.project?.[`${side}_group_id`] && groupById(groupId)?.variable_ids?.length) {
+    renderAll({ rebuild: false });
+    return;
+  }
+  // Replacing a role, rather than stepping through setup, goes straight to the map.
+  state.changingAnchorSide = side;
+  assignGroupAsAnchor(side, groupId);
+  state.changingAnchorSide = null;
+  setupGroupController.renderIdentifyPicker();
+}
 function seedLabel(side) { return groupEditorController.seedLabel(side); }
 // Event handlers retain group references through edits. Apply pure results while
 // preserving those identities; snapshots deliberately replace them on undo.
@@ -1106,7 +1226,8 @@ function addVariableToGroup(group, variableId) {
 }
 function addVariableSetToGroup(group, ids) {
   if (group?.group_id === "__definition_new__") {
-    for (const id of ids) toggleDefinitionVariable(id, true);
+    // One change for the whole lasso, so a single Undo reverts it.
+    if (state.definitionMethod === "manual") definitionWorkflowController.classifyDefinitionVariables(ids, "in");
     return;
   }
   return groupEditorController.addVariableSetToGroup(group, ids);
@@ -1126,6 +1247,19 @@ function activeGroupingSet() { return groupingSetController.active(); }
 
 function copyPermalink() { return groupingSetController.copyPermalink(); }
 
+// A temporary note beside the brand for completed operations. It clears itself
+// unless something else has written to the status in the meantime.
+let briefNoticeTimer = null;
+function notifyBriefly(message) {
+  const status = els.localSaveStatus;
+  if (!status) return;
+  clearTimeout(briefNoticeTimer);
+  status.textContent = message;
+  briefNoticeTimer = setTimeout(() => {
+    if (status.textContent === message) status.textContent = "";
+  }, 5000);
+}
+
 function currentWorkingGroupingSchema() { return groupingSetController.workingSchema(); }
 
 const persistentViewer = createPersistentViewer({
@@ -1140,7 +1274,18 @@ const persistentViewer = createPersistentViewer({
       ? { scale, position: network.getViewPosition() } : null;
   },
   status: message => {
-    if (els.localSaveStatus) els.localSaveStatus.textContent = message;
+    // Routine saves show as a small icon; anything else (errors, editing, notices) as text.
+    const saving = message.startsWith("Saving");
+    const saved = message.startsWith("Saved");
+    const indicator = document.getElementById("localSaveIndicator");
+    if (indicator) {
+      indicator.hidden = !saving && !saved;
+      indicator.dataset.state = saving ? "saving" : "saved";
+      const label = saving ? "Saving in this browser…" : "Saved in this browser";
+      indicator.title = label;
+      indicator.setAttribute("aria-label", label);
+    }
+    if (els.localSaveStatus) els.localSaveStatus.textContent = saving || saved || message === "Published schema" ? "" : message;
     if (els.retryLocalSave) els.retryLocalSave.hidden = !message.startsWith("Not saved");
     if (els.saveIndependentCopy) els.saveIndependentCopy.hidden =
       !message.includes("Schema revision changed");
@@ -1166,6 +1311,29 @@ const taskViews = createTaskViews({
     if (bothExplore) renderExploreFocus(); else renderAll({ reuseLinks: true });
   },
   openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
+  onRowHover: row => dagNetworkController.hoverExploreRow(row),
+  onChooseIdentify: (side, groupId) => chooseIdentifyVariable(side, groupId),
+  onIdentifyPicking: () => { setupGroupController.renderIdentifyPicker(); taskViews.render(); },
+  onIdentifyRowHover: groupId => groupId ? dagNetworkController.highlightConfounderPaths(groupId)
+    : dagNetworkController.clearConfounderPathHover(),
+  onIdentifyExcludedChange: () => updateDagFilters(),
+  // A row opens the variable's definition and concepts in the evidence pane, as clicking its node does.
+  onOpenIdentifyVariable: groupId => {
+    if (state.fullscreenPanel) setFullscreenPanel(null);
+    state.selectedEdgeId = null;
+    state.comparisonVariableIds = [];
+    state.selectedEvidenceGroupId = groupId;
+    renderCoordinator.selectEdge();
+    taskViews.refreshSelection();
+    persistentViewer.viewerChanged();
+    shellController.showMobilePanel("dag");
+  },
+  canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
+  onEditCustom: groupId => startEditSplit(groupId),
+  onDeleteCustom: deleteCustomVariable,
+  onCreateCustom: () => startDefinition("candidate"),
+
+  placeEvidencePane: () => shellController.placeEvidencePane(),
   onChange: () => persistentViewer.viewerChanged(), prepareReset: () => persistentViewer.prepareReset(), whenReady: () => persistentViewer.whenReady(),
 });
 taskViews.install();
@@ -1383,10 +1551,13 @@ function computeExploreLinks() {
 function computeVisibleLinks() {
   if (taskViews.exploring()) { computeExploreLinks(); return; }
   ensureDiagnosticFilter(state);
-  const missingSparseEvidence = state.excludeSparseEdges ? missingLinkSupportIds() : [];
+  // Links carry their papers per direction; only those an edit stripped of
+  // paper keys need their findings fetched before sparse edges can be judged.
+  const sparseNeeding = state.excludeSparseEdges ? linksNeedingExactCounts(state.project?.links || []) : [];
+  const missingSparseEvidence = sparseNeeding.length ? missingLinkSupportIds(sparseNeeding) : [];
   if (missingSparseEvidence.length && !sparseWaitingForSupport) {
     sparseWaitingForSupport = true;
-    void loadLinkSupport(state.project?.links).then(loaded => {
+    void loadLinkSupport(sparseNeeding).then(loaded => {
       sparseWaitingForSupport = false;
       if (!loaded && linkSupportFailed) state.excludeSparseEdges = false;
       updateDagFilters();
@@ -1407,9 +1578,14 @@ function computeVisibleLinks() {
   const excludedFindingCount = Object.keys(state.project.finding_decisions || {}).length;
   els.showExcludedFindings.hidden = excludedFindingCount === 0;
   els.showExcludedFindings.textContent = `Excluded findings (${excludedFindingCount})`;
+  // Variables unticked in Identify's list are left off the map, and no path runs through them.
+  const studyIds = new Set([state.project.iv_group_id, state.project.dv_group_id, state.project.instrument_group_id]);
+  const identifyExcluded = new Set([...taskViews.identifyExcluded()].filter(id => !studyIds.has(id)));
   const view = deriveDagView({
-    groups: dagGroups(),
-    links: state.project.links,
+    groups: identifyExcluded.size
+      ? dagGroups().filter(group => !identifyExcluded.has(group.group_id)) : dagGroups(),
+    links: identifyExcluded.size ? state.project.links.filter(link =>
+      !identifyExcluded.has(link.group_a) && !identifyExcluded.has(link.group_b)) : state.project.links,
     ivId: state.project.iv_group_id,
     dvId: state.project.dv_group_id,
     instrumentId: state.project.instrument_group_id,
@@ -1464,7 +1640,7 @@ function showExcludedLinks() {
     h("strong", { textContent: "Excluded links" }),
     ...links.map(link => {
       const model = inspector.edgeInspector(link, state.project);
-      const button = h("button", { className: "action-button", type: "button",
+      const button = h("button", { className: "btn btn--sm", type: "button",
         textContent: `${model.sourceLabel} ${model.arrow} ${model.targetLabel}` });
       button.addEventListener("click", () => inspectDagEdge(link.edge_id));
       return button;
@@ -1511,7 +1687,7 @@ async function showExcludedFindings() {
       const reason = code === "not_relevant_to_target_population" ? "Not relevant to target population"
         : code === "concept_miscategorized" ? "Concept miscategorized"
           : code === "other" ? "Other" : "";
-      const restore = h("button", { className: "text-button", type: "button", textContent: "Restore" });
+      const restore = h("button", { className: "btn btn--ghost", type: "button", textContent: "Restore" });
       restore.addEventListener("click", () => {
         const before = takeSnapshot();
         if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
@@ -1645,7 +1821,6 @@ function renderSelectedEdge() {
 // The open evidence is per task; clear what the old task showed so the pane
 // matches the new task's selection (restored by the task views).
 function dismissEvidenceForTask() {
-  inspectorController.clearPendingExclude();
   state.selectedVariableIds.clear();
   state.comparisonVariableIds = [];
   if (!state.selectedEdgeId) {
@@ -1656,7 +1831,6 @@ function dismissEvidenceForTask() {
 }
 
 function dismissEvidencePane() {
-  inspectorController.clearPendingExclude();
   els.provenancePanel.scrollLeft = 0;
   els.closeEvidencePane.closest(".dag-ws-footer").scrollLeft = 0;
   state.selectedEdgeId = null;
@@ -1700,9 +1874,10 @@ function initializeProjectShape() {
 function renderExportStatus() {
   const cycle = detectDirectedCycle();
   const bidirectional = state.project.links.some((l) => l.direction_type === "BIDIRECTIONAL" && l.display_status !== "excluded");
-  els.strictDagStatus.textContent = cycle || bidirectional
-    ? "Strict DAG export unavailable until bidirectional links and cycles are resolved."
-    : "Strict DAG export conditions are currently satisfied.";
+  // Shown as the Causal diagram export's tooltip.
+  els.exportWorkingMap.title = cycle || bidirectional
+    ? "Not a strict DAG: has cycles or two-way links"
+    : "Valid strict DAG";
 }
 
 // ─── Decision log ──────────────────────────────────────────────────────────────
@@ -1905,6 +2080,19 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   },
 });
 
+const customVariablesPresenter = createCustomVariablesPresenter({
+  state, elements: els, truncate, normalized,
+  customVariables: () => (state.project?.groups || []).filter(group => group.source === "user_split")
+    .sort((a, b) => String(a.label || "").localeCompare(String(b.label || ""))),
+  sourceLabels: group => (group.provenance?.source_group_ids || []).map(id => groupById(id)?.label).filter(Boolean),
+  canChange: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
+  onCreate: () => startDefinition("candidate"),
+  onEdit: groupId => startEditSplit(groupId),
+  onDelete: deleteCustomVariable,
+  canExplore: () => taskViews.exploring(),
+  onExplore: groupId => taskViews.chooseFocus(groupId),
+});
+
 const projectController = createDagProjectController({
   state, storage: window.localStorage, storagePrefix: PROJECT_STORAGE_PREFIX,
   nowIso, invalidateMapCaches, renderAll, rebuildLinkDecision, renderUndoRedo, renderActionHistory,
@@ -1957,6 +2145,9 @@ const setupGroupController = createDagSetupGroupController({
   searchAnchorGroups, beginEditor: () => persistentViewer.beginEditor(),
   exploreFocus: () => taskViews.focus(), searchFocusGroups: query => taskViews.searchFocusGroups(query),
   onChooseFocus: groupId => taskViews.chooseFocus(groupId),
+  identifyPicking: () => taskViews.identifySide(), onChooseIdentify: (side, groupId) => taskViews.chooseIdentify(side, groupId),
+  canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
+  deleteCustom: deleteCustomVariable,
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
   excludeConcept: excludeGroupConcept,
@@ -1964,7 +2155,9 @@ const setupGroupController = createDagSetupGroupController({
 
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, exploreRows: () => taskViews.neighborhood().rows,
+  drawMap, setMapMode, renderAll, exploreRows: () => taskViews.neighborhood().included,
+  onNodeHover: id => taskViews.highlightRow(id),
+  onSetStatus: (kind, groupId, status, text) => setDiagnosticStatus(kind, groupId, status, text),
   onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
   selectEdge: () => {
     if (state.fullscreenPanel) setFullscreenPanel(null);
@@ -2073,6 +2266,7 @@ publicationController = createPublicationController({
     get publish() { return els.publishSchema; },
     get status() { return els.publicationStatus; },
     get badge() { return els.schemaPublicationBadge; },
+    get menuButton() { return document.querySelector("#schemaMenu > summary"); },
     get permalink() { return els.publishedSchemaPermalink; },
     get confirmation() { return els.publishSchemaDialog; },
     get share() { return els.copyPermalink; },
@@ -2081,6 +2275,7 @@ publicationController = createPublicationController({
   getCompiledDag: () => state.compiledDagValid && !state.compiledDagUpdating ? state.compiledDag : null,
   canPublish: () => !state.publishedSchemaHydrating && !state.publishedSchemaLoadFailed
     && persistentViewer.canPublish,
+  notify: notifyBriefly,
   getCompileInput: async () => {
     if (state.compiledDagValid && !state.compiledDagUpdating) {
       return { project: dagProjectView(), linkLookup: state.linkLookup, rawLinksById: state.rawLinksById };

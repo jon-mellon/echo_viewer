@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ECHO</title>
-    <link rel="stylesheet" href="/styles.css?v=resume-saved-split-v1">
+    <link rel="stylesheet" href="/styles.css?v=type-calm-v7">
   </head>
   <body class="dag-body dag2-mode viewer-loading password-locked">
     <div id="passwordGate" class="password-gate" role="dialog" aria-modal="true" aria-labelledby="passwordGateTitle">
@@ -15,7 +15,7 @@
         <label class="dag-label" for="passwordGateInput">Password</label>
         <input id="passwordGateInput" class="search-input" type="password" autocomplete="current-password" required autofocus>
         <p id="passwordGateError" class="password-gate-error" role="alert" hidden>Incorrect password.</p>
-        <button class="primary-button" type="submit">Open viewer</button>
+        <button class="btn btn--primary" type="submit">Open viewer</button>
       </form>
     </div>
     <div id="startupLoading" class="startup-loading" role="status" aria-live="polite">
@@ -29,126 +29,190 @@
     </div>
     <header id="taskBar" class="task-bar" hidden>
       <span class="task-bar-brand">ECHO</span>
-      <nav class="task-tabs" aria-label="Choose what to do">
-        <button class="task-tab" type="button" data-task="identify" aria-pressed="false"><span class="task-tab-long">Identify an estimate</span><span class="task-tab-short">Identify</span></button>
-        <button class="task-tab" type="button" data-task="causes" aria-pressed="false"><span class="task-tab-long">Causes of a variable</span><span class="task-tab-short">Causes</span></button>
-        <button class="task-tab" type="button" data-task="consequences" aria-pressed="false"><span class="task-tab-long">Consequences of a variable</span><span class="task-tab-short">Consequences</span></button>
-      </nav>
-      <button id="taskReset" class="toolbar-button task-reset" type="button" hidden>Reset</button>
-    </header>
-    <section id="taskLanding" class="task-view task-landing" aria-labelledby="taskLandingTitle" hidden>
-      <div class="task-landing-inner">
-        <h1 id="taskLandingTitle">What do you want to do?</h1>
-        <div class="task-choices">
-          <button class="task-choice" type="button" data-task="identify">
-            <strong>Help causally identify an estimate</strong>
-            <span>Find confounders, colliders, and exclusion restriction violations from the literature.</span>
-          </button>
-          <button class="task-choice" type="button" data-task="causes">
-            <strong>Find causes of a variable</strong>
-            <span>See the variables that the literature links as causes of a variable, directly or through others.</span>
-          </button>
-          <button class="task-choice" type="button" data-task="consequences">
-            <strong>Find consequences of a variable</strong>
-            <span>See the variables that the literature links as effects of a variable, directly or through others.</span>
-          </button>
+      <!-- Where the working copy is saved: a quiet note beside the brand, not a panel section. -->
+      <span id="localSaveIndicator" class="save-indicator" role="img" data-state="saved" hidden><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle class="save-icon-saved" cx="12" cy="12" r="10"/><path class="save-icon-saved" d="m9 12 2 2 4-4"/><path class="save-icon-saving" d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></span>
+      <span id="localSaveStatus" class="task-bar-status" role="status" aria-live="polite"></span>
+      <!-- Everything else in the bar. On wide screens this wrapper adds no box; on narrow
+           screens it collapses behind the hamburger button (#navToggle) into one panel. -->
+      <div id="taskBarOverflow" class="task-bar-overflow">
+        <!-- What the user is doing: the view switcher, beside the brand. -->
+        <details id="taskMenu" class="nav-menu menu task-menu">
+          <!-- One control: the muted "Task" label, the current task, and a chevron. -->
+          <summary id="taskMenuToggle" class="task-selector" title="Choose what to do"><span class="task-selector-label">Task</span><span id="taskMenuValue" class="task-selector-value">Identification</span><svg class="lucide task-selector-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="nav-menu-panel menu-panel menu-panel--list task-menu-panel" role="group" aria-label="Choose what to do">
+            <button class="menu-item task-tab" type="button" data-task="identify" aria-pressed="false">Identification</button>
+            <button class="menu-item task-tab" type="button" data-task="explore" aria-pressed="false">Exploration</button>
+          </div>
+        </details>
+        <!-- Exploration: Causes | Consequences and Graph | Table move here from the graph header (task_views.mjs). -->
+        <div id="taskBarViewControls" class="task-bar-view-controls"></div>
+        <div class="task-bar-menus">
+          <!-- Undo, redo and History (edits, earlier sessions, reset) apply to the whole project. -->
+          <div class="undo-group" role="group" aria-label="Undo and redo">
+            <button id="undoBtn" class="btn btn--icon" type="button" title="Nothing to undo" aria-label="Nothing to undo" disabled><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg></button>
+            <button id="redoBtn" class="btn btn--icon" type="button" title="Nothing to redo" aria-label="Nothing to redo" disabled><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></svg></button>
+          </div>
+          <details id="historyMenu" class="nav-menu menu history-menu">
+            <summary id="historyToggle" class="btn" title="Edit history, earlier sessions and reset" aria-label="History"><svg class="lucide nav-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg><span class="nav-label">History</span></summary>
+            <div id="previousSessionsPanel" class="nav-menu-panel menu-panel menu-panel--list" aria-label="History">
+              <div class="history-edits">
+                <p class="menu-section-label" title="Filters and view changes aren't recorded">This session</p>
+                <div id="actionHistory" class="edit-history-list"></div>
+                <div class="menu-separator" role="separator"></div>
+              </div>
+              <p class="menu-section-label" title="Saved in this browser only">Earlier sessions</p>
+              <div id="previousSessionsList" class="menu-list"></div>
+              <div class="history-reset">
+                <div class="menu-separator" role="separator"></div>
+                <button id="taskReset" class="menu-item menu-item--danger" type="button" hidden>Reset project…</button>
+              </div>
+            </div>
+          </details>
+          <span id="historyStatus" class="sr-only" aria-live="polite"></span>
+          <div class="task-bar-sep" aria-hidden="true"></div>
+          <!-- Grouping schema: which schema is loaded and whether it is public. -->
+          <div id="groupingPanel" class="task-bar-item">
+            <details id="schemaMenu" class="nav-menu menu">
+              <summary class="btn" title="Schema" aria-label="Schema"><svg class="lucide nav-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg><span class="nav-label">Schema</span></summary>
+              <div class="nav-menu-panel menu-panel menu-panel--list schema-menu-panel" aria-label="Schema">
+                <div class="menu-header schema-menu-header">
+                  <p class="schema-menu-title">Schema</p>
+                  <span id="schemaPublicationBadge" class="badge muted">Local draft</span>
+                </div>
+                <div class="menu-field">
+                  <select id="groupingSetSelect" class="select-input" aria-label="Active schema"></select>
+                  <p id="groupingSummary" class="menu-note"></p>
+                  <div id="publicationStatus" class="menu-note publication-status" role="status" aria-live="polite"></div>
+                </div>
+                <div class="menu-separator" role="separator"></div>
+                <button id="importSchemaAction" class="menu-item" type="button"><svg class="lucide menu-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg><span>Import schema…</span></button>
+                <button id="publishSchema" class="menu-item" type="button" hidden><svg class="lucide menu-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg><span>Publish changes…</span></button>
+                <a id="publishedSchemaPermalink" class="menu-item" href="#" target="_blank" rel="noopener" hidden><svg class="lucide menu-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg><span>Open public version</span></a>
+              </div>
+            </details>
+          </div>
+          <!-- Import: everything you can open. -->
+          <details id="importSection" class="nav-menu menu">
+            <summary id="importToggleBtn" class="btn" title="Import" aria-label="Import"><svg class="lucide nav-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg><span class="nav-label">Import</span></summary>
+            <div id="importBody" class="nav-menu-panel menu-panel menu-panel--list" aria-label="Import">
+              <label class="menu-item file-button" data-hint=".json">Project…
+                <input id="projectImport" type="file" accept="application/json,.json">
+              </label>
+              <label class="menu-item file-button" data-hint=".json">Schema draft…
+                <input id="importLocalDraft" type="file" accept="application/json,.json">
+              </label>
+            </div>
+          </details>
+          <!-- Export: everything you can save. -->
+          <details id="exportSection" class="nav-menu menu">
+            <summary id="exportToggleBtn" class="btn" title="Export" aria-label="Export"><svg class="lucide nav-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg><span class="nav-label">Export</span></summary>
+            <div id="exportBody" class="nav-menu-panel menu-panel menu-panel--list" aria-label="Export">
+              <button id="exportProject" class="menu-item" type="button" data-hint=".json">Project</button>
+              <button id="exportWorkingMap" class="menu-item" type="button" data-hint=".json">Causal diagram</button>
+              <button id="exportMd" class="menu-item" data-keep-open type="button" data-hint=".md">Write-up (Markdown)</button>
+              <button id="exportTex" class="menu-item" data-keep-open type="button" data-hint=".tex">Write-up (LaTeX)</button>
+              <button id="exportBib" class="menu-item" data-keep-open type="button" data-hint=".bib">References</button>
+              <button id="exportGroupingFolder" class="menu-item" data-keep-open type="button" data-hint=".zip">Schema folder</button>
+              <button id="exportLocalDraft" class="menu-item" type="button" data-hint=".json" title="Includes your private exclusion reasons">Private schema draft</button>
+            </div>
+          </details>
         </div>
       </div>
-    </section>
+      <!-- On narrow screens: switch between the panels of the current task. -->
+      <nav class="mobile-panel-nav" aria-label="Panels in current task">
+        <button class="mobile-panel-tab active" type="button" data-mobile-panel="controls" aria-pressed="true">Setup view</button>
+        <button class="mobile-panel-tab mobile-variable-tab" type="button" data-mobile-panel="variables" aria-pressed="false">Variables view</button>
+        <button class="mobile-panel-tab" type="button" data-mobile-panel="dag" aria-pressed="false">Map view</button>
+      </nav>
+      <button id="navToggle" class="btn btn--icon nav-toggle" type="button" aria-label="Menu" title="Menu" aria-expanded="false" aria-controls="taskBarOverflow"><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
+    </header>
     <dialog id="resetDialog" class="publication-dialog reset-dialog" aria-labelledby="resetDialogTitle">
       <h2 id="resetDialogTitle">Reset this project?</h2>
-      <p>Resetting clears the variables chosen in all three views and returns to the start page. The current project is kept in Previous Sessions in this browser.</p>
+      <p>Resetting clears the variables chosen in all three views and opens a fresh project in Exploration. The current project stays available under History › Earlier sessions.</p>
       <p id="resetError" role="alert" hidden></p>
       <div class="reset-dialog-actions">
-        <button id="resetContinue" class="primary-button" type="button" autofocus>Continue working on this project</button>
-        <button id="resetNewTab" class="toolbar-button" type="button">Open new project in a new tab</button>
-        <button id="resetHere" class="toolbar-button reset-here" type="button">Reset in current tab</button>
+        <button id="resetContinue" class="btn btn--primary" type="button" autofocus>Continue working on this project</button>
+        <button id="resetNewTab" class="btn" type="button">Open new project in a new tab</button>
+        <button id="resetHere" class="btn reset-here" type="button">Reset in current tab</button>
       </div>
     </dialog>
     <main class="dag-shell">
 
       <!-- LEFT PANEL: Navigation + mode-specific content -->
       <aside class="dag-left-panel">
-        <header class="panel-header">
-          <div>
-            <h1>ECHO</h1>
-          </div>
-        </header>
-
         <nav id="modeSwitcher" class="mode-switcher" aria-label="Workflow mode">
           <button class="mode-tab active" data-mode="setup" type="button">Setup</button>
           <button class="mode-tab" data-mode="group_review" type="button">Groups</button>
         </nav>
-        <div class="panel-section">
-          <div id="localSaveStatus" role="status" aria-live="polite"></div>
-          <button id="retryLocalSave" class="text-button" type="button" hidden>Retry save</button>
-          <button id="saveIndependentCopy" class="text-button" type="button" hidden>Save independent copy</button>
-          <div class="mini-toolbar">
-            <button id="previousSessions" class="text-button" type="button" aria-expanded="false" aria-controls="previousSessionsPanel">Previous Sessions</button>
-          </div>
-          <div id="previousSessionsPanel" class="previous-sessions-panel" hidden>
-            <p class="dag-label">Previous views in this browser</p>
-            <div id="previousSessionsList"></div>
-          </div>
+        <div id="saveStatusSection" class="panel-section">
+          <button id="retryLocalSave" class="btn btn--ghost" type="button" hidden>Retry save</button>
+          <button id="saveIndependentCopy" class="btn btn--ghost" type="button" hidden>Save independent copy</button>
         </div>
-
-        <!-- Grouping schema (shown in setup + groups modes) -->
-        <section id="groupingPanel" class="panel-section">
-          <details>
-          <summary class="section-title schema-summary">
-            <h2>Variable schema</h2>
-            <span id="schemaPublicationBadge" class="status-pill muted">Private working copy</span>
-          </summary>
-          <select id="groupingSetSelect" class="select-input"></select>
-          <div class="mini-toolbar">
-            <button id="publishSchema" class="primary-button" type="button" hidden>Publish publicly</button>
-          </div>
-          <div id="publicationStatus" class="publication-status" role="status" aria-live="polite"></div>
-          <a id="publishedSchemaPermalink" class="published-schema-permalink" href="#" target="_blank" rel="noopener" hidden>Open public version</a>
-          <div id="groupingSummary" class="small-note"></div>
-          <div class="mini-toolbar">
-            <label class="toolbar-button file-button">
-              Import draft
-              <input id="importLocalDraft" type="file" accept="application/json,.json">
-            </label>
-          </div>
-          </details>
-        </section>
 
         <!-- Study anchors: change the selected groups at any time -->
         <div id="anchorBar" class="anchor-bar" hidden>
+          <!-- Explore: the one variable whose causes or consequences are shown. -->
+          <button id="exploreFocusSelector" class="focus-selector" type="button" hidden>
+            <span class="focus-selector-caption">Selected variable</span>
+            <span class="focus-selector-row">
+              <span id="exploreFocusName" class="focus-selector-name"></span>
+              <span class="focus-selector-chevron" aria-hidden="true">▾</span>
+            </span>
+          </button>
           <div class="anchor-row">
-            <span class="anchor-tag anchor-dv">Dep var</span>
+            <span class="badge anchor-dv">Dep var</span>
             <strong id="anchorDvLabel" class="anchor-label"></strong>
-            <button id="editSplitDv" class="text-button" type="button" hidden>Edit split</button>
-            <button id="changeDv" class="text-button" type="button">Change</button>
+            <button id="editSplitDv" class="btn btn--ghost" type="button" hidden>Edit split</button>
+            <button id="changeDv" class="btn btn--ghost" type="button">Change</button>
           </div>
           <div class="anchor-row">
-            <span class="anchor-tag anchor-iv">Ind var</span>
+            <span class="badge anchor-iv">Ind var</span>
             <strong id="anchorIvLabel" class="anchor-label"></strong>
-            <button id="editSplitIv" class="text-button" type="button" hidden>Edit split</button>
-            <button id="changeIv" class="text-button" type="button">Change</button>
+            <button id="editSplitIv" class="btn btn--ghost" type="button" hidden>Edit split</button>
+            <button id="changeIv" class="btn btn--ghost" type="button">Change</button>
           </div>
           <div class="anchor-row" id="instrumentRow" hidden>
-            <span class="anchor-tag anchor-instrument">Instrument</span>
+            <span class="badge anchor-instrument">Instrument</span>
             <strong id="anchorInstrumentLabel" class="anchor-label">None</strong>
-            <button id="changeInstrument" class="text-button" type="button">Change</button>
-          </div>
-          <div class="mini-toolbar dag2-history-controls">
-            <button id="dag2UndoBtn" class="toolbar-button" type="button" disabled>↩ Undo</button>
-            <button id="dag2RedoBtn" class="toolbar-button" type="button" disabled>Redo ↪</button>
-            <span id="dag2HistoryStatus" class="history-status" aria-live="polite"></span>
-            <span class="history-help">Undo and redo cover project edits and exclude/restore decisions, not display filters.</span>
+            <button id="changeInstrument" class="btn btn--ghost" type="button">Change</button>
           </div>
         </div>
 
-        <section id="exploreView" class="panel-section explore-view" aria-label="Causes or consequences of a variable" hidden>
+        <section id="exploreView" class="panel-section explore-view" aria-label="Variables" hidden>
+          <!-- Identification: the study's Cause, Outcome and optional Instrument; a field being searched opens the list below them. -->
+          <div id="identifyFields" class="identify-fields" hidden>
+            <div class="search-block identify-field" data-side="iv">
+              <label class="identify-field-label" for="identify-iv-input">Cause</label>
+              <div class="focus-input-wrap">
+                <input id="identify-iv-input" class="search-input identify-input" type="search" data-side="iv" placeholder="Search group or constituent variable" autocomplete="off">
+                <button class="focus-clear identify-clear" type="button" data-side="iv" title="Clear the cause" aria-label="Clear the cause" hidden>×</button>
+              </div>
+            </div>
+            <div class="search-block identify-field" data-side="dv">
+              <label class="identify-field-label" for="identify-dv-input">Outcome</label>
+              <div class="focus-input-wrap">
+                <input id="identify-dv-input" class="search-input identify-input" type="search" data-side="dv" placeholder="Search group or constituent variable" autocomplete="off">
+                <button class="focus-clear identify-clear" type="button" data-side="dv" title="Clear the outcome" aria-label="Clear the outcome" hidden>×</button>
+              </div>
+            </div>
+            <div class="search-block identify-field" data-side="instrument">
+              <label class="identify-field-label" for="identify-instrument-input">Instrument</label>
+              <div class="focus-input-wrap">
+                <input id="identify-instrument-input" class="search-input identify-input" type="search" data-side="instrument" placeholder="Optional" autocomplete="off">
+                <button class="focus-clear identify-clear" type="button" data-side="instrument" title="Clear the instrument" aria-label="Clear the instrument" hidden>×</button>
+              </div>
+            </div>
+            <div id="identifyGroupPicker" class="setup-group-picker" hidden></div>
+          </div>
           <div id="focusSearchBlock" class="search-block">
             <div class="anchor-source-header">
               <label id="focusInputLabel" class="dag-label" for="focusInput">Search existing groups</label>
-              <button id="focusPickerCancel" class="text-button" type="button" hidden>Cancel</button>
+              <button id="focusPickerCancel" class="btn btn--ghost" type="button" hidden>Cancel</button>
             </div>
-            <input id="focusInput" class="search-input" type="search" placeholder="Search group or constituent variable" autocomplete="off">
+            <div class="focus-input-wrap">
+              <input id="focusInput" class="search-input" type="search" placeholder="Search group or constituent variable" autocomplete="off">
+              <button id="focusClear" class="focus-clear" type="button" title="Clear the variable and start over" aria-label="Clear the primary variable" hidden>×</button>
+            </div>
             <div id="focusGroupPicker" class="setup-group-picker" hidden></div>
           </div>
           <div id="exploreResultsBlock" class="explore-results-block" hidden>
@@ -161,13 +225,13 @@
         <section id="setupSection" class="panel-section">
           <div class="section-title">
             <h2 id="currentStepTitle">Select independent variable</h2>
-            <span id="dagStatusBadge" class="status-pill">Setup</span>
+            <span id="dagStatusBadge" class="badge">Setup</span>
           </div>
 
           <div id="dvSearchBlock" class="search-block">
             <div class="anchor-source-header">
               <label id="dvInputLabel" class="dag-label" for="dvInput">Search existing groups</label>
-              <button id="dvDefineNew" class="text-button" type="button">Define new group</button>
+              <button id="dvDefineNew" class="btn btn--ghost" type="button">Define new group</button>
             </div>
             <input id="dvInput" class="search-input" type="search" placeholder="Income, prejudice, labor-market outcome">
             <div id="dvSeeds" class="seed-row"></div>
@@ -178,7 +242,7 @@
           <div id="ivSearchBlock" class="search-block">
             <div class="anchor-source-header">
               <label id="ivInputLabel" class="dag-label" for="ivInput">Search existing groups</label>
-              <button id="ivDefineNew" class="text-button" type="button">Define new group</button>
+              <button id="ivDefineNew" class="btn btn--ghost" type="button">Define new group</button>
             </div>
             <input id="ivInput" class="search-input" type="search" placeholder="Education, religiosity, parental status">
             <div id="ivSeeds" class="seed-row"></div>
@@ -189,143 +253,211 @@
           <div id="instrumentSearchBlock" class="search-block" hidden>
             <div class="anchor-source-header">
               <label class="dag-label" for="instrumentInput">Search existing groups</label>
-              <button id="instrumentDefineNew" class="text-button" type="button">Define new group</button>
+              <button id="instrumentDefineNew" class="btn btn--ghost" type="button">Define new group</button>
             </div>
             <input id="instrumentInput" class="search-input" type="search" placeholder="Search group or constituent variable">
             <div id="instrumentGroupPicker" class="setup-group-picker"></div>
           </div>
 
           <div id="schemaChoice" class="schema-choice" hidden>
-            <button id="loadSchema" class="primary-button" type="button">Load grouping schema</button>
-            <button id="skipSchema" class="toolbar-button" type="button">Work without schema</button>
+            <button id="loadSchema" class="btn btn--primary" type="button">Load grouping schema</button>
+            <button id="skipSchema" class="btn" type="button">Work without schema</button>
           </div>
           <div id="definitionBlock" class="definition-block" hidden>
             <div class="definition-heading">
-              <strong id="definitionTitle">Define new variable</strong>
-              <button id="definitionCancel" class="text-button" type="button">Cancel</button>
+              <strong id="definitionTitle">Create a variable</strong>
+              <!-- Which step is current comes from which step panel is shown (see styles.css). -->
+              <ol class="definition-stepper" aria-label="Steps">
+                <li data-step="describe"><span>Describe</span></li>
+                <li data-step="sources"><span>Start from</span></li>
+                <li data-step="sort"><span>Choose concepts</span></li>
+              </ol>
             </div>
-            <div id="definitionMethodStep" class="definition-method-step">
-              <h2>How do you want to split the variables?</h2>
-              <div class="definition-method-choices">
-                <button id="definitionChooseManual" class="definition-method-choice" type="button">
-                  <strong>Sort manually</strong><span>Inspect the source variables and move them yourself.</span>
-                </button>
-                <button id="definitionChooseJev" class="definition-method-choice" type="button">
-                  <strong>Classify with AI</strong><span>Requires an OpenRouter key with a non-resetting $5 or lower maximum spend. Keys without that limit are rejected.</span>
-                </button>
-                <button id="definitionChooseBrowse" class="definition-method-choice" type="button">
-                  <strong>Browse user splits</strong><span>Find published splits for these variables, inspect their names and descriptions, and adapt one.</span>
-                </button>
-              </div>
+            <!-- 1 · Describe: what the new variable is. Its name and definition are
+                 also what the AI sorts against, so they come first. -->
+            <div id="definitionDescribeStep" class="definition-describe-step">
+              <h2>Name and define your variable</h2>
+              <p class="small-note definition-explainer">It will be built from concepts that now sit in other variables. Next you'll choose those variables, then the concepts to move. Anything you don't move stays where it is.</p>
+              <label class="dag-label" for="definitionNewLabel">Name</label>
+              <input id="definitionNewLabel" class="search-input" type="text" placeholder="For example: school grades" autocomplete="off">
+              <label class="dag-label" for="definitionNewDescription">Definition</label>
+              <textarea id="definitionNewDescription" class="search-input" rows="3" minlength="20" maxlength="1000" aria-describedby="definitionValidation" placeholder="What belongs in it, and what does not (at least 20 characters)"></textarea>
+              <div id="definitionValidation" class="small-note" aria-live="polite">At least 20 characters.</div>
               <div id="definitionResumeList" class="definition-resume-list" hidden></div>
+              <div class="mini-toolbar">
+                <button id="definitionCancel" class="btn definition-cancel" type="button">Cancel</button>
+                <button id="definitionDescribeNext" class="btn btn--primary" type="button">Next</button>
+              </div>
             </div>
-            <div id="definitionAiSetupStep" hidden><div class="definition-chosen-method"><span>Classify with AI</span><button id="definitionAiChangeMethod" class="text-button" type="button">Change method</button></div><div id="definitionAiSetupHost"></div></div>
+            <!-- 2 · Start from: the existing variables whose concepts it takes. -->
             <div id="definitionSourcesStep" hidden>
-              <div class="definition-chosen-method"><span id="definitionChosenMethod"></span><button id="definitionChangeMethod" class="text-button" type="button">Change method</button></div>
-              <label class="dag-label" for="definitionSourceSearch">Choose one or more categories to chop from</label>
-              <input id="definitionSourceSearch" class="search-input" type="search" placeholder="Search categories or constituent variables">
+              <h2>Which existing variables contain these concepts?</h2>
+              <p class="small-note definition-explainer">Pick every variable the new one should take concepts from. You choose the exact concepts next.</p>
+              <label class="dag-label" for="definitionSourceSearch">Search variables</label>
+              <input id="definitionSourceSearch" class="search-input" type="search" placeholder="Search variables or the concepts in them">
               <div id="definitionSourceList" class="setup-group-picker-list"></div>
               <div id="definitionBrowsePanel" hidden>
-                <p id="definitionBrowseStatus" class="small-note" role="status">Choose a source category to see published splits.</p>
+                <h3>Already made by others from these variables</h3>
+                <p id="definitionBrowseStatus" class="small-note" role="status"></p>
                 <div id="definitionBrowseResults" class="definition-browse-results"></div>
               </div>
-              <button id="definitionContinue" class="primary-button" type="button" disabled>Continue</button>
+              <div class="mini-toolbar">
+                <button id="definitionSourcesBack" class="btn" type="button">Back</button>
+                <button class="btn definition-cancel" type="button">Cancel</button>
+                <button id="definitionContinue" class="btn btn--primary" type="button" disabled>Next</button>
+              </div>
             </div>
+            <!-- 3 · Choose concepts: by hand or with AI, then save. Both modes share
+                 the heading, mode switch, progress summary and footer. -->
             <div id="definitionPartitionStep" hidden>
-              <div class="definition-method-switch" role="group" aria-label="How to split these variables">
-                <button id="definitionMethodJev" class="toolbar-button" type="button" aria-pressed="true">AI suggestions</button>
-                <button id="definitionMethodManual" class="toolbar-button" type="button" aria-pressed="false">Sort manually</button>
+              <div class="definition-concepts-head">
+                <h2>Choose concepts</h2>
+                <p id="definitionConceptsIntro" class="small-note"></p>
+              </div>
+              <div class="definition-method-switch segmented" role="group" aria-label="How to choose concepts">
+                <button id="definitionMethodManual" class="btn" type="button" aria-pressed="true">Choose manually</button>
+                <button id="definitionMethodJev" class="btn" type="button" aria-pressed="false">Suggest with AI</button>
+              </div>
+              <div class="definition-progress" aria-live="polite">
+                <span class="definition-progress-item"><strong id="definitionCountIncluded">0</strong> included</span>
+                <span class="definition-progress-item"><strong id="definitionCountExcluded">0</strong> excluded</span>
+                <span class="definition-progress-item"><strong id="definitionCountUnreviewed">0</strong> unreviewed</span>
               </div>
               <div id="definitionLoadStatus" class="small-note" role="status" hidden></div>
-              <section id="definitionJevPanel" class="definition-ai-assist" aria-labelledby="definitionAiTitle">
-                <div class="section-title compact-title"><h2 id="definitionAiTitle">Classify with AI</h2></div>
-                <p class="small-note">Describe the new variable, test 24 examples, then review the suggestions before running the full split. Leftover includes anything that does not clearly fit, including uncertain cases. Your description and variable labels and text go to OpenRouter; your account is charged for each run.</p>
-                <div id="definitionAiWork">
-                <label class="dag-label" for="definitionAiDescription">New variable description</label>
-                <div id="definitionAiDescriptionHelp" class="small-note">Write at least 20 characters. This description will also be used when you save.</div>
-                <textarea id="definitionAiDescription" class="search-input" rows="3" minlength="20" maxlength="1000" aria-describedby="definitionAiDescriptionHelp" placeholder="For example: academic grades, tests, and skills assessed in school or college; exclude informal learning outside those settings"></textarea>
+              <!-- Suggest with AI: connect, check the limit, try a sample, then classify the rest. -->
+              <section id="definitionJevPanel" class="definition-ai" aria-labelledby="definitionAiTitle" hidden>
+                <div class="definition-ai-intro">
+                  <h3 id="definitionAiTitle">Suggest concepts with AI</h3>
+                  <p>The AI reads your definition and suggests which concepts belong in the new variable. You check a sample before it classifies the rest, and nothing changes in your choices until you use its suggestions.</p>
+                  <p class="definition-ai-privacy">Your definition and the labels and text of these concepts are sent to OpenRouter. Each run is charged to your OpenRouter account. The key lives only in this browser tab.</p>
                 </div>
-                <div id="definitionAiSetup"><p class="small-note"><strong>Required before AI classification:</strong> Set this OpenRouter key's maximum spend to $5 or less and choose a limit that never resets. The app rejects keys with no limit, a higher limit, or a resetting limit. After changing the key settings, select Recheck limit.</p>
-                <div class="mini-toolbar">
-                  <button id="definitionAiConnect" class="toolbar-button" type="button">Connect OpenRouter</button>
-                  <button id="definitionAiRecheck" class="toolbar-button" type="button" hidden>Recheck limit</button>
-                  <button id="definitionAiDisconnect" class="text-button" type="button" hidden>Disconnect</button>
-                </div>
-                <div id="definitionAiStatus" class="small-note" aria-live="polite"></div>
-                </div>
-                <div id="definitionAiResults">
-                <div id="definitionAiCost" class="small-note" aria-live="polite"></div>
-                <button id="definitionAiRun" class="primary-button" type="button" disabled>Test split on 50 variables</button>
+                <ol class="definition-ai-steps">
+                  <li id="definitionAiStepConnect" class="definition-ai-step">
+                    <div class="definition-ai-step-head"><span class="definition-ai-step-num" aria-hidden="true">1</span><strong>Connect OpenRouter</strong><span id="definitionAiConnectSummary" class="definition-ai-step-summary"></span></div>
+                    <div class="definition-ai-step-body">
+                      <p class="small-note">Sign in to OpenRouter to create a key for this tab.</p>
+                      <div class="definition-ai-actions">
+                        <button id="definitionAiConnect" class="btn btn--primary" type="button">Connect OpenRouter</button>
+                      </div>
+                    </div>
+                    <button id="definitionAiDisconnect" class="btn btn--ghost definition-ai-step-aside" type="button" hidden>Disconnect</button>
+                  </li>
+                  <li id="definitionAiStepLimit" class="definition-ai-step">
+                    <div class="definition-ai-step-head"><span class="definition-ai-step-num" aria-hidden="true">2</span><strong>Check the spending limit</strong><span id="definitionAiLimitSummary" class="definition-ai-step-summary"></span></div>
+                    <div class="definition-ai-step-body">
+                      <p id="definitionAiLimitText" class="small-note">The key needs a maximum spend of $5 or less that never resets.</p>
+                      <div class="definition-ai-actions">
+                        <button id="definitionAiRecheck" class="btn" type="button" hidden>Recheck limit</button>
+                        <span id="definitionAiSettingsLink"></span>
+                      </div>
+                    </div>
+                  </li>
+                  <li id="definitionAiStepSample" class="definition-ai-step">
+                    <div class="definition-ai-step-head"><span class="definition-ai-step-num" aria-hidden="true">3</span><strong>Review a sample</strong><span id="definitionAiSampleSummary" class="definition-ai-step-summary"></span></div>
+                    <div class="definition-ai-step-body">
+                      <p class="small-note">The AI classifies a small random sample first. Check its choices before it classifies the rest.</p>
+                      <div id="definitionAiWork">
+                        <label class="dag-label" for="definitionAiDescription">What the AI should look for</label>
+                        <textarea id="definitionAiDescription" class="search-input" rows="3" minlength="20" maxlength="1000" aria-describedby="definitionAiDescriptionHelp"></textarea>
+                        <div id="definitionAiDescriptionHelp" class="small-note">Starts as your definition. Editing it here changes only what the AI is told.</div>
+                      </div>
+                      <div class="definition-ai-actions">
+                        <button id="definitionAiRun" class="btn btn--primary" type="button" disabled>Classify a sample</button>
+                        <button id="definitionAiMore" class="btn" type="button" hidden>Classify 50 more</button>
+                      </div>
+                      <div id="definitionAiCost" class="small-note"></div>
+                      <div id="definitionAiSampleHost"></div>
+                    </div>
+                  </li>
+                  <li id="definitionAiStepFull" class="definition-ai-step">
+                    <div class="definition-ai-step-head"><span class="definition-ai-step-num" aria-hidden="true">4</span><strong>Classify the remaining concepts</strong><span id="definitionAiFullSummary" class="definition-ai-step-summary"></span></div>
+                    <div class="definition-ai-step-body">
+                      <p id="definitionAiFullText" class="small-note">Available after the sample.</p>
+                      <div class="definition-ai-actions">
+                        <button id="definitionAiFullRun" class="btn btn--primary" type="button" hidden>Classify remaining concepts</button>
+                        <button id="definitionAiApply" class="btn btn--primary" type="button" hidden>Use these suggestions</button>
+                        <button id="definitionAiDiscard" class="btn btn--ghost" type="button" hidden>Discard suggestions</button>
+                      </div>
+                      <p id="definitionAiApplyNote" class="small-note" hidden></p>
+                      <div id="definitionAiFullHost"></div>
+                    </div>
+                  </li>
+                </ol>
+                <div id="definitionAiStatus" class="definition-ai-status" role="status" aria-live="polite"></div>
+                <!-- The AI's suggestions: shown under the sample step, then under the full run. -->
                 <div id="definitionAiPreview" class="definition-ai-preview" hidden>
-                  <div id="definitionAiSummary" class="small-note"></div>
-                  <div class="mini-toolbar">
-                    <button id="definitionAiApply" class="primary-button" type="button" hidden>Name and review</button>
-                    <button id="definitionAiMore" class="toolbar-button" type="button" hidden>Label 50 more</button>
-                    <button id="definitionAiFullRun" class="toolbar-button" type="button" hidden>Run full split</button>
-                    <button id="definitionAiDiscard" class="text-button" type="button">Discard suggestions</button>
-                  </div>
-                  <div id="definitionAiReviewTools" class="mini-toolbar" hidden>
-                    <label for="definitionAiReviewFilter">Inspect</label>
+                  <div id="definitionAiSummary" class="definition-ai-summary"></div>
+                  <div id="definitionAiReviewTools" class="definition-ai-review-tools" hidden>
+                    <label for="definitionAiReviewFilter">Show</label>
                     <select id="definitionAiReviewFilter" class="select-input-sm">
                       <option value="spot">Spot check</option>
-                      <option value="uncertain">Lower-score choices</option>
-                      <option value="new">Suggested new</option>
-                      <option value="leftover">Leftover</option>
-                      <option value="all">All results</option>
+                      <option value="uncertain">Low-score suggestions</option>
+                      <option value="new">Suggested In</option>
+                      <option value="leftover">Suggested Out</option>
+                      <option value="all">All suggestions</option>
                     </select>
                     <span id="definitionAiReviewPage" class="small-note"></span>
-                    <button id="definitionAiReviewPrev" class="toolbar-button" type="button">Previous</button>
-                    <button id="definitionAiReviewNext" class="toolbar-button" type="button">Next</button>
+                    <button id="definitionAiReviewPrev" class="btn btn--sm" type="button">Previous</button>
+                    <button id="definitionAiReviewNext" class="btn btn--sm" type="button">Next</button>
                   </div>
-                  <div id="definitionAiRows" class="definition-ai-rows"></div>
-                </div>
+                  <div id="definitionAiRows" class="definition-ai-rows" role="list"></div>
                 </div>
               </section>
-              <div id="definitionManualPanel" hidden>
-              <div id="definitionCounts" class="workflow-hint"></div>
-              <div class="definition-batch-review">
-                <div class="section-title compact-title"><h2>Sort variables</h2></div>
-                <p class="small-note">Inspect variables here without searching. Tap a common word for a batch, then correct exceptions with the two side buttons.</p>
-                <div id="definitionTermChips" class="definition-term-chips"></div>
-                <div id="definitionTermSummary" class="small-note" aria-live="polite"></div>
-                <div id="definitionTermItems" class="definition-term-items"></div>
-                <div class="definition-page-actions">
-                  <button id="definitionTermPrev" class="toolbar-button" type="button">Previous</button>
-                  <span id="definitionTermPage" class="small-note"></span>
-                  <button id="definitionTermNext" class="toolbar-button" type="button">Next</button>
-                </div>
-                <div class="mini-toolbar definition-term-actions">
-                  <button id="definitionTermToNew" class="toolbar-button" type="button">Move shown to new</button>
-                  <button id="definitionTermToLeftover" class="toolbar-button" type="button">Move shown to leftover</button>
-                  <button id="definitionUndoBatch" class="text-button" type="button" hidden>Undo batch</button>
-                </div>
+              <!-- Choose manually: browse and classify on the left, what is included on the right. -->
+              <div id="definitionManualPanel" class="definition-manual" hidden>
+                <section class="definition-browse" aria-labelledby="definitionBrowseTitle">
+                  <div class="definition-panel-head">
+                    <h3 id="definitionBrowseTitle">Browse concepts</h3>
+                  </div>
+                  <input id="definitionConceptSearch" class="search-input" type="search" placeholder="Search concepts by name…" aria-label="Search concepts by name" autocomplete="off">
+                  <div class="definition-browse-controls">
+                    <div id="definitionStatusFilter" class="segmented definition-status-filter" role="group" aria-label="Show concepts"></div>
+                    <select id="definitionTermSelect" class="select-input-sm" aria-label="Filter by a common term"></select>
+                  </div>
+                  <div id="definitionActiveFilters" class="definition-active-filters"></div>
+                  <div class="definition-list-meta">
+                    <span id="definitionTermSummary" class="small-note" aria-live="polite"></span>
+                    <span class="definition-list-batch">
+                      <button id="definitionUndoBatch" class="btn btn--sm" type="button" hidden>Undo</button>
+                      <button id="definitionTermToNew" class="btn btn--sm" type="button">Include shown</button>
+                      <button id="definitionTermToLeftover" class="btn btn--sm" type="button">Exclude shown</button>
+                    </span>
+                  </div>
+                  <div id="definitionTermItems" class="definition-term-items" role="list"></div>
+                  <div class="definition-page-actions">
+                    <button id="definitionTermPrev" class="btn btn--sm" type="button">Previous</button>
+                    <span id="definitionTermPage" class="small-note"></span>
+                    <button id="definitionTermNext" class="btn btn--sm" type="button">Next</button>
+                  </div>
+                </section>
+                <aside class="definition-sort-side" aria-labelledby="definitionSelectedTitle">
+                  <div class="definition-panel-head">
+                    <h3 id="definitionSelectedTitle">Included concepts (0)</h3>
+                  </div>
+                  <input id="definitionIncludedFilter" class="search-input" type="search" placeholder="Filter included…" aria-label="Filter included concepts" autocomplete="off" hidden>
+                  <div id="definitionSelectedVariables" class="definition-selected-variables" role="list"></div>
+                  <section id="definitionRelated" class="definition-related" hidden>
+                    <div class="definition-panel-head definition-related-head">
+                      <h3>Related concepts</h3>
+                      <button id="definitionAddNeighbors" class="btn btn--sm" type="button">Include all</button>
+                    </div>
+                    <p class="small-note">Based on your included concepts: similar wording or nearby on the map.</p>
+                    <div id="definitionNeighborResults" class="definition-related-list" role="list"></div>
+                  </section>
+                </aside>
               </div>
-              <label class="dag-label" for="definitionVariableSearch">Search displayed variables</label>
-              <input id="definitionVariableSearch" class="search-input" type="search" placeholder="Search canonical variables">
-              <div id="definitionVariableResults" class="search-results"></div>
-              <div class="section-title compact-title"><h2>New group variables</h2></div>
-              <div id="definitionSelectedVariables" class="definition-selected-variables"></div>
-              <div class="section-title compact-title"><h2>Nearby variables</h2></div>
-              <button id="definitionAddNeighbors" class="action-button" type="button">Add top neighbors</button>
-              <div id="definitionNeighborResults" class="search-results"></div>
-              <div class="mini-toolbar">
-                <button id="definitionBack" class="toolbar-button" type="button">Back</button>
-                <button id="definitionReview" class="primary-button" type="button" disabled>Name and review</button>
-              </div>
-              </div>
-            </div>
-            <div id="definitionReviewStep" hidden>
-              <label class="dag-label" for="definitionNewLabel">New variable name</label>
-              <input id="definitionNewLabel" class="search-input" type="text" placeholder="New variable">
-              <label class="dag-label" for="definitionNewDescription">New group definition</label>
-              <textarea id="definitionNewDescription" class="search-input" rows="3" minlength="20" maxlength="1000" aria-describedby="definitionValidation" placeholder="Describe what belongs in this group (at least 20 characters)"></textarea>
-              <div id="definitionValidation" class="small-note" aria-live="polite">Enter at least 20 characters for the group definition.</div>
-              <div class="section-title compact-title"><h2>New group variables</h2></div>
-              <div id="definitionReviewVariables" class="definition-review-variables"></div>
-              <div id="definitionResidualLabels"></div>
-              <div class="mini-toolbar">
-                <button id="definitionReviewBack" class="toolbar-button" type="button">Back</button>
-                <button id="definitionSave" class="primary-button" type="button">Save and use</button>
+              <!-- What happens to the variables the concepts come from: always shown, above Save. -->
+              <section id="definitionSourcesSection" class="definition-sources" aria-labelledby="definitionSourcesSummary">
+                <h3 id="definitionSourcesSummary">What stays in the original variables</h3>
+                <p class="small-note">Concepts you don't include stay where they are. Each original variable keeps its name unless you rename it here.</p>
+                <div id="definitionResidualLabels" class="definition-sources-table"></div>
+              </section>
+              <p id="definitionSaveStatus" class="small-note definition-save-status" role="alert" hidden></p>
+              <div class="mini-toolbar definition-footer">
+                <span id="definitionSaveHint" class="small-note definition-save-hint"></span>
+                <button id="definitionBack" class="btn" type="button">Back</button>
+                <button class="btn definition-cancel" type="button">Cancel</button>
+                <button id="definitionSave" class="btn btn--primary" type="button" disabled aria-describedby="definitionSaveHint">Save variable</button>
               </div>
             </div>
           </div>
@@ -334,10 +466,10 @@
 
         <section id="variablePanel" class="panel-section variable-panel" hidden>
           <div class="variable-panel-header">
-            <button id="variableDefineNew" class="toolbar-button" type="button">+ Define new variable</button>
+            <button id="variableDefineNew" class="btn" type="button">+ Define new variable</button>
           </div>
           <details id="variablePanelDisclosure" open>
-            <summary>Variables <span id="variablePanelCount" class="status-pill muted">0</span></summary>
+            <summary>Variables <span id="variablePanelCount" class="badge muted">0</span></summary>
             <div id="variablePanelList" class="variable-panel-list"></div>
             <div id="variablePanelPagination" class="variable-panel-pagination" hidden></div>
           </details>
@@ -356,10 +488,10 @@
           <div class="section-title">
             <div style="display:flex;gap:8px;align-items:center">
               <h2>Groups</h2>
-              <span id="groupListCount" class="status-pill muted">0</span>
+              <span id="groupListCount" class="badge muted">0</span>
             </div>
             <div style="display:flex;gap:6px;align-items:center">
-              <button id="createGroupBtn" class="toolbar-button" type="button" title="Create a blank group">+ New</button>
+              <button id="createGroupBtn" class="btn" type="button" title="Create a blank group">+ New</button>
               <select id="groupListSort" class="select-input-sm" title="Sort order">
                 <option value="relevance">By relevance to Ind var/Dep var</option>
                 <option value="alpha">A–Z</option>
@@ -378,14 +510,26 @@
         </section>
       </aside>
 
+      <dialog id="importSchemaDialog" class="publication-dialog">
+        <form method="dialog">
+          <h2>Import a schema draft?</h2>
+          <p>The imported draft replaces the schema you are working on in this view. Choose a schema draft (.json) exported from Echo.</p>
+          <p>Unpublished edits to the current schema are not carried over; export them as a private schema draft first if you want to keep a copy.</p>
+          <div class="publication-dialog-actions">
+            <button class="btn" value="cancel" type="submit">Cancel</button>
+            <button id="importSchemaChooseFile" class="btn btn--primary" value="import" type="button">Choose file…</button>
+          </div>
+        </form>
+      </dialog>
+
       <dialog id="publishSchemaDialog" class="publication-dialog">
         <form method="dialog">
           <h2>Publish this schema publicly?</h2>
           <p>Publishing creates an immutable public version of this schema. Anyone with the link can view and download it, and it may appear in public schema discovery or recommendation features.</p>
           <p>Your unpublished local edits remain private until you publish them.</p>
           <div class="publication-dialog-actions">
-            <button class="toolbar-button" value="cancel" type="submit">Cancel</button>
-            <button class="primary-button" value="publish" type="submit">Publish publicly</button>
+            <button class="btn" value="cancel" type="submit">Cancel</button>
+            <button class="btn btn--primary" value="publish" type="submit">Publish publicly</button>
           </div>
         </form>
       </dialog>
@@ -396,25 +540,19 @@
       <!-- CENTER: Semantic variable map -->
       <section class="dag-map-panel">
         <div class="map-toolbar dag-map-toolbar">
-          <button id="dagZoomIn" class="icon-button" type="button" title="Zoom in">+</button>
-          <button id="dagZoomOut" class="icon-button" type="button" title="Zoom out">−</button>
-          <button id="dagFitView" class="toolbar-button" type="button" title="Fit the central 95% of variables; pan or zoom out to reach distant variables">Fit 95%</button>
-          <button id="dagFitAll" class="toolbar-button" type="button" title="Fit every variable, including distant outliers">Fit all</button>
-          <button id="toggleVariableLabels" class="toolbar-button active" type="button" aria-pressed="true" title="Toggle variable labels across the whole map">Labels</button>
-          <button id="toggleGroupLabels" class="toolbar-button active" type="button" aria-pressed="true" title="Toggle group region labels across the whole map">Groups</button>
+          <button id="dagZoomIn" class="btn btn--icon" type="button" title="Zoom in">+</button>
+          <button id="dagZoomOut" class="btn btn--icon" type="button" title="Zoom out">−</button>
+          <button id="dagFitView" class="btn" type="button" title="Fit the central 95% of variables; pan or zoom out to reach distant variables">Fit 95%</button>
+          <button id="dagFitAll" class="btn" type="button" title="Fit every variable, including distant outliers">Fit all</button>
+          <button id="toggleVariableLabels" class="btn active" type="button" aria-pressed="true" title="Toggle variable labels across the whole map">Labels</button>
+          <button id="toggleGroupLabels" class="btn active" type="button" aria-pressed="true" title="Toggle group region labels across the whole map">Groups</button>
           <div class="toolbar-sep"></div>
-          <button id="dagSelectMode" class="toolbar-button active" type="button" aria-pressed="true" title="Inspect variables — click to select, no edits">Inspect</button>
-          <button id="dagBrushMode" class="toolbar-button" type="button" aria-pressed="false" title="Draw a boundary to add variables to the active group">Draw +</button>
-          <button id="dagEraseMode" class="toolbar-button" type="button" aria-pressed="false" title="Draw a boundary to remove variables from the active group">Draw −</button>
-          <span id="selectionCount" class="status-pill muted selection-count" hidden>0 selected</span>
+          <button id="dagSelectMode" class="btn active" type="button" aria-pressed="true" title="Inspect variables — click to select, no edits">Inspect</button>
+          <button id="dagBrushMode" class="btn" type="button" aria-pressed="false" title="Draw a boundary to add variables to the active group">Draw +</button>
+          <button id="dagEraseMode" class="btn" type="button" aria-pressed="false" title="Draw a boundary to remove variables from the active group">Draw −</button>
+          <span id="selectionCount" class="badge muted selection-count" hidden>0 selected</span>
           <div class="toolbar-sep"></div>
-          <button id="undoBtn" class="toolbar-button" type="button" title="Undo last action" disabled>↩ Undo</button>
-          <button id="redoBtn" class="toolbar-button" type="button" title="Redo" disabled>Redo ↪</button>
-          <button id="historyToggle" class="toolbar-button" type="button" title="Toggle action history">History</button>
-          <span id="historyStatus" class="history-status" aria-live="polite"></span>
-          <span class="history-help">Undo and redo cover project edits and exclude/restore decisions, not display filters.</span>
-          <div class="toolbar-sep"></div>
-          <button id="fullscreenVariableMap" class="toolbar-button fullscreen-toggle" type="button" aria-pressed="false" title="Expand the variable viewer to fill the window; press Escape to exit">Full screen map</button>
+          <button id="fullscreenVariableMap" class="btn fullscreen-toggle" type="button" aria-pressed="false" title="Expand the variable viewer to fill the window; press Escape to exit">Full screen map</button>
         </div>
         <div class="map-toolbar variable-layout-control">
           <label for="variableLayoutSelect">Variable layout</label>
@@ -427,11 +565,26 @@
         <div id="dagMapLabels" class="dag-map-labels"></div>
         <div id="dagMapTooltip" class="tooltip" hidden></div>
         <div id="dagMapContextMenu" class="map-context-menu" hidden></div>
-        <!-- Action history overlay -->
-        <div id="actionHistory" class="action-history" hidden></div>
       </section>
 
       <!-- Drag handle between map and right panel -->
+      <!-- Creating a variable: on a wide screen the creation steps move here and
+           take the map's place (see placeDefinitionBlock in dag_shell_controller). -->
+      <section id="definitionWorkspace" class="definition-workspace" aria-label="Custom variables">
+        <!-- Custom variables: replaces the graph while open (see custom_variables_presenter). -->
+        <div id="customVariablesView" class="custom-variables-view" hidden>
+          <div class="custom-variables-heading">
+            <h2 id="customVariablesTitle">Custom variables</h2>
+            <button id="customVariablesCreate" class="btn btn--primary" type="button">Create variable</button>
+            <button id="customVariablesClose" class="btn" type="button">Close</button>
+          </div>
+          <p class="small-note custom-variables-intro">Variables you made by moving concepts out of existing variables. Deleting one puts its concepts back where they came from.</p>
+          <input id="customVariablesFilter" class="search-input" type="search" placeholder="Filter by name, definition or source" aria-label="Filter custom variables">
+          <p id="customVariablesStatus" class="small-note" role="status" aria-live="polite"></p>
+          <div id="customVariablesTable" class="custom-variables-table"></div>
+        </div>
+      </section>
+
       <div id="rightResizer" class="panel-resizer"></div>
 
       <!-- RIGHT PANEL: Context workspace (group editor OR DAG workspace) -->
@@ -442,18 +595,18 @@
           <div class="section-title">
             <h2 id="groupEditorTitle">Group</h2>
             <div>
-              <button id="discardGroupEdit" class="text-button" type="button">Discard</button>
-              <button id="cancelGroupEdit" class="text-button" type="button">Done</button>
+              <button id="discardGroupEdit" class="btn btn--ghost" type="button">Discard</button>
+              <button id="cancelGroupEdit" class="btn btn--ghost" type="button">Done</button>
             </div>
           </div>
           <div id="groupEditorHint" class="workflow-hint"></div>
           <p id="groupDescription" class="group-description" hidden></p>
           <input id="groupLabelInput" class="search-input" type="text" placeholder="Group label">
           <textarea id="groupNotesInput" class="dag-textarea" placeholder="Notes (optional)"></textarea>
-          <button id="useGroupAsAnchor" class="primary-button" type="button" hidden>Use as anchor</button>
+          <button id="useGroupAsAnchor" class="btn btn--primary" type="button" hidden>Use as anchor</button>
           <div class="mini-toolbar">
-            <button id="zoomGroup" class="toolbar-button" type="button">Zoom to group</button>
-            <button id="editSplit" class="toolbar-button" type="button" hidden>Edit split</button>
+            <button id="zoomGroup" class="btn" type="button">Zoom to group</button>
+            <button id="editSplit" class="btn" type="button" hidden>Edit split</button>
           </div>
           <div class="search-block" id="groupSeedBlock">
             <input id="groupSeedInput" class="search-input" type="search" placeholder="Search variables to add to this group">
@@ -463,9 +616,9 @@
             <h2>Variables in group</h2>
           </div>
           <div class="mini-toolbar">
-            <button id="addNeighbors" class="action-button" type="button">Add neighbors</button>
-            <button id="removeNeighbors" class="action-button" type="button">Remove non-seeds</button>
-            <button id="clearGroupSelection" class="action-button" type="button">Clear all</button>
+            <button id="addNeighbors" class="btn btn--sm" type="button">Add neighbors</button>
+            <button id="removeNeighbors" class="btn btn--sm" type="button">Remove non-seeds</button>
+            <button id="clearGroupSelection" class="btn btn--sm" type="button">Clear all</button>
           </div>
           <div id="includedVariables" class="chip-list"></div>
           <div class="section-title compact-title">
@@ -477,42 +630,41 @@
         <!-- DAG workspace — shown when no group is open -->
         <section id="dagWorkspaceSection" class="panel-section dag-workspace">
           <div class="dag-ws-header section-title">
-            <h2 id="dagViewTitle">Working map</h2>
+            <h2 id="dagViewTitle"></h2>
             <div class="dag-ws-controls">
-              <div class="dag-diagnostic-switch" role="group" aria-label="Diagnostic view">
-                <button id="toggleConfoundersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that could point into both; bidirectional edges count in either direction">Confounders</button>
-                <button id="toggleCollidersOnly" class="toolbar-button" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that both could point into; bidirectional edges count in either direction">Colliders</button>
-                <button id="toggleExclusionViolations" class="toolbar-button" type="button" aria-pressed="false" aria-label="Exclusion restriction violations" hidden>Exclusion</button>
-                <button id="toggleExogeneity" class="toolbar-button" type="button" aria-pressed="false" hidden>Exogeneity</button>
+              <div id="exploreDirection" class="explore-direction segmented" role="group" aria-label="Show causes or consequences">
+                <button class="btn" type="button" data-direction="causes" aria-pressed="false">Causes</button>
+                <button class="btn" type="button" data-direction="consequences" aria-pressed="false">Consequences</button>
               </div>
-              <details class="filter-dropdown">
-                <summary class="toolbar-button">Filters</summary>
-                <div class="filter-dropdown-panel" aria-label="Diagram filters">
+              <div class="dag-diagnostic-switch segmented" role="group" aria-label="Diagnostic view">
+                <button id="toggleConfoundersOnly" class="btn" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that could point into both; bidirectional edges count in either direction">Confounders</button>
+                <button id="toggleCollidersOnly" class="btn" type="button" aria-pressed="false" title="Show the Ind var, Dep var, and groups that both could point into; bidirectional edges count in either direction">Colliders</button>
+                <button id="toggleExclusionViolations" class="btn" type="button" aria-pressed="false" aria-label="Exclusion restriction violations" hidden>Exclusion</button>
+                <button id="toggleExogeneity" class="btn" type="button" aria-pressed="false" hidden>Exogeneity</button>
+              </div>
+              <div class="dag-view-switch segmented" role="group" aria-label="Show the data as">
+                <button id="dagViewGraph" class="btn active" type="button" aria-pressed="true" title="Show the diagram">Graph</button>
+                <button id="dagViewTable" class="btn" type="button" aria-pressed="false" title="Show the same variables and links as tables">Table</button>
+              </div>
+              <details class="filter-dropdown menu">
+                <summary class="btn btn--icon" title="Filter which variables and links are shown" aria-label="Filters"><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></svg></summary>
+                <div class="filter-dropdown-panel menu-panel" aria-label="Diagram filters">
               <label class="path-length-control" for="confounderPathLength" title="Maximum number of directed edges allowed on each path from a confounder to the Ind var and Dep var">
                 <span id="confounderPathLengthLabel">Max path</span>
                 <input id="confounderPathLength" class="path-length-input" type="number" min="1" max="99" step="1" value="1" inputmode="numeric" aria-label="Maximum confounder path length">
               </label>
-              <button id="toggleSparseEdges" class="toolbar-button" type="button" aria-pressed="false" title="Hide edges supported by fewer than the minimum number of distinct papers">Exclude sparse edges</button>
-              <label class="path-length-control" for="minimumEdgePapers" title="Minimum number of distinct supporting papers required when sparse edges are excluded">
+              <button id="toggleSparseEdges" class="btn" type="button" aria-pressed="false" title="Hide edges supported by fewer than the minimum number of distinct papers">Exclude sparse edges</button>
+              <label class="path-length-control" for="minimumEdgePapers" title="Minimum number of distinct papers supporting each direction of a link; 1 shows every link">
                 <span>Min papers</span>
-                <input id="minimumEdgePapers" class="path-length-input" type="number" min="1" step="1" value="2" inputmode="numeric" aria-label="Minimum supporting papers per edge">
+                <input id="minimumEdgePapers" class="path-length-input" type="number" min="1" step="1" value="1" inputmode="numeric" aria-label="Minimum supporting papers per edge">
               </label>
-              <button id="toggleBottleneckedConfounders" class="toolbar-button" type="button" aria-pressed="false" title="Keep only candidates with bounded paths to the Ind var and Dep var that share no intermediate group; mouseover shows that same qualifying pair">Exclude bottlenecked</button>
-              <button id="toggleIrrelevantConfounderLinks" class="toolbar-button" type="button" aria-pressed="false" title="Hide links that are not used by any currently displayed confounder's Ind var or Dep var witness path">Path links only</button>
-              <button id="toggleAllExclusionLinks" class="toolbar-button" type="button" aria-pressed="false" title="Show every link between groups visible in the exclusion restriction view" hidden>All visible links</button>
-              <button id="showExcludedLinks" class="toolbar-button" type="button" hidden>Excluded links</button>
-              <button id="showExcludedFindings" class="toolbar-button" type="button" hidden>Excluded findings</button>
+              <button id="toggleBottleneckedConfounders" class="btn" type="button" aria-pressed="false" title="Keep only candidates with bounded paths to the Ind var and Dep var that share no intermediate group; mouseover shows that same qualifying pair">Exclude bottlenecked</button>
+              <button id="toggleIrrelevantConfounderLinks" class="btn" type="button" aria-pressed="false" title="Hide links that are not used by any currently displayed confounder's Ind var or Dep var witness path">Path links only</button>
+              <button id="toggleAllExclusionLinks" class="btn" type="button" aria-pressed="false" title="Show every link between groups visible in the exclusion restriction view" hidden>All visible links</button>
+              <button id="showExcludedLinks" class="btn" type="button" hidden>Excluded links</button>
+              <button id="showExcludedFindings" class="btn" type="button" hidden>Excluded findings</button>
                 </div>
               </details>
-              <button id="dagSvgZoomIn" class="icon-button" type="button" title="Zoom in">+</button>
-              <button id="dagSvgZoomOut" class="icon-button" type="button" title="Zoom out">−</button>
-              <button id="dagSvgFit" class="toolbar-button" type="button" title="Reset zoom">Fit</button>
-              <button id="fullscreenDag" class="toolbar-button fullscreen-toggle" type="button" aria-pressed="false" title="Expand the DAG to fill the window; press Escape to exit">Full screen DAG</button>
-              <button id="copyPermalink" class="toolbar-button" type="button" title="Copy a link to this view of the public schema">Share</button>
-              <div class="dag-view-switch" role="group" aria-label="Show the data as">
-                <button id="dagViewGraph" class="toolbar-button active" type="button" aria-pressed="true" title="Show the diagram">Graph</button>
-                <button id="dagViewTable" class="toolbar-button" type="button" aria-pressed="false" title="Show the same variables and links as tables">Table</button>
-              </div>
             </div>
           </div>
           <div class="dag-network-wrapper">
@@ -520,10 +672,18 @@
             <div id="dagTable" class="dag-table-view" hidden tabindex="-1" aria-label="Variables and links as tables"></div>
             <p id="exploreGraphHint" class="explore-graph-hint" hidden></p>
             <div id="diagnosticOverlapKey" class="diagnostic-overlap-key" hidden></div>
+            <!-- Graph view controls float over the graph's bottom-right corner (Lucide icons). -->
+            <div class="dag-overlay-controls" role="group" aria-label="Graph view">
+              <button id="dagSvgZoomIn" class="btn btn--icon" type="button" title="Zoom in" aria-label="Zoom in"><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+              <button id="dagSvgZoomOut" class="btn btn--icon" type="button" title="Zoom out" aria-label="Zoom out"><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+              <button id="dagSvgFit" class="btn btn--icon" type="button" title="Reset zoom" aria-label="Reset zoom"><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg></button>
+              <button id="fullscreenDag" class="btn btn--icon fullscreen-toggle" type="button" aria-pressed="false" title="Expand the DAG to fill the window; press Escape to exit" aria-label="Full screen DAG"><svg class="lucide icon-enter" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg><svg class="lucide icon-exit" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg></button>
+              <button id="copyPermalink" class="btn btn--icon share-toggle" type="button" title="Copy a link to this view" aria-label="Share view"><svg class="lucide icon-copy" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="lucide icon-copied" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button>
+            </div>
           </div>
           <div class="dag-ws-footer">
             <div class="evidence-pane-header">
-              <button id="closeEvidencePane" class="text-button evidence-close" type="button" hidden aria-label="Close evidence or description">Close</button>
+              <button id="closeEvidencePane" class="btn btn--ghost evidence-close" type="button" hidden aria-label="Close evidence or description">Close</button>
             </div>
             <!-- Edge inspector: appears when an edge is selected -->
             <div id="edgeInspector" class="edge-inspector" hidden></div>
@@ -531,42 +691,9 @@
             <div id="provenancePanel" class="provenance-panel" hidden></div>
           </div>
         </section>
-
-        <!-- Export — collapsible, compact -->
-        <section id="exportSection" class="panel-section export-section">
-          <div class="section-title export-toggle-header" id="exportToggleBtn" role="button" tabindex="0" title="Toggle export options">
-            <h2>Export</h2>
-            <span class="export-chevron">▲</span>
-          </div>
-          <div id="exportBody" class="export-body">
-            <div class="mini-toolbar">
-              <button id="exportGroupingFolder" class="toolbar-button" type="button">Download schema folder ZIP</button>
-              <button id="exportLocalDraft" class="toolbar-button" type="button" title="Includes private edge exclusion reasons">Export private draft</button>
-            </div>
-            <div class="mini-toolbar">
-              <button id="exportProject" class="toolbar-button" type="button">Project JSON</button>
-              <button id="exportWorkingMap" class="toolbar-button" type="button">Causal diagram JSON</button>
-              <label class="toolbar-button file-button">
-                Import project
-                <input id="projectImport" type="file" accept="application/json,.json">
-              </label>
-            </div>
-            <div class="mini-toolbar">
-              <button id="exportBib" class="toolbar-button" type="button">References .bib</button>
-              <button id="exportMd" class="toolbar-button" type="button">Export .md</button>
-              <button id="exportTex" class="toolbar-button" type="button">Export .tex</button>
-            </div>
-            <div id="strictDagStatus" class="small-note"></div>
-          </div>
-        </section>
       </aside>
 
     </main>
-    <nav class="mobile-panel-nav" aria-label="Panels in current task">
-      <button class="mobile-panel-tab active" type="button" data-mobile-panel="controls" aria-pressed="true">Setup view</button>
-      <button class="mobile-panel-tab mobile-variable-tab" type="button" data-mobile-panel="variables" aria-pressed="false">Variables view</button>
-      <button class="mobile-panel-tab" type="button" data-mobile-panel="dag" aria-pressed="false">Map view</button>
-    </nav>
     <a class="legal-link" href="/privacy.html" target="_blank" rel="noopener">Privacy</a>
     <script src="/password_gate.js"></script>
     <script src="/visjs-min.js"></script>

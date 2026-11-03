@@ -76,7 +76,7 @@ test("?schema_source=cloudflare reads the same files from Cloudflare and keeps t
     } });
   });
   await page.locator("#copyPermalink").click();
-  await expect(page.locator("#copyPermalink")).toContainText("Copied");
+  await expect(page.locator("#copyPermalink")).toHaveAttribute("aria-label", "Copied");
   const link = await page.evaluate(() => window.__sharedText);
   expect(new URL(link).searchParams.get("schema_source")).toBe("cloudflare");
   // Evidence opens from it too, and nothing was fetched from Supabase storage along the way.
@@ -96,6 +96,6 @@ test("a page that names no source makes links that name none", async ({ page }) 
     } });
   });
   await page.locator("#copyPermalink").click();
-  await expect(page.locator("#copyPermalink")).toContainText("Copied");
+  await expect(page.locator("#copyPermalink")).toHaveAttribute("aria-label", "Copied");
   expect(new URL(await page.evaluate(() => window.__sharedText)).searchParams.has("schema_source")).toBe(false);
 });

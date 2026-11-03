@@ -396,7 +396,7 @@ test("diagram heading follows the active diagnostic view", () => {
     ["showCollidersOnly", "Colliders"], ["showExogeneity", "Exogeneity"],
     ["showExclusionViolations", "Exclusion restriction"]]) {
     assert.equal(diagnosticViewTitle({ [flag]: true }, true), title);
-    assert.equal(diagnosticViewTitle({ [flag]: true }, false), "Working map");
+    assert.equal(diagnosticViewTitle({ [flag]: true }, false), "");
   }
   assert.equal(diagnosticViewTitle({}, true), "Confounders");
 });

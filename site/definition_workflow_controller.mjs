@@ -26,10 +26,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (!browseState.loading) return;
     try {
       const rows = await browsePublishedSplits(state.definitionDraft.source_group_ids);
-      if (revision !== browseRevision || state.definitionMethod !== "browse") return;
+      if (revision !== browseRevision || state.definitionDraft?.step !== "sources") return;
       browseState.rows = rows;
     } catch (error) {
-      if (revision !== browseRevision || state.definitionMethod !== "browse") return;
+      if (revision !== browseRevision || state.definitionDraft?.step !== "sources") return;
       browseState.error = `Could not browse splits: ${error.message || error}`;
     }
     browseState.loading = false;
@@ -53,18 +53,12 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       state.definitionMethod = "manual";
       await continueDefinition();
       if (state.definitionDraft !== draft) return;
-      if (draft.step !== "partition") {
-        state.definitionMethod = "browse";
-        throw new Error("Could not load the current source variables.");
-      }
+      if (draft.step !== "partition") throw new Error("Could not load the current source variables.");
+      // The published split supplies which concepts move; the name and
+      // definition stay the ones the user wrote in the first step.
       draft.new_variable_ids = [...new Set(ids.map(clusterRep))];
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
-      draft.new_label = row.name;
-      draft.new_description = row.description;
-      // A published split keeps its name and description; each leftover keeps
-      // its source category's name, so the split is used without a naming step.
       draft.published_split = { publication_id: row.publication_id, group_id: row.group_id };
-      draft.residual_labels = Object.fromEntries(sources.map(group => [group.group_id, group.label || group.group_id]));
       state.selectedVariableIds = new Set(draft.new_variable_ids);
       persistProjectLocally();
       invalidateMapCaches();
@@ -89,7 +83,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv", "instrument", "candidate"].includes(role)) return;
     jevAssist.clearPreview();
-    state.definitionMethod = null;
+    state.definitionMethod = "manual";
     browseRevision += 1;
     browseState.rows = [];
     browseState.error = "";
@@ -101,14 +95,14 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     sourceHydrations.clear();
     lastBatch = null;
     state.definitionDraft = {
-      role, step: "sources", source_group_ids: [], source_snapshot: [],
+      role, step: "describe", source_group_ids: [], source_snapshot: [],
       eligible_variable_ids: [], new_variable_ids: [], new_label: "", new_description: "",
-      residual_labels: {}, reviewed_variable_ids: [],
+      ai_description: "", residual_labels: {}, reviewed_variable_ids: [],
     };
     state.selectedVariableIds.clear();
     invalidateMapCaches();
     renderDraft();
-    els.definitionChooseManual.focus();
+    els.definitionNewLabel.focus();
     void renderSavedRuns();
   }
 
@@ -133,6 +127,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       reviewed_variable_ids: eligible,
       new_label: newGroup.label || "",
       new_description: newGroup.description || "",
+      ai_description: newGroup.description || "",
+      ai_description_source: newGroup.description || "",
       residual_labels: Object.fromEntries(residuals.map(group => [group.group_id, group.label || ""])),
       details_loading: true,
     };
@@ -178,7 +174,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   async function continueDefinition() {
     const draft = state.definitionDraft;
     const sources = definitionSources();
-    if (!draft || draft.details_loading || !state.definitionMethod || !sources.length) return;
+    if (!draft || draft.details_loading || !sources.length) return;
+    state.definitionMethod ||= "manual";
     lastBatch = null;
     const revision = ++hydrationRevision;
     draft.source_snapshot = sources.map(group => ({ group_id: group.group_id, label: group.label,
@@ -187,8 +184,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       group.variable_ids.map(clusterRep)))];
     draft.new_variable_ids = [];
     draft.reviewed_variable_ids = [];
+    // What stays behind keeps its variable's name unless the user renames it.
     draft.residual_labels = Object.fromEntries(sources.map(group =>
-      [group.group_id, `Other: ${group.label || group.group_id}`]));
+      [group.group_id, group.label || group.group_id]));
     draft.details_loading = true;
     state.selectedVariableIds.clear();
     presenter.setContinueLoading();
@@ -217,42 +215,43 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     return [...new Set(source.variable_ids.map(clusterRep))].filter(id => !carved.has(id));
   }
 
-  function toggleDefinitionVariable(variableId, add = null) {
-    const draft = state.definitionDraft;
-    if (!draft || draft.step !== "partition" || state.definitionMethod !== "manual") return;
-    const id = clusterRep(variableId);
-    if (!draft.eligible_variable_ids.includes(id)) return;
-    lastBatch = null;
-    const selected = new Set(draft.new_variable_ids);
-    const shouldAdd = add === null ? !selected.has(id) : add;
-    if (shouldAdd) selected.add(id); else selected.delete(id);
-    draft.new_variable_ids = [...selected];
-    draft.reviewed_variable_ids = [...new Set([...(draft.reviewed_variable_ids || []), id])];
-    state.selectedVariableIds = new Set(draft.new_variable_ids);
-    state.selectedVariableId = id;
-    invalidateMapCaches();
-    renderDraft({ redrawMap: true });
-  }
-
-  function batchMoveDefinitionVariables(ids, add) {
+  /**
+   * Classify concepts as included ("in"), excluded ("out") or back to
+   * unreviewed ("clear"). Every manual change goes through here, so the last
+   * one can always be undone.
+   */
+  function classifyDefinitionVariables(ids, side) {
     const draft = state.definitionDraft;
     if (!draft || draft.step !== "partition") return;
     const eligible = new Set(draft.eligible_variable_ids);
     const selected = new Set(draft.new_variable_ids);
     const reviewed = new Set(draft.reviewed_variable_ids || []);
-    const changed = [...new Set(ids)].filter(id => eligible.has(id)
-      && (selected.has(id) !== add || !reviewed.has(id)));
+    const wantSelected = side === "in";
+    const wantReviewed = side !== "clear";
+    const changed = [...new Set(ids.map(clusterRep))].filter(id => eligible.has(id)
+      && (selected.has(id) !== wantSelected || reviewed.has(id) !== wantReviewed));
     if (!changed.length) return;
     lastBatch = new Map(changed.map(id => [id, { selected: selected.has(id), reviewed: reviewed.has(id) }]));
     for (const id of changed) {
-      if (add) selected.add(id); else selected.delete(id);
-      reviewed.add(id);
+      if (wantSelected) selected.add(id); else selected.delete(id);
+      if (wantReviewed) reviewed.add(id); else reviewed.delete(id);
     }
     draft.new_variable_ids = [...selected];
     draft.reviewed_variable_ids = [...reviewed];
     state.selectedVariableIds = new Set(selected);
+    if (changed.length === 1) state.selectedVariableId = changed[0];
+    persistProjectLocally();
     invalidateMapCaches();
     renderDraft({ redrawMap: true });
+  }
+
+  // The map toggles one point at a time; `add` forces a side.
+  function toggleDefinitionVariable(variableId, add = null) {
+    const draft = state.definitionDraft;
+    if (!draft || draft.step !== "partition" || state.definitionMethod !== "manual") return;
+    const id = clusterRep(variableId);
+    const shouldAdd = add === null ? !draft.new_variable_ids.includes(id) : add;
+    classifyDefinitionVariables([id], shouldAdd ? "in" : "out");
   }
 
   function undoDefinitionBatch() {
@@ -268,6 +267,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.new_variable_ids = [...selected];
     draft.reviewed_variable_ids = [...reviewed];
     state.selectedVariableIds = new Set(selected);
+    persistProjectLocally();
     invalidateMapCaches();
     renderDraft({ redrawMap: true });
   }
@@ -308,7 +308,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     state.definitionDraft.source_group_ids = [...ids];
     persistProjectLocally();
     renderDefinition();
-    if (state.definitionMethod === "browse") void refreshBrowse();
+    void refreshBrowse();
     if (selected && !sourceHydrations.has(sourceId)) {
       const source = groupById(sourceId);
       if (source?.variable_ids?.length) {
@@ -324,6 +324,46 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (!state.definitionDraft) return;
     state.definitionDraft.residual_labels[groupId] = label;
     persistProjectLocally();
+  }
+
+  /** Why the name and definition cannot be used yet, or "" when they can. */
+  function describeError(draft = state.definitionDraft) {
+    const label = clean(draft?.new_label);
+    if (!label) return "Name the new variable.";
+    const description = clean(draft?.new_description);
+    if ([...description].length < 20) return "Write a definition of at least 20 characters.";
+    const own = draft.existing_new_group_id;
+    const taken = (state.project?.groups || []).some(group => group.group_id !== own
+      && clean(group.label).toLowerCase() === label.toLowerCase());
+    return taken ? `Another variable is already called “${label}”.` : "";
+  }
+
+  function goToStep(step) {
+    const draft = state.definitionDraft;
+    if (!draft) return;
+    if (draft.step === "describe" && step !== "describe") {
+      const error = describeError(draft);
+      if (error) { presenter.showDescribeError(error); return; }
+      draft.new_label = clean(draft.new_label);
+      draft.new_description = clean(draft.new_description);
+      // The AI sorts against the definition unless it was reworded for the AI.
+      if (!draft.ai_description || draft.ai_description === draft.ai_description_source) {
+        draft.ai_description = draft.new_description;
+        draft.ai_description_source = draft.new_description;
+      }
+    }
+    if (step === "sources" && draft.mode === "edit") step = "partition";
+    if (step === "partition" && draft.step === "describe" && draft.mode !== "edit") step = "sources";
+    if (step === "sources") {
+      state.selectedVariableIds.clear();
+      delete draft.published_split;
+    }
+    draft.step = step;
+    persistProjectLocally();
+    invalidateMapCaches();
+    renderDraft({ redrawMap: step === "partition" });
+    if (step === "sources") void refreshBrowse();
+    if (step === "describe") els.definitionNewLabel.focus();
   }
 
   function renderDefinition() {
@@ -342,10 +382,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (!draft) return;
     draft.new_label = clean(draft.new_label);
     draft.new_description = clean(draft.new_description || "");
-    if ([...draft.new_description].length < 20) {
-      showSaveError(new Error("Group definition must be at least 20 characters. Please add more detail."));
-      els.definitionNewDescription.setAttribute("aria-invalid", "true");
-      els.definitionNewDescription.focus();
+    const describeProblem = describeError(draft);
+    if (describeProblem) {
+      draft.step = "describe";
+      renderDraft();
+      presenter.showDescribeError(describeProblem);
       return;
     }
     draft.residual_labels = Object.fromEntries(Object.entries(draft.residual_labels)
@@ -380,13 +421,16 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       }
       // In Causes and Consequences a new variable becomes the focus; it is not
       // an anchor and has no group panel to open.
-      const forFocus = Boolean(onFocusDefined) && draft.role === "candidate" && draft.mode !== "edit"
+      // Started from the Custom variables page: go back to it, showing the new row.
+      const fromManager = Boolean(state.customVariablesOpen);
+      const forFocus = !fromManager && Boolean(onFocusDefined) && draft.role === "candidate" && draft.mode !== "edit"
         && (state.task === "causes" || state.task === "consequences");
+      if (fromManager) state.customVariablesHighlight = newGroupId;
       state.definitionDraft = null;
       state.selectedVariableIds.clear();
       state.activeGroupId = null;
       state.focusedGroupId = newGroupId;
-      if (draft.role === "candidate" && !forFocus) state.pendingVariablePanelGroupId = newGroupId;
+      if (draft.role === "candidate" && !forFocus && !fromManager) state.pendingVariablePanelGroupId = newGroupId;
       const initialAnchor = draft.mode !== "edit" && !state.changingAnchorSide;
       if (!forFocus) {
         state.phase = initialAnchor && draft.role === "iv" ? "select_dv"
@@ -414,77 +458,44 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     }
   }
 
-  // Validation messages live on the review step, which a published split skips.
   function showSaveError(error) {
-    const draft = state.definitionDraft;
-    if (draft && draft.step !== "review") { draft.step = "review"; renderDraft(); }
-    presenter.showValidationError(error);
+    presenter.showSaveError(error);
   }
 
   function installDefinitionHandlers() {
     jevAssist.install();
-    const chooseInitialMethod = method => {
-      if (state.definitionDraft?.step !== "sources") return;
-      browseRevision += 1;
-      state.definitionMethod = method;
-      renderDraft();
-      if (method === "browse") void refreshBrowse();
-      (method ? els.definitionSourceSearch : els.definitionChooseManual).focus();
-    };
-    els.definitionChooseJev.addEventListener("click", () => chooseInitialMethod("jev"));
-    els.definitionChooseManual.addEventListener("click", () => chooseInitialMethod("manual"));
-    els.definitionChooseBrowse.addEventListener("click", () => chooseInitialMethod("browse"));
-    els.definitionChangeMethod.addEventListener("click", () => chooseInitialMethod(null));
-    els.definitionAiChangeMethod.addEventListener("click", () => chooseInitialMethod(null));
     const chooseMethod = method => {
       if (state.definitionDraft?.step !== "partition" || state.definitionMethod === method) return;
       state.definitionMethod = method;
-      delete state.definitionDraft.published_split;
       if (state.map) state.map._groupRegions = null;
       renderDraft({ redrawMap: true });
     };
     els.definitionMethodJev.addEventListener("click", () => chooseMethod("jev"));
     els.definitionMethodManual.addEventListener("click", () => chooseMethod("manual"));
-    els.definitionCancel.addEventListener("click", cancelDefinition);
     els.definitionSourceSearch.addEventListener("input", renderDefinition);
     els.definitionContinue.addEventListener("click", continueDefinition);
-    els.definitionVariableSearch.addEventListener("input", renderDefinition);
-    els.definitionTermToNew.addEventListener("click", () => batchMoveDefinitionVariables(presenter.selectedTermIds(), true));
-    els.definitionTermToLeftover.addEventListener("click", () => batchMoveDefinitionVariables(presenter.selectedTermIds(), false));
-    els.definitionTermPrev.addEventListener("click", () => presenter.changeTermPage(-1));
-    els.definitionTermNext.addEventListener("click", () => presenter.changeTermPage(1));
+    els.definitionDescribeNext.addEventListener("click", () => goToStep("partition"));
+    els.definitionSourcesBack.addEventListener("click", () => goToStep("describe"));
+    presenter.install();
+    els.definitionTermToNew.addEventListener("click", () => classifyDefinitionVariables(presenter.selectedTermIds(), "in"));
+    els.definitionTermToLeftover.addEventListener("click", () => classifyDefinitionVariables(presenter.selectedTermIds(), "out"));
     els.definitionUndoBatch.addEventListener("click", undoDefinitionBatch);
-    els.definitionAddNeighbors.addEventListener("click", () => {
-      const selected = new Set(state.definitionDraft?.new_variable_ids || []);
-      const added = definitionNeighbors().slice(0, 8).map(neighbor => neighbor.variable_id);
-      for (const id of added) selected.add(id);
-      state.definitionDraft.new_variable_ids = [...selected];
-      state.definitionDraft.reviewed_variable_ids = [...new Set([
-        ...(state.definitionDraft.reviewed_variable_ids || []), ...added,
-      ])];
-      state.selectedVariableIds = new Set(selected);
-      invalidateMapCaches();
-      renderDraft({ redrawMap: true });
-    });
-    els.definitionBack.addEventListener("click", () => {
-      state.definitionDraft.step = "sources"; state.selectedVariableIds.clear();
-      delete state.definitionDraft.published_split;
-      invalidateMapCaches(); renderDraft();
-    });
-    els.definitionReview.addEventListener("click", () => {
-      if (!definitionCanReview()) return;
-      if (state.definitionDraft.published_split) { void saveDefinition(); return; }
-      state.definitionDraft.step = "review"; renderDraft();
-    });
-    els.definitionReviewBack.addEventListener("click", () => {
-      state.definitionDraft.new_label = clean(els.definitionNewLabel.value);
-      state.definitionDraft.new_description = clean(els.definitionNewDescription.value);
-      state.definitionDraft.step = "partition"; renderDraft({ redrawMap: true });
-    });
+    els.definitionAddNeighbors.addEventListener("click", () =>
+      classifyDefinitionVariables(definitionNeighbors().slice(0, 8).map(neighbor => neighbor.variable_id), "in"));
+    els.definitionBack.addEventListener("click", () =>
+      goToStep(state.definitionDraft?.mode === "edit" ? "describe" : "sources"));
     els.definitionNewLabel.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_label = els.definitionNewLabel.value;
+      presenter.clearDescriptionValidation();
       persistProjectLocally();
     });
+    const nextOnEnter = event => {
+      if (event.key === "Enter" && !event.shiftKey && state.definitionDraft?.step === "describe") {
+        event.preventDefault();
+        goToStep("partition");
+      }
+    };
+    els.definitionNewLabel.addEventListener("keydown", nextOnEnter);
     els.definitionNewDescription.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_description = els.definitionNewDescription.value;
       presenter.clearDescriptionValidation();
@@ -534,7 +545,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     let saved = [];
     try { saved = await jevAssist.listSavedRuns(); }
     catch (error) { console.warn("Could not read saved Jev runs.", error); }
-    if (state.definitionDraft !== draft || draft?.step !== "sources") return;
+    if (state.definitionDraft !== draft || draft?.step !== "describe") return;
     // Group memberships may still be loading, which would look like a change.
     const loading = state.publishedSchemaHydrating;
     presenter.showSavedRuns(saved
@@ -570,7 +581,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     definitionResidualIds, definitionCanReview, searchVariables, searchSourceGroups, visibleVariables,
     clusterDisplayVariable, definitionNeighbors,
     resizeMap, fitMap, onSourceSelection: setSourceSelection,
-    onToggleVariable: toggleDefinitionVariable, onResidualLabel: setResidualLabel,
+    onClassify: (id, side) => classifyDefinitionVariables([id], side), onResidualLabel: setResidualLabel,
+    onCancel: cancelDefinition,
     canUndoBatch: () => Boolean(lastBatch),
     browseState, onChoosePublishedSplit: choosePublishedSplit,
   });
@@ -587,18 +599,18 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       if (state.map) state.map._groupRegions = null;
       drawMap();
     },
-    onApply: (ids, description) => {
+    onApply: ids => {
       const draft = state.definitionDraft;
       if (!draft || draft.step !== "partition") return;
       state.definitionMethod = "manual";
-      lastBatch = null;
+      // Replacing every choice is one change, so Undo restores what was there.
+      const before = new Set(draft.new_variable_ids);
+      const beforeReviewed = new Set(draft.reviewed_variable_ids || []);
+      lastBatch = new Map(draft.eligible_variable_ids.map(id => [id, { selected: before.has(id), reviewed: beforeReviewed.has(id) }]));
       draft.new_variable_ids = ids;
-      draft.new_description = description;
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
       state.selectedVariableIds = new Set(ids);
-      // Skip the manual draft; it can still be reached with Back. A split with
-      // no leftover in some source cannot be reviewed, so stay to fix that.
-      if (definitionCanReview()) draft.step = "review";
+      // The suggestions land in the manual list, where they can be checked and saved.
       invalidateMapCaches();
       persistProjectLocally();
       renderDraft({ redrawMap: true });
@@ -606,7 +618,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   });
 
   return { startDefinition, startEditSplit, cancelDefinition, definitionSources, continueDefinition,
-    definitionResidualIds, toggleDefinitionVariable,
+    definitionResidualIds, toggleDefinitionVariable, classifyDefinitionVariables,
     definitionCanReview, definitionNeighbors, renderDefinition, saveDefinition, installDefinitionHandlers,
     resumeAfterOAuth };
 }

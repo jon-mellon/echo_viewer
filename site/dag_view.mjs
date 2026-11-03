@@ -24,6 +24,40 @@ export function presentPaperIds(rawLinkIds, edgeSupportById, rawLinksById = edge
   return papers;
 }
 
+/**
+ * Papers behind one direction of a link. The aggregated DAG already carries
+ * them per direction (distinct papers among its paper/table keys), so nothing
+ * is counted. An edge that a local edit touched carries no keys, because they
+ * cannot be kept in step with its findings; those are counted exactly from
+ * per-finding support records, when given.
+ */
+export function directionalPaperCounter(edgeSupportById = null, rawLinksById = edgeSupportById) {
+  return (link, forward) => {
+    const keys = forward ? link.a_to_b_paper_table_keys : link.b_to_a_paper_table_keys;
+    if (Array.isArray(keys)) return new Set(keys.map(key => String(key).split("::")[0])).size;
+    if (!edgeSupportById) return 0;
+    return presentPaperIds(forward ? link.a_to_b_raw_link_ids : link.b_to_a_raw_link_ids,
+      edgeSupportById, rawLinksById).size;
+  };
+}
+
+const forwardDirections = new Set(["A_TO_B", "BIDIRECTIONAL"]);
+const backwardDirections = new Set(["B_TO_A", "BIDIRECTIONAL"]);
+
+/**
+ * The link with only the directions that at least `minimum` papers support, or
+ * null when neither does. Each direction is judged on its own evidence, as
+ * Explore and the Papers column count it: findings for b → a do not support a → b.
+ */
+function sparseFiltered(link, minimum, papersFor) {
+  const forward = forwardDirections.has(link.direction_type) && papersFor(link, true) >= minimum;
+  const backward = backwardDirections.has(link.direction_type) && papersFor(link, false) >= minimum;
+  if (forward && backward) return link;
+  if (forward) return link.direction_type === "A_TO_B" ? link : { ...link, direction_type: "A_TO_B" };
+  if (backward) return link.direction_type === "B_TO_A" ? link : { ...link, direction_type: "B_TO_A" };
+  return null;
+}
+
 export function excludedForConnectivity(link) {
   return link.display_status === "excluded" && !link.is_target_relation;
 }
@@ -54,9 +88,9 @@ export function deriveDagView({
   hideIrrelevantDiagnosticLinks = false,
   showAllExclusionLinks = false,
 } = {}) {
-  const retainedLinks = excludeSparseEdges ? links.filter(link => presentPaperIds(
-    [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])], edgeSupportById, rawLinksById,
-  ).size >= minimumEdgePapers) : links;
+  const papersFor = excludeSparseEdges && directionalPaperCounter(edgeSupportById, rawLinksById);
+  const retainedLinks = excludeSparseEdges
+    ? links.map(link => sparseFiltered(link, minimumEdgePapers, papersFor)).filter(Boolean) : links;
   const fullGraph = createGraph(groups.map((group) => group.group_id), retainedLinks);
   const traversableLink = (link) => !excludedForConnectivity(link);
   const diagnosticOptions = {

@@ -69,15 +69,19 @@ try {
         nodes: window.__dagBuilderState.componentGroupIds.size, edges: window.__dagBuilderState.visibleLinks.length }), { name, start }));
     }
     await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
-    await page.locator('#definitionChooseManual').click();
+    await page.locator('#definitionNewLabel').fill('Profile variable');
+    await page.locator('#definitionNewDescription').fill('A variable made while profiling the viewer.');
+    await page.locator('#definitionDescribeNext').click();
     await measure('cold definition source', async () => {
       await page.locator('#definitionSourceList input[data-source-id]').first().check();
       await page.locator('#definitionContinue').click();
-      if (mobile) await page.locator('button[data-mobile-panel="variables"]').click();
-      await page.locator('#dagZoomIn').waitFor({ state: 'visible' });
+      if (mobile) {
+        await page.locator('button[data-mobile-panel="variables"]').click();
+        await page.locator('#dagZoomIn').waitFor({ state: 'visible' });
+      } else await page.locator('#definitionPartitionStep').waitFor({ state: 'visible' });
     });
     if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
-    await page.locator('#definitionCancel').click();
+    await page.locator('.definition-cancel:visible').first().click();
     const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(g => g.variable_ids.length).slice(0, 2).map(g => g.group_id));
     await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
     await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();

@@ -33,6 +33,7 @@ test("resizing the DAG refits a fully visible graph and preserves a cropped view
   globalThis.document = {
     querySelector: selector => selector === ".dag-shell" ? shell : null,
     querySelectorAll: () => [],
+    getElementById: () => null,
     addEventListener: (name, handler) => documentHandlers.set(name, handler),
     removeEventListener: name => documentHandlers.delete(name),
   };

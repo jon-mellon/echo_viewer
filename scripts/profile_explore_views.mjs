@@ -81,8 +81,8 @@ try {
       if (!timing.rows) throw new Error(`No results after ${name}: ${timing.summary}`);
       // The graph draws exactly the links behind the list, so a stale or empty graph fails here.
       if (table) {
-        const shown = await page.evaluate(() => ({ links: document.querySelectorAll('#dagPathsTable tbody tr').length,
-          total: Number(/\((\d+)\)/.exec(document.querySelector('#dagPathsTable caption')?.textContent || '')?.[1]),
+        const shown = await page.evaluate(() => ({ links: document.querySelectorAll('#dagPathsTable tbody tr:not(.dag-table-section)').length,
+          total: Number(document.querySelector('#dagPathsTable')?.dataset.pathCount),
           graphHidden: document.getElementById('dagNetwork').hidden }));
         if (!shown.graphHidden) throw new Error(`The graph is still shown after ${name}`);
         if (shown.links !== Math.min(shown.total, 200) || shown.total !== timing.rows) throw new Error(`Table shows ${shown.links} of ${shown.total} links for ${timing.rows} listed variables after ${name}`);
@@ -105,45 +105,59 @@ try {
       .catch(() => console.log('search catalog not ready before the interactions were timed'));
     await page.waitForTimeout(500);
     // On a phone the list and the graph (with its Filters) are separate tabs.
-    // The Filters dropdown closes on an outside click, so reopen it before steps that need its controls.
+    // Distance and minimum papers live in the variable list's funnel menu, which closes on an outside click;
+    // reopen it (on the list's own tab on a phone) before steps that need its controls.
+    const navToggle = () => page.locator('#navToggle');
+    const openNav = async () => { if ((await navToggle().isVisible()) && (await navToggle().getAttribute('aria-expanded')) !== 'true') await navToggle().click(); };
+    const closeNav = async () => { if ((await navToggle().isVisible()) && (await navToggle().getAttribute('aria-expanded')) === 'true') await navToggle().click(); };
     const openFilters = async () => {
-      const dropdown = page.locator('.filter-dropdown');
+      await closeNav();
+      if (mobile) await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').click();
+      const dropdown = page.locator('.list-filter');
       if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator('summary').click();
     };
     const showPanel = async panel => { if (mobile) await page.locator(`.mobile-panel-nav [data-mobile-panel="${panel}"]`).click(); };
-    await showPanel('dag');
-    await page.locator('.filter-dropdown > summary').click();
+    await openFilters();
     for (const depth of [2, 3, 4, 1]) {
-      await measure(`distance ${depth}`, () => page.locator('#confounderPathLength').fill(String(depth)));
+      await openFilters();
+      await measure(`distance ${depth}`, () => page.locator('.list-filter-distance').fill(String(depth)));
     }
-    await measure('min papers 5', () => page.locator('#minimumEdgePapers').fill('5'));
+    await openFilters();
+    await measure('min papers 5', () => page.locator('.list-filter-papers').fill('5'));
     await showPanel('controls');
     await measure('open evidence for a variable (cold)', () => page.locator('.explore-row-open').first().click(),
       { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude finding "]' });
     await measure('close evidence', () => page.locator('#closeEvidencePane').click());
-    await showPanel('controls');
+    // Flipping to Consequences keeps the variable and the list settings, so there is no second pick.
+    await openNav();
     await measure('switch to consequences', async () => {
-      await page.locator('#taskBar .task-tab[data-task=consequences]').click();
-      await page.locator('#focusGroupPicker button[data-group-id="category-income-earnings"]').click();
+      await page.locator('#exploreDirection button[data-direction=consequences]').click();
+      await page.waitForFunction(() => window.__dagBuilderState.task === 'consequences' && document.querySelector('.explore-row'));
     });
-    await showPanel('dag');
+    await closeNav();
     await openFilters();
-    await measure('consequences distance 4', () => page.locator('#confounderPathLength').fill('4'));
+    await measure('consequences distance 4', () => page.locator('.list-filter-distance').fill('4'));
     await showPanel('controls');
     // The table shows the same links without laying out a graph, so it is held to the same budgets.
     await showPanel('dag');
+    await openNav();
     await measure('switch to table', () => page.locator('#dagViewTable').click(), { table: true });
+    await closeNav();
     await openFilters();
-    await measure('table distance 4', () => page.locator('#confounderPathLength').fill('4'), { table: true });
-    await measure('table min papers 5', () => page.locator('#minimumEdgePapers').fill('5'), { table: true });
+    await measure('table distance 4', () => page.locator('.list-filter-distance').fill('4'), { table: true });
+    await openFilters();
+    await measure('table min papers 5', () => page.locator('.list-filter-papers').fill('5'), { table: true });
+    await showPanel('dag');
     await measure('table sort by papers', () => page.locator('#dagPathsTable thead button').last().click(), { table: true });
-    await measure('open evidence from the table (cold)', () => page.locator('#dagPathsTable .dag-table-arrow').first().click(),
+    await measure('open evidence from the table (cold)', () => page.locator('#dagPathsTable .dag-table-link').first().click(),
       { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude finding "]', table: true });
     await measure('close evidence in the table', () => page.locator('#closeEvidencePane').click(), { table: true });
+    await openNav();
     await measure('switch back to graph', () => page.locator('#dagViewGraph').click());
+    await closeNav();
     await showPanel('controls');
     await measure('change the variable', async () => {
-      await page.locator('#changeIv').click();
+      await page.locator('#focusInput').click();
       await page.locator('#focusGroupPicker button[data-group-id="category-age"]').click();
     });
     if (errors.length) throw new Error(errors.join('; '));

@@ -1,4 +1,5 @@
 const { test, expect } = require("./fixtures.cjs");
+const { chooseAnchors } = require("./support/identify.cjs");
 const { EventEmitter } = require("node:events");
 const { watchBrowserErrors } = require("./browser_errors.cjs");
 
@@ -71,10 +72,8 @@ test("browser-v2 supports group detail, auto layout, fullscreen and project expo
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   expect(anchors).toHaveLength(2);
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await expect(page.locator('#dvGroupPicker button[data-group-id]').first()).toBeVisible();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.getByText('Variable schema', { exact: true }).click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  await page.locator('#groupingPanel summary').click();
   await expect.poll(async () => page.getByRole('link', { name: 'Open public version' }).getAttribute('href'))
     .toContain(`iv=${anchors[0]}`);
   const publicView = await page.getByRole('link', { name: 'Open public version' }).getAttribute('href');
