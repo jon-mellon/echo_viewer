@@ -92,7 +92,7 @@ test("tall panels load a bounded larger page and reuse cached labels", async () 
     const state = { project: { groups: [{ group_id: "g1", variable_ids: ids }] },
       selectedEvidenceGroupId: "g1", variableById: new Map() };
     const edgeInspector = new Element("div");
-    edgeInspector.parentElement = { clientHeight: 2000 };
+    edgeInspector.parentElement = { clientHeight: 2000, closest: () => null };
     const elements = { edgeInspector, closeEvidencePane: new Element("button"), provenancePanel: new Element("div") };
     const requests = [];
     const controller = createDagInspectorController({ state, elements, loadConceptLabels: async requested => {
@@ -267,7 +267,7 @@ test("concept exclude control passes the selected concept to the group update pa
       excludeConcept: (...args) => exclusions.push(args),
     }).renderGroupDefinition();
     const button = elements.edgeInspector.querySelector("[data-exclude-concept-id]");
-    assert.equal(button.textContent, "Exclude");
+    assert.equal(button.textContent, "×");
     button.click();
     assert.deepEqual(exclusions, [["g1", "v1", "Concept one"]]);
   } finally {

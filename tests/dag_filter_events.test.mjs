@@ -15,7 +15,7 @@ test('diagnostic controls update the view without rebuilding or saving the proje
   }
   const state = createDagAppState(); state.map.canvas = element('canvas');
   const calls = [];
-  globalThis.document = { addEventListener() {}, getElementById() { return null; } };
+  globalThis.document = { addEventListener() {}, getElementById() { return null; }, querySelectorAll() { return []; } };
   globalThis.window = { addEventListener() {} };
   try {
     createDagEventController({ state,
