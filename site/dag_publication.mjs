@@ -270,24 +270,40 @@ export function createPublicationController({
     }
   }
 
-  async function publicPermalink() {
-    const published = getPublicationState();
-    if (!published?.publication_id || !published?.content_hash) {
-      showStatus(elements.status, "This schema is still private. Choose Publish changes… in the Schema menu to create a public permalink.", true);
-      elements.publish.focus();
-      return null;
+  // Warn that the public version lacks the current view and offer to publish it first.
+  function confirmPublishBeforeShare(neverPublished) {
+    const dialog = elements.shareWarning;
+    const detail = neverPublished
+      ? "This schema is unpublished, so there is no public link to share yet."
+      : "This schema has unpublished changes, so a shared link would not show your latest edits.";
+    if (!dialog?.showModal) {
+      return Promise.resolve(windowApi.confirm(`${detail}\n\nPublish it now?`));
     }
+    const message = dialog.querySelector("[data-share-warning-message]");
+    if (message) message.textContent = detail;
+    return new Promise(resolve => {
+      dialog.addEventListener("close", () => resolve(dialog.returnValue === "publish"), { once: true });
+      dialog.returnValue = "cancel";
+      dialog.showModal();
+    });
+  }
+
+  async function publicPermalink() {
+    let published = getPublicationState();
+    const neverPublished = !published?.publication_id || !published?.content_hash;
     try {
-      const canonical = await currentCanonical();
-      const permalink = stablePermalink(published);
-      const hasLocalChanges = canonical.contentHash !== published.content_hash;
-      renderPublicationState(published, hasLocalChanges);
-      if (hasLocalChanges) {
-        showStatus(elements.status, "This schema has unpublished changes. Publish them before creating a permalink.", true);
-        elements.publish.focus();
-        return null;
+      let hasLocalChanges = neverPublished;
+      if (!neverPublished) {
+        const canonical = await currentCanonical();
+        hasLocalChanges = canonical.contentHash !== published.content_hash;
+        renderPublicationState(published, hasLocalChanges);
       }
-      return { permalink, hasLocalChanges: false };
+      if (hasLocalChanges) {
+        if (!await confirmPublishBeforeShare(neverPublished)) return null;
+        published = await publish();
+        if (!published?.publication_id) return null;
+      }
+      return { permalink: stablePermalink(published), hasLocalChanges: false };
     } catch (error) {
       const message = `Could not create a public permalink: ${formatSupabaseError(error)}`;
       showStatus(elements.status, message, true);
