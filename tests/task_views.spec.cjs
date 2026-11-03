@@ -1,4 +1,5 @@
 const { test, expect } = require("./fixtures.cjs");
+const { chooseTask, chooseDirection, chooseFocus } = require("./support/navigation.cjs");
 
 const viewer = "http://127.0.0.1:8767/";
 
@@ -18,23 +19,23 @@ const renderedEdges = page => page.evaluate(async () => {
 
 test("tabs start unconfigured views at setup and reopen configured views", async ({ page }) => {
   await open(page);
-  await page.locator("#taskBar .task-tab[data-task=causes]").click();
-  await expect(page.locator("#focusSearchBlock")).toBeVisible();
-  await pick(page, "category-sleep").click();
-  await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
-
-  await page.locator("#changeDv").click();
-  await page.locator("#focusInput").fill("sleep");
-  await page.locator("#taskBar .task-tab[data-task=consequences]").click();
+  await chooseTask(page, "causes");
   await expect(page.locator("#focusSearchBlock")).toBeVisible();
   await expect(page.locator("#focusInput")).toHaveValue("");
-  await expect(pick(page, "category-income-earnings")).toBeVisible();
+  await pick(page, "category-sleep").click();
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
+
+  // Flipping the direction keeps the variable; the results follow it.
+  await chooseDirection(page, "consequences");
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
+  await expect(page.locator("#exploreResultsBlock")).toBeVisible();
   await page.evaluate(() => { window.__dagBuilderState.workflowMode = "group_review"; });
-  await page.locator("#taskBar .task-tab[data-task=identify]").click();
+  await chooseTask(page, "identify");
   await expect(page.locator("#setupSection")).toBeVisible();
   expect(await page.evaluate(() => window.__dagBuilderState.workflowMode)).toBe("setup");
-  await page.locator("#taskBar .task-tab[data-task=causes]").click();
-  await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
+  // Exploration reopens in the direction it was last in, with its variable.
+  await chooseTask(page, "causes");
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
   await expect(page.locator("#exploreResultsBlock")).toBeVisible();
 });
 
@@ -42,23 +43,21 @@ test("the start page leads to causes and consequences views that behave like Ide
   await open(page);
   await expect(page.locator("#taskLanding")).toBeVisible();
   await expect(page.locator("#taskLanding h1")).toHaveText("What do you want to do?");
-  await expect(page.locator("#taskLanding .task-choice")).toHaveCount(3);
+  await expect(page.locator("#taskLanding .task-choice")).toHaveCount(2);
   await expect(page.locator("#taskReset")).toBeHidden();
   expect(page.url()).toBe(viewer);
 
   // The same picker as Identify, offering the one anchor.
-  await page.locator("#taskLanding .task-choice[data-task=causes]").click();
+  await chooseTask(page, "causes");
   await expect(page.locator("#exploreView")).toBeVisible();
   await expect(page.locator("#focusInput")).toHaveAttribute("placeholder", "Search group or constituent variable");
-  await expect(pick(page, "category-sleep")).toHaveText("Use as Dep var");
+  await expect(pick(page, "category-sleep")).toContainText("sleep");
   await expect(page.locator("#dagNetwork")).toBeVisible();
   await pick(page, "category-sleep").click();
 
-  // The same anchor bar, with a single row.
-  await expect(page.locator("#anchorBar")).toBeVisible();
-  await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
-  await expect(page.locator("#anchorDvLabel").locator("xpath=ancestor::div[contains(@class,'anchor-row')]")).toBeVisible();
-  await expect(page.locator("#anchorIvLabel").locator("xpath=ancestor::div[contains(@class,'anchor-row')]")).toBeHidden();
+  // The chosen variable stays in the Primary variable field; the old anchor bar is not shown.
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
+  await expect(page.locator("#anchorBar")).toBeHidden();
   // The list stands on its own: no summary sentence, hint line or per-row extra action.
   await expect(page.locator("#exploreSummary")).toBeHidden();
   await expect(page.locator("#exploreHint")).toHaveCount(0);
@@ -69,7 +68,7 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(page.locator('.explore-row[data-distance="2"]')).toHaveCount(0);
   // The graph draws exactly the links in the list.
   expect(await renderedEdges(page)).toBe(direct);
-  await expect(page.locator("#dagViewTitle")).toHaveText("Causes of sleep");
+  await expect(page.locator("#exploreDirection button[data-direction=causes]")).toHaveAttribute("aria-pressed", "true");
 
   // Clicking a row shows the evidence for its link, as clicking that link would.
   const row = page.locator('.explore-row[data-distance="1"]').first();
@@ -81,10 +80,12 @@ test("the start page leads to causes and consequences views that behave like Ide
   expect(await page.evaluate(() => window.__dagBuilderState.selectedEdgeId)).toBe(edgeId);
   await expect.poll(() => new URL(page.url()).searchParams.get("selected_edge")).toBe(edgeId);
   await expect(row.locator(".explore-row-open")).toHaveAttribute("aria-pressed", "true");
-  // Evidence takes over the left panel and Close brings the list back.
-  await expect(page.locator("#exploreView")).toBeHidden();
-  await page.locator("#closeEvidencePane").click();
+  // Evidence replaces the map, the list stays, and Back to map restores the graph.
   await expect(page.locator("#exploreView")).toBeVisible();
+  await expect(page.locator("#dagNetwork")).toBeHidden();
+  await expect(page.locator("#closeEvidencePane")).toHaveText("Back to map");
+  await page.locator("#closeEvidencePane").click();
+  await expect(page.locator("#dagNetwork")).toBeVisible();
   await expect(page.locator("#provenancePanel")).toBeHidden();
 
   // Distance and minimum papers live in the list's funnel menu; the graph header has no Filters menu.
@@ -100,48 +101,43 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect.poll(() => new URL(page.url()).searchParams.get("causes_min_papers")).toBe("10");
   await expect.poll(() => new URL(page.url()).searchParams.get("causes_depth")).toBe("2");
 
-  // Consequences keeps a separate variable and settings; Identify is untouched underneath.
-  await page.locator("#taskBar .task-tab[data-task=consequences]").click();
-  await expect(page.locator("#focusSearchBlock")).toBeVisible();
-  await expect(pick(page, "category-income-earnings")).toHaveText("Use as Ind var");
-  await pick(page, "category-income-earnings").click();
-  await expect(page.locator("#anchorIvLabel")).toHaveText("income/earnings");
+  // Flipping to Consequences keeps the variable and the list settings; Identify is untouched underneath.
+  await chooseDirection(page, "consequences");
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
   await expect(page.locator(".explore-row").first()).toBeVisible();
   await expect(page.locator("#exploreSummary")).toBeHidden();
-  await expect(page.locator("#confounderPathLength")).toHaveValue("1");
-  await page.locator("#taskBar .task-tab[data-task=identify]").click();
+  await expect(page.locator(".list-filter-distance")).toHaveValue("2");
+  await chooseTask(page, "identify");
   await expect(page.locator("#exploreView")).toBeHidden();
   await expect(page.locator("#setupSection")).toBeVisible();
   await expect(page.locator("#confounderPathLength")).toHaveValue("1");
-  await page.locator("#taskBar .task-tab[data-task=causes]").click();
-  await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
+  await chooseTask(page, "causes");
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
   await expect(page.locator("#confounderPathLength")).toHaveValue("2");
   await expect(page.locator("#minimumEdgePapers")).toHaveValue("10");
 
-  // Change reopens the picker with the current variable kept until another is chosen.
-  await page.locator("#changeDv").click();
-  await expect(page.locator("#focusSearchBlock")).toBeVisible();
-  await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
+  // Clicking the field reopens the picker; Cancel keeps the current variable.
+  await page.locator("#focusInput").click();
+  await expect(page.locator("#focusGroupPicker")).toBeVisible();
+  await expect(page.locator("#focusPickerCancel")).toBeVisible();
   await page.locator("#focusPickerCancel").click();
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
   await expect(page.locator("#exploreResultsBlock")).toBeVisible();
 
-  // Choosing a different variable is done the usual way: Change, then the picker.
+  // Choosing a different variable is done the same way.
   const target = "category-age";
-  await page.locator("#changeDv").click();
+  await page.locator("#focusInput").click();
   await pick(page, target).click();
-  await expect(page.locator("#anchorDvLabel")).toHaveText("age");
+  await expect(page.locator("#focusInput")).toHaveValue("age");
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.explore.causes.focusId)).toBe(target);
 
   // The address carries the new variable before we reload, or the reload would restore the old one.
   await expect.poll(() => new URL(page.url()).searchParams.get("causes_of")).toBe(target);
-  await expect.poll(() => new URL(page.url()).searchParams.get("effects_of")).toBe("category-income-earnings");
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("#exploreView")).toBeVisible();
   await expect(page.locator("#confounderPathLength")).toHaveValue("2");
   await expect(page.locator("#minimumEdgePapers")).toHaveValue("10");
   expect(await page.evaluate(() => window.__dagBuilderState.explore.causes.focusId)).toBe(target);
-  await page.locator("#taskBar .task-tab[data-task=consequences]").click();
-  await expect(page.locator("#anchorIvLabel")).toHaveText("income/earnings");
 });
 
 test("the graph puts the chosen variable in the middle with its causes and consequences around it", async ({ page }) => {
@@ -181,10 +177,10 @@ test("each task keeps the evidence that was open in it", async ({ page }) => {
   const edgeId = await row.getAttribute("data-edge-id");
   await row.locator(".explore-row-open").click();
   await expect(page.locator("#closeEvidencePane")).toBeVisible();
-  await page.locator("#taskBar .task-tab[data-task=identify]").click();
+  await chooseTask(page, "identify");
   await expect(page.locator("#closeEvidencePane")).toBeHidden();
   expect(await page.evaluate(() => window.__dagBuilderState.selectedEdgeId)).toBeNull();
-  await page.locator("#taskBar .task-tab[data-task=causes]").click();
+  await chooseTask(page, "causes");
   await expect(page.locator("#closeEvidencePane")).toBeVisible();
   expect(await page.evaluate(() => window.__dagBuilderState.selectedEdgeId)).toBe(edgeId);
 });
@@ -193,7 +189,7 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await open(page, `${viewer}?task=causes`);
   await expect(page.locator("#exploreView")).toBeVisible();
   await pick(page, "category-sleep").click();
-  await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
 
   await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
@@ -203,7 +199,7 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
     "Continue working on this project", "Open new project in a new tab", "Reset in current tab"]);
   await dialog.getByRole("button", { name: "Continue working on this project" }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
 
   await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
@@ -213,7 +209,7 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   const fresh = new URL(tab.url());
   expect([...fresh.searchParams.keys()].filter(key => !["schema", "data_version"].includes(key))).toEqual([]);
   await expect(dialog).toBeHidden();
-  await expect(page.locator("#anchorDvLabel")).toHaveText("sleep");
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
   await tab.close();
 
   await page.locator("#historyToggle").click();
@@ -223,7 +219,7 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
     && document.getElementById("startupLoading")?.hidden);
   await expect(page.locator("#taskLanding")).toBeVisible();
   expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
-  await page.locator("#taskLanding .task-choice[data-task=causes]").click();
+  await chooseTask(page, "causes");
   await expect(page.locator("#focusSearchBlock")).toBeVisible();
 });
 
@@ -260,7 +256,7 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
     await pick(page, "category-sleep").tap();
     await expect(page.locator(".explore-row").first()).toBeVisible();
     const sizes = await page.evaluate(() => ({ page: document.documentElement.scrollWidth,
-      tabs: document.querySelector(".task-tabs").scrollWidth - document.querySelector(".task-tabs").clientWidth }));
+      tabs: document.getElementById("taskBar").scrollWidth - document.getElementById("taskBar").clientWidth }));
     expect(sizes.page).toBeLessThanOrEqual(375);
     expect(sizes.tabs).toBe(0);
     await expect(page.locator(".mobile-panel-nav .mobile-panel-tab:visible")).toHaveText(["Variables view", "Map view"]);
@@ -269,7 +265,7 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
     await expect(page.locator("#provenancePanel")).toBeVisible();
     await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').tap();
     await expect(page.locator(".explore-row").first()).toBeVisible();
-    await page.locator("#taskBar .task-tab[data-task=identify]").tap();
+    await chooseTask(page, "identify", { tap: true });
     await expect(page.locator("#setupSection")).toBeVisible();
     // Identify gets its own tab names back.
     await expect(page.locator('.mobile-panel-nav [data-mobile-panel="controls"]')).toHaveText("Setup view");
@@ -279,7 +275,7 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
   }
 });
 
-test("mobile task tabs open setup when their view has no chosen variable", async ({ browser }) => {
+test("on a phone Exploration opens its picker first, keeps its variable when flipped, and Identify returns to setup", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
@@ -289,19 +285,14 @@ test("mobile task tabs open setup when their view has no chosen variable", async
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
     await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
 
-    await page.locator("#taskBar .task-tab[data-task=consequences]").tap();
-    await expect(page.locator("#focusSearchBlock")).toBeVisible();
-    await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
-    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
-    await page.locator("#taskBar .task-tab[data-task=consequences]").tap();
-    await expect(page.locator("#focusSearchBlock")).toBeVisible();
-    await pick(page, "category-age").tap();
-    await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
-    await page.locator("#taskBar .task-tab[data-task=causes]").tap();
+    // Flipping the direction keeps the variable, so the map stays in view.
+    await chooseDirection(page, "consequences", { tap: true });
     await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "dag");
     await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
+    await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').tap();
+    await expect(page.locator("#focusInput")).toHaveValue("sleep");
 
-    await page.locator("#taskBar .task-tab[data-task=identify]").tap();
+    await chooseTask(page, "identify", { tap: true });
     await expect(page.locator("#setupSection")).toBeVisible();
     await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
   } finally {
@@ -333,7 +324,7 @@ test("mobile home stays on one document while evidence warms in the background",
     expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
     await expect(page.locator("#startupLoading")).toBeHidden();
     await expect(page.locator("#taskLanding")).toBeVisible();
-    await page.locator("#taskLanding .task-choice[data-task=causes]").tap();
+    await chooseTask(page, "causes", { tap: true });
     await expect(page.locator("#exploreView")).toBeVisible();
   } finally {
     await context.close();
@@ -346,7 +337,7 @@ test("paper counts come from the DAG: results are immediate and no findings are 
     if (/\/causal_link_occurrences\.parquet/.test(request.url())) findings.push(request.url());
   });
   await open(page);
-  await page.locator("#taskLanding .task-choice[data-task=causes]").click();
+  await chooseTask(page, "causes");
   await pick(page, "category-sleep").click();
   // No waiting on anything: the numbers are already on the links.
   await expect(page.locator(".explore-row").first()).toBeVisible({ timeout: 1500 });
@@ -500,8 +491,8 @@ test("the graph is the default view everywhere, whatever was chosen before", asy
   await shownGraph(page);
   // Switching between tasks keeps the chosen view, and Reset in the current tab returns to the graph.
   await page.locator("#dagViewTable").click();
-  await page.locator("#taskBar .task-tab[data-task=consequences]").click();
-  await pick(page, "category-income-earnings").click();
+  await chooseTask(page, "consequences");
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
   await expect(page.locator("#dagTable")).toBeVisible();
   await expect(page.locator("#dagPathsTable tbody tr").first()).toBeVisible();
 });
@@ -651,8 +642,8 @@ test("in Identify each row is a confounder path with an arrow per link that open
   await expect(page.locator("#diagnosticOverlapKey")).toBeVisible();
   // The study arrow must not carry over when the same schema is explored from one focal variable.
   for (const [task, focus] of [["causes", "category-sleep"], ["consequences", "category-income-earnings"]]) {
-    await page.locator(`#taskBar .task-tab[data-task=${task}]`).click();
-    await pick(page, focus).click();
+    await chooseTask(page, task);
+    await chooseFocus(page, focus);
     await page.locator("#dagViewGraph").click();
     expect(await renderedEdges(page)).toBeGreaterThan(0);
     const hasStudyArrow = await page.evaluate(async () => {
@@ -735,19 +726,19 @@ test("on a phone, Identify opens on its setup even when another view was left on
     await pick(page, "category-sleep").tap();
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
     await expect(page.locator("#dagNetwork")).toBeVisible();
-    await page.locator("#taskBar .task-tab[data-task=identify]").tap();
+    await chooseTask(page, "identify", { tap: true });
     // Not a blank screen: the setup is shown, and tapping Identify again changes nothing.
     await expect(page.locator("#ivGroupPicker")).toBeVisible();
     await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
-    await page.locator("#taskBar .task-tab[data-task=identify]").tap();
+    await chooseTask(page, "identify", { tap: true });
     await expect(page.locator("#ivGroupPicker")).toBeVisible();
     // The same from Consequences, and the other views still open on their own panels afterwards.
-    await page.locator("#taskBar .task-tab[data-task=consequences]").tap();
-    await pick(page, "category-income-earnings").tap();
+    await chooseTask(page, "consequences", { tap: true });
+    await chooseFocus(page, "category-income-earnings", { tap: true });
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
-    await page.locator("#taskBar .task-tab[data-task=identify]").tap();
+    await chooseTask(page, "identify", { tap: true });
     await expect(page.locator("#ivGroupPicker")).toBeVisible();
-    await page.locator("#taskBar .task-tab[data-task=causes]").tap();
+    await chooseTask(page, "causes", { tap: true });
     await expect(page.locator("#exploreView")).toBeVisible();
   } finally {
     await context.close();

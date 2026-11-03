@@ -353,6 +353,7 @@ h2,
 
 /* Inline table links are text, not controls. */
 .dag-table-action { min-height: 0; padding: 0; }
+@media (pointer: coarse) { .dag-table-action { min-height: 24px; } } /* WCAG 2.2 minimum target size */
 
 @media (pointer: coarse) {
   .search-input, .select-input, .select-input-sm, .path-length-input, .exclude-reason-input,
@@ -3339,6 +3340,10 @@ h2 {
 }
 @media (max-width: 640px) and (pointer: coarse) {
   .task-bar-menus .menu > summary.btn { width: var(--control-touch); }
+}
+/* Six touch-sized icons plus the task menu are wider than a 375px phone, which clipped Export. */
+@media (max-width: 400px) and (pointer: coarse) {
+  .task-bar-menus .menu > summary.btn, .task-bar-menus .btn--icon { width: 38px; }
 }
 @media (max-width: 360px) {
   .task-bar { gap: var(--space-1); padding: 0 var(--space-1); }
