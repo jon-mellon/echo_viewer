@@ -1,5 +1,5 @@
 // Owns cross-feature shell layout: fullscreen focus and draggable panel sizes.
-import { DAG_FIT_OPTIONS } from "./dag_network_controller.mjs";
+import { fitDagNetwork } from "./dag_network_controller.mjs";
 export function createDagShellController({ state, elements, renderDag, getNetwork, isDagFullyVisible, dismissEvidencePane }) {
   let showInstalledMobilePanel = null;
   // Set by installResizers; moves the evidence pane to where the current task reads it.
@@ -27,7 +27,7 @@ export function createDagShellController({ state, elements, renderDag, getNetwor
       requestAnimationFrame(() => {
         if (panel === "dag") {
           renderDag();
-          setTimeout(() => getNetwork()?.fit(DAG_FIT_OPTIONS), 50);
+          setTimeout(() => fitDagNetwork(getNetwork()), 50);
         }
       });
     };
@@ -64,7 +64,7 @@ export function createDagShellController({ state, elements, renderDag, getNetwor
       const network = getNetwork();
       if (network) network.setSize("100%", "100%");
       else renderDag();
-      setTimeout(() => getNetwork()?.fit(DAG_FIT_OPTIONS), 100);
+      setTimeout(() => fitDagNetwork(getNetwork()), 100);
     });
   }
 
@@ -131,7 +131,7 @@ export function createDagShellController({ state, elements, renderDag, getNetwor
           element.classList.remove("dragging");
           document.removeEventListener("mousemove", onMove);
           document.removeEventListener("mouseup", onUp);
-          if (moved && refitDag) setTimeout(() => getNetwork()?.fit(DAG_FIT_OPTIONS), 50);
+          if (moved && refitDag) setTimeout(() => fitDagNetwork(getNetwork()), 50);
         }
         document.addEventListener("mousemove", onMove);
         document.addEventListener("mouseup", onUp);

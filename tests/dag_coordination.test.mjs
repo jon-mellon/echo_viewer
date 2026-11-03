@@ -39,7 +39,7 @@ test("resizing the DAG refits a fully visible graph and preserves a cropped view
   };
   globalThis.window = { matchMedia: () => ({ matches: false, addEventListener() {} }) };
   let fullyVisible = true, fitCalls = 0;
-  const network = { fit: () => fitCalls++ };
+  const network = { fit: () => fitCalls++, getScale: () => 1 };
   try {
     createDagShellController({
       state: { interfaceMode: "dag2" },
