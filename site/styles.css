@@ -3103,8 +3103,8 @@ h2 {
 .diagnostic-key-swatch { width: 15px; height: 15px; border-radius: var(--radius-sm); }
 .collider-key .diagnostic-key-fill, .collider-key .diagnostic-key-outline { background: color-mix(in srgb, var(--dag-confounder) 60%, var(--surface)); }
 .confounder-key .diagnostic-key-fill, .confounder-key .diagnostic-key-outline { background: color-mix(in srgb, var(--dag-collider) 60%, var(--surface)); }
-.collider-key .diagnostic-key-outline { border: 3px dashed var(--dag-collider-deep); }
-.confounder-key .diagnostic-key-outline { border: 3px dashed var(--dag-confounder-deep); }
+.collider-key .diagnostic-key-outline { border: 1.5px dashed var(--dag-collider-deep); }
+.confounder-key .diagnostic-key-outline { border: 1.5px dashed var(--dag-confounder-deep); }
 
 /* Give the initial variable selection the whole viewport. */
 .dag2-mode.initial-setup:not(.definition-active) .dag-shell {

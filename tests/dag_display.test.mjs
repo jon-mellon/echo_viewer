@@ -28,7 +28,7 @@ test("display records preserve node roles, selection, edge styles and descriptio
   vm.runInContext(readFileSync(new URL("./fixtures/legacy_dag_display.js", import.meta.url), "utf8"), legacy);
   const plain = value => JSON.parse(JSON.stringify(value));
   // Colours, fonts, hover behaviour and shadows are restyled; geometry and text are not.
-  const geometry = ({ color, font, chosen, shadow, shapeProperties, ...rest }) => rest;
+  const geometry = ({ color, font, chosen, shadow, shapeProperties, borderWidth, borderWidthSelected, ...rest }) => rest;
   const before = structuredClone(groups);
   for (const mode of ["normal", "confounder", "collider"]) for (const selected of [null, "candidate", "iv"]) {
     state.showCollidersOnly = mode === "collider";
@@ -141,11 +141,13 @@ test("overlapping diagnostic roles get a dashed border in the opposite role colo
     assert.equal(node.color.border, color);
     assert.equal(node.color.highlight.border, color);
     assert.equal(node.color.hover.border, color);
-    assert.equal(node.borderWidth, 4);
-    assert.deepEqual(node.shapeProperties.borderDashes, [6, 4]);
+    assert.equal(node.borderWidth, 1.5);
+    assert.deepEqual(node.shapeProperties.borderDashes, [4, 3]);
   }
   const plain = display.visNodeData(group, null, {}, { ...base, activeGroupId: "other" });
   assert.equal(plain.shapeProperties, undefined);
+  assert.equal(plain.color.border, plain.color.background);
+  assert.equal(plain.color.highlight.border, plain.color.background);
 });
 
 test("hovering a node colours its border without changing its size", () => {

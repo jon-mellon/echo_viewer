@@ -31,7 +31,7 @@ export const softEdge = (hex, strength) => mixHex(DAG_SURFACE, hex, strength);
 const TARGET_EDGE_COLOR = softEdge(OKABE_ITO.blue, 0.85);
 const PLAIN_EDGE_COLOR = softEdge(OKABE_ITO.sky, 0.6);
 
-// Node fills are the Okabe-Ito role colours softened toward white; role borders and hover
+// Node fills are the Okabe-Ito role colours softened toward white; hover and overlap
 // borders are deeper shades of the same hue.
 const NODE_FILL_SOFTNESS = 0.4;
 const ROLE_COLORS = {
@@ -102,15 +102,17 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     mass: 1 + Math.min(3, Math.sqrt(group.variable_ids.length || group.member_count || 1) / 6),
     color: {
       background: fill,
-      border: overlapBorder || (isSelected ? "#b83b5e" : role ? roleBorder : "#fbfcfa"),
-      highlight: { background: fill, border: overlapBorder || (role ? deeper(color, 0.55) : "#b83b5e") },
+      // No border until hover; only an overlapping role gets a thin dashed one.
+      border: overlapBorder || fill,
+      highlight: { background: fill, border: overlapBorder || fill },
       hover: { background: fill, border: overlapBorder || roleBorder },
     },
     font: { color: "#1b2420" },
     chosen: { node: chosenNodeHover(overlapBorder || roleBorder), label: false },
     shape: (isIv || isDv || isInstrument) ? "ellipse" : "box",
-    borderWidth: overlapBorder ? 4 : isSelected ? 3 : 2.4,
-    ...(overlapBorder ? { borderWidthSelected: 4, shapeProperties: { borderDashes: [6, 4] } } : {}),
+    borderWidth: overlapBorder ? 1.5 : 2.4,
+    borderWidthSelected: overlapBorder ? 1.5 : 2.4,
+    ...(overlapBorder ? { shapeProperties: { borderDashes: [4, 3] } } : {}),
     // Light outline keeps dense links visually separated from node bodies.
     shadow: isSelected
       ? { enabled: true, color: "rgba(184,59,94,0.45)", size: 12, x: 0, y: 0 }
