@@ -110,8 +110,9 @@ function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-// vis ends an edge at a box's sharp-cornered rectangle; follow the rounded outline instead
-// so arrowheads reach the node near its corners.
+// vis ends an edge at a box's sharp-cornered rectangle, plus a full border width although the
+// border is drawn half outside the edge. Follow the drawn rounded outline instead so arrowheads
+// touch the node. (endPointOffset can't do this: vis ignores it when arrowStrikethrough is off.)
 function patchBoxBorderDistance(network) {
   const sample = Object.values(network.body?.nodes ?? {}).find(node => node.options?.shape === "box");
   const proto = sample && Object.getPrototypeOf(sample.shape);
@@ -120,7 +121,7 @@ function patchBoxBorderDistance(network) {
   proto.distanceToBorder = function (ctx, angle) {
     if (ctx) this.resize(ctx);
     const radius = this.options.shapeProperties?.borderRadius ?? 0;
-    return roundedBoxDistance(this.width, this.height, radius, angle) + this.options.borderWidth;
+    return roundedBoxDistance(this.width, this.height, radius, angle) + this.options.borderWidth / 2;
   };
 }
 

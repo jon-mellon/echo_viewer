@@ -12,10 +12,6 @@ export function routeNodeData(id, point) {
   };
 }
 
-// vis stops the arrow tip a full border width past the node edge, but the border is
-// drawn centred on that edge, so the tip lands about half a border short. Pull it in.
-const ARROW_TIP_OFFSET = { to: -1.2 };
-
 export function routesToVisData(routes, { edgeStyle, edgeTitle }) {
   const nodeData = [];
   const edgeData = [];
@@ -25,7 +21,7 @@ export function routesToVisData(routes, { edgeStyle, edgeTitle }) {
     const title = edgeTitle(link);
     if (points.length <= 2) {
       edgeSegments.set(link.edge_id, link.edge_id);
-      edgeData.push({ id: link.edge_id, from: sourceId, to: targetId, ...style, endPointOffset: ARROW_TIP_OFFSET, title });
+      edgeData.push({ id: link.edge_id, from: sourceId, to: targetId, ...style, title });
       continue;
     }
     const bendIds = points.slice(1, -1).map((point, index) => {
@@ -40,7 +36,6 @@ export function routesToVisData(routes, { edgeStyle, edgeTitle }) {
       edgeData.push({
         id: segmentId, from: ids[index], to: ids[index + 1],
         ...style, title,
-        ...(index === ids.length - 2 ? { endPointOffset: ARROW_TIP_OFFSET } : {}),
         arrows: { to: index === ids.length - 2 ? { enabled: true, scaleFactor: 0.7 } : { enabled: false },
           from: link.direction_type === "BIDIRECTIONAL" && index === 0 ? { enabled: true, scaleFactor: 0.7 } : undefined },
       });
