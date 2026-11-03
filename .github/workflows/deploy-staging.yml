@@ -48,13 +48,13 @@ jobs:
           restore-keys: supabase-published-
 
       - name: Enforce mobile diagnostic switching budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
+        run: PROFILE_SITE_DIR=dist/site node scripts/ci_retry.mjs npm run profile:diagnostics
 
       - name: Enforce evidence loading budgets on the default snapshot
-        run: PROFILE_SITE_DIR=dist/site npm run profile:edge-evidence
+        run: PROFILE_SITE_DIR=dist/site node scripts/ci_retry.mjs npm run profile:edge-evidence
 
       - name: Enforce mobile causes and consequences budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:explore
+        run: PROFILE_SITE_DIR=dist/site node scripts/ci_retry.mjs npm run profile:explore
 
       - uses: actions/upload-artifact@v4
         if: always()

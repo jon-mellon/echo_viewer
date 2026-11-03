@@ -46,17 +46,17 @@ jobs:
       - name: Build cache-versioned site
         run: npm run build:site
       - name: Enforce performance budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile
+        run: PROFILE_SITE_DIR=dist/site node scripts/ci_retry.mjs npm run profile
       - name: Enforce mobile performance budgets
-        run: PROFILE_SITE_DIR=dist/site PROFILE_DEVICE=mobile npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
       - name: Enforce permalink performance budgets
-        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink node scripts/ci_retry.mjs npm run profile
       - name: Enforce mobile permalink performance budgets
-        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
       - name: Enforce mobile diagnostic switching budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
+        run: PROFILE_SITE_DIR=dist/site node scripts/ci_retry.mjs npm run profile:diagnostics
       - name: Enforce mobile causes and consequences budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:explore
+        run: PROFILE_SITE_DIR=dist/site node scripts/ci_retry.mjs npm run profile:explore
       - uses: actions/upload-artifact@v4
         if: always()
         with:

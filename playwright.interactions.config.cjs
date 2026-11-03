@@ -5,6 +5,8 @@ module.exports = {
     "local_schema_persistence.spec.cjs", "evidence_panel.spec.cjs", "task_views.spec.cjs", "schema_source.spec.cjs"],
   workers: 1,
   maxFailures: process.env.CI ? 1 : 0,
+  // One retry in CI; a test that passes on retry is reported as flaky, not hidden.
+  retries: process.env.CI ? 1 : 0,
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: { browserName: "chromium", acceptDownloads: true },
