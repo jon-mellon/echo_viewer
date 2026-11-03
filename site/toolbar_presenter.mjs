@@ -60,19 +60,25 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
       element.setAttribute("aria-pressed", active ? "true" : "false");
     }
     if (elements.diagnosticOverlapKey) {
-      const showKey = anchorsReady && !state.showExogeneity
-        && (state.showConfoundersOnly || state.showCollidersOnly || state.showExclusionViolations);
+      const showKey = anchorsReady
+        && (state.showConfoundersOnly || state.showCollidersOnly || state.showExclusionViolations || state.showExogeneity);
       elements.diagnosticOverlapKey.hidden = !showKey;
       elements.diagnosticOverlapKey.classList.toggle("collider-key", !state.showExclusionViolations && state.showConfoundersOnly);
       elements.diagnosticOverlapKey.classList.toggle("confounder-key", !state.showExclusionViolations && state.showCollidersOnly);
       const keyItem = (swatchClass, label) => h("span", { className: "diagnostic-key-item" },
         h("span", { className: `diagnostic-key-swatch ${swatchClass}`, attrs: { "aria-hidden": "true" } }), label);
-      replaceChildren(elements.diagnosticOverlapKey, state.showExclusionViolations
-        ? [keyItem("diagnostic-key-instrument", "Instrument"),
-          keyItem("diagnostic-key-violation", "Potential violation"),
+      const anchorItems = [keyItem("diagnostic-key-iv", "Cause"),
+        keyItem("diagnostic-key-dv", "Outcome")];
+      replaceChildren(elements.diagnosticOverlapKey, state.showExogeneity
+        ? [...anchorItems, keyItem("diagnostic-key-instrument", "Instrument"),
+          keyItem("diagnostic-key-cause", "Potential common cause"),
           keyItem("diagnostic-key-path", "Path on hover")]
-        : [keyItem("diagnostic-key-fill", state.showConfoundersOnly ? "Confounder" : "Collider"),
-          keyItem("diagnostic-key-outline", state.showConfoundersOnly ? "Also a collider" : "Also a confounder")]);
+        : state.showExclusionViolations
+          ? [...anchorItems, keyItem("diagnostic-key-instrument", "Instrument"),
+            keyItem("diagnostic-key-violation", "Potential violation"),
+            keyItem("diagnostic-key-path", "Path on hover")]
+          : [...anchorItems, keyItem("diagnostic-key-fill", state.showConfoundersOnly ? "Confounder" : "Collider"),
+            keyItem("diagnostic-key-outline", state.showConfoundersOnly ? "Also a collider" : "Also a confounder")]);
     }
     const confounderCount = state.confounderGroupIds?.size || 0;
     const instrumentReady = anchorsReady && Boolean(state.project?.instrument_group_id)

@@ -72,7 +72,7 @@ test("connected edge hover updates routed segments in one batch", () => {
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].map(record => record.id), ["a::seg0", "a::seg1"]);
   assert.deepEqual(calls[0].map(record => record.width), [3.4, 6.2]);
-  assert.ok(calls[0].every(record => record.color.color === "#9a5a0a" && record.shadow.enabled));
+  assert.ok(calls[0].every(record => record.color.color === "#000000" && record.shadow.enabled));
   applyLogicalEdgeHover([], dataset);
   assert.equal(calls.length, 1);
 });
