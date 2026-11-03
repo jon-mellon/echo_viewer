@@ -3362,7 +3362,7 @@ h2 {
 .list-filter-field { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   color: var(--text); font-size: var(--text-md); font-weight: var(--weight-normal); }
 #exploreResults .explore-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--space-1); }
-/* Two clear states: a filled accent box with a white tick is on the map; an empty box is off it
+/* Two clear states: a filled accent box with a tick is on the map; an empty box is off it
    (and its row is dimmed and struck through). A dash means only some of a section is on the map. */
 .explore-include {
   appearance: none;
