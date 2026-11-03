@@ -2806,14 +2806,6 @@ h2 {
   color: #fff;
 }
 
-.published-schema-permalink {
-  display: inline-block;
-  margin-top: 6px;
-  color: var(--accent, #3157a4);
-  font-size: 12px;
-  font-weight: 650;
-}
-
 .publication-dialog {
   width: min(520px, calc(100vw - 40px));
   padding: 24px;
@@ -3045,7 +3037,6 @@ h2 {
 
 .diagnostic-key-instrument { background: #166534; border-radius: 50%; }
 .diagnostic-key-violation { background: #c62828; }
-.diagnostic-key-path { background: #176b80; height: 3px; border-radius: 0; }
 
 .schema-summary {
   cursor: pointer;

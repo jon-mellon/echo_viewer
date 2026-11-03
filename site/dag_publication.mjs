@@ -1,6 +1,5 @@
 import { supabase } from "/supabase_client.mjs";
 import { publicationPermalink } from "/published_schema_loader.mjs";
-import { setSafeUrl } from "/dom_builder.mjs";
 import { canonicalizeWorkingSchema, publishWorkingSchema, formatSupabaseError } from "./dag_publication_core.mjs";
 export { CANONICAL_BASELINE_ID, CANONICAL_BASELINE_HASH, canonicalizeWorkingSchema, publishWorkingSchema, formatSupabaseError } from "./dag_publication_core.mjs";
 
@@ -74,7 +73,6 @@ export function createPublicationController({
   }
 
   function renderPublicationState(published, hasLocalChanges = false) {
-    const permalink = stablePermalink(published);
     hasPublishableChanges = !published?.publication_id || hasLocalChanges;
     refreshPublishVisibility();
     elements.badge.textContent = !published?.publication_id
@@ -82,9 +80,6 @@ export function createPublicationController({
       : hasLocalChanges ? "Public schema · Unpublished local changes" : "Public schema";
     elements.badge.classList.toggle("muted", !published?.publication_id);
     elements.badge.classList.toggle("warn", Boolean(published?.publication_id && hasLocalChanges));
-    elements.permalink.hidden = !permalink || hasLocalChanges;
-    if (permalink && !hasLocalChanges) setSafeUrl(elements.permalink, "href", permalink);
-    else elements.permalink.removeAttribute("href");
   }
 
   async function refreshPublicationState() {
@@ -265,11 +260,6 @@ export function createPublicationController({
     if (published?.publication_id) {
       elements.badge.textContent = "Public schema";
       elements.badge.classList.remove("muted", "warn");
-      const currentUrl = new URL(windowApi.location.href);
-      if (currentUrl.searchParams.get("schema") === published.publication_id) {
-        setSafeUrl(elements.permalink, "href", currentUrl.href);
-        elements.permalink.hidden = false;
-      }
       if (canPublish()) {
         showStatus(elements.status, "Loaded the public schema. Further edits remain private and local until you publish them.");
       }

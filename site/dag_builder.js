@@ -143,7 +143,7 @@ function initElements() {
     // Grouping schema
     "groupingPanel", "groupingSetSelect", "exportGroupingFolder", "publishSchema",
     "copyPermalink", "groupingSummary", "publicationStatus", "schemaPublicationBadge",
-    "publishedSchemaPermalink", "publishSchemaDialog",
+    "publishSchemaDialog",
     // Rejected variables
     "rejectedVariablesPanel", "rejectedVariableSearch", "rejectedVariablesList",
     // Map
@@ -2073,7 +2073,6 @@ publicationController = createPublicationController({
     get publish() { return els.publishSchema; },
     get status() { return els.publicationStatus; },
     get badge() { return els.schemaPublicationBadge; },
-    get permalink() { return els.publishedSchemaPermalink; },
     get confirmation() { return els.publishSchemaDialog; },
     get share() { return els.copyPermalink; },
   },

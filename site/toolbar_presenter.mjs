@@ -68,8 +68,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
         h("span", { className: `diagnostic-key-swatch ${swatchClass}`, attrs: { "aria-hidden": "true" } }), label);
       replaceChildren(elements.diagnosticOverlapKey, state.showExclusionViolations
         ? [keyItem("diagnostic-key-instrument", "Instrument"),
-          keyItem("diagnostic-key-violation", "Potential violation"),
-          keyItem("diagnostic-key-path", "Path on hover")]
+          keyItem("diagnostic-key-violation", "Potential violation")]
         : [keyItem("diagnostic-key-fill", state.showConfoundersOnly ? "Confounder" : "Collider"),
           keyItem("diagnostic-key-outline", state.showConfoundersOnly ? "Also a collider" : "Also a confounder")]);
     }
