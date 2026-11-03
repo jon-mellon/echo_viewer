@@ -36,7 +36,7 @@ const NODE_FILL_STRENGTH = 0.3;
 
 /** Hovering keeps the node's size: the (otherwise clear) border turns the node's own colour. */
 export const chosenNodeHover = color => (values, _id, selected, hovering) => {
-  if (hovering && !selected) values.borderColor = color;
+  if (hovering) values.borderColor = color;
 };
 
 export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
@@ -75,7 +75,6 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const isSelected = group.group_id === view.activeGroupId;
   const color = isViolation ? "#c62828" : isInstrument ? "#166534" : isExogeneityCandidate ? "#c62828" : isConfounder ? "#c62828" : isCollider ? "#801744" : isPathMediator ? "#6b7280" : view.groupColor;
   const fill = mixHex(DAG_SURFACE, color, NODE_FILL_STRENGTH);
-  const clearBorder = fill;
   const roleTag = view.focusId && group.group_id === view.focusId ? " (focus)" : isIv ? " (Ind var)" : isDv ? " (Dep var)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : isExogeneityCandidate ? " (potential common cause of instrument and Dep var)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
@@ -91,17 +90,20 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     mass: 1 + Math.min(3, Math.sqrt(group.variable_ids.length || group.member_count || 1) / 6),
     color: {
       background: fill,
-      border: overlapBorder || (isSelected ? "#b83b5e" : clearBorder),
-      highlight: { background: fill, border: overlapBorder || "#b83b5e" },
-      hover: { background: fill, border: overlapBorder || color },
+      border: fill,
+      highlight: { background: fill, border: fill },
+      hover: { background: fill, border: color },
     },
     font: { color: "#1b2420" },
     chosen: { node: chosenNodeHover(color), label: false },
     shape: (isIv || isDv || isInstrument) ? "ellipse" : "box",
-    borderWidth: overlapBorder ? 4 : isSelected ? 3 : 2.4,
-    ...(overlapBorder ? { borderWidthSelected: 4 } : {}),
+    borderWidth: 2.4,
+    borderWidthSelected: 2.4,
+    // Borders appear only on hover, so selection and an overlapping role show as a glow.
     shadow: isSelected
       ? { enabled: true, color: "rgba(184,59,94,0.45)", size: 12, x: 0, y: 0 }
+      : overlapBorder
+        ? { enabled: true, color: overlapBorder, size: 11, x: 0, y: 0 }
       : isConfounder || isExogeneityCandidate
         ? { enabled: true, color: "rgba(198,40,40,0.34)", size: 11, x: 0, y: 2 }
         : isCollider

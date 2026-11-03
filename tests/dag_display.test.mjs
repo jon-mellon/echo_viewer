@@ -28,7 +28,7 @@ test("display records preserve node roles, selection, edge styles and descriptio
   vm.runInContext(readFileSync(new URL("./fixtures/legacy_dag_display.js", import.meta.url), "utf8"), legacy);
   const plain = value => JSON.parse(JSON.stringify(value));
   // Colours, fonts, hover behaviour and shadows are restyled; geometry and text are not.
-  const geometry = ({ color, font, chosen, shadow, ...rest }) => rest;
+  const geometry = ({ color, font, chosen, shadow, borderWidth, borderWidthSelected, ...rest }) => rest;
   const before = structuredClone(groups);
   for (const mode of ["normal", "confounder", "collider"]) for (const selected of [null, "candidate", "iv"]) {
     state.showCollidersOnly = mode === "collider";
@@ -42,7 +42,7 @@ test("display records preserve node roles, selection, edge styles and descriptio
       assert.deepEqual(plain(geometry(node)), plain(geometry(legacy.visNodeData(group, point, { nodeMaxWidth: width }))));
       assert.equal(node.chosen.label, false);
       assert.equal(typeof node.chosen.node, "function");
-      assert.equal(node.color.border === node.color.background || node.color.border === "#b83b5e" || /^#(801744|c62828)$/.test(node.color.border), true);
+      assert.equal(node.color.border, node.color.background);
     }
   }
   for (const direction_type of ["A_TO_B", "B_TO_A", "BIDIRECTIONAL"]) {
@@ -132,16 +132,16 @@ test("group centroid skips cold membership scans and retains duplicate-represent
 });
 
 
-test("overlapping diagnostic roles retain the opposite role outline", () => {
+test("overlapping diagnostic roles glow in the opposite role colour without a border", () => {
   const group = { group_id: "both", label: "Both", variable_ids: [] };
   const base = { confounderGroupIds: new Set(["both"]), colliderGroupIds: new Set(["both"]),
     confounderPathGroupIds: new Set(), colliderPathGroupIds: new Set(), groupColor: "#123456" };
   for (const [mode, color] of [["showConfoundersOnly", "#801744"], ["showCollidersOnly", "#c62828"]]) {
-    const node = display.visNodeData(group, null, {}, { ...base, [mode]: true, activeGroupId: "both" });
-    assert.equal(node.color.border, color);
-    assert.equal(node.color.highlight.border, color);
-    assert.equal(node.color.hover.border, color);
-    assert.equal(node.borderWidth, 4);
+    const node = display.visNodeData(group, null, {}, { ...base, [mode]: true, activeGroupId: "other" });
+    assert.equal(node.color.border, node.color.background);
+    assert.equal(node.color.highlight.border, node.color.background);
+    assert.equal(node.shadow.color, color);
+    assert.equal(node.borderWidth, 2.4);
   }
 });
 
@@ -152,9 +152,9 @@ test("hovering a node colours its clear border without changing its size", () =>
   assert.equal(values.borderWidth, 2.4);
   assert.equal(values.borderColor, "#0072B2");
   assert.equal(values.color, "#cce3f0");
-  const selected = { borderWidth: 3, borderColor: "#b83b5e", color: "#cce3f0" };
+  const selected = { borderWidth: 2.4, borderColor: "#cce3f0", color: "#cce3f0" };
   hover(selected, "n", true, true);
-  assert.equal(selected.borderColor, "#b83b5e");
+  assert.equal(selected.borderColor, "#0072B2");
   const idle = { borderColor: "#cce3f0" };
   hover(idle, "n", false, false);
   assert.equal(idle.borderColor, "#cce3f0");
