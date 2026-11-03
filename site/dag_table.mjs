@@ -356,7 +356,8 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
         "aria-sort": active ? (key === "label" ? "ascending" : "descending") : "none" },
       button(`${text}${active ? (key === "label" ? " ↑" : " ↓") : ""}`,
         active ? `${text}: sorted; click to return to nearest first` : `Sort by ${text.toLowerCase()}`,
-        () => { exploreSort = active ? null : key; render(); }, { class: "btn btn--ghost dag-table-action dag-table-sort" }));
+        () => { exploreSort = active ? null : key; render(); },
+        { class: "btn btn--ghost dag-table-action dag-table-sort", "data-sort-key": key }));
     };
     const body = el("tbody", {});
     const items = sections.flatMap(section => [{ heading: section.title, count: section.rows.length },
@@ -489,7 +490,8 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
       if (!key) return el("th", { scope: "col", class: numeric ? "dag-table-number" : null, text });
       return el("th", { scope: "col", class: numeric ? "dag-table-number" : null, "aria-sort": active ? "descending" : "none" },
         button(`${text}${active ? " ↓" : ""}`, active ? `${text}: sorted; click to sort by name` : `Sort by ${text.toLowerCase()}`,
-          () => { diagnosticSort = active ? null : key; render(); }, { class: "btn btn--ghost dag-table-action dag-table-sort" }));
+          () => { diagnosticSort = active ? null : key; render(); },
+          { class: "btn btn--ghost dag-table-action dag-table-sort", "data-sort-key": key }));
     };
     const body = el("tbody", {});
     const items = sections.flatMap(section => [{ heading: section.title, count: section.rows.length },
@@ -554,8 +556,10 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
   let pendingFills = [];
   const ROW_CHUNK = 40;
 
-  function restoreFocus(label) {
-    if (label) [...container.querySelectorAll("button, select, input")].find(node => node.getAttribute("aria-label") === label)?.focus();
+  // A sort header's accessible name changes once it is active, so it is found again by its sort key.
+  function restoreFocus(label, sortKey) {
+    if (sortKey) container.querySelector(`button[data-sort-key="${sortKey}"]`)?.focus();
+    else if (label) [...container.querySelectorAll("button, select, input")].find(node => node.getAttribute("aria-label") === label)?.focus();
   }
 
   /**
@@ -565,6 +569,8 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
   async function render() {
     const focused = doc.activeElement && container.contains(doc.activeElement)
       ? doc.activeElement.getAttribute("aria-label") : null;
+    const focusedSort = doc.activeElement && container.contains(doc.activeElement)
+      ? doc.activeElement.getAttribute("data-sort-key") : null;
     const scroll = container.scrollTop;
     const token = ++renderToken;
     pendingFills = [];
@@ -589,7 +595,7 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
       }
     }
     container.scrollTop = scroll;
-    restoreFocus(focused);
+    restoreFocus(focused, focusedSort);
   }
 
   return {

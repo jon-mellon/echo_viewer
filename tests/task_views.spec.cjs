@@ -1,6 +1,6 @@
 const { test, expect } = require("./fixtures.cjs");
 const { chooseAnchor, chooseAnchors, startCreate } = require("./support/identify.cjs");
-const { chooseTask, chooseDirection, chooseFocus } = require("./support/navigation.cjs");
+const { chooseTask, chooseDirection, chooseFocus, openNav, closeNav, showPanel } = require("./support/navigation.cjs");
 
 const viewer = "http://127.0.0.1:8767/";
 
@@ -30,10 +30,9 @@ test("tabs start unconfigured views at setup and reopen configured views", async
   await chooseDirection(page, "consequences");
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
   await expect(page.locator("#exploreResultsBlock")).toBeVisible();
-  await page.evaluate(() => { window.__dagBuilderState.workflowMode = "group_review"; });
   await chooseTask(page, "identify");
-  await expect(page.locator("#setupSection")).toBeVisible();
-  expect(await page.evaluate(() => window.__dagBuilderState.workflowMode)).toBe("setup");
+  await expect(page.locator("#identifyFields")).toBeVisible();
+  await expect(page.locator("#identify-iv-input")).toHaveValue("");
   // Exploration reopens in the direction it was last in, with its variable.
   await chooseTask(page, "causes");
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
@@ -42,19 +41,20 @@ test("tabs start unconfigured views at setup and reopen configured views", async
 
 test("the start page leads to causes and consequences views that behave like Identify with one variable", async ({ page }) => {
   await open(page);
-  await expect(page.locator("#taskLanding")).toBeVisible();
-  await expect(page.locator("#taskLanding h1")).toHaveText("What do you want to do?");
-  await expect(page.locator("#taskLanding .task-choice")).toHaveCount(2);
-  await expect(page.locator("#taskReset")).toBeHidden();
-  expect(page.url()).toBe(viewer);
+  // There is no start page: the app opens in Exploration, asking for its variable.
+  await expect(page.locator("#taskMenuValue")).toHaveText("Exploration");
+  await expect(page.locator("#exploreView")).toBeVisible();
+  await expect(page.locator("#focusInput")).toHaveValue("");
+  expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
 
   // The same picker as Identify, offering the one anchor.
   await chooseTask(page, "causes");
   await expect(page.locator("#exploreView")).toBeVisible();
   await expect(page.locator("#focusInput")).toHaveAttribute("placeholder", "Search group or constituent variable");
   await expect(pick(page, "category-sleep")).toContainText("sleep");
-  await expect(page.locator("#dagNetwork")).toBeVisible();
+  await expect(page.locator("#exploreGraphHint")).toBeVisible();
   await pick(page, "category-sleep").click();
+  await expect(page.locator("#dagNetwork")).toBeVisible();
 
   // The chosen variable stays in the Primary variable field; the old anchor bar is not shown.
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
@@ -109,8 +109,7 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(page.locator("#exploreSummary")).toBeHidden();
   await expect(page.locator(".list-filter-distance")).toHaveValue("2");
   await chooseTask(page, "identify");
-  await expect(page.locator("#exploreView")).toBeHidden();
-  await expect(page.locator("#setupSection")).toBeVisible();
+  await expect(page.locator("#identifyFields")).toBeVisible();
   await expect(page.locator("#confounderPathLength")).toHaveValue("1");
   await chooseTask(page, "causes");
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
@@ -218,7 +217,8 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await dialog.getByRole("button", { name: "Reset in current tab" }).click();
   await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100
     && document.getElementById("startupLoading")?.hidden);
-  await expect(page.locator("#taskLanding")).toBeVisible();
+  await expect(page.locator("#exploreView")).toBeVisible();
+  await expect(page.locator("#focusInput")).toHaveValue("");
   expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
   await chooseTask(page, "causes");
   await expect(page.locator("#focusSearchBlock")).toBeVisible();
@@ -232,10 +232,11 @@ test("mobile reset keeps the previous project after navigating", async ({ browse
     await page.context().newCDPSession(page).then(cdp => cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 }));
     await open(page, `${viewer}?task=causes`);
     await pick(page, "category-sleep").tap();
+    await openNav(page, { tap: true });
     await page.locator("#historyToggle").tap();
     await page.locator("#taskReset").tap();
     await page.locator("#resetHere").tap();
-    await expect(page.locator("#taskLanding")).toBeVisible({ timeout: 60000 });
+    await expect(page.locator("#focusInput")).toHaveValue("", { timeout: 60000 });
     await expect(page.locator("#resetError")).toBeHidden();
     expect(new URL(page.url()).searchParams.get("causes_of")).toBeNull();
     await expect.poll(() => page.evaluate(async () => {
@@ -267,9 +268,9 @@ test("on a phone the list and graph are tabs, and a tapped variable shows its ev
     await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').tap();
     await expect(page.locator(".explore-row").first()).toBeVisible();
     await chooseTask(page, "identify", { tap: true });
-    await expect(page.locator("#setupSection")).toBeVisible();
-    // Identify gets its own tab names back.
-    await expect(page.locator('.mobile-panel-nav [data-mobile-panel="controls"]')).toHaveText("Setup view");
+    await expect(page.locator("#identifyFields")).toBeVisible();
+    // Identification names its tabs the same way as Exploration.
+    await expect(page.locator('.mobile-panel-nav [data-mobile-panel="controls"]')).toHaveText("Variables view");
     await expect(page.locator('.mobile-panel-nav [data-mobile-panel="dag"]')).toHaveText("Map view");
   } finally {
     await context.close();
@@ -294,22 +295,22 @@ test("on a phone Exploration opens its picker first, keeps its variable when fli
     await expect(page.locator("#focusInput")).toHaveValue("sleep");
 
     await chooseTask(page, "identify", { tap: true });
-    await expect(page.locator("#setupSection")).toBeVisible();
+    await expect(page.locator("#identifyFields")).toBeVisible();
     await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
   } finally {
     await context.close();
   }
 });
 
-test("the start page preloads the search catalog and query engine", async ({ page }) => {
+test("the app preloads the search catalog and query engine at startup", async ({ page }) => {
   await open(page);
-  await expect(page.locator("#taskLanding")).toBeVisible();
-  // Nothing has opened a task or a search, yet both arrive in the background.
+  await expect(page.locator("#exploreView")).toBeVisible();
+  // Nothing has chosen a variable or run a search, yet both arrive in the background.
   await page.waitForFunction(() => window.__dagBuilderState.variableSearchStatus === "ready"
     && performance.getEntriesByName("echo:evidence:engine").length, null, { timeout: 90000 });
 });
 
-test("mobile home stays on one document while evidence warms in the background", async ({ browser }) => {
+test("mobile start stays on one document while evidence warms in the background", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
@@ -317,14 +318,14 @@ test("mobile home stays on one document while evidence warms in the background",
       String(Number(sessionStorage.getItem("echo-home-loads") || 0) + 1)));
     await open(page);
     await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated);
-    await expect(page.locator("#taskLanding")).toBeVisible();
-    expect(page.url()).toBe(viewer);
+    await expect(page.locator("#exploreView")).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/");
     expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
     await page.waitForFunction(() => performance.getEntriesByName("echo:evidence:engine").length > 0);
-    expect(page.url()).toBe(viewer);
+    expect(new URL(page.url()).pathname).toBe("/");
     expect(await page.evaluate(() => sessionStorage.getItem("echo-home-loads"))).toBe("1");
     await expect(page.locator("#startupLoading")).toBeHidden();
-    await expect(page.locator("#taskLanding")).toBeVisible();
+    await expect(page.locator("#exploreView")).toBeVisible();
     await chooseTask(page, "causes", { tap: true });
     await expect(page.locator("#exploreView")).toBeVisible();
   } finally {
@@ -401,31 +402,31 @@ test("every view can show the same variables and links as a table, with the same
   await expect(page.locator("#dagNetwork")).toBeHidden();
   await expect(page.locator("#dagViewTable")).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => new URL(page.url()).searchParams.get("dag_view")).toBe("table");
-  // The same links the graph drew, plus the focal variable among the variables.
-  await expect(page.locator("#dagPathsTable tbody tr")).toHaveCount(direct);
-  await expect(page.locator('#dagVariablesTable tr[data-group-id="category-sleep"] td').nth(1)).toHaveText("Focus");
+  // One row per variable, in Custom and Built-in sections, with the same links the graph drew.
+  await expect(page.locator("#dagPathsTable caption")).toContainText("Causes of sleep");
+  await expect(page.locator("#dagPathsTable tbody tr.dag-table-section")).toHaveCount(2);
+  await expect(page.locator("#dagPathsTable tbody tr:not(.dag-table-section)")).toHaveCount(direct);
   // The filters stay where they were, and drive the table.
   await expect(page.locator(".list-filter > summary")).toBeVisible();
-  await expect(page.locator("#dagSvgZoomIn")).toBeHidden();
   await page.locator(".list-filter > summary").click();
   await page.locator(".list-filter-papers").fill("20");
-  await expect.poll(() => page.locator("#dagPathsTable tbody tr").count()).toBeLessThan(direct);
+  await expect.poll(() => page.locator("#dagPathsTable tbody tr:not(.dag-table-section)").count()).toBeLessThan(direct);
   await page.locator(".list-filter-papers").fill("2");
-  await expect(page.locator("#dagPathsTable tbody tr")).toHaveCount(direct);
+  await expect(page.locator("#dagPathsTable tbody tr:not(.dag-table-section)")).toHaveCount(direct);
 
   // Definitions and evidence open from the table as they do from the graph.
-  // Each row is a path; its arrows open the evidence for that link.
-  const arrow = page.locator("#dagPathsTable .dag-table-arrow").first();
-  await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Path", "Papers"]);
+  // Each row is a variable; its link opens the evidence for that link.
+  const arrow = page.locator("#dagPathsTable .dag-table-link[data-edge-id]").first();
+  await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Variable", "Link", "Papers", "Concepts"]);
   await expect(page.locator("#dagPathsTable").getByText("Evidence", { exact: true })).toHaveCount(0);
   const edgeId = await arrow.getAttribute("data-edge-id");
   await arrow.click();
   await expect(page.locator("#provenancePanel")).toBeVisible();
   await expect(page.locator("#edgeInspector")).toBeVisible();
   expect(await page.evaluate(() => window.__dagBuilderState.selectedEdgeId)).toBe(edgeId);
-  await expect(page.locator(`#dagPathsTable .dag-table-arrow[data-edge-id="${edgeId}"]`)).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(`#dagPathsTable .dag-table-link[data-edge-id="${edgeId}"]`)).toHaveAttribute("aria-pressed", "true");
   await page.locator("#closeEvidencePane").click();
-  await page.locator("#dagVariablesTable tbody tr").nth(1).getByRole("button").first().click();
+  await page.locator("#dagPathsTable tbody tr:not(.dag-table-section)").nth(1).getByRole("button").first().click();
   await expect(page.locator("#closeEvidencePane")).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBeTruthy();
 
@@ -458,12 +459,12 @@ test("the table also covers Identify and works from the keyboard", async ({ page
   await page.keyboard.press("Enter");
   await expect(page.locator("#dagTable")).toBeVisible();
   await expect(page.locator("#dagViewTable")).toBeFocused();
-  await page.locator("#dagVariablesTable thead button").first().focus();
+  await page.locator("#dagPathsTable thead button").first().focus();
   await page.keyboard.press("Enter");
-  await expect(page.locator("#dagVariablesTable thead th[aria-sort=descending]")).toHaveCount(1);
-  await expect(page.locator("#dagVariablesTable thead button").first()).toBeFocused();
-  // Identify shows each confounder as a path to the Ind var and a path to the Dep var.
-  await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Confounder", "Route"]);
+  await expect(page.locator("#dagPathsTable thead th[aria-sort=ascending], #dagPathsTable thead th[aria-sort=descending]")).toHaveCount(1);
+  await expect(page.locator("#dagPathsTable thead button").first()).toBeFocused();
+  // Identify shows each confounder with its path to the cause and its path to the outcome, and a status to set.
+  await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Variable", "Path to cause", "Path to outcome", /^Papers/, "Concepts", "Status"]);
 });
 
 const shownGraph = async page => {
@@ -504,19 +505,21 @@ test("on a phone the table fits the screen and its controls can be tapped", asyn
     await pick(page, "category-sleep").tap();
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
     await shownGraph(page);
-    // The switch is the first control, so it never scrolls out of reach.
+    // The Graph and Table switch is in the top bar's menu and fits inside the screen.
+    await openNav(page, { tap: true });
     const box = await page.locator(".dag-view-switch").boundingBox();
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(375);
     await page.locator("#dagViewTable").tap();
+    await closeNav(page, { tap: true });
     await expect(page.locator("#dagTable")).toBeVisible();
-    await expect(page.locator("#dagPathsTable tbody tr").first()).toBeVisible();
+    await expect(page.locator("#dagPathsTable tbody tr:not(.dag-table-section)").first()).toBeVisible();
     const overflow = await page.evaluate(() => ({ page: document.documentElement.scrollWidth,
       table: document.getElementById("dagTable").scrollWidth - document.getElementById("dagTable").clientWidth }));
     expect(overflow.page).toBeLessThanOrEqual(375);
     expect(overflow.table).toBe(0);
     // Every evidence button is on screen, and the table scrolls rather than the page.
-    const rowButtons = page.locator("#dagPathsTable tbody tr").first().getByRole("button");
+    const rowButtons = page.locator("#dagPathsTable tbody tr:not(.dag-table-section)").first().getByRole("button");
     for (let index = 0, count = await rowButtons.count(); index < count; index++) {
       // Looked up afresh: a late data load may rebuild the table between buttons.
       await expect(rowButtons.nth(index)).toBeVisible();
@@ -529,11 +532,11 @@ test("on a phone the table fits the screen and its controls can be tapped", asyn
     await page.locator(".list-filter > summary").tap();
     await expect(page.locator(".list-filter-papers")).toBeVisible();
     await page.locator(".list-filter-papers").fill("20");
-    await expect.poll(() => page.locator("#dagPathsTable tbody tr").count()).toBeLessThan(10);
+    await expect.poll(() => page.locator("#dagPathsTable tbody tr:not(.dag-table-section)").count()).toBeLessThan(10);
     await page.locator(".list-filter-papers").fill("2");
     await page.locator(".list-filter > summary").tap();
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
-    const arrow = page.locator("#dagPathsTable .dag-table-arrow").first();
+    const arrow = page.locator("#dagPathsTable .dag-table-link[data-edge-id]").first();
     const edgeId = await arrow.getAttribute("data-edge-id");
     await arrow.tap();
     await expect(page.locator("#closeEvidencePane")).toBeVisible();
@@ -541,10 +544,12 @@ test("on a phone the table fits the screen and its controls can be tapped", asyn
     expect(await page.evaluate(() => window.__dagBuilderState.selectedEdgeId)).toBe(edgeId);
     await page.locator("#closeEvidencePane").tap();
     // A variable's definition opens from the table too.
-    await page.locator("#dagVariablesTable tbody tr").nth(1).getByRole("button").first().tap();
+    await page.locator("#dagPathsTable tbody tr:not(.dag-table-section)").nth(1).getByRole("button").first().tap();
     await expect(page.locator("#closeEvidencePane")).toBeVisible();
     await page.locator("#closeEvidencePane").tap();
+    await openNav(page, { tap: true });
     await page.locator("#dagViewGraph").tap();
+    await closeNav(page, { tap: true });
     await shownGraph(page);
     await expect.poll(() => page.evaluate(async () => {
       const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
@@ -563,19 +568,19 @@ test("a table of a graph with hundreds of links stays small and quick", async ({
   await page.locator(".list-filter > summary").click();
   await page.locator(".list-filter-papers").fill("1");
   await page.locator(".list-filter-distance").fill("4");
-  await expect(page.locator("#dagPathsTable tbody tr").first()).toBeVisible();
+  await expect(page.locator("#dagPathsTable tbody tr:not(.dag-table-section)").first()).toBeVisible();
   const { rendered, total } = await page.evaluate(() => ({
-    rendered: document.querySelectorAll("#dagPathsTable tbody tr").length,
+    rendered: document.querySelectorAll("#dagPathsTable tbody tr:not(.dag-table-section)").length,
     total: Number(document.querySelector("#dagPathsTable").dataset.pathCount) }));
   expect(rendered).toBeLessThanOrEqual(200);
   expect(rendered).toBe(Math.min(total, 200));
   if (total > 200) {
     await page.locator(".dag-table-more button").first().click();
-    await expect(page.locator("#dagPathsTable tbody tr")).toHaveCount(Math.min(total, 400));
+    await expect(page.locator("#dagPathsTable tbody tr:not(.dag-table-section)")).toHaveCount(Math.min(total, 400));
   }
 });
 
-test("in Identify each row is a confounder path with an arrow per link that opens its evidence", async ({ page }) => {
+test("in Identify each row is a confounder with its paths, a status, and links that open evidence", async ({ page }) => {
   await open(page, `${viewer}?task=identify`);
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag && window.__dagBuilderState?.publishedSchemaHydrated
     && !window.__dagBuilderState?.publishedSchemaHydrating);
@@ -601,39 +606,41 @@ test("in Identify each row is a confounder path with an arrow per link that open
   await expect(page.locator("#diagnosticOverlapKey")).toBeVisible();
   await page.locator("#dagViewTable").click();
   await expect(page.locator("#diagnosticOverlapKey")).toBeHidden();
-  await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Confounder", "Route"]);
-  const rows = page.locator("#dagPathsTable tbody tr");
+  await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Variable", "Path to cause", "Path to outcome", "Papers", "Concepts", "Status"]);
+  // One row per confounder, in Custom and Built-in sections, each with its shortest path to the cause and to the outcome.
+  const rows = page.locator("#dagPathsTable tbody tr:not(.dag-table-section)");
   expect(await rows.count()).toBeGreaterThan(0);
-  // A confounder's paths sit together: its name is one cell spanning all of its rows.
-  const confounder = await rows.first().getAttribute("data-row-id");
-  const own = page.locator(`#dagPathsTable tbody tr[data-row-id="${confounder}"]`);
-  await expect(page.locator(`#dagPathsTable th.dag-table-candidate [data-group-id="${confounder}"]`)).toHaveCount(1);
-  await expect(page.locator(`#dagPathsTable th.dag-table-candidate`).first()).toHaveAttribute("rowspan", String(await own.count()));
-  const order = await rows.evaluateAll(trs => trs.map(tr => tr.dataset.rowId));
-  expect(order.filter(id => id === confounder).length).toBe(await own.count());
-  expect(order.indexOf(confounder)).toBe(order.lastIndexOf(confounder) - (await own.count()) + 1);
-  const routeRows = await own.evaluateAll(trs => trs.map(tr => ({
-    route: tr.querySelector(".dag-table-route-label")?.textContent.trim(),
-    end: tr.querySelector(".dag-table-path .dag-table-node:last-of-type")?.dataset.groupId,
-  })));
-  expect([...new Set(routeRows.map(item => item.route))]).toEqual(["To Ind var", "To Dep var"]);
-  expect(routeRows.every(item => item.end === anchors[item.route === "To Ind var" ? 0 : 1])).toBe(true);
+  await expect(page.locator("#dagPathsTable tbody tr.dag-table-section")).toHaveCount(2);
   const row = rows.first();
-  await expect(row.locator("td")).toHaveCount(1);
-  for (const cell of await own.locator("td").all()) {
-    expect(await cell.locator(".dag-table-arrow").count()).toBeGreaterThan(0);
-    // Each path starts at the confounder and ends at an anchor.
-    await expect(cell.locator(".dag-table-node").first()).toHaveAttribute("data-group-id", /.+/);
+  const causeLinks = row.locator("td.dag-table-routes").nth(0).locator(".dag-table-link[data-edge-id]");
+  const outcomeLinks = row.locator("td.dag-table-routes").nth(1).locator(".dag-table-link[data-edge-id]");
+  expect(await causeLinks.count() + await outcomeLinks.count()).toBeGreaterThan(0);
+  // Further paths sit behind "+N more", and the toggle shows and hides them.
+  const more = page.locator("#dagPathsTable .dag-table-more-routes").first();
+  if (await more.count()) {
+    const before = await more.locator("xpath=ancestor::td").locator(".dag-table-route").count();
+    await more.click();
+    expect(await page.locator("#dagPathsTable .dag-table-more-routes[aria-expanded=true]").first()
+      .locator("xpath=ancestor::td").locator(".dag-table-route").count()).toBeGreaterThan(before);
+    await page.locator("#dagPathsTable .dag-table-more-routes[aria-expanded=true]").first().click();
   }
-  // The arrows are the only way into evidence: there is no separate column.
+  // A status is chosen from a menu in the row.
+  const status = row.locator("select.dag-table-status");
+  await expect(status).toHaveValue("unaddressed");
+  const options = await status.locator("option").evaluateAll(list => list.map(option => option.value));
+  expect(options.length).toBeGreaterThan(1);
+  await status.selectOption(options.find(value => value !== "unaddressed" && value !== "other"));
+  await expect(status).not.toHaveValue("unaddressed");
+  // The links are the only way into evidence: there is no separate column.
   await expect(page.locator("#dagPathsTable").getByText("Evidence", { exact: true })).toHaveCount(0);
-  const arrow = row.locator("td").first().locator(".dag-table-arrow").last();
+  const arrow = (await causeLinks.count() ? causeLinks : outcomeLinks).first();
   const edgeId = await arrow.getAttribute("data-edge-id");
   await arrow.click();
   await expect(page.locator("#provenancePanel")).toBeVisible();
   expect(await page.evaluate(() => window.__dagBuilderState.selectedEdgeId)).toBe(edgeId);
-  await expect(arrow).toHaveAttribute("aria-pressed", "true");
-  // Switching back restores the graph.
+  await expect(page.locator(`#dagPathsTable .dag-table-link[data-edge-id="${edgeId}"]`).first()).toHaveAttribute("aria-pressed", "true");
+  // The view switches are hidden while evidence is open; closing it brings them back, and switching restores the graph.
+  await page.locator("#closeEvidencePane").click();
   await page.locator("#dagViewGraph").click();
   await expect(page.locator("#dagNetwork")).toBeVisible();
   await expect(page.locator("#diagnosticOverlapKey")).toBeVisible();
@@ -649,7 +656,7 @@ test("in Identify each row is a confounder path with an arrow per link that open
     });
     expect(hasStudyArrow).toBe(false);
     await page.locator("#dagViewTable").click();
-    await expect(page.locator("#dagPathsTable tbody tr").first()).toBeVisible();
+    await expect(page.locator("#dagPathsTable tbody tr:not(.dag-table-section)").first()).toBeVisible();
     await expect(page.locator("#dagStudyTable")).toHaveCount(0);
   }
 });
@@ -675,29 +682,30 @@ test("links the view implies beyond the paths are listed too, as many as the gra
     return null;
   });
   await chooseAnchors(page, anchors[0], anchors[1]);
-  await page.locator(".filter-dropdown > summary").click();
+  await page.locator("details.filter-dropdown:visible > summary").click();
   const drawnLinks = () => page.evaluate(async () => {
     const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
     await api.whenDagRendered();
     return window.__dagBuilderState.visibleLinks.filter(link => !link.is_target_relation).map(link => link.edge_id).sort();
   });
-  const tabled = () => page.evaluate(() => [...document.querySelectorAll("#dagPathsTable .dag-table-arrow[data-edge-id], #dagOtherLinksTable .dag-table-arrow[data-edge-id]")]
+  const tabled = () => page.evaluate(() => [...document.querySelectorAll("#dagPathsTable :is(.dag-table-arrow, .dag-table-link)[data-edge-id], #dagOtherLinksTable :is(.dag-table-arrow, .dag-table-link)[data-edge-id]")]
     .map(arrow => arrow.dataset.edgeId).filter((id, index, all) => all.indexOf(id) === index).sort());
   // Showing only path links, every drawn link is on some path.
   const pathOnly = page.locator("#toggleIrrelevantConfounderLinks");
   if ((await pathOnly.getAttribute("aria-pressed")) !== "true") await pathOnly.click();
   await page.locator("#dagViewTable").click();
+  await expect(page.locator("#dagPathsTable tbody tr:not(.dag-table-section)").first()).toBeVisible();
   expect(await tabled()).toEqual(await drawnLinks());
   await expect(page.locator("#dagOtherLinksTable")).toHaveCount(0);
   // With "Path links only" off the graph also draws links no confounder path uses; the table lists them after the paths.
   // Choosing the Table view closed the Filters dropdown; reopen it for the toggle.
-  if (!(await page.locator("details.filter-dropdown").evaluate(element => element.open))) await page.locator(".filter-dropdown > summary").click();
+  if (!(await page.locator("details.filter-dropdown:visible").evaluate(element => element.open))) await page.locator("details.filter-dropdown:visible > summary").click();
   await pathOnly.click();
   await expect(pathOnly).toHaveAttribute("aria-pressed", "false");
   const all = await drawnLinks();
   await expect(page.locator("#dagOtherLinksTable")).toBeVisible();
   // Every drawn link is either on a listed path or in the other-links table (shown 200 at a time).
-  const onPaths = await page.evaluate(() => new Set([...document.querySelectorAll("#dagPathsTable .dag-table-arrow[data-edge-id]")]
+  const onPaths = await page.evaluate(() => new Set([...document.querySelectorAll("#dagPathsTable :is(.dag-table-arrow, .dag-table-link)[data-edge-id]")]
     .map(arrow => arrow.dataset.edgeId)).size);
   const listedOthers = Number(/\((\d+)\)/.exec(await page.locator("#dagOtherLinksTable caption").textContent())[1]);
   expect(onPaths + listedOthers).toBe(all.length);
@@ -713,7 +721,7 @@ test("links the view implies beyond the paths are listed too, as many as the gra
   expect(await page.evaluate(() => window.__dagBuilderState.selectedEdgeId)).toBe(edgeId);
 });
 
-test("on a phone, Identify opens on its setup even when another view was left on its Graph tab", async ({ browser }) => {
+test("on a phone, Identify opens on its fields even when another view was left on its Graph tab", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
@@ -722,17 +730,17 @@ test("on a phone, Identify opens on its setup even when another view was left on
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
     await expect(page.locator("#dagNetwork")).toBeVisible();
     await chooseTask(page, "identify", { tap: true });
-    // Not a blank screen: the setup is shown, and tapping Identify again changes nothing.
-    await expect(page.locator("#ivGroupPicker")).toBeVisible();
+    // Not a blank screen: the Cause field is shown, and choosing Identification again changes nothing.
+    await expect(page.locator("#identify-iv-input")).toBeVisible();
     await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
     await chooseTask(page, "identify", { tap: true });
-    await expect(page.locator("#ivGroupPicker")).toBeVisible();
+    await expect(page.locator("#identify-iv-input")).toBeVisible();
     // The same from Consequences, and the other views still open on their own panels afterwards.
     await chooseTask(page, "consequences", { tap: true });
     await chooseFocus(page, "category-income-earnings", { tap: true });
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
     await chooseTask(page, "identify", { tap: true });
-    await expect(page.locator("#ivGroupPicker")).toBeVisible();
+    await expect(page.locator("#identify-iv-input")).toBeVisible();
     await chooseTask(page, "causes", { tap: true });
     await expect(page.locator("#exploreView")).toBeVisible();
   } finally {
