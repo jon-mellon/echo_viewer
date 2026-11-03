@@ -16,7 +16,7 @@ const booleanFields = {
   conf: "showConfoundersOnly", coll: "showCollidersOnly", excl: "showExclusionViolations", exog: "showExogeneity",
   sparse: "excludeSparseEdges",
   bottle: "excludeBottleneckedConfounders",
-  paths: "hideIrrelevantConfounderLinks", vl: "showVariableLabels", gl: "showGroupLabels",
+  paths: "hideIrrelevantConfounderLinks",
   excl_links: "showAllExclusionLinks",
 };
 
@@ -54,8 +54,6 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state,
     selected_group: state.activeGroupId || "", selected_variable: state.selectedVariableId || "",
     selected_edge: state.selectedEdgeId || "", sort: state.groupListSort || "",
     fs: state.fullscreenPanel || "",
-    mz: String(state.map?.transform?.scale ?? ""), mx: String(state.map?.transform?.tx ?? ""),
-    my: String(state.map?.transform?.ty ?? ""),
     dz: String(state.dagViewport?.scale ?? ""), dx: String(state.dagViewport?.position?.x ?? ""),
     dy: String(state.dagViewport?.position?.y ?? ""),
   };
@@ -168,13 +166,8 @@ export function applyPermalink(params, state) {
   state.selectedVariableId = params.get("selected_variable") || null;
   state.selectedEdgeId = params.get("selected_edge") || null;
   state.groupListSort = params.get("sort") === "alpha" ? "alpha" : "relevance";
-  state.fullscreenPanel = ["variable-map", "dag"].includes(params.get("fs")) ? params.get("fs") : null;
+  state.fullscreenPanel = params.get("fs") === "dag" ? "dag" : null;
   const numeric = key => Number(params.get(key));
-  if (["mz", "mx", "my"].every(key => params.has(key) && Number.isFinite(numeric(key)))) {
-    state.map ||= {};
-    state.map.transform = { scale: numeric("mz"), tx: numeric("mx"), ty: numeric("my") };
-    state.permalinkMapViewport = true;
-  }
   if (["dz", "dx", "dy"].every(key => params.has(key) && Number.isFinite(numeric(key)))) {
     state.permalinkDagViewport = { scale: numeric("dz"), position: { x: numeric("dx"), y: numeric("dy") } };
   }

@@ -1,6 +1,6 @@
 const { test, expect } = require("./fixtures.cjs");
 const { chooseAnchor, chooseAnchors, startCreate } = require("./support/identify.cjs");
-const { describeVariable, conceptLabel } = require("./support/definition.cjs");
+const { describeVariable, includeConcepts } = require("./support/definition.cjs");
 const { chooseTask, openNav, closeNav } = require("./support/navigation.cjs");
 const { readFile } = require("node:fs/promises");
 
@@ -104,9 +104,7 @@ test("definition navigation returns through both Back steps and Cancel", async (
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
-  await page.locator("#definitionMethodManual").click();
-  // Opening a source only needs map records; neighbor suggestions are fetched
-  // for selected variables when the person starts defining the new group.
+  // Defining a variable never needs neighbor suggestions: the AI or an existing split supplies the concepts.
   expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:neighbors").length)).toBe(0);
   expect(await page.evaluate(() => window.__neighborQuerySizes)).toEqual([]);
   await page.locator("#definitionBack").click();
@@ -114,18 +112,9 @@ test("definition navigation returns through both Back steps and Cancel", async (
   await page.locator("#definitionContinue").click();
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
-  await page.locator("#definitionMethodManual").click();
-  await page.locator("#definitionConceptSearch").fill(await conceptLabel(page, variableId));
-  await page.locator("#definitionTermItems button", { hasText: /^In$/ }).first().click();
-  await expect.poll(() => page.evaluate(() => {
-    const variables = performance.getEntriesByName("echo:evidence:variables").at(-1);
-    const neighbors = performance.getEntriesByName("echo:evidence:neighbors").at(-1);
-    return Boolean(variables && neighbors && neighbors.startTime >= variables.startTime + variables.duration);
-  })).toBe(true);
-  expect(await page.evaluate(() => window.__neighborQuerySizes)).toEqual([1]);
-  if (await page.locator("#definitionAddNeighbors").isEnabled()) {
-    await page.locator("#definitionAddNeighbors").click();
-  }
+  await includeConcepts(page, [variableId]);
+  expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:neighbors").length)).toBe(0);
+  expect(await page.evaluate(() => window.__neighborQuerySizes)).toEqual([]);
   await page.locator(".definition-cancel:visible").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft)).toBeNull();
   await expect(page.locator("#identify-iv-input")).toBeVisible();
@@ -156,36 +145,6 @@ test("variable search catalog preloads once and serves anchor search", async ({ 
   expect(catalogRequests).toHaveLength(hasStaticCatalog ? 1 : 0);
   await page.locator("#identify-iv-input").fill("education");
   await expect(page.locator("#identifyGroupPicker button[data-group-id]").first()).toBeVisible();
-});
-
-test("map context menu changes a definition selection and closes with Escape", async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  // The map is available while defining in the narrower layout, not beside the wide concept list.
-  await page.setViewportSize({ width: 820, height: 900 });
-  await page.goto(viewer);
-  await ready(page);
-  await startCreate(page, "iv");
-  await describeVariable(page);
-  await page.locator("#definitionSourceList input[data-source-id]").first().check();
-  await page.locator("#definitionContinue").click();
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
-  await page.locator("#definitionMethodManual").click();
-  const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
-  await page.locator("#definitionConceptSearch").fill(await conceptLabel(page, variableId));
-  await page.locator("#definitionTermItems button", { hasText: /^In$/ }).first().click();
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedVariableIds.size)).toBeGreaterThan(0);
-  await page.locator('button[data-mobile-panel="variables"]').click();
-  await expect(page.locator("#dagMapCanvas")).toBeVisible();
-  await page.locator("#dagMapCanvas").click({ button: "right", position: { x: 450, y: 360 }, timeout: 5_000 });
-  await expect(page.locator("#dagMapContextMenu")).toBeVisible();
-  await page.locator('#dagMapContextMenu button[data-definition-action="remove"]').click();
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
-  await page.locator("#dagMapCanvas").click({ button: "right", position: { x: 450, y: 360 }, timeout: 5_000 });
-  await page.locator('#dagMapContextMenu button[data-definition-action="add"]').click();
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(1);
-  await page.locator("#dagMapCanvas").click({ button: "right", position: { x: 450, y: 360 }, timeout: 5_000 });
-  await page.keyboard.press("Escape");
-  await expect(page.locator("#dagMapContextMenu")).toBeHidden();
 });
 
 test("edge evidence renders provenance without loading map layouts", async ({ page }) => {
@@ -340,47 +299,7 @@ test("mobile evidence tables reopen at their left edge", async ({ page }) => {
   expect(await panel.evaluate(node => node.scrollLeft)).toBe(0);
 });
 
-test("pinching the mobile variable map zooms the map without selecting a variable", async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.setViewportSize({ width: 390, height: 800 });
-  await page.goto(viewer);
-  await ready(page);
-  await startCreate(page, "iv");
-  await describeVariable(page);
-  await expect(page.locator('#definitionSourceList input[data-source-id]').first()).toBeVisible();
-  await page.locator('#definitionSourceList input[data-source-id]').first().check();
-  await page.locator('#definitionContinue').click();
-  await page.locator('button[data-mobile-panel="variables"]').click();
-  await expect(page.locator('button[data-mobile-panel="dag"]')).toBeHidden();
-  await expect(page.locator('.mobile-panel-nav .mobile-panel-tab:visible')).toHaveCount(2);
-  const canvas = page.locator('#dagMapCanvas');
-  await expect(canvas).toBeVisible();
-  await expect.poll(() => canvas.evaluate(node => node.width)).toBeGreaterThan(100);
-  expect(await canvas.evaluate(node => getComputedStyle(node).touchAction)).toBe('none');
-
-  const box = await canvas.boundingBox();
-  const centerX = box.x + box.width / 2;
-  const centerY = box.y + box.height / 2;
-  const before = await page.evaluate(() => window.__dagBuilderState.map.transform.scale);
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
-  const point = (x, id) => ({ x, y: centerY, id });
-  await cdp.send('Input.dispatchTouchEvent', {
-    type: 'touchStart', touchPoints: [point(centerX - 30, 1)],
-  });
-  await cdp.send('Input.dispatchTouchEvent', {
-    type: 'touchStart', touchPoints: [point(centerX - 30, 1), point(centerX + 30, 2)],
-  });
-  await cdp.send('Input.dispatchTouchEvent', {
-    type: 'touchMove', touchPoints: [point(centerX - 65, 1), point(centerX + 65, 2)],
-  });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.map.transform.scale)).toBeGreaterThan(before);
-  expect(await page.evaluate(() => window.__dagBuilderState.selectedVariableIds.size)).toBe(0);
-});
-
-test("mobile definition waits for variable data before opening the map", async ({ page }) => {
+test("mobile definition waits for variable data before showing the concepts", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(viewer);
@@ -396,12 +315,10 @@ test("mobile definition waits for variable data before opening the map", async (
   await page.locator('#definitionSourceList input[data-source-id]').first().check();
   await page.locator("#definitionContinue").click();
   await expect(page.locator("#definitionContinue")).toHaveText("Loading concepts…");
-  await expect(page.locator('button[data-mobile-panel="variables"]')).toBeHidden();
+  await expect(page.locator("#definitionPartitionStep")).toBeHidden();
   await page.evaluate(() => window.__releaseVariableLoad());
-  await expect(page.locator('button[data-mobile-panel="variables"]')).toBeVisible();
-  await page.locator('button[data-mobile-panel="variables"]').click();
+  await expect(page.locator("#definitionPartitionStep")).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variables.length)).toBeGreaterThan(0);
-  await expect(page.locator('#variableAssignmentCounts')).not.toHaveText(/0 assigned\s*0 unassigned/);
 });
 
 test("project export can be imported with its anchors intact", async ({ page }) => {

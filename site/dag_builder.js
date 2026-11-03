@@ -7,7 +7,6 @@ import { aggregateGroupLinks as deriveGroupLinks, rawLinksBetween as lookupRawLi
 import * as exportData from "/dag_exports.mjs";
 import { createDagExportController } from "/dag_export_controller.mjs";
 import { renderDagPng } from "/dag_export_image.mjs";
-import * as mapGeometry from "/map_geometry.mjs";
 import { createRenderCoordinator } from "/render_coordinator.mjs";
 import * as candidates from "/dag_candidates.mjs";
 import * as inspector from "/dag_inspector.mjs";
@@ -18,13 +17,12 @@ import { createDagAppState, ensureDiagnosticFilter } from "/dag_app_state.mjs";
 import { createDagProjectController } from "/dag_project_controller.mjs";
 import { createDagInspectorController, STUDY_DESIGN_EDGE_ID } from "/dag_inspector_controller.mjs";
 import { createDagShellController } from "/dag_shell_controller.mjs";
-import { createDagMapViewController } from "/dag_map_view_controller.mjs";
-import { createDagMapUiController } from "/dag_map_ui_controller.mjs";
 import { createDagSetupGroupController } from "/dag_setup_group_controller.mjs";
 import { createDagGroupEditorController } from "/dag_group_editor_controller.mjs";
 import { deriveDagView, excludedForConnectivity } from "/dag_view.mjs";
 import { createDagNetworkController, isDagDisplayGroup } from "/dag_network_controller.mjs?v=compiled-first-v2";
 import { createDagEventController } from "/dag_event_controller.mjs";
+import { createGroupPalette } from "/group_palette.mjs";
 import { createUoaController } from "/uoa_controller.mjs";
 import { createToolbarController } from "/toolbar_controller.mjs";
 import { createDefinitionWorkflowController } from "/definition_workflow_controller.mjs";
@@ -52,7 +50,6 @@ const ROLE_LABELS = {
   possible_common_consequence_or_collider: "Common consequence",
   other_possible_cause_of_dv: "Other cause of Dep var",
   other_possible_cause_of_iv: "Other cause of Ind var",
-  near_iv_dv_map_region: "Near Ind var/Dep var region",
 };
 
 const GROUP_COLORS = {
@@ -77,6 +74,7 @@ const GROUP_PALETTE = (() => {
 
 // The current interface has one canonical entry point at the site root.
 const state = createDagAppState("dag2");
+const groupPalette = createGroupPalette({ state, colors: GROUP_COLORS, palette: GROUP_PALETTE });
 let schemaBatchDepth = 0;
 let schemaCommitQueued = false;
 const PROJECT_STORAGE_PREFIX = state.interfaceMode === "dag2" ? "dag2-project-v1" : "dag-builder-project-v2";
@@ -128,11 +126,10 @@ function initElements() {
     "definitionBlock", "definitionTitle", "definitionCancel", "definitionDescribeStep", "definitionDescribeNext", "definitionResumeList",
     "definitionAiWork", "definitionSourcesStep", "definitionSourcesBack",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults",
-    "definitionPartitionStep", "definitionMethodJev", "definitionMethodManual", "definitionLoadStatus", "definitionJevPanel", "definitionManualPanel",
+    "definitionPartitionStep", "definitionLoadStatus", "definitionJevPanel", "definitionIncludedPanel",
     "definitionConceptsIntro", "definitionCountIncluded", "definitionCountExcluded", "definitionCountUnreviewed",
-    "definitionSourcesSummary", "definitionTermSummary",
-    "definitionConceptSearch", "definitionStatusFilter", "definitionTermSelect", "definitionActiveFilters",
-    "definitionIncludedFilter", "definitionRelated", "definitionSaveHint",
+    "definitionSourcesSummary",
+    "definitionIncludedFilter", "definitionSaveHint",
     "definitionAiStepConnect", "definitionAiStepLimit", "definitionAiStepSample", "definitionAiStepFull",
     "definitionAiConnectSummary", "definitionAiLimitSummary", "definitionAiSampleSummary", "definitionAiFullSummary",
     "definitionAiLimitText", "definitionAiSettingsLink", "definitionAiSampleHost", "definitionAiFullHost",
@@ -141,9 +138,7 @@ function initElements() {
     "definitionAiRun", "definitionAiPreview", "definitionAiSummary", "definitionAiRows", "definitionAiFullRun", "definitionAiMore",
     "definitionAiReviewTools", "definitionAiReviewFilter", "definitionAiReviewPage", "definitionAiReviewPrev", "definitionAiReviewNext",
     "definitionAiApply", "definitionAiDiscard",
-    "definitionTermItems", "definitionTermPrev", "definitionTermPage", "definitionTermNext",
-    "definitionTermToNew", "definitionTermToLeftover", "definitionUndoBatch",
-    "definitionSelectedVariables", "definitionAddNeighbors", "definitionNeighborResults",
+    "definitionSelectedVariables",
     "definitionBack", "definitionSelectedTitle", "definitionSaveStatus",
     "definitionNewLabel", "definitionNewDescription", "definitionResidualLabels",
     "definitionValidation", "definitionSave",
@@ -161,11 +156,8 @@ function initElements() {
     "importSchemaChooseFile",
     // Rejected variables
     "rejectedVariablesPanel", "rejectedVariableSearch", "rejectedVariablesList",
-    // Map
-    "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts", "definitionMapPreviewStatus",
-    "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleSparseEdges", "minimumEdgePapers", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
-    "selectionCount",
+    // Graph filters
+    "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleSparseEdges", "minimumEdgePapers", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
     // Right: group editor
@@ -191,8 +183,6 @@ function initElements() {
   ]) {
     els[id] = $(id);
   }
-  state.map.canvas = els.dagMapCanvas;
-  state.map.ctx = state.map.canvas.getContext("2d");
   els.confounderDisclosure.addEventListener("toggle", renderConfounderStatuses);
   els.exportLocalDraft?.addEventListener("click", exportLocalDraft);
   // History (previous sessions) is a top-bar menu; its list is rebuilt each time it opens.
@@ -318,7 +308,7 @@ function isRejectedVariable(variableId) {
 }
 
 function visibleVariables() {
-  if (state.map?._visibleVariables) return state.map._visibleVariables;
+  if (state.visibleCache.variables) return state.visibleCache.variables;
   let variables = visibility.visibleVariables(
     state.variables, rejectedVariableEntries(), state.clusterOf, state.clusterMembers,
   );
@@ -326,25 +316,24 @@ function visibleVariables() {
     const eligible = new Set(state.definitionDraft.eligible_variable_ids || []);
     variables = variables.filter(variable => eligible.has(clusterRep(variable.variable_id)));
   }
-  if (state.map) state.map._visibleVariables = variables;
+  state.visibleCache.variables = variables;
   return variables;
 }
 
 function visibleClusterReps() {
-  if (state.map?._visibleClusterReps) return state.map._visibleClusterReps;
+  if (state.visibleCache.clusterReps) return state.visibleCache.clusterReps;
   const representatives = visibleVariables().filter((variable) => variable.is_cluster_rep);
-  if (state.map) state.map._visibleClusterReps = representatives;
+  state.visibleCache.clusterReps = representatives;
   return representatives;
 }
 
-function invalidateMapCaches() {
-  mapUiController.invalidateCaches();
-  if (!state.map) return;
-  state.map._visibleVariables = null;
-  state.map._visibleClusterReps = null;
-  state.map._worldSpan = null;
-  state.map._groupRegions = null;
+function invalidateVisibleCaches() {
+  state.visibleCache.variables = null;
+  state.visibleCache.clusterReps = null;
+  groupPalette.invalidate();
 }
+
+function groupColor(group) { return groupPalette.groupColor(group); }
 
 
 function initializeProject() {
@@ -501,8 +490,8 @@ const renderCoordinator = createRenderCoordinator({
   buildCandidateQueue, aggregateGroupLinks, computeVisibleLinks, renderConfounderStatuses, renderGroupList,
   renderRejectedVariablesPanel, renderDag, refreshDagEdgeSelection,
   renderVariableComparison,
-  renderSelectedEdge, renderExportStatus, renderMapModeControls,
-  renderMapToolbarToggles, renderUndoRedo, drawMap, saveProjectLocally,
+  renderSelectedEdge, renderExportStatus,
+  renderMapToolbarToggles, renderUndoRedo, saveProjectLocally,
   renderModeUI, renderAnchorBar, renderStatus, renderUoaStep, renderUoaFilterBar,
   renderVariablePanel: () => setupGroupController.renderVariablePanel(),
   renderSearch, renderSetupGroupPickers, renderSeedRows, renderGroupingSetControls,
@@ -535,11 +524,8 @@ function rebuildLinkDecision() {
   renderCoordinator.rebuildLinkDecision();
 }
 
-function renderMapToolbarToggles(options) { return toolbarController.render(options); }
+function renderMapToolbarToggles() { return toolbarController.render(); }
 
-function assignmentCoverage() { return toolbarController.assignmentCoverage(); }
-
-function renderAssignmentCoverage() { return toolbarController.renderAssignmentCoverage(); }
 
 // ─── Mode UI rendering ────────────────────────────────────────────────────────
 
@@ -562,8 +548,6 @@ function changeAnchor(side) {
   Object.assign(state, workflow.transition(state, { type: "change-anchor", side, groupId: gid }));
   const input = side === "dv" ? els.dvInput : side === "instrument" ? els.instrumentInput : els.ivInput;
   if (input) input.value = "";
-  setMapMode("select");
-  if (group) fitMap(group.variable_ids);
   renderAll({ rebuild: false });
   setTimeout(() => { input?.focus(); }, 60);
 }
@@ -668,15 +652,11 @@ function assignGroupAsInstrument(groupId) {
   Object.assign(state, workflow.transition(state, {
     type: "anchor-selected", side: "instrument", groupId,
   }));
-  setMapMode("select");
-  if (group) fitMap(group.variable_ids);
   // Instrument selection changes the view, but not group membership or link
   // aggregation. Keep the existing project graph and candidate queue.
   renderAll({ rebuild: false });
   updateDagFilters();
-  renderMapModeControls();
   renderUndoRedo();
-  drawMap();
   shellController.showMobilePanel("dag");
 }
 
@@ -700,9 +680,7 @@ function cancelDefinition() { return definitionWorkflowController.cancelDefiniti
 function definitionSources() { return definitionWorkflowController.definitionSources(); }
 function continueDefinition() { return definitionWorkflowController.continueDefinition(); }
 function definitionResidualIds(source) { return definitionWorkflowController.definitionResidualIds(source); }
-function toggleDefinitionVariable(variableId, add = null) { return definitionWorkflowController.toggleDefinitionVariable(variableId, add); }
 function definitionCanReview() { return definitionWorkflowController.definitionCanReview(); }
-function definitionNeighbors() { return definitionWorkflowController.definitionNeighbors(); }
 function renderDefinition() {
   definitionWorkflowController.renderDefinition();
   customVariablesPresenter.render();
@@ -723,7 +701,7 @@ async function deleteCustomVariable(groupId) {
     if (state[key] === groupId) state[key] = null;
   }
   addToUndoHistory(`Deleted variable "${group?.label || groupId}"`, before);
-  invalidateMapCaches();
+  invalidateVisibleCaches();
   renderAll();
   await persistentViewer.commitDecision();
   publicationController.workingCopyChanged();
@@ -774,16 +752,9 @@ function renderSearch(side, { renderPicker = true } = {}) {
         const group = activeGroup();
         if (group && group.type === side) addVariableToGroup(group, variableId);
         renderAll();
-        fitNeighborhood([...selected]);
       }
     });
   });
-}
-
-function fitSearchContext(side) {
-  const previewIds = (state.searchMatches[side] || []).slice(0, 5);
-  if (previewIds.length) fitNeighborhood(previewIds, 12);
-  else drawMap();
 }
 
 function searchVariables(query, limit = 20) {
@@ -860,6 +831,28 @@ function groupedVariableIds(excludeGroupId = null) {
     for (const variableId of group.variable_ids || []) grouped.add(variableId);
   }
   return grouped;
+}
+
+function restoreRejectedVariable(variableId) {
+  const repId = clusterRep(variableId);
+  const entry = rejectedVariableEntries().find((item) => clusterRep(item.variable_id) === repId);
+  if (!entry) return;
+  const memberIds = entry.member_variable_ids || [entry.variable_id];
+  for (const groupId of entry.previous_group_ids || []) {
+    const group = groupById(groupId);
+    if (!group) continue;
+    for (const memberId of memberIds) {
+      if (!group.variable_ids.includes(memberId)) group.variable_ids.push(memberId);
+    }
+  }
+  state.project = visibility.restoreRejection(state.project, repId, state.clusterOf, state.clusterMembers);
+  invalidateVisibleCaches();
+  addDecision("rejected_variable_restored", {
+    variable_id: repId,
+    member_variable_ids: memberIds,
+    restored_group_ids: entry.previous_group_ids || [],
+  });
+  void persistentViewer.commitDecision().catch(error => console.error("Could not save restored variable", error));
 }
 
 function renderRejectedVariablesPanel() {
@@ -1188,7 +1181,7 @@ async function hydrateVariableDetails(variableIds, { skipNeighbors = false } = {
     }
     state.variables = [...state.variableById.values()].sort((a, b) => Number(a.index || 0) - Number(b.index || 0));
     buildDuplicateClusters();
-    invalidateMapCaches();
+    invalidateVisibleCaches();
     if (!skipNeighbors) applyVariableNeighbors(variables, neighbors);
   }
   if (!skipNeighbors) await hydrateVariableNeighbors(requested);
@@ -1225,19 +1218,16 @@ function renderGroupEditor() {
 function renderGroupSeedSearch() { return groupEditorController.renderGroupSeedSearch(); }
 function renderNeighborSuggestions(group) { return groupEditorController.renderNeighborSuggestions(group); }
 function addVariableToGroup(group, variableId) {
-  if (group?.group_id === "__definition_new__") return toggleDefinitionVariable(variableId, true);
+  // The new variable's members come from the AI or an existing split, never from the map.
+  if (group?.group_id === "__definition_new__") return;
   return groupEditorController.addVariableToGroup(group, variableId);
 }
 function addVariableSetToGroup(group, ids) {
-  if (group?.group_id === "__definition_new__") {
-    // One change for the whole lasso, so a single Undo reverts it.
-    if (state.definitionMethod === "manual") definitionWorkflowController.classifyDefinitionVariables(ids, "in");
-    return;
-  }
+  if (group?.group_id === "__definition_new__") return;
   return groupEditorController.addVariableSetToGroup(group, ids);
 }
 function removeVariableFromGroup(group, variableId) {
-  if (group?.group_id === "__definition_new__") return toggleDefinitionVariable(variableId, false);
+  if (group?.group_id === "__definition_new__") return;
   return groupEditorController.removeVariableFromGroup(group, variableId);
 }
 function addTopNeighborsToActiveGroup() { return groupEditorController.addTopNeighborsToActiveGroup(); }
@@ -1294,7 +1284,7 @@ const persistentViewer = createPersistentViewer({
     if (els.saveIndependentCopy) els.saveIndependentCopy.hidden =
       !message.includes("Schema revision changed");
   },
-  onDiscard: invalidateMapCaches,
+  onDiscard: invalidateVisibleCaches,
 });
 
 const taskViews = createTaskViews({
@@ -1371,20 +1361,6 @@ function applyActiveGroupingSet() { return groupingSetController.applyActive(); 
 function candidateInputs() {
   return { variables: state.variableById, similarityEdgeMap: state.similarityEdgeMap, linkLookup: state.linkLookup };
 }
-
-function createDensityCandidateGroup() {
-  const group = candidates.createDensityCandidateGroup(state.project, candidateInputs(), {
-    visibleVariables: visibleVariables(), transform: state.map.transform,
-    width: canvasWidth(), height: canvasHeight(), groupId: `density_${Date.now()}`,
-    createdAt: nowIso(), updatedAt: nowIso(),
-  });
-  if (!group) return null;
-  ensureGroup(group);
-  addDecision("density_candidate_created", { group_id: group.group_id, variable_ids: group.variable_ids });
-  return group;
-}
-
-
 
 // ─── Candidate queue ──────────────────────────────────────────────────────────
 
@@ -1910,8 +1886,6 @@ function selectedEdge() {
   return inspectorController.selectedEdge();
 }
 
-// ─── Map helpers ──────────────────────────────────────────────────────────────
-
 
 function detectDirectedCycle(groups = dagGroups(), links = state.project.links) {
   const graph = new Map();
@@ -1937,108 +1911,6 @@ function detectDirectedCycle(groups = dagGroups(), links = state.project.links) 
   return false;
 }
 
-// ─── Map mode controls ────────────────────────────────────────────────────────
-
-function setMapMode(mode) {
-  mapViewController.setMode(mode);
-}
-
-function isDrawMode(mode = state.map.mode) {
-  return mapViewController.isDrawMode(mode);
-}
-
-// During Dep var/Ind var selection the user can draw a boundary before picking a seed; the
-// enclosed variables become the seed set and open the target group directly.
-function isSeedSelectionPhase() {
-  return mapViewController.isSeedSelectionPhase();
-}
-
-function renderMapModeControls() {
-  mapViewController.renderModeControls();
-}
-
-// ─── Map rendering ────────────────────────────────────────────────────────────
-
-function resizeMap() {
-  mapViewController.resize();
-}
-
-function canvasWidth() { return mapViewController.canvasWidth(); }
-function canvasHeight() { return mapViewController.canvasHeight(); }
-
-function visibleVariableBounds() {
-  return mapViewController.visibleBounds();
-}
-
-function constrainMapTransform(transform) {
-  return mapViewController.constrain(transform);
-}
-
-function globalWorldSpan() {
-  return mapViewController.worldSpan();
-}
-
-function fitMap(variableIds = null, options = {}) {
-  mapViewController.fit(variableIds, options);
-}
-
-function fitNeighborhood(variableIds, neighborLimit = 48) {
-  mapViewController.fitNeighborhood(variableIds, neighborLimit);
-}
-
-function zoomMap(screenX, screenY, factor, interactive = false) {
-  mapViewController.zoom(screenX, screenY, factor, interactive);
-}
-
-function worldToScreen(x, y) {
-  return mapViewController.worldToScreen(x, y);
-}
-
-function screenToWorld(x, y) {
-  return mapViewController.screenToWorld(x, y);
-}
-
-function scheduleMapDraw(includeLabels = false) {
-  mapViewController.schedule(includeLabels);
-}
-
-function scheduleSettledMapDraw(delayMs = 100) {
-  mapViewController.scheduleSettled(delayMs);
-}
-
-function drawMap(options) {
-  // The variable map is not shown in the causes and consequences views.
-  if (taskViews.exploring()) return undefined;
-  const result = mapUiController.drawMap(options);
-  persistentViewer.viewerChanged(true);
-  return result;
-}
-function drawMapPoints(ctx, width, height) { return mapUiController.drawMapPoints(ctx, width, height); }
-function ensureGlobalVoronoiCells() { return mapUiController.ensureGlobalVoronoiCells(); }
-function applyBrush() {
-  schemaBatchDepth += 1;
-  try { return mapUiController.applyBrush(); }
-  finally {
-    schemaBatchDepth -= 1;
-    if (!schemaBatchDepth && !state.definitionDraft && !state.activeGroupId) {
-      void persistentViewer.commitDecision().catch(error =>
-        console.error("Could not save brush edits", error));
-    }
-  }
-}
-function groupColor(group) { return mapUiController.groupColor(group); }
-function repAtPoint(clientX, clientY) { return mapUiController.repAtPoint(clientX, clientY); }
-function clearHoverIntent() { return mapUiController.clearHoverIntent(); }
-function updateMapHover(event) { return mapUiController.updateMapHover(event); }
-function nearestVariable(clientX, clientY, threshold) { return mapUiController.nearestVariable(clientX, clientY, threshold); }
-function showMapTooltip(variable, clientX, clientY) { return mapUiController.showMapTooltip(variable, clientX, clientY); }
-function hideMapContextMenu() { return mapUiController.hideMapContextMenu(); }
-function flagVariableLowQuality(variableId) { return mapUiController.flagVariableLowQuality(variableId); }
-function restoreRejectedVariable(variableId) { return mapUiController.restoreRejectedVariable(variableId); }
-function showMapContextMenu(variable, clientX, clientY, variableIds = null) {
-  return mapUiController.showMapContextMenu(variable, clientX, clientY, variableIds);
-}
-
 // ─── Geometry helpers ──────────────────────────────────────────────────────────
 
 function groupCoherence(variableIds) {
@@ -2047,27 +1919,19 @@ function groupCoherence(variableIds) {
 
 
 
-function groupCentroid(variableIds) { return mapGeometry.centroid(variableIds, state.variableById); }
-
-function distance(a, b) { return mapGeometry.distance(a, b); }
-
 const uoaController = createUoaController({
   state, elements: els, visibleVariables, groupById, clusterRep, truncate, renderAll,
 });
 
-const toolbarController = createToolbarController({
-  state, elements: els, dagGroups, groupById, visibleVariables, uoaMatches,
-  clusterRep, rejectedVariableIdSet,
-});
+const toolbarController = createToolbarController({ state, elements: els, dagGroups, groupById });
 
 const definitionWorkflowController = createDefinitionWorkflowController({
-  state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll, drawMap, renderAssignmentCoverage,
-  setMapMode, fitMap, groupById, persistProjectLocally, getReturnUrl: () => persistentViewer.currentUrl() || location.href, visibleVariables,
+  state, elements: els, activeGroup, clusterRep, invalidateVisibleCaches, renderAll,
+  groupById, persistProjectLocally, getReturnUrl: () => persistentViewer.currentUrl() || location.href, visibleVariables,
   searchVariables: searchVisibleVariables, searchSourceGroups: searchDefinitionSourceGroups,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
-  takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
+  takeSnapshot, addToUndoHistory, clean, normalized, truncate,
   hydrateVariableDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),
-  hydrateNeighbors: hydrateVariableNeighbors,
   commitSchema: async () => {
     await persistentViewer.commitDecision();
     publicationController.workingCopyChanged();
@@ -2099,7 +1963,7 @@ const customVariablesPresenter = createCustomVariablesPresenter({
 
 const projectController = createDagProjectController({
   state, storage: window.localStorage, storagePrefix: PROJECT_STORAGE_PREFIX,
-  nowIso, invalidateMapCaches, renderAll, rebuildLinkDecision, renderUndoRedo, renderActionHistory,
+  nowIso, invalidateVisibleCaches, renderAll, rebuildLinkDecision, renderUndoRedo, renderActionHistory,
 });
 
 const inspectorController = createDagInspectorController({
@@ -2111,39 +1975,20 @@ const inspectorController = createDagInspectorController({
   excludeConcept: excludeGroupConcept,
 });
 
-const mapViewController = createDagMapViewController({
-  state, elements: els, activeGroup, visibleVariables, isRejectedVariable, drawMap,
-});
-
 const groupEditorController = createDagGroupEditorController({
   state, elements: els, applyProjectOperation, groupById, takeSnapshot,
-  expandToClusterMembers, nowIso, clean, setMapMode, fitNeighborhood, fitMap,
+  expandToClusterMembers, nowIso, clean,
   addToUndoHistory, renderAll, addDecision, setWorkflowMode, groupedVariableIds,
   searchVariables, clusterMemberIds, rejectedVariableIdSet, uoaMatches,
-  fitSearchContext, applyActiveGroupingSet, rebuildProject, createDensityCandidateGroup,
+  applyActiveGroupingSet, rebuildProject,
   escapeHtml, truncate, hydrateVariableDetails,
   beginEditor: () => persistentViewer.beginEditor(),
   onAnchorsReady: () => shellController.showMobilePanel("dag"),
 });
 
-const mapUiController = createDagMapUiController({
-  state, elements: els,
-  beginDraw: (includeLabels) => mapViewController.beginDraw(includeLabels),
-  canvasWidth, canvasHeight, worldToScreen, screenToWorld, visibleClusterReps,
-  dagGroups, activeGroup, uoaMatches, clusterRep, clusterMemberIds,
-  clusterDisplayVariable, clusterExactStringGroups, expandToClusterMembers, groupById,
-  applyProjectOperation, nowIso, takeSnapshot, addToUndoHistory, addDecision, addVariableToGroup,
-  addVariableSetToGroup, removeVariableFromGroup, beginTargetGroup, setMapMode,
-  renderAll, rebuildProject, invalidateMapCaches, rejectedVariableEntries,
-  rejectedVariableIdSet, isRejectedVariable, clean, escapeHtml, truncate,
-  groupColors: GROUP_COLORS, groupPalette: GROUP_PALETTE,
-  schemaChanged: () => { void persistentViewer.commitDecision().catch(error =>
-    console.error("Could not save restored variable", error)); },
-});
-
 const setupGroupController = createDagSetupGroupController({
   state, elements: els, escapeHtml, normalized, truncate, groupById,
-  assignGroupAsAnchor, assignGroupAsInstrument, setMapMode, renderAll,
+  assignGroupAsAnchor, assignGroupAsInstrument, renderAll,
   roleLabels: ROLE_LABELS, dagProjectView, startDefinition, startEditSplit,
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
   searchAnchorGroups, beginEditor: () => persistentViewer.beginEditor(),
@@ -2159,7 +2004,7 @@ const setupGroupController = createDagSetupGroupController({
 
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, exploreRows: () => taskViews.neighborhood().included,
+  renderAll, exploreRows: () => taskViews.neighborhood().included,
   onNodeHover: id => taskViews.highlightRow(id),
   onSetStatus: (kind, groupId, status, text) => setDiagnosticStatus(kind, groupId, status, text),
   onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
@@ -2202,7 +2047,7 @@ export function renderedDagEdgeIds() {
 }
 
 const shellController = createDagShellController({
-  state, elements: els, resizeMap, fitMap, renderDag,
+  state, elements: els, renderDag,
   getNetwork: () => dagNetworkController.getNetwork(),
   isDagFullyVisible: () => dagNetworkController.isFullyVisible(),
   dismissEvidencePane,
@@ -2307,10 +2152,10 @@ const groupingSetController = createGroupingSetController({
 });
 
 const projectBootstrap = createProjectBootstrap({
-  state, initElements, installHandlers, installDefinitionHandlers, resizeMap,
+  state, initElements, installHandlers, installDefinitionHandlers,
   restoreProjectLocally, initializeProject, loadLatestSchemaGroups,
   normalizeProjectDuplicateAssignments, saveProjectLocally, publicationController,
-  renderAll, constrainMapTransform, drawMap, fitMap, dagNetworkController,
+  renderAll, dagNetworkController,
   buildDuplicateClusters, linkKey, pairKey, loadVariableSearchCatalog,
   onLocalSchemaLoaded: record => persistentViewer.setLoadedRecord(record),
   onReady: () => {
@@ -2333,23 +2178,19 @@ const exportProject = () => exportController.exportProject();
 const exportWorkingMap = () => exportController.exportWorkingMap();
 const eventController = createDagEventController({
   state, elements: els, dagNetwork: dagNetworkController,
-  renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
-  renderSearch, fitSearchContext, prefetchVariableSearch: loadVariableSearchCatalog,
+  activeGroup, renderNeighborSuggestions, renderAll,
+  renderSearch, prefetchVariableSearch: loadVariableSearchCatalog,
   toggleAnchorSearchMode, finishSchemaChoice, changeAnchor, renderSetupGroupPicker,
   setWorkflowMode, renderGroupList, closeGroupEditor, discardGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
-  renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
+  renderGroupSeedSearch, renderRejectedVariablesPanel, applyProjectOperation,
   saveProjectLocally, applyActiveGroupingSet, rebuildProject, updateDagFilters, exportGroupingFolder,
-  copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
-  canvasHeight, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber, setMapMode,
+  copyPermalink, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber,
   undo, redo, renderActionHistory, renderDag, setFullscreenPanel,
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,
-  exportTex, resizeMap, installDagHandlers, initPanelResizers, hideMapContextMenu,
-  showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,
-  isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
-  addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean,
+  exportTex, installDagHandlers, initPanelResizers, takeSnapshot,
+  addToUndoHistory, clusterRep, addVariableToGroup, clean,
   startEditSplit, startDefinition, dismissEvidencePane,
-  toggleDefinitionVariable,
   showExcludedLinks, showExcludedFindings,
 });
 

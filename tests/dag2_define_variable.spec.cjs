@@ -1,7 +1,7 @@
 const { test, expect } = require("./fixtures.cjs");
 const { chooseAnchor, chooseAnchors, startCreate, openIdentifyField, createVariableButton, editVariableButton } = require("./support/identify.cjs");
 const { watchBrowserErrors } = require("./browser_errors.cjs");
-const { describeVariable, conceptLabel, startAiSplit } = require("./support/definition.cjs");
+const { describeVariable, startAiSplit, includeConcepts } = require("./support/definition.cjs");
 const { chooseTask, chooseFocus } = require("./support/navigation.cjs");
 
 test("DAG2 defines a canonical variable from per-source residual slices", async ({ page }) => {
@@ -48,9 +48,10 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await page.locator("#definitionContinue").click();
   await expect(page.locator("body"), browserErrors.errors.join("\n")).toHaveClass(/defining-variable/);
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
-  await expect(page.locator("#definitionMethodManual")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#definitionJevPanel")).toBeVisible();
+  await expect(page.locator("#definitionIncludedPanel")).toBeVisible();
   await expect(page.locator("#definitionSave")).toBeDisabled();
-  await expect(page.locator("#definitionSaveHint")).toHaveText("Include at least one concept to save.");
+  await expect(page.locator("#definitionSaveHint")).toHaveText("Include at least one concept to save: use the AI suggestions or an existing split.");
   expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids
     .filter(id => {
       const variable = window.__dagBuilderState.variableById.get(id);
@@ -58,9 +59,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
     }).length)).toBeGreaterThan(0);
 
   const canonicalId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
-  const canonicalLabel = await conceptLabel(page, canonicalId);
-  await page.locator("#definitionConceptSearch").fill(canonicalLabel);
-  await page.locator("#definitionTermItems button", { hasText: /^In$/ }).first().click();
+  await includeConcepts(page, [canonicalId]);
   await expect(page.locator("#definitionSelectedVariables .definition-included-row")).toHaveCount(1);
   await expect(page.locator("#definitionSelectedTitle")).toHaveText("Included concepts (1)");
   await expect(page.locator("#definitionSave")).toBeEnabled();
@@ -96,11 +95,8 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await editVariableButton(page, "Browser test construct").click();
   await expect(page.locator("#definitionTitle")).toHaveText("Edit “Browser test construct”");
   await expect(page.locator("#definitionSave")).toHaveText("Save changes");
-  // Remove the concept (it becomes excluded), then include it again.
-  await page.locator("#definitionSelectedVariables .definition-remove").first().click();
-  await expect(page.locator("#definitionSave")).toBeDisabled();
-  await page.locator("#definitionConceptSearch").fill(canonicalLabel);
-  await page.locator("#definitionTermItems button", { hasText: /^In$/ }).first().click();
+  // Editing keeps the concepts already included; the AI is the way to change them.
+  await expect(page.locator("#definitionSelectedVariables .definition-included-row")).toHaveCount(1);
   // Back to name: rename, and the steps lead straight back to the concepts.
   await page.locator("#definitionBack").click();
   await page.locator("#definitionNewLabel").fill("Browser test construct updated");
@@ -151,10 +147,8 @@ test("Variables list definition and split editing are reachable on desktop and m
   const source = page.locator("#definitionSourceList input[data-source-id]").nth(2);
   await source.check();
   await page.locator("#definitionContinue").click();
-  await page.locator("#definitionMethodManual").click();
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
-  await page.locator("#definitionConceptSearch").fill(await conceptLabel(page, variableId));
-  await page.locator("#definitionTermItems button", { hasText: /^In$/ }).first().click();
+  await includeConcepts(page, [variableId]);
   await page.locator("#definitionResidualLabels input").fill("Browser list residual");
   await page.locator("#definitionSave").click();
   await expect(createVariableButton(page)).toBeVisible();
@@ -204,7 +198,6 @@ test("OpenRouter returns to the variable picker with the current anchors", async
   await describeVariable(page);
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
-  await page.locator("#definitionMethodJev").click();
   await page.locator("#definitionAiConnect").click();
   // The saved draft comes back on the concepts step, where the connection was made.
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
@@ -238,110 +231,16 @@ test("a new variable can be defined through the mobile controls", async ({ page 
   await expect(page.locator("#definitionContinue")).toBeInViewport();
   await page.locator("#definitionContinue").click();
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
-  await page.locator("#definitionMethodManual").click();
   await expect(page.locator("#definitionTitle")).toBeInViewport();
 
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
-  await page.locator("#definitionConceptSearch").fill(await conceptLabel(page, variableId));
-  await page.locator("#definitionTermItems button", { hasText: /^In$/ }).first().click();
+  await includeConcepts(page, [variableId]);
   await page.locator("#definitionResidualLabels input").fill("Mobile browser residual");
   await page.locator("#definitionSave").click();
   await expect(page.locator("#definitionBlock")).toBeHidden();
   expect(await page.evaluate(() => window.__dagBuilderState.project.groups
     .some(group => group.label === "Mobile browser variable"))).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-});
-
-test("mobile spatial editor adds and removes a variable with a tap", async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
-  const page = await context.newPage();
-  try {
-    await page.addInitScript(() => {
-      localStorage.clear();
-      sessionStorage.setItem("echo-viewer-password-accepted", "yes");
-    });
-    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
-      && window.__dagBuilderState?.publishedSchemaHydrated
-      && !window.__dagBuilderState?.publishedSchemaHydrating);
-    await startCreate(page, "iv");
-    await describeVariable(page);
-    await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: "academic achievement" }).first().click();
-    await page.locator("#definitionContinue").click();
-    await page.locator("#definitionMethodManual").click();
-    await page.locator('.mobile-panel-tab[data-mobile-panel="variables"]').click();
-    await expect(page.locator("#dagMapCanvas")).toBeVisible();
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    await expect.poll(() => page.locator("#dagMapLabels .map-label").count()).toBeGreaterThan(0);
-    const target = await page.evaluate(() => {
-      const state = window.__dagBuilderState;
-      const canvas = document.querySelector("#dagMapCanvas");
-      const rect = canvas.getBoundingClientRect();
-      const eligible = new Set(state.definitionDraft.eligible_variable_ids);
-      return (state.map._visibleClusterReps || []).filter(item => eligible.has(item.variable_id)
-        && item.is_cluster_rep && Number.isFinite(item.map_x) && Number.isFinite(item.map_y))
-        .map(variable => ({
-          id: variable.variable_id,
-          x: rect.left + variable.map_x * state.map.transform.scale + state.map.transform.tx,
-          y: rect.top + variable.map_y * state.map.transform.scale + state.map.transform.ty,
-        }))
-        .find(point => point.x > rect.left + 30 && point.x < rect.right - 30
-          && point.y > rect.top + 100 && point.y < rect.bottom - 30
-          && document.elementFromPoint(point.x, point.y) === canvas) || null;
-    });
-    expect(target).toBeTruthy();
-    await page.touchscreen.tap(target.x, target.y);
-    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(1);
-    const tappedId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids[0]);
-    await page.touchscreen.tap(target.x, target.y);
-    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
-    const drawAroundTarget = async () => {
-      await page.mouse.move(target.x - 15, target.y - 15);
-      await page.mouse.down();
-      await page.mouse.move(target.x + 15, target.y - 15);
-      await page.mouse.move(target.x + 15, target.y + 15);
-      await page.mouse.move(target.x - 15, target.y + 15);
-      await page.mouse.move(target.x - 15, target.y - 15);
-      await page.mouse.up();
-    };
-    await page.locator("#dagBrushMode").click();
-    await drawAroundTarget();
-    await expect.poll(() => page.evaluate(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), tappedId)).toBe(true);
-    await page.locator("#dagEraseMode").click();
-    await drawAroundTarget();
-    await expect.poll(() => page.evaluate(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), tappedId)).toBe(false);
-    await page.locator('.mobile-panel-tab[data-mobile-panel="controls"]').click();
-    await expect(page.locator('#definitionStatusFilter button[data-status="unreviewed"]')).toContainText('Unreviewed');
-    await expect(page.locator('#definitionTermItems .definition-sort-row')).toHaveCount(20);
-    const firstRow = page.locator('#definitionTermItems .definition-sort-row').first();
-    const firstId = await firstRow.getAttribute('data-term-variable-id');
-    await firstRow.locator('button', { hasText: /^In$/ }).tap();
-    await expect.poll(() => page.evaluate(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), firstId)).toBe(true);
-    await page.locator('#definitionStatusFilter button[data-status="all"]').tap();
-    const allFirstRow = page.locator('#definitionTermItems .definition-sort-row').first();
-    const allFirstId = await allFirstRow.getAttribute('data-term-variable-id');
-    await allFirstRow.locator('button', { hasText: /^Out$/ }).tap();
-    await expect.poll(() => page.evaluate(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), allFirstId)).toBe(false);
-    const pageLabel = await page.locator('#definitionTermPage').innerText();
-    const pageCount = Number(pageLabel.match(/^Page 1 of (\d+)$/)?.[1]);
-    expect(pageCount).toBeGreaterThan(1);
-    await page.locator('#definitionTermNext').tap();
-    await expect(page.locator('#definitionTermPage')).toHaveText(`Page 2 of ${pageCount}`);
-    await expect(page.locator('#definitionTermItems .definition-sort-row').first())
-      .not.toHaveAttribute('data-term-variable-id', allFirstId);
-    if (await page.locator('#definitionSelectedVariables .definition-remove').count()) {
-      await page.locator('#definitionSelectedVariables .definition-remove').first().tap();
-    }
-    await page.locator('#definitionTermSelect').selectOption('knowledge');
-    const count = await page.locator('#definitionTermItems .definition-sort-row').count();
-    expect(count).toBe(20);
-    await page.locator('#definitionTermToNew').click();
-    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(count);
-    await page.locator('#definitionUndoBatch').click();
-    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
-  } finally {
-    await context.close();
-  }
 });
 
 for (const device of [
@@ -401,9 +300,7 @@ for (const device of [
         && window.__dagBuilderState?.publishedSchemaHydrated);
       await startCreate(page, "iv");
       // The map is shown while defining only in the narrower layout.
-      const hasMap = device.name === "mobile";
       await startAiSplit(page, { label: "School and college achievement", description: "School and college academic achievement" });
-      await expect(page.locator("#definitionManualPanel")).toBeHidden();
       await page.locator("#definitionAiConnect").click();
       await expect(page.locator("#definitionJevPanel")).toBeVisible();
       await expect(page.locator("#definitionAiLimitText")).toContainText("Lower its limit to $5");
@@ -415,38 +312,19 @@ for (const device of [
       await expect(page.locator("#definitionAiRun")).toBeEnabled();
       await expect(page.locator("#definitionAiCost")).toContainText("Estimated test (50): $");
       await expect(page.locator("#definitionAiCost")).toContainText("estimated remaining full run");
-      async function mapImage() {
-        if (!hasMap) return null;
-        await page.locator('.mobile-panel-tab[data-mobile-panel="variables"]').click();
-        await expect(page.locator("#dagMapCanvas")).toBeVisible();
-        const image = await page.locator("#dagMapCanvas").screenshot();
-        await page.locator('.mobile-panel-tab[data-mobile-panel="controls"]').click();
-        return image;
-      }
-      const mapBeforeTest = await mapImage();
       await page.locator("#definitionAiRun").click();
       await expect(page.locator("#definitionAiPreview")).toBeVisible();
       await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(50);
       await expect(page.locator("#definitionAiFullRun")).toBeVisible();
       await expect(page.locator("#definitionAiCost")).toContainText("Test usage at listed price (50): $0.000168");
       await expect(page.locator("#definitionAiCost")).toContainText("calibrated from test");
-      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(50);
-      if (hasMap) await expect(page.locator("#definitionMapPreviewStatus")).toContainText("AI sample preview only · 50 suggested for new");
       expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
-      if (hasMap) expect(await mapImage()).not.toEqual(mapBeforeTest);
-      await page.locator("#definitionMethodManual").click();
-      await expect(page.locator("#definitionJevPanel")).toBeHidden();
-      await expect(page.locator("#definitionManualPanel")).toBeVisible();
-      if (hasMap) await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
-      await page.locator("#definitionMethodJev").click();
       await expect(page.locator("#definitionAiPreview")).toBeVisible();
-      if (hasMap) await expect(page.locator("#definitionMapPreviewStatus")).toBeVisible();
       await expect(page.locator("#definitionAiApply")).toBeHidden();
       expect(decisions).toBe(4);
       const firstSample = batches.flatMap(batch => batch.records);
       await page.locator("#definitionAiDescription").fill("School and college academic achievement");
       await expect(page.locator("#definitionAiPreview")).toBeHidden();
-      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds)).toBeNull();
       await page.locator("#definitionAiRun").click();
       await expect(page.locator("#definitionAiFullRun")).toBeVisible();
       expect(batches.slice(4).flatMap(batch => batch.records)).toEqual(firstSample);
@@ -458,19 +336,14 @@ for (const device of [
       expect(await page.locator("#definitionAiRows .definition-ai-row").count()).toBeLessThanOrEqual(50);
       await expect(page.locator("#definitionAiApply")).toBeVisible();
       await expect(page.locator("#definitionAiCost")).toContainText("full run usage at listed price");
-      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(eligibleCount);
-      if (hasMap) await expect(page.locator("#definitionMapPreviewStatus")).toContainText(`AI full preview only · ${eligibleCount} suggested for new`);
       await page.locator("#definitionAiReviewFilter").selectOption("all");
       await expect(page.locator("#definitionAiRows .definition-ai-row")).toHaveCount(50);
       await page.locator("#definitionAiReviewNext").click();
       await expect(page.locator("#definitionAiReviewPage")).toContainText("51–100");
       await page.locator("#definitionAiRows .definition-ai-row").first().locator("button[data-ai-side=leftover]").click();
-      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(eligibleCount - 1);
       expect(batches.slice(8).flatMap(batch => batch.records)).toHaveLength(eligibleCount - 50);
       expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
       await page.locator("#definitionAiApply").click();
-      expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds)).toBeNull();
-      if (hasMap) await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
       expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBeGreaterThan(0);
       // The name and definition were written first, so applying leaves only Save.
       await expect(page.locator("#definitionSave")).toBeEnabled();
@@ -503,7 +376,7 @@ for (const device of [
       await expect(editVariableButton(page, "School and college achievement")).toBeVisible();
       await editVariableButton(page, "School and college achievement").click();
       await expect(page.locator("#definitionTitle")).toHaveText("Edit “School and college achievement”");
-      await expect(page.locator("#definitionManualPanel")).toBeVisible();
+      await expect(page.locator("#definitionIncludedPanel")).toBeVisible();
       // The Included list shows the first 300 and leaves the rest to its filter.
       await expect(page.locator("#definitionSelectedVariables .definition-included-row")).toHaveCount(300);
       await page.locator("#definitionBack").click();
@@ -882,7 +755,6 @@ test("Classify 50 more appends to the list, sorts new first, and applying leaves
     expect((await sides()).every(side => side === "new")).toBe(true);
     await page.locator("#definitionAiReviewNext").click();
     expect((await sides()).every(side => side === "leftover")).toBe(true);
-    expect(await page.evaluate(() => window.__dagBuilderState.definitionAiPreviewIds?.size)).toBe(50);
 
     await expect(page.locator("#definitionAiApply")).toBeHidden();
 
@@ -926,8 +798,7 @@ test("Exploration creates a variable from its picker, which becomes the focus wi
   await page.locator("#definitionContinue").click();
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
-  await page.locator("#definitionConceptSearch").fill(await conceptLabel(page, variableId));
-  await page.locator("#definitionTermItems button", { hasText: /^In$/ }).first().click();
+  await includeConcepts(page, [variableId]);
   await page.locator("#definitionSave").click();
 
   // Saving makes the new variable the focus; it is not an anchor.
@@ -960,9 +831,7 @@ test("a saved AI split is not restored on load; Define offers it in Causes and r
   await page.reload({ waitUntil: "domcontentloaded" });
   await ready();
   expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft)).toBeNull();
-  await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
 
-  await expect(page.locator("#definitionMapPreviewStatus")).toBeHidden();
   await createVariableButton(page).click();
   const row = page.locator("#definitionResumeList .definition-resume-row");
   await expect(row).toContainText("Seeded saved split");
