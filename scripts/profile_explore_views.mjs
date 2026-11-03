@@ -6,6 +6,7 @@ import { chromium } from 'playwright';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { routeProfileSite } from './profile_site_route.mjs';
+import { noteRetry, runRetries } from './profile_run_retry.mjs';
 
 const url = new URL(process.env.PROFILE_URL || 'https://www.jonathanmellon.com/echo_viewer_staging/');
 url.search = '';
@@ -32,122 +33,149 @@ const browser = await chromium.launch({ headless: true });
 let activePage;
 try {
   for (let run = 0; run < runs; run++) {
-    const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1365, height: 900 }, isMobile: mobile, hasTouch: mobile });
-    if (!remote) await routeProfileSite(context, url.href, root);
-    const page = await context.newPage(); activePage = page;
-    const errors = [];
-    page.on('pageerror', error => { errors.push(error.message); console.error(error.message); });
-    await page.addInitScript(() => {
-      sessionStorage.setItem('echo-viewer-password-accepted', 'yes');
-      window.__exploreTasks = [];
-      window.__exploreObserver = new PerformanceObserver(list => window.__exploreTasks.push(...list.getEntries().map(e => ({ start: e.startTime, ms: e.duration }))));
-      window.__exploreObserver.observe({ type: 'longtask', buffered: true });
-    });
-    const cdp = await context.newCDPSession(page);
-    if (mobile) await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.PROFILE_CPU_RATE || 4) });
-    // Optional slow network for the data requests, e.g. PROFILE_NETWORK_LATENCY_MS=100 PROFILE_NETWORK_KBPS=2500.
-    if (process.env.PROFILE_NETWORK_LATENCY_MS || process.env.PROFILE_NETWORK_KBPS) {
-      const kbps = Number(process.env.PROFILE_NETWORK_KBPS || 0);
-      await cdp.send('Network.enable');
-      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: Number(process.env.PROFILE_NETWORK_LATENCY_MS || 0),
-        downloadThroughput: kbps ? kbps * 1024 : -1, uploadThroughput: kbps ? kbps * 1024 : -1 });
-    }
-    page.setDefaultTimeout(60000);
-    await page.goto(url.href);
-    await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100
-      && document.getElementById('startupLoading')?.hidden && !document.getElementById('exploreView').hidden, null, { timeout: 120000 });
-    const result = { errors, timings: [] };
-    report.runs.push(result);
-    // Each interaction is timed until the list and the graph both show the result.
-    async function measure(name, action, { budget = budgets.interactionMs, ready = null, table = false } = {}) {
-      const start = await page.evaluate(() => performance.now());
-      await action();
-      const timing = await page.evaluate(async ({ start, name, ready }) => {
-        const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
-        await api.whenDagRendered();
-        if (ready) while (!document.querySelector(ready) && performance.now() - start < 90000) await new Promise(resolve => setTimeout(resolve, 20));
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        window.__exploreTasks.push(...window.__exploreObserver.takeRecords().map(e => ({ start: e.startTime, ms: e.duration })));
-        const tasks = window.__exploreTasks.filter(t => t.start >= start);
-        const rows = document.querySelectorAll('.explore-row').length;
-        const edges = api.renderedDagEdgeIds().filter(id => id !== '__study_design_iv_to_dv__').length;
-        const layoutPhases = performance.getEntriesByType('measure').filter(m => m.name.startsWith('echo:dag:') && m.startTime >= start).map(m => `${m.name.slice(9)}:${Math.round(m.duration)}`);
-        const layouts = layoutPhases.length;
-        return { name, layouts, layoutPhases, ms: performance.now() - start, longestTaskMs: Math.max(0, ...tasks.map(t => t.ms)),
-          rows, edges, summary: document.getElementById('exploreSummary').textContent };
-      }, { start, name, ready });
-      result.timings.push({ ...timing, budget });
-      console.log(JSON.stringify({ run: run + 1, ...timing, budget }));
-      if (!timing.rows) throw new Error(`No results after ${name}: ${timing.summary}`);
-      // The graph draws exactly the links behind the list, so a stale or empty graph fails here.
-      if (table) {
-        const shown = await page.evaluate(() => ({ links: document.querySelectorAll('#dagPathsTable tbody tr').length,
-          total: Number(/\((\d+)\)/.exec(document.querySelector('#dagPathsTable caption')?.textContent || '')?.[1]),
-          graphHidden: document.getElementById('dagNetwork').hidden }));
-        if (!shown.graphHidden) throw new Error(`The graph is still shown after ${name}`);
-        if (shown.links !== Math.min(shown.total, 200) || shown.total !== timing.rows) throw new Error(`Table shows ${shown.links} of ${shown.total} links for ${timing.rows} listed variables after ${name}`);
-      } else if (!ready && timing.edges !== timing.rows) throw new Error(`Graph shows ${timing.edges} links for ${timing.rows} listed variables after ${name}`);
-      if (process.env.PROFILE_DISABLE_BUDGETS !== '1'
-        && (timing.ms > budget || (budget === budgets.interactionMs && timing.longestTaskMs > budgets.longestTaskMs))) {
-        throw new Error(`Explore budget exceeded: ${name} took ${Math.round(timing.ms)} ms, longest task ${Math.round(timing.longestTaskMs)} ms`);
+    for (let attempt = 0; ; attempt++) {
+      let context;
+      try {
+        context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1365, height: 900 }, isMobile: mobile, hasTouch: mobile });
+        if (!remote) await routeProfileSite(context, url.href, root);
+        const page = await context.newPage(); activePage = page;
+        const errors = [];
+        page.on('pageerror', error => { errors.push(error.message); console.error(error.message); });
+        await page.addInitScript(() => {
+          sessionStorage.setItem('echo-viewer-password-accepted', 'yes');
+          window.__exploreTasks = [];
+          window.__exploreObserver = new PerformanceObserver(list => window.__exploreTasks.push(...list.getEntries().map(e => ({ start: e.startTime, ms: e.duration }))));
+          window.__exploreObserver.observe({ type: 'longtask', buffered: true });
+        });
+        const cdp = await context.newCDPSession(page);
+        if (mobile) await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.PROFILE_CPU_RATE || 4) });
+        // Optional slow network for the data requests, e.g. PROFILE_NETWORK_LATENCY_MS=100 PROFILE_NETWORK_KBPS=2500.
+        if (process.env.PROFILE_NETWORK_LATENCY_MS || process.env.PROFILE_NETWORK_KBPS) {
+          const kbps = Number(process.env.PROFILE_NETWORK_KBPS || 0);
+          await cdp.send('Network.enable');
+          await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: Number(process.env.PROFILE_NETWORK_LATENCY_MS || 0),
+            downloadThroughput: kbps ? kbps * 1024 : -1, uploadThroughput: kbps ? kbps * 1024 : -1 });
+        }
+        page.setDefaultTimeout(60000);
+        await page.goto(url.href);
+        await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100
+          && document.getElementById('startupLoading')?.hidden && !document.getElementById('exploreView').hidden, null, { timeout: 120000 });
+        const result = { errors, timings: [] };
+        report.runs.push(result);
+        // Each interaction is timed until the list and the graph both show the result.
+        async function measure(name, action, { budget = budgets.interactionMs, ready = null, table = false } = {}) {
+          const start = await page.evaluate(() => performance.now());
+          await action();
+          const timing = await page.evaluate(async ({ start, name, ready }) => {
+            const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+            await api.whenDagRendered();
+            if (ready) while (!document.querySelector(ready) && performance.now() - start < 90000) await new Promise(resolve => setTimeout(resolve, 20));
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            window.__exploreTasks.push(...window.__exploreObserver.takeRecords().map(e => ({ start: e.startTime, ms: e.duration })));
+            const tasks = window.__exploreTasks.filter(t => t.start >= start);
+            const rows = document.querySelectorAll('.explore-row').length;
+            const edges = api.renderedDagEdgeIds().filter(id => id !== '__study_design_iv_to_dv__').length;
+            const layoutPhases = performance.getEntriesByType('measure').filter(m => m.name.startsWith('echo:dag:') && m.startTime >= start).map(m => `${m.name.slice(9)}:${Math.round(m.duration)}`);
+            const layouts = layoutPhases.length;
+            return { name, layouts, layoutPhases, ms: performance.now() - start, longestTaskMs: Math.max(0, ...tasks.map(t => t.ms)),
+              rows, edges, summary: document.getElementById('exploreSummary').textContent };
+          }, { start, name, ready });
+          result.timings.push({ ...timing, budget });
+          console.log(JSON.stringify({ run: run + 1, ...timing, budget }));
+          if (!timing.rows) throw new Error(`No results after ${name}: ${timing.summary}`);
+          // The graph draws exactly the links behind the list, so a stale or empty graph fails here.
+          if (table) {
+            const shown = await page.evaluate(() => ({ links: document.querySelectorAll('#dagPathsTable tbody tr:not(.dag-table-section)').length,
+              total: Number(document.querySelector('#dagPathsTable')?.dataset.pathCount),
+              graphHidden: document.getElementById('dagNetwork').hidden }));
+            if (!shown.graphHidden) throw new Error(`The graph is still shown after ${name}`);
+            if (shown.links !== Math.min(shown.total, 200) || shown.total !== timing.rows) throw new Error(`Table shows ${shown.links} of ${shown.total} links for ${timing.rows} listed variables after ${name}`);
+          } else if (!ready && timing.edges !== timing.rows) throw new Error(`Graph shows ${timing.edges} links for ${timing.rows} listed variables after ${name}`);
+          if (process.env.PROFILE_DISABLE_BUDGETS !== '1'
+            && (timing.ms > budget || (budget === budgets.interactionMs && timing.longestTaskMs > budgets.longestTaskMs))) {
+            throw new Error(`Explore budget exceeded: ${name} took ${Math.round(timing.ms)} ms, longest task ${Math.round(timing.longestTaskMs)} ms`);
+          }
+        }
+        // Optional: simulate time spent choosing, during which paper support loads.
+        if (Number(process.env.PROFILE_PICK_DELAY_MS) > 0) await page.waitForTimeout(Number(process.env.PROFILE_PICK_DELAY_MS));
+        await measure('choose Dep var (first results)', async () => {
+          await page.locator('#focusGroupPicker button[data-group-id="category-mental-health"]').click();
+          await page.locator('.explore-row').first().waitFor({ timeout: 90000 });
+        }, { budget: budgets.firstResultsMs });
+        // Background loading (the search catalog is indexed while the user chooses) competes with whatever is measured
+        // next and showed up as a lone slow interaction; the interactions are what is budgeted, so let it finish.
+        // A slow runner may not have started it yet, so wait for it to be ready rather than only for it not to be running.
+        await page.waitForFunction(() => ['ready', 'error'].includes(window.__dagBuilderState.variableSearchStatus), null, { timeout: 30000 })
+          .catch(() => console.log('search catalog not ready before the interactions were timed'));
+        await page.waitForTimeout(500);
+        // On a phone the list and the graph (with its Filters) are separate tabs.
+        // Distance and minimum papers live in the variable list's funnel menu, which closes on an outside click;
+        // reopen it (on the list's own tab on a phone) before steps that need its controls.
+        const navToggle = () => page.locator('#navToggle');
+        const openNav = async () => { if ((await navToggle().isVisible()) && (await navToggle().getAttribute('aria-expanded')) !== 'true') await navToggle().click(); };
+        const closeNav = async () => { if ((await navToggle().isVisible()) && (await navToggle().getAttribute('aria-expanded')) === 'true') await navToggle().click(); };
+        const openFilters = async () => {
+          await closeNav();
+          if (mobile) await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').click();
+          const dropdown = page.locator('.list-filter');
+          if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator('summary').click();
+        };
+        const showPanel = async panel => { if (mobile) await page.locator(`.mobile-panel-nav [data-mobile-panel="${panel}"]`).click(); };
+        await openFilters();
+        for (const depth of [2, 3, 4, 1]) {
+          await openFilters();
+          await measure(`distance ${depth}`, () => page.locator('.list-filter-distance').fill(String(depth)));
+        }
+        await openFilters();
+        await measure('min papers 5', () => page.locator('.list-filter-papers').fill('5'));
+        await showPanel('controls');
+        await measure('open evidence for a variable (cold)', () => page.locator('.explore-row-open').first().click(),
+          { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude finding "]' });
+        await measure('close evidence', () => page.locator('#closeEvidencePane').click());
+        // Flipping to Consequences keeps the variable and the list settings, so there is no second pick.
+        await openNav();
+        await measure('switch to consequences', async () => {
+          await page.locator('#exploreDirection button[data-direction=consequences]').click();
+          await page.waitForFunction(() => window.__dagBuilderState.task === 'consequences' && document.querySelector('.explore-row'));
+        });
+        await closeNav();
+        await openFilters();
+        await measure('consequences distance 4', () => page.locator('.list-filter-distance').fill('4'));
+        await showPanel('controls');
+        // The table shows the same links without laying out a graph, so it is held to the same budgets.
+        await showPanel('dag');
+        await openNav();
+        await measure('switch to table', () => page.locator('#dagViewTable').click(), { table: true });
+        await closeNav();
+        await openFilters();
+        await measure('table distance 4', () => page.locator('.list-filter-distance').fill('4'), { table: true });
+        await openFilters();
+        await measure('table min papers 5', () => page.locator('.list-filter-papers').fill('5'), { table: true });
+        await showPanel('dag');
+        await measure('table sort by papers', () => page.locator('#dagPathsTable thead button').last().click(), { table: true });
+        await measure('open evidence from the table (cold)', () => page.locator('#dagPathsTable .dag-table-link').first().click(),
+          { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude finding "]', table: true });
+        await measure('close evidence in the table', () => page.locator('#closeEvidencePane').click(), { table: true });
+        await openNav();
+        await measure('switch back to graph', () => page.locator('#dagViewGraph').click());
+        await closeNav();
+        await showPanel('controls');
+        await measure('change the variable', async () => {
+          await page.locator('#focusInput').click();
+          await page.locator('#focusGroupPicker button[data-group-id="category-age"]').click();
+        });
+        if (errors.length) throw new Error(errors.join('; '));
+        await context.close(); activePage = null;
+        break;
+      } catch (error) {
+        // The last attempt keeps its page open so the failure handler below can capture it.
+        if (attempt >= runRetries) throw error;
+        noteRetry(report, run, error);
+        report.runs.length = run;
+        activePage = null;
+        await context?.close().catch(() => {});
       }
     }
-    // Optional: simulate time spent choosing, during which paper support loads.
-    if (Number(process.env.PROFILE_PICK_DELAY_MS) > 0) await page.waitForTimeout(Number(process.env.PROFILE_PICK_DELAY_MS));
-    await measure('choose Dep var (first results)', async () => {
-      await page.locator('#focusGroupPicker button[data-group-id="category-mental-health"]').click();
-      await page.locator('.explore-row').first().waitFor({ timeout: 90000 });
-    }, { budget: budgets.firstResultsMs });
-    // Background loading (the search catalog is indexed while the user chooses) competes with whatever is measured
-    // next and showed up as a lone slow interaction; the interactions are what is budgeted, so let it finish.
-    // A slow runner may not have started it yet, so wait for it to be ready rather than only for it not to be running.
-    await page.waitForFunction(() => ['ready', 'error'].includes(window.__dagBuilderState.variableSearchStatus), null, { timeout: 30000 })
-      .catch(() => console.log('search catalog not ready before the interactions were timed'));
-    await page.waitForTimeout(500);
-    // On a phone the list and the graph (with its Filters) are separate tabs.
-    // The Filters dropdown closes on an outside click, so reopen it before steps that need its controls.
-    const openFilters = async () => {
-      const dropdown = page.locator('.filter-dropdown');
-      if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator('summary').click();
-    };
-    const showPanel = async panel => { if (mobile) await page.locator(`.mobile-panel-nav [data-mobile-panel="${panel}"]`).click(); };
-    await showPanel('dag');
-    await page.locator('.filter-dropdown > summary').click();
-    for (const depth of [2, 3, 4, 1]) {
-      await measure(`distance ${depth}`, () => page.locator('#confounderPathLength').fill(String(depth)));
-    }
-    await measure('min papers 5', () => page.locator('#minimumEdgePapers').fill('5'));
-    await showPanel('controls');
-    await measure('open evidence for a variable (cold)', () => page.locator('.explore-row-open').first().click(),
-      { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude finding "]' });
-    await measure('close evidence', () => page.locator('#closeEvidencePane').click());
-    await showPanel('controls');
-    await measure('switch to consequences', async () => {
-      await page.locator('#taskBar .task-tab[data-task=consequences]').click();
-      await page.locator('#focusGroupPicker button[data-group-id="category-income-earnings"]').click();
-    });
-    await showPanel('dag');
-    await openFilters();
-    await measure('consequences distance 4', () => page.locator('#confounderPathLength').fill('4'));
-    await showPanel('controls');
-    // The table shows the same links without laying out a graph, so it is held to the same budgets.
-    await showPanel('dag');
-    await measure('switch to table', () => page.locator('#dagViewTable').click(), { table: true });
-    await openFilters();
-    await measure('table distance 4', () => page.locator('#confounderPathLength').fill('4'), { table: true });
-    await measure('table min papers 5', () => page.locator('#minimumEdgePapers').fill('5'), { table: true });
-    await measure('table sort by papers', () => page.locator('#dagPathsTable thead button').last().click(), { table: true });
-    await measure('open evidence from the table (cold)', () => page.locator('#dagPathsTable .dag-table-arrow').first().click(),
-      { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude finding "]', table: true });
-    await measure('close evidence in the table', () => page.locator('#closeEvidencePane').click(), { table: true });
-    await measure('switch back to graph', () => page.locator('#dagViewGraph').click());
-    await showPanel('controls');
-    await measure('change the variable', async () => {
-      await page.locator('#changeIv').click();
-      await page.locator('#focusGroupPicker button[data-group-id="category-age"]').click();
-    });
-    if (errors.length) throw new Error(errors.join('; '));
-    await context.close(); activePage = null;
   }
 } catch (error) {
   report.error = String(error);

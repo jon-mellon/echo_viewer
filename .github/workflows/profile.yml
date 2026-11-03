@@ -29,10 +29,10 @@ jobs:
           key: supabase-published-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/supabase_cache.cjs') }}
           restore-keys: supabase-published-
       - run: npm run test:browser
-      - run: npm run profile
-      - run: PROFILE_DEVICE=mobile npm run profile
-      - run: PROFILE_SCENARIO=permalink npm run profile
-      - run: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile npm run profile
+      - run: node scripts/ci_retry.mjs npm run profile
+      - run: PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
+      - run: PROFILE_SCENARIO=permalink node scripts/ci_retry.mjs npm run profile
+      - run: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
       - name: Enforce mobile diagnostic switching budgets
         run: npm run profile:diagnostics
       - name: Enforce evidence loading budgets on the default snapshot

@@ -21,10 +21,11 @@ test("registry insert follows every upload and preserves baseline lineage", () =
   assert.match(core, /parent_schema_id: parentSchemaId/);
 });
 
-test("share refuses to create a permalink while schema changes are unpublished", () => {
+test("share warns when the schema is unpublished and offers to publish first", () => {
   assert.match(source, /canonical\.contentHash !== published\.content_hash/);
-  assert.match(source, /This schema has unpublished changes\. Publish them before creating a permalink\./);
-  assert.match(source, /if \(hasLocalChanges\) \{[\s\S]*?return null;/);
+  assert.match(source, /confirmPublishBeforeShare\(neverPublished\)/);
+  assert.match(source, /published = await publish\(\);/);
+  assert.match(source, /if \(!await confirmPublishBeforeShare\(neverPublished\)\) return null;/);
   assert.doesNotMatch(source, /Copied a view permalink using the last published schema/);
   assert.match(source, /publicationPermalink\(published\.publication_id/);
   assert.match(source, /getPermalinkState\(\)/);
@@ -40,9 +41,9 @@ test("share rebuilds a published permalink from the current view state", () => {
 });
 
 test("successful sharing gives visible feedback on the share button", () => {
-  assert.match(source, /button\.textContent = "✓ Copied"/);
+  assert.match(source, /button\.setAttribute\("aria-label", "Copied"\)/);
   assert.match(source, /button\.classList\.add\("share-copied"\)/);
-  assert.match(source, /button\.textContent = "Share"/);
+  assert.match(source, /button\.setAttribute\("aria-label", "Share view"\)/);
   assert.match(source, /showShareCopied\(\)/);
 });
 
@@ -59,13 +60,18 @@ test("publication requests authentication only after immutable-public confirmati
 });
 
 test("published state distinguishes private working-copy changes", () => {
-  assert.match(source, /Public schema · Unpublished local changes/);
-  assert.match(source, /Private working copy/);
+  assert.match(source, /label: "Unpublished changes"/);
+  assert.match(source, /label: "Local draft"/);
+  assert.match(source, /label: "Published"/);
+  assert.match(source, /setBadge\(publicationStatus\(published, hasLocalChanges\)\)/);
   assert.match(source, /workingCopyChanged/);
   assert.match(source, /hasPublishableChanges = !published\?\.publication_id \|\| hasLocalChanges/);
   assert.match(source, /elements\.publish\.hidden = !client \|\| !hasPublishableChanges/);
 });
 
-test("completed schema hydration replaces the loading status", () => {
-  assert.match(source, /Loaded the public schema\. Editing and publishing are ready\./);
+test("completed schema hydration clears the loading status instead of logging success", () => {
+  const ready = source.slice(source.indexOf("function setSchemaReady"), source.indexOf("function setSchemaLoadFailed"));
+  assert.match(ready, /Loading group memberships…/);
+  assert.match(ready, /else clearStatus\(\)/);
+  assert.doesNotMatch(source, /Loaded the public schema/);
 });

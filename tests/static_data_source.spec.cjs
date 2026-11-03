@@ -112,7 +112,7 @@ for (const route of ["/"]) {
     await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
       && document.getElementById("startupLoading")?.hidden, null,
       { timeout: 78000 });
-    await expect(page.locator("#schemaPublicationBadge")).toHaveText("Public schema", { timeout: 78000 });
+    await expect(page.locator("#schemaPublicationBadge")).toHaveText("Published", { timeout: 78000 });
     await page.evaluate(async () => {
       const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
       await dagDataSource.ensureEvidenceConnection();

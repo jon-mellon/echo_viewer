@@ -1,20 +1,18 @@
 import * as projectOps from "./dag_project.mjs";
 import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
-import { nearbyMapNeighbors } from "./definition_neighbors.mjs";
 import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
 import { browsePublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
-  invalidateMapCaches, renderAll, drawMap = () => {}, renderAssignmentCoverage = () => {}, setMapMode, fitMap, groupById, persistProjectLocally, getReturnUrl = () => location.href,
+  invalidateVisibleCaches, renderAll, groupById, persistProjectLocally, getReturnUrl = () => location.href,
   visibleVariables, searchVariables, searchSourceGroups = groups => groups.map((group, index) => ({ group, index, variableMatch: "" })),
   clusterDisplayVariable, expandToClusterMembers, nowIso,
-  applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
-  hydrateVariableDetails = async () => {}, hydrateNeighbors = async () => {},
+  applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate,
+  hydrateVariableDetails = async () => {},
   prewarmEvidence = async () => {}, commitSchema = async () => {},
   onCommitFailureRestored = () => {}, onInstrumentReady = () => {}, onFocusDefined = null }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
-  let lastBatch = null;
   let browseRevision = 0;
   const browseState = { rows: [], loading: false, error: "" };
   async function refreshBrowse() {
@@ -26,10 +24,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (!browseState.loading) return;
     try {
       const rows = await browsePublishedSplits(state.definitionDraft.source_group_ids);
-      if (revision !== browseRevision || state.definitionMethod !== "browse") return;
+      if (revision !== browseRevision || state.definitionDraft?.step !== "sources") return;
       browseState.rows = rows;
     } catch (error) {
-      if (revision !== browseRevision || state.definitionMethod !== "browse") return;
+      if (revision !== browseRevision || state.definitionDraft?.step !== "sources") return;
       browseState.error = `Could not browse splits: ${error.message || error}`;
     }
     browseState.loading = false;
@@ -50,25 +48,18 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         || sources.some(group => group.variable_ids.every(id => ids.includes(id)))) {
         throw new Error("This split does not fit the current source category assignments.");
       }
-      state.definitionMethod = "manual";
       await continueDefinition();
       if (state.definitionDraft !== draft) return;
-      if (draft.step !== "partition") {
-        state.definitionMethod = "browse";
-        throw new Error("Could not load the current source variables.");
-      }
+      if (draft.step !== "partition") throw new Error("Could not load the current source variables.");
+      // The published split supplies which concepts move; the name and
+      // definition stay the ones the user wrote in the first step.
       draft.new_variable_ids = [...new Set(ids.map(clusterRep))];
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
-      draft.new_label = row.name;
-      draft.new_description = row.description;
-      // A published split keeps its name and description; each leftover keeps
-      // its source category's name, so the split is used without a naming step.
       draft.published_split = { publication_id: row.publication_id, group_id: row.group_id };
-      draft.residual_labels = Object.fromEntries(sources.map(group => [group.group_id, group.label || group.group_id]));
       state.selectedVariableIds = new Set(draft.new_variable_ids);
       persistProjectLocally();
-      invalidateMapCaches();
-      renderDraft({ redrawMap: true });
+      invalidateVisibleCaches();
+      renderDraft();
     } catch (error) {
       if (state.definitionDraft === draft) {
         browseState.error = `Could not use this split: ${error.message || error}`;
@@ -77,19 +68,16 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       }
     }
   }
-  const renderDraft = ({ redrawMap = false } = {}) => {
-    // Definition steps change selection and map contents, not the project DAG.
+  const renderDraft = () => {
+    // Definition steps change the draft, not the project DAG.
     // The DAG is hidden until cancel/save, where a full render is performed.
     renderAll({ rebuild: false });
-    renderAssignmentCoverage();
     jevAssist.render();
-    if (redrawMap) drawMap();
   };
 
   function startDefinition(role) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv", "instrument", "candidate"].includes(role)) return;
     jevAssist.clearPreview();
-    state.definitionMethod = null;
     browseRevision += 1;
     browseState.rows = [];
     browseState.error = "";
@@ -99,25 +87,22 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     void prewarmEvidence().catch(() => {});
     hydrationRevision += 1;
     sourceHydrations.clear();
-    lastBatch = null;
     state.definitionDraft = {
-      role, step: "sources", source_group_ids: [], source_snapshot: [],
+      role, step: "describe", source_group_ids: [], source_snapshot: [],
       eligible_variable_ids: [], new_variable_ids: [], new_label: "", new_description: "",
-      residual_labels: {}, reviewed_variable_ids: [],
+      ai_description: "", residual_labels: {}, reviewed_variable_ids: [],
     };
     state.selectedVariableIds.clear();
-    invalidateMapCaches();
+    invalidateVisibleCaches();
     renderDraft();
-    els.definitionChooseManual.focus();
+    els.definitionNewLabel.focus();
     void renderSavedRuns();
   }
 
   async function startEditSplit(groupId = null) {
-    lastBatch = null;
     const context = projectOps.editableSplitContext(state.project, groupId ? groupId : activeGroup());
     if (!context) return;
     jevAssist.clearPreview();
-    state.definitionMethod = "manual";
     const { splitId, newGroup, residuals } = context;
     const eligible = [...new Set([...newGroup.variable_ids, ...residuals.flatMap(group => group.variable_ids)]
       .map(clusterRep))];
@@ -133,15 +118,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       reviewed_variable_ids: eligible,
       new_label: newGroup.label || "",
       new_description: newGroup.description || "",
+      ai_description: newGroup.description || "",
+      ai_description_source: newGroup.description || "",
       residual_labels: Object.fromEntries(residuals.map(group => [group.group_id, group.label || ""])),
       details_loading: true,
     };
     state.activeGroupId = null;
     state.selectedVariableIds = new Set(state.definitionDraft.new_variable_ids);
-    invalidateMapCaches();
-    setMapMode("select");
+    invalidateVisibleCaches();
     renderDraft();
-    fitMap(eligible);
     try {
       await hydrateVariableDetails(eligible, { skipNeighbors: true });
     } catch (error) {
@@ -151,22 +136,18 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     }
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     draft.details_loading = false;
-    invalidateMapCaches();
-    renderDraft({ redrawMap: true });
-    fitMap(eligible);
+    invalidateVisibleCaches();
+    renderDraft();
   }
 
   function cancelDefinition() {
     browseRevision += 1;
     hydrationRevision += 1;
-    lastBatch = null;
     jevAssist.clearPreview();
     state.definitionDraft = null;
-    state.definitionMethod = null;
     state.selectedVariableIds.clear();
     state.selectedVariableId = null;
-    invalidateMapCaches();
-    setMapMode("select");
+    invalidateVisibleCaches();
     renderAll({ rebuild: false, refreshView: true });
   }
 
@@ -178,8 +159,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   async function continueDefinition() {
     const draft = state.definitionDraft;
     const sources = definitionSources();
-    if (!draft || draft.details_loading || !state.definitionMethod || !sources.length) return;
-    lastBatch = null;
+    if (!draft || draft.details_loading || !sources.length) return;
     const revision = ++hydrationRevision;
     draft.source_snapshot = sources.map(group => ({ group_id: group.group_id, label: group.label,
       variable_ids: [...group.variable_ids], updated_at: group.updated_at || null }));
@@ -187,8 +167,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       group.variable_ids.map(clusterRep)))];
     draft.new_variable_ids = [];
     draft.reviewed_variable_ids = [];
+    // What stays behind keeps its variable's name unless the user renames it.
     draft.residual_labels = Object.fromEntries(sources.map(group =>
-      [group.group_id, `Other: ${group.label || group.group_id}`]));
+      [group.group_id, group.label || group.group_id]));
     draft.details_loading = true;
     state.selectedVariableIds.clear();
     presenter.setContinueLoading();
@@ -206,70 +187,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     draft.details_loading = false;
     draft.step = "partition";
-    invalidateMapCaches();
-    setMapMode("select");
+    invalidateVisibleCaches();
     renderDraft();
-    fitMap(draft.eligible_variable_ids);
   }
 
   function definitionResidualIds(source) {
     const carved = new Set(state.definitionDraft?.new_variable_ids || []);
     return [...new Set(source.variable_ids.map(clusterRep))].filter(id => !carved.has(id));
-  }
-
-  function toggleDefinitionVariable(variableId, add = null) {
-    const draft = state.definitionDraft;
-    if (!draft || draft.step !== "partition" || state.definitionMethod !== "manual") return;
-    const id = clusterRep(variableId);
-    if (!draft.eligible_variable_ids.includes(id)) return;
-    lastBatch = null;
-    const selected = new Set(draft.new_variable_ids);
-    const shouldAdd = add === null ? !selected.has(id) : add;
-    if (shouldAdd) selected.add(id); else selected.delete(id);
-    draft.new_variable_ids = [...selected];
-    draft.reviewed_variable_ids = [...new Set([...(draft.reviewed_variable_ids || []), id])];
-    state.selectedVariableIds = new Set(draft.new_variable_ids);
-    state.selectedVariableId = id;
-    invalidateMapCaches();
-    renderDraft({ redrawMap: true });
-  }
-
-  function batchMoveDefinitionVariables(ids, add) {
-    const draft = state.definitionDraft;
-    if (!draft || draft.step !== "partition") return;
-    const eligible = new Set(draft.eligible_variable_ids);
-    const selected = new Set(draft.new_variable_ids);
-    const reviewed = new Set(draft.reviewed_variable_ids || []);
-    const changed = [...new Set(ids)].filter(id => eligible.has(id)
-      && (selected.has(id) !== add || !reviewed.has(id)));
-    if (!changed.length) return;
-    lastBatch = new Map(changed.map(id => [id, { selected: selected.has(id), reviewed: reviewed.has(id) }]));
-    for (const id of changed) {
-      if (add) selected.add(id); else selected.delete(id);
-      reviewed.add(id);
-    }
-    draft.new_variable_ids = [...selected];
-    draft.reviewed_variable_ids = [...reviewed];
-    state.selectedVariableIds = new Set(selected);
-    invalidateMapCaches();
-    renderDraft({ redrawMap: true });
-  }
-
-  function undoDefinitionBatch() {
-    const draft = state.definitionDraft;
-    if (!draft || draft.step !== "partition" || !lastBatch) return;
-    const selected = new Set(draft.new_variable_ids);
-    const reviewed = new Set(draft.reviewed_variable_ids || []);
-    for (const [id, previous] of lastBatch) {
-      if (previous.selected) selected.add(id); else selected.delete(id);
-      if (previous.reviewed) reviewed.add(id); else reviewed.delete(id);
-    }
-    lastBatch = null;
-    draft.new_variable_ids = [...selected];
-    draft.reviewed_variable_ids = [...reviewed];
-    state.selectedVariableIds = new Set(selected);
-    invalidateMapCaches();
-    renderDraft({ redrawMap: true });
   }
 
   function definitionCanReview() {
@@ -278,37 +202,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       definitionResidualIds(source).length));
   }
 
-  function definitionNeighbors() {
-    const draft = state.definitionDraft;
-    if (!draft?.new_variable_ids?.length) return [];
-    const eligible = new Set(draft.eligible_variable_ids);
-    const selected = new Set(draft.new_variable_ids);
-    const best = new Map();
-    for (const id of draft.new_variable_ids) {
-      for (const neighbor of state.variableById.get(id)?.similarity_neighbors || []) {
-        const rep = clusterRep(neighbor.variable_id);
-        if (!eligible.has(rep) || selected.has(rep)) continue;
-        const current = best.get(rep);
-        if (!current || Number(neighbor.llm_rank || 99) < Number(current.llm_rank || 99)
-            || Number(neighbor.cosine_similarity || 0) > Number(current.cosine_similarity || 0)) {
-          best.set(rep, { ...neighbor, variable_id: rep });
-        }
-      }
-    }
-    // Some source groups have no similarity links between their members. Keep
-    // nearby suggestions useful by falling back to the displayed map layout.
-    if (!best.size) return nearbyMapNeighbors(eligible, selected, state.variableById);
-    return [...best.values()].sort((a, b) => Number(a.llm_rank || 99) - Number(b.llm_rank || 99)
-      || Number(b.cosine_similarity || 0) - Number(a.cosine_similarity || 0)).slice(0, 12);
-  }
-
   function setSourceSelection(sourceId, selected) {
     const ids = new Set(state.definitionDraft?.source_group_ids || []);
     if (selected) ids.add(sourceId); else ids.delete(sourceId);
     state.definitionDraft.source_group_ids = [...ids];
     persistProjectLocally();
     renderDefinition();
-    if (state.definitionMethod === "browse") void refreshBrowse();
+    void refreshBrowse();
     if (selected && !sourceHydrations.has(sourceId)) {
       const source = groupById(sourceId);
       if (source?.variable_ids?.length) {
@@ -326,13 +226,47 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     persistProjectLocally();
   }
 
-  function renderDefinition() {
+  /** Why the name and definition cannot be used yet, or "" when they can. */
+  function describeError(draft = state.definitionDraft) {
+    const label = clean(draft?.new_label);
+    if (!label) return "Name the new variable.";
+    const description = clean(draft?.new_description);
+    if ([...description].length < 20) return "Write a definition of at least 20 characters.";
+    const own = draft.existing_new_group_id;
+    const taken = (state.project?.groups || []).some(group => group.group_id !== own
+      && clean(group.label).toLowerCase() === label.toLowerCase());
+    return taken ? `Another variable is already called “${label}”.` : "";
+  }
+
+  function goToStep(step) {
     const draft = state.definitionDraft;
-    if (draft?.step === "partition" && !draft.details_loading && draft.new_variable_ids?.length
-      && !(draft.mode === "edit" && draft.new_variable_ids.length > 40)) {
-      void hydrateNeighbors(draft.new_variable_ids)
-        .catch(error => console.warn("Could not load variable neighbor suggestions.", error));
+    if (!draft) return;
+    if (draft.step === "describe" && step !== "describe") {
+      const error = describeError(draft);
+      if (error) { presenter.showDescribeError(error); return; }
+      draft.new_label = clean(draft.new_label);
+      draft.new_description = clean(draft.new_description);
+      // The AI sorts against the definition unless it was reworded for the AI.
+      if (!draft.ai_description || draft.ai_description === draft.ai_description_source) {
+        draft.ai_description = draft.new_description;
+        draft.ai_description_source = draft.new_description;
+      }
     }
+    if (step === "sources" && draft.mode === "edit") step = "partition";
+    if (step === "partition" && draft.step === "describe" && draft.mode !== "edit") step = "sources";
+    if (step === "sources") {
+      state.selectedVariableIds.clear();
+      delete draft.published_split;
+    }
+    draft.step = step;
+    persistProjectLocally();
+    invalidateVisibleCaches();
+    renderDraft();
+    if (step === "sources") void refreshBrowse();
+    if (step === "describe") els.definitionNewLabel.focus();
+  }
+
+  function renderDefinition() {
     presenter.render();
     jevAssist.render();
   }
@@ -342,10 +276,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (!draft) return;
     draft.new_label = clean(draft.new_label);
     draft.new_description = clean(draft.new_description || "");
-    if ([...draft.new_description].length < 20) {
-      showSaveError(new Error("Group definition must be at least 20 characters. Please add more detail."));
-      els.definitionNewDescription.setAttribute("aria-invalid", "true");
-      els.definitionNewDescription.focus();
+    const describeProblem = describeError(draft);
+    if (describeProblem) {
+      draft.step = "describe";
+      renderDraft();
+      presenter.showDescribeError(describeProblem);
       return;
     }
     draft.residual_labels = Object.fromEntries(Object.entries(draft.residual_labels)
@@ -380,13 +315,16 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       }
       // In Causes and Consequences a new variable becomes the focus; it is not
       // an anchor and has no group panel to open.
-      const forFocus = Boolean(onFocusDefined) && draft.role === "candidate" && draft.mode !== "edit"
+      // Started from the Custom variables page: go back to it, showing the new row.
+      const fromManager = Boolean(state.customVariablesOpen);
+      const forFocus = !fromManager && Boolean(onFocusDefined) && draft.role === "candidate" && draft.mode !== "edit"
         && (state.task === "causes" || state.task === "consequences");
+      if (fromManager) state.customVariablesHighlight = newGroupId;
       state.definitionDraft = null;
       state.selectedVariableIds.clear();
       state.activeGroupId = null;
       state.focusedGroupId = newGroupId;
-      if (draft.role === "candidate" && !forFocus) state.pendingVariablePanelGroupId = newGroupId;
+      if (draft.role === "candidate" && !forFocus && !fromManager) state.pendingVariablePanelGroupId = newGroupId;
       const initialAnchor = draft.mode !== "edit" && !state.changingAnchorSide;
       if (!forFocus) {
         state.phase = initialAnchor && draft.role === "iv" ? "select_dv"
@@ -394,11 +332,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         state.workflowMode = state.phase === "build" ? "group_review" : "setup";
       }
       state.changingAnchorSide = null;
-      invalidateMapCaches();
+      invalidateVisibleCaches();
       addToUndoHistory(draft.mode === "edit" ? `Updated split "${draft.new_label}"`
         : draft.role === "candidate" ? `Defined variable "${draft.new_label}"`
           : `Defined "${draft.new_label}" as ${draft.role.toUpperCase()}`, before);
-      setMapMode("select");
       renderAll();
       if (forFocus) onFocusDefined(newGroupId);
       if (draft.role === "instrument") onInstrumentReady();
@@ -408,83 +345,37 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       state.compiledDagUpdating = false;
       state.project = previousProject;
       onCommitFailureRestored();
-      invalidateMapCaches();
-      renderDraft({ redrawMap: true });
+      invalidateVisibleCaches();
+      renderDraft();
       showSaveError(error);
     }
   }
 
-  // Validation messages live on the review step, which a published split skips.
   function showSaveError(error) {
-    const draft = state.definitionDraft;
-    if (draft && draft.step !== "review") { draft.step = "review"; renderDraft(); }
-    presenter.showValidationError(error);
+    presenter.showSaveError(error);
   }
 
   function installDefinitionHandlers() {
     jevAssist.install();
-    const chooseInitialMethod = method => {
-      if (state.definitionDraft?.step !== "sources") return;
-      browseRevision += 1;
-      state.definitionMethod = method;
-      renderDraft();
-      if (method === "browse") void refreshBrowse();
-      (method ? els.definitionSourceSearch : els.definitionChooseManual).focus();
-    };
-    els.definitionChooseJev.addEventListener("click", () => chooseInitialMethod("jev"));
-    els.definitionChooseManual.addEventListener("click", () => chooseInitialMethod("manual"));
-    els.definitionChooseBrowse.addEventListener("click", () => chooseInitialMethod("browse"));
-    els.definitionChangeMethod.addEventListener("click", () => chooseInitialMethod(null));
-    els.definitionAiChangeMethod.addEventListener("click", () => chooseInitialMethod(null));
-    const chooseMethod = method => {
-      if (state.definitionDraft?.step !== "partition" || state.definitionMethod === method) return;
-      state.definitionMethod = method;
-      delete state.definitionDraft.published_split;
-      if (state.map) state.map._groupRegions = null;
-      renderDraft({ redrawMap: true });
-    };
-    els.definitionMethodJev.addEventListener("click", () => chooseMethod("jev"));
-    els.definitionMethodManual.addEventListener("click", () => chooseMethod("manual"));
-    els.definitionCancel.addEventListener("click", cancelDefinition);
     els.definitionSourceSearch.addEventListener("input", renderDefinition);
     els.definitionContinue.addEventListener("click", continueDefinition);
-    els.definitionVariableSearch.addEventListener("input", renderDefinition);
-    els.definitionTermToNew.addEventListener("click", () => batchMoveDefinitionVariables(presenter.selectedTermIds(), true));
-    els.definitionTermToLeftover.addEventListener("click", () => batchMoveDefinitionVariables(presenter.selectedTermIds(), false));
-    els.definitionTermPrev.addEventListener("click", () => presenter.changeTermPage(-1));
-    els.definitionTermNext.addEventListener("click", () => presenter.changeTermPage(1));
-    els.definitionUndoBatch.addEventListener("click", undoDefinitionBatch);
-    els.definitionAddNeighbors.addEventListener("click", () => {
-      const selected = new Set(state.definitionDraft?.new_variable_ids || []);
-      const added = definitionNeighbors().slice(0, 8).map(neighbor => neighbor.variable_id);
-      for (const id of added) selected.add(id);
-      state.definitionDraft.new_variable_ids = [...selected];
-      state.definitionDraft.reviewed_variable_ids = [...new Set([
-        ...(state.definitionDraft.reviewed_variable_ids || []), ...added,
-      ])];
-      state.selectedVariableIds = new Set(selected);
-      invalidateMapCaches();
-      renderDraft({ redrawMap: true });
-    });
-    els.definitionBack.addEventListener("click", () => {
-      state.definitionDraft.step = "sources"; state.selectedVariableIds.clear();
-      delete state.definitionDraft.published_split;
-      invalidateMapCaches(); renderDraft();
-    });
-    els.definitionReview.addEventListener("click", () => {
-      if (!definitionCanReview()) return;
-      if (state.definitionDraft.published_split) { void saveDefinition(); return; }
-      state.definitionDraft.step = "review"; renderDraft();
-    });
-    els.definitionReviewBack.addEventListener("click", () => {
-      state.definitionDraft.new_label = clean(els.definitionNewLabel.value);
-      state.definitionDraft.new_description = clean(els.definitionNewDescription.value);
-      state.definitionDraft.step = "partition"; renderDraft({ redrawMap: true });
-    });
+    els.definitionDescribeNext.addEventListener("click", () => goToStep("partition"));
+    els.definitionSourcesBack.addEventListener("click", () => goToStep("describe"));
+    presenter.install();
+    els.definitionBack.addEventListener("click", () =>
+      goToStep(state.definitionDraft?.mode === "edit" ? "describe" : "sources"));
     els.definitionNewLabel.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_label = els.definitionNewLabel.value;
+      presenter.clearDescriptionValidation();
       persistProjectLocally();
     });
+    const nextOnEnter = event => {
+      if (event.key === "Enter" && !event.shiftKey && state.definitionDraft?.step === "describe") {
+        event.preventDefault();
+        goToStep("partition");
+      }
+    };
+    els.definitionNewLabel.addEventListener("keydown", nextOnEnter);
     els.definitionNewDescription.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_description = els.definitionNewDescription.value;
       presenter.clearDescriptionValidation();
@@ -500,9 +391,15 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   // Saved runs are only offered from Define, never restored at startup, so a
   // preview appears only where its controls do. `adopt` makes the draft current.
+  // Group memberships fill in after startup, and a saved draft is compared against them, so wait for them first.
+  async function whenGroupsHydrated() {
+    const deadline = Date.now() + 60_000;
+    while (state.publishedSchemaHydrating && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
   async function resumeJevDraft(draft, { adopt }) {
+    await whenGroupsHydrated();
     if (!sourcesUnchanged(draft)) return;
-    state.definitionMethod = "jev";
     if (adopt) {
       state.definitionDraft = draft;
       state.selectedVariableIds = new Set(draft.new_variable_ids || []);
@@ -510,10 +407,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (draft.step === "sources") { renderDraft(); return; }
     try { await hydrateVariableDetails(draft.eligible_variable_ids); }
     catch (error) { console.warn("Could not reload all split variable details.", error); }
-    invalidateMapCaches();
-    setMapMode("select");
+    invalidateVisibleCaches();
     renderDraft();
-    fitMap(draft.eligible_variable_ids);
     try { await jevAssist.restoreForDraft({ force: true }); }
     catch (error) { console.warn("Could not restore saved Jev progress.", error); }
   }
@@ -534,7 +429,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     let saved = [];
     try { saved = await jevAssist.listSavedRuns(); }
     catch (error) { console.warn("Could not read saved Jev runs.", error); }
-    if (state.definitionDraft !== draft || draft?.step !== "sources") return;
+    if (state.definitionDraft !== draft || draft?.step !== "describe") return;
     // Group memberships may still be loading, which would look like a change.
     const loading = state.publishedSchemaHydrating;
     presenter.showSavedRuns(saved
@@ -568,10 +463,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   const presenter = createDefinitionWorkflowPresenter({
     state, elements: els, normalized, clusterRep, truncate, definitionSources,
     definitionResidualIds, definitionCanReview, searchVariables, searchSourceGroups, visibleVariables,
-    clusterDisplayVariable, definitionNeighbors,
-    resizeMap, fitMap, onSourceSelection: setSourceSelection,
-    onToggleVariable: toggleDefinitionVariable, onResidualLabel: setResidualLabel,
-    canUndoBatch: () => Boolean(lastBatch),
+    clusterDisplayVariable,
+    onSourceSelection: setSourceSelection, onResidualLabel: setResidualLabel,
+    onCancel: cancelDefinition,
     browseState, onChoosePublishedSplit: choosePublishedSplit,
   });
 
@@ -580,33 +474,21 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     getVariable: id => clusterDisplayVariable(id) || state.variableById.get(id),
     persistDraft: persistProjectLocally, getReturnUrl,
     onConnectionChange: ready => { state.definitionAiReady = ready; if (state.project && state.definitionDraft) renderDraft(); },
-    onPreviewChange: (ids, mode) => {
-      state.definitionAiPreviewIds = ids ? new Set(ids) : null;
-      presenter.setJevPreviewStatus(ids, mode);
-      // The positions and visible variables are unchanged; only group regions move.
-      if (state.map) state.map._groupRegions = null;
-      drawMap();
-    },
-    onApply: (ids, description) => {
+    onApply: ids => {
       const draft = state.definitionDraft;
       if (!draft || draft.step !== "partition") return;
-      state.definitionMethod = "manual";
-      lastBatch = null;
       draft.new_variable_ids = ids;
-      draft.new_description = description;
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
       state.selectedVariableIds = new Set(ids);
-      // Skip the manual draft; it can still be reached with Back. A split with
-      // no leftover in some source cannot be reviewed, so stay to fix that.
-      if (definitionCanReview()) draft.step = "review";
-      invalidateMapCaches();
+      // The suggestions land in the included list, where they can be checked and saved.
+      invalidateVisibleCaches();
       persistProjectLocally();
-      renderDraft({ redrawMap: true });
+      renderDraft();
     },
   });
 
   return { startDefinition, startEditSplit, cancelDefinition, definitionSources, continueDefinition,
-    definitionResidualIds, toggleDefinitionVariable,
-    definitionCanReview, definitionNeighbors, renderDefinition, saveDefinition, installDefinitionHandlers,
+    definitionResidualIds,
+    definitionCanReview, renderDefinition, saveDefinition, installDefinitionHandlers,
     resumeAfterOAuth };
 }

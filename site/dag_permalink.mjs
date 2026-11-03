@@ -6,12 +6,17 @@ export const TASKS = ["identify", "causes", "consequences"];
 // Each explore view's URL keys: focus group, depth and minimum papers per link.
 const exploreKeys = { causes: ["causes_of", "causes_depth", "causes_min_papers"],
   consequences: ["effects_of", "effects_depth", "effects_min_papers"] };
+// Variables left off each explore view's map, one parameter per variable.
+const exploreExcludedKeys = { causes: "causes_excluded", consequences: "effects_excluded" };
+// Variables left off Identify's map, kept for the cause and outcome they were unticked under.
+const IDENTIFY_EXCLUDED_KEY = "id_excluded";
+const identifyExclusionKey = (iv, dv) => `${iv || ""}\u0000${dv || ""}`;
 
 const booleanFields = {
   conf: "showConfoundersOnly", coll: "showCollidersOnly", excl: "showExclusionViolations", exog: "showExogeneity",
   sparse: "excludeSparseEdges",
   bottle: "excludeBottleneckedConfounders",
-  paths: "hideIrrelevantConfounderLinks", vl: "showVariableLabels", gl: "showGroupLabels",
+  paths: "hideIrrelevantConfounderLinks",
   excl_links: "showAllExclusionLinks",
 };
 
@@ -49,8 +54,6 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state,
     selected_group: state.activeGroupId || "", selected_variable: state.selectedVariableId || "",
     selected_edge: state.selectedEdgeId || "", sort: state.groupListSort || "",
     fs: state.fullscreenPanel || "",
-    mz: String(state.map?.transform?.scale ?? ""), mx: String(state.map?.transform?.tx ?? ""),
-    my: String(state.map?.transform?.ty ?? ""),
     dz: String(state.dagViewport?.scale ?? ""), dx: String(state.dagViewport?.position?.x ?? ""),
     dy: String(state.dagViewport?.position?.y ?? ""),
   };
@@ -68,6 +71,14 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state,
     values[papersKey] = String(explore.minPapers);
   }
   for (const [key, value] of Object.entries(values)) if (value !== "") url.searchParams.set(key, value);
+  for (const [view, key] of Object.entries(exploreExcludedKeys)) {
+    const explore = state.explore?.[view];
+    if (explore?.focusId) for (const id of explore.excluded || []) url.searchParams.append(key, id);
+  }
+  const identifyExclusion = state.identifyExclusion;
+  if (identifyExclusion?.key === identifyExclusionKey(state.project.iv_group_id, state.project.dv_group_id)) {
+    for (const id of identifyExclusion.ids || []) url.searchParams.append(IDENTIFY_EXCLUDED_KEY, id);
+  }
   if (publishedSchemaId) url.searchParams.set("schema", publishedSchemaId);
   if (localSchemaId) url.searchParams.set("local_schema", localSchemaId);
   return url.href;
@@ -86,6 +97,8 @@ export function applyTaskPermalink(params, state, resolveGroup) {
       depth: depth >= 1 && depth <= MAX_NEIGHBORHOOD_DEPTH ? depth : 1,
       minPapers: Number.isSafeInteger(papers) && papers >= 1 ? papers : 2,
     };
+    const excluded = [...new Set(params.getAll(exploreExcludedKeys[view]).map(resolveGroup).filter(Boolean))];
+    if (state.explore[view].focusId && excluded.length) state.explore[view].excluded = excluded;
   }
 }
 
@@ -103,6 +116,9 @@ export function applyPermalink(params, state) {
   }
   state.project.iv_group_id = iv || "";
   state.project.dv_group_id = dv || "";
+  const identifyExcluded = [...new Set(params.getAll(IDENTIFY_EXCLUDED_KEY).map(resolveGroup).filter(Boolean))];
+  state.identifyExclusion = iv && dv && identifyExcluded.length
+    ? { key: identifyExclusionKey(iv, dv), ids: identifyExcluded } : null;
   const instrument = resolveGroup(params.get("instrument"));
   state.project.instrument_group_id = instrument && instrument !== iv && instrument !== dv ? instrument : null;
   for (const group of groups) {
@@ -150,13 +166,8 @@ export function applyPermalink(params, state) {
   state.selectedVariableId = params.get("selected_variable") || null;
   state.selectedEdgeId = params.get("selected_edge") || null;
   state.groupListSort = params.get("sort") === "alpha" ? "alpha" : "relevance";
-  state.fullscreenPanel = ["variable-map", "dag"].includes(params.get("fs")) ? params.get("fs") : null;
+  state.fullscreenPanel = params.get("fs") === "dag" ? "dag" : null;
   const numeric = key => Number(params.get(key));
-  if (["mz", "mx", "my"].every(key => params.has(key) && Number.isFinite(numeric(key)))) {
-    state.map ||= {};
-    state.map.transform = { scale: numeric("mz"), tx: numeric("mx"), ty: numeric("my") };
-    state.permalinkMapViewport = true;
-  }
   if (["dz", "dx", "dy"].every(key => params.has(key) && Number.isFinite(numeric(key)))) {
     state.permalinkDagViewport = { scale: numeric("dz"), position: { x: numeric("dx"), y: numeric("dy") } };
   }

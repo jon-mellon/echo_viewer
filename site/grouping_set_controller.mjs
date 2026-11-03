@@ -99,6 +99,8 @@ export function createGroupingSetController({ state, elements, publicationContro
         ? { finding_decisions: structuredClone(state.project.finding_decisions) } : {}),
       ...(Object.keys(state.project.confounder_statuses || {}).length
         ? { confounder_statuses: structuredClone(state.project.confounder_statuses) } : {}),
+      ...(Object.keys(state.project.collider_statuses || {}).length
+        ? { collider_statuses: structuredClone(state.project.collider_statuses) } : {}),
       ...(Object.hasOwn(source, "hidden_variable_ids") || hidden_variable_ids.length
         ? { hidden_variable_ids }
         : {}),

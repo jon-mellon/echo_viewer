@@ -92,7 +92,7 @@ test("tall panels load a bounded larger page and reuse cached labels", async () 
     const state = { project: { groups: [{ group_id: "g1", variable_ids: ids }] },
       selectedEvidenceGroupId: "g1", variableById: new Map() };
     const edgeInspector = new Element("div");
-    edgeInspector.parentElement = { clientHeight: 2000 };
+    edgeInspector.parentElement = { clientHeight: 2000, closest: () => null };
     const elements = { edgeInspector, closeEvidencePane: new Element("button"), provenancePanel: new Element("div") };
     const requests = [];
     const controller = createDagInspectorController({ state, elements, loadConceptLabels: async requested => {
@@ -157,7 +157,7 @@ test("a finding's exclude control waits for both concept labels", () => {
     assert.equal(elements.provenancePanel.findAll("button").length, 0);
     state.variableById.set("v2", { concept_label: "Target" });
     controller.renderProvenance();
-    assert.equal(elements.provenancePanel.findAll("button")[0].textContent, "×");
+    assert.equal(elements.provenancePanel.findAll("button")[0].textContent, "Exclude");
     elements.provenancePanel.findAll("button")[0].click();
     assert.ok(elements.provenancePanel.findAll("option")
       .some(option => option.textContent === "Concept miscategorized"));

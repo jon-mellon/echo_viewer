@@ -97,3 +97,14 @@ test("lane renderer produces separated strokes and arrow canvas commands", () =>
   assert.equal(commands.filter(command => command[0] === "stroke").length, 2);
   assert.ok(commands.some(command => command[0] === "fill"));
 });
+
+test("study anchors off the highlighted paths stay opaque so the study arrows do not show through them", () => {
+  const model = highlights.buildPathHighlightModel({
+    paths: { toIv: ["c", "iv"], toDv: ["c", "dv"] },
+    visibleLinks: [], edges: [],
+    nodes: [{ id: "c" }, { id: "iv" }, { id: "dv" }, { id: "z" }, { id: "x" }],
+    groupId: "c", ivId: "other", dvId: "dv", studyAnchorIds: ["z"],
+  });
+  assert.equal(model.nodeUpdates.find(node => node.id === "z").opacity, 1);
+  assert.equal(model.nodeUpdates.find(node => node.id === "x").opacity, 0.16);
+});

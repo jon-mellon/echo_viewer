@@ -8,9 +8,9 @@ import { normalizeLinkDecision } from "./dag_link_aggregation.mjs";
 import { validateGroupingSchema } from "./data_validation.mjs";
 
 export function createProjectBootstrap({ state, initElements, installHandlers, installDefinitionHandlers,
-  resizeMap, initializeProject, loadLatestSchemaGroups,
+  initializeProject, loadLatestSchemaGroups,
   normalizeProjectDuplicateAssignments, publicationController, renderAll,
-  constrainMapTransform, drawMap, fitMap, dagNetworkController, buildDuplicateClusters,
+  dagNetworkController, buildDuplicateClusters,
   linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {},
   onLocalSchemaLoaded = () => {} }) {
   const presenter = createProjectBootstrapPresenter({});
@@ -23,7 +23,6 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     initElements();
     installHandlers();
     installDefinitionHandlers();
-    resizeMap();
     const requested = new URL(window.location.href);
     // A plain ?task= link opens that task directly; permalinks carry their own.
     const requestedTask = requested.searchParams.get("task");
@@ -102,6 +101,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       || state.data.grouping_sets?.[0])?.finding_decisions || {});
     state.project.confounder_statuses = structuredClone((localRecord?.schema
       || state.data.grouping_sets?.[0])?.confounder_statuses || {});
+    state.project.collider_statuses = structuredClone((localRecord?.schema
+      || state.data.grouping_sets?.[0])?.collider_statuses || {});
     normalizeProjectDuplicateAssignments();
     if (state.interfaceMode === "dag2") {
       state.phase = "select_iv";
@@ -113,6 +114,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       applyPermalink(permalink, state);
       if (state.project.iv_group_id && state.project.dv_group_id) state.phase = "build";
     } else if (TASKS.includes(requestedTask)) state.task = requestedTask;
+    // A new project, or a link that names no task, opens the start page (state.task stays null).
     if (state.data.publication_source && !state.project.publication) {
       state.project.publication = {
         ...state.data.publication_source,
@@ -136,12 +138,6 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     renderAll();
     await dagNetworkController.whenRendered?.();
     performance.measure("echo:startup:graph", { start: renderStart, end: performance.now() });
-    if (state.permalinkMapViewport) {
-      constrainMapTransform();
-      drawMap();
-    } else {
-      fitMap();
-    }
     if (state.permalinkDagViewport) {
       dagNetworkController.getNetwork()?.moveTo({ ...state.permalinkDagViewport, animation: false });
     }
@@ -174,6 +170,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.project.link_decisions = structuredClone(schema.link_decisions || {});
         state.project.finding_decisions = structuredClone(schema.finding_decisions || {});
         state.project.confounder_statuses = structuredClone(schema.confounder_statuses || {});
+        state.project.collider_statuses = structuredClone(schema.collider_statuses || {});
         loadLatestSchemaGroups();
         normalizeProjectDuplicateAssignments();
         // Membership hydration and the following DOM/canvas refresh are

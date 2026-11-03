@@ -7,7 +7,6 @@ import { aggregateGroupLinks as deriveGroupLinks, rawLinksBetween as lookupRawLi
 import * as exportData from "/dag_exports.mjs";
 import { createDagExportController } from "/dag_export_controller.mjs";
 import { renderDagPng } from "/dag_export_image.mjs";
-import * as mapGeometry from "/map_geometry.mjs";
 import { createRenderCoordinator } from "/render_coordinator.mjs";
 import * as candidates from "/dag_candidates.mjs";
 import * as inspector from "/dag_inspector.mjs";
@@ -18,16 +17,16 @@ import { createDagAppState, ensureDiagnosticFilter } from "/dag_app_state.mjs";
 import { createDagProjectController } from "/dag_project_controller.mjs";
 import { createDagInspectorController, STUDY_DESIGN_EDGE_ID } from "/dag_inspector_controller.mjs";
 import { createDagShellController } from "/dag_shell_controller.mjs";
-import { createDagMapViewController } from "/dag_map_view_controller.mjs";
-import { createDagMapUiController } from "/dag_map_ui_controller.mjs";
 import { createDagSetupGroupController } from "/dag_setup_group_controller.mjs";
 import { createDagGroupEditorController } from "/dag_group_editor_controller.mjs";
 import { deriveDagView, excludedForConnectivity } from "/dag_view.mjs";
 import { createDagNetworkController, isDagDisplayGroup } from "/dag_network_controller.mjs?v=compiled-first-v2";
 import { createDagEventController } from "/dag_event_controller.mjs";
+import { createGroupPalette } from "/group_palette.mjs";
 import { createUoaController } from "/uoa_controller.mjs";
 import { createToolbarController } from "/toolbar_controller.mjs";
 import { createDefinitionWorkflowController } from "/definition_workflow_controller.mjs";
+import { createCustomVariablesPresenter } from "/custom_variables_presenter.mjs";
 import { createTaskViews } from "/task_views.mjs";
 import { directionalPaperCounter, linksNeedingExactCounts } from "/causal_neighborhood.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
@@ -40,7 +39,7 @@ import { importDraftFile, makeDraftExport } from "/draft_exchange.mjs";
 import { listPreviousSessions } from "/local_schema_store.mjs";
 import { escapeHtml } from "/text_utils.mjs";
 import { relevantExclusions } from "/dag_export_relevance.mjs";
-import { CONFOUNDER_STATUSES, confounderRows } from "/confounder_status.mjs";
+import { DIAGNOSTIC_STATUSES, STATUS_MENU_LABELS, diagnosticStatusRows } from "/confounder_status.mjs";
 import { h, replaceChildren, safeUrl, setSafeUrl } from "/dom_builder.mjs";
 import { hydrateSearchResult, variableSearchCatalog } from "/variable_search_catalog.mjs";
 
@@ -51,27 +50,31 @@ const ROLE_LABELS = {
   possible_common_consequence_or_collider: "Common consequence",
   other_possible_cause_of_dv: "Other cause of Dep var",
   other_possible_cause_of_iv: "Other cause of Ind var",
-  near_iv_dv_map_region: "Near Ind var/Dep var region",
 };
 
 const GROUP_COLORS = {
-  iv: "#315f9d",
-  dv: "#9b5c2e",
-  assigned: "#1f7a67",
+  iv: "#0072B2",
+  dv: "#E69F00",
+  assigned: "#009E73",
   active: "#b83b5e",
 };
 
-// Distinct colors for groups (Ind var and Dep var use GROUP_COLORS above).
-const GROUP_PALETTE = [
-  "#0f766e", "#9f1239", "#1d4ed8", "#b45309", "#4d7c0f",
-  "#176b80", "#be123c", "#0369a1", "#92400e", "#047857",
-  "#4338ca", "#c2410c", "#166534", "#a21caf", "#7e22ce",
-  "#b91c1c", "#1e40af", "#a16207", "#065f46", "#6d28d9",
-  "#0ea5e9", "#ca8a04", "#15803d", "#db2777",
-];
+// Distinct colors for groups (Ind var and Dep var use GROUP_COLORS above): the Okabe-Ito
+// hues in roughly the original order (teal, rose, blue, amber, ...), then deeper and lighter variants.
+const GROUP_PALETTE = (() => {
+  const base = ["#009E73", "#CC79A7", "#0072B2", "#E69F00", "#56B4E9", "#D55E00", "#999999"];
+  const mix = (hex, target, t) => {
+    const n = parseInt(hex.slice(1), 16);
+    const t0 = parseInt(target.slice(1), 16);
+    const ch = shift => Math.round(((n >> shift) & 255) + (((t0 >> shift) & 255) - ((n >> shift) & 255)) * t).toString(16).padStart(2, "0");
+    return `#${ch(16)}${ch(8)}${ch(0)}`;
+  };
+  return [...base, ...base.map(c => mix(c, "#000000", 0.35)), ...base.map(c => mix(c, "#ffffff", 0.3))];
+})();
 
 // The current interface has one canonical entry point at the site root.
 const state = createDagAppState("dag2");
+const groupPalette = createGroupPalette({ state, colors: GROUP_COLORS, palette: GROUP_PALETTE });
 let schemaBatchDepth = 0;
 let schemaCommitQueued = false;
 const PROJECT_STORAGE_PREFIX = state.interfaceMode === "dag2" ? "dag2-project-v1" : "dag-builder-project-v2";
@@ -120,43 +123,47 @@ function initElements() {
     "ivInput", "ivInputLabel", "ivDefineNew", "ivSeeds", "ivResults", "ivGroupPicker",
     "instrumentInput", "instrumentDefineNew", "instrumentGroupPicker",
     "schemaChoice", "loadSchema", "skipSchema",
-    "definitionBlock", "definitionTitle", "definitionCancel", "definitionMethodStep", "definitionResumeList", "definitionChooseManual", "definitionChooseJev", "definitionChooseBrowse",
-    "definitionAiSetupStep", "definitionAiSetupHost", "definitionAiChangeMethod", "definitionAiSetup", "definitionAiWork", "definitionAiResults", "definitionSourcesStep", "definitionChosenMethod", "definitionChangeMethod",
+    "definitionBlock", "definitionTitle", "definitionCancel", "definitionDescribeStep", "definitionDescribeNext", "definitionResumeList",
+    "definitionAiWork", "definitionSourcesStep", "definitionSourcesBack",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults",
-    "definitionPartitionStep", "definitionMethodJev", "definitionMethodManual", "definitionLoadStatus", "definitionJevPanel", "definitionManualPanel",
-    "definitionCounts", "definitionTermChips", "definitionTermSummary",
+    "definitionPartitionStep", "definitionLoadStatus", "definitionJevPanel", "definitionIncludedPanel",
+    "definitionConceptsIntro", "definitionCountIncluded", "definitionCountExcluded", "definitionCountUnreviewed",
+    "definitionSourcesSummary",
+    "definitionIncludedFilter", "definitionSaveHint",
+    "definitionAiStepConnect", "definitionAiStepLimit", "definitionAiStepSample", "definitionAiStepFull",
+    "definitionAiConnectSummary", "definitionAiLimitSummary", "definitionAiSampleSummary", "definitionAiFullSummary",
+    "definitionAiLimitText", "definitionAiSettingsLink", "definitionAiSampleHost", "definitionAiFullHost",
+    "definitionAiFullText", "definitionAiApplyNote",
     "definitionAiDescription", "definitionAiConnect", "definitionAiRecheck", "definitionAiDisconnect", "definitionAiStatus", "definitionAiCost",
     "definitionAiRun", "definitionAiPreview", "definitionAiSummary", "definitionAiRows", "definitionAiFullRun", "definitionAiMore",
     "definitionAiReviewTools", "definitionAiReviewFilter", "definitionAiReviewPage", "definitionAiReviewPrev", "definitionAiReviewNext",
     "definitionAiApply", "definitionAiDiscard",
-    "definitionTermItems", "definitionTermPrev", "definitionTermPage", "definitionTermNext",
-    "definitionTermToNew", "definitionTermToLeftover", "definitionUndoBatch", "definitionVariableSearch",
-    "definitionVariableResults", "definitionSelectedVariables", "definitionAddNeighbors", "definitionNeighborResults",
-    "definitionBack", "definitionReview",
-    "definitionReviewStep", "definitionNewLabel", "definitionNewDescription", "definitionReviewVariables", "definitionResidualLabels",
-    "definitionManualReview", "definitionValidation", "definitionReviewBack", "definitionSave",
+    "definitionSelectedVariables",
+    "definitionBack", "definitionSelectedTitle", "definitionSaveStatus",
+    "definitionNewLabel", "definitionNewDescription", "definitionResidualLabels",
+    "definitionValidation", "definitionSave",
+    "customVariablesView", "customVariablesTitle", "customVariablesCreate", "customVariablesClose",
+    "customVariablesFilter", "customVariablesStatus", "customVariablesTable",
     "workflowHint", "dagStatusBadge",
     "variablePanel", "variableDefineNew", "variablePanelDisclosure", "variablePanelCount", "variablePanelList", "variablePanelPagination",
-    "anchorBar", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "dag2UndoBtn", "dag2RedoBtn", "dag2HistoryStatus", "historyStatus",
+    "anchorBar", "exploreFocusSelector", "exploreFocusName", "anchorDvLabel", "anchorIvLabel", "anchorInstrumentLabel", "instrumentRow", "changeInstrument", "changeDv", "changeIv", "editSplitDv", "editSplitIv", "historyStatus",
     // Group list panel
     "groupListPanel", "groupListSort", "groupList", "groupListCount", "createGroupBtn",
     // Grouping schema
     "groupingPanel", "groupingSetSelect", "exportGroupingFolder", "publishSchema",
     "copyPermalink", "groupingSummary", "publicationStatus", "schemaPublicationBadge",
-    "publishSchemaDialog",
+    "publishSchemaDialog", "shareUnpublishedDialog", "importSchemaAction", "importSchemaDialog",
+    "importSchemaChooseFile",
     // Rejected variables
     "rejectedVariablesPanel", "rejectedVariableSearch", "rejectedVariablesList",
-    // Map
-    "dagMapCanvas", "dagMapTooltip", "dagMapLabels", "variableLayoutSelect", "variableAssignmentCounts", "definitionMapPreviewStatus",
-    "dagMapContextMenu",
-    "dagZoomIn", "dagZoomOut", "dagFitView", "dagFitAll", "toggleVariableLabels", "toggleGroupLabels", "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleSparseEdges", "minimumEdgePapers", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
-    "selectionCount",
+    // Graph filters
+    "toggleConfoundersOnly", "toggleCollidersOnly", "toggleExclusionViolations", "toggleExogeneity", "confounderPathLength", "toggleSparseEdges", "minimumEdgePapers", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks", "toggleAllExclusionLinks", "showExcludedLinks", "showExcludedFindings", "dagSelectMode", "dagBrushMode", "dagEraseMode", "fullscreenVariableMap",
     // Undo / history
     "undoBtn", "redoBtn", "historyToggle", "actionHistory",
     // Right: group editor
     "groupEditorSection", "groupEditorTitle", "groupEditorHint", "groupDescription", "cancelGroupEdit",
     "discardGroupEdit", "localSaveStatus", "retryLocalSave", "saveIndependentCopy",
-    "exportLocalDraft", "importLocalDraft", "previousSessions", "previousSessionsPanel",
+    "exportLocalDraft", "importLocalDraft", "previousSessionsPanel",
     "previousSessionsList",
     "groupLabelInput", "groupNotesInput", "useGroupAsAnchor",
     "zoomGroup", "editSplit",
@@ -169,38 +176,36 @@ function initElements() {
     "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag", "dagTable", "dagViewGraph", "dagViewTable",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
-    "exportProject", "exportWorkingMap", "projectImport", "strictDagStatus",
+    "exportProject", "exportWorkingMap", "projectImport",
     "exportBib", "exportMd", "exportTex",
     // Panel resizers
     "leftResizer", "rightResizer",
   ]) {
     els[id] = $(id);
   }
-  state.map.canvas = els.dagMapCanvas;
-  state.map.ctx = state.map.canvas.getContext("2d");
   els.confounderDisclosure.addEventListener("toggle", renderConfounderStatuses);
   els.exportLocalDraft?.addEventListener("click", exportLocalDraft);
-  els.previousSessions?.addEventListener("click", async () => {
-    const panel = els.previousSessionsPanel;
-    if (!panel.hidden) {
-      panel.hidden = true;
-      els.previousSessions.setAttribute("aria-expanded", "false");
-      return;
-    }
+  // History (previous sessions) is a top-bar menu; its list is rebuilt each time it opens.
+  const historyMenu = /** @type {HTMLDetailsElement | null} */ (document.getElementById("historyMenu"));
+  historyMenu?.addEventListener("toggle", async () => {
+    if (!historyMenu.open) return;
     try {
       await persistentViewer.flushUrl();
       const sessions = (await listPreviousSessions())
         .filter(record => record.id !== persistentViewer.sessionId);
       replaceChildren(els.previousSessionsList);
       if (!sessions.length) replaceChildren(els.previousSessionsList,
-        h("p", { textContent: "No previous views saved in this browser." }));
+        h("p", { className: "menu-note", textContent: "No earlier sessions" }));
       for (const record of sessions) {
         const url = new URL(record.url, window.location.origin);
         if (url.origin !== window.location.origin || url.searchParams.get("p") !== "1") continue;
-        const button = h("button", { type: "button", className: "text-button previous-session-entry" },
-          h("strong", { textContent: record.title || "Untitled view" }),
-          h("span", { className: "previous-session-meta",
-            textContent: `${url.searchParams.has("local_schema") ? "Local draft" : "Published schema"} · ${new Date(record.updatedAt).toLocaleString()}` }));
+        const title = record.title || "Untitled view";
+        const when = formatSessionTime(record.updatedAt);
+        // Only the exception is worth a label: most sessions use the published schema.
+        const meta = url.searchParams.has("local_schema") ? `${when} · Local draft` : when;
+        const button = h("button", { type: "button", className: "menu-item previous-session-entry", title },
+          h("span", { className: "previous-session-title", textContent: title }),
+          h("span", { className: "previous-session-meta", textContent: meta }));
         button.addEventListener("click", () => {
           if ((persistentViewer.editorDirty || state.definitionDraft)
             && !window.confirm("Discard uncommitted changes and open this previous view?")) return;
@@ -210,8 +215,6 @@ function initElements() {
         });
         els.previousSessionsList.append(button);
       }
-      panel.hidden = false;
-      els.previousSessions.setAttribute("aria-expanded", "true");
     } catch (error) { els.localSaveStatus.textContent = `Could not list previous views — ${error.message}`; }
   });
   els.retryLocalSave?.addEventListener("click", () => {
@@ -225,6 +228,16 @@ function initElements() {
       if (editorWasOpen) groupEditorController.closeGroupEditor();
       publicationController.workingCopyChanged();
     } catch (error) { els.localSaveStatus.textContent = `Not saved — ${error.message}`; }
+  });
+  // Schema menu → Import schema…: the dialog explains what importing replaces,
+  // then opens the same file picker as Import → Schema draft.
+  els.importSchemaAction?.addEventListener("click", () => {
+    if (els.importSchemaDialog?.showModal) els.importSchemaDialog.showModal();
+    else els.importLocalDraft?.click();
+  });
+  els.importSchemaChooseFile?.addEventListener("click", () => {
+    els.importSchemaDialog?.close("import");
+    els.importLocalDraft?.click();
   });
   els.importLocalDraft?.addEventListener("change", async event => {
     const file = event.target.files?.[0];
@@ -295,7 +308,7 @@ function isRejectedVariable(variableId) {
 }
 
 function visibleVariables() {
-  if (state.map?._visibleVariables) return state.map._visibleVariables;
+  if (state.visibleCache.variables) return state.visibleCache.variables;
   let variables = visibility.visibleVariables(
     state.variables, rejectedVariableEntries(), state.clusterOf, state.clusterMembers,
   );
@@ -303,25 +316,24 @@ function visibleVariables() {
     const eligible = new Set(state.definitionDraft.eligible_variable_ids || []);
     variables = variables.filter(variable => eligible.has(clusterRep(variable.variable_id)));
   }
-  if (state.map) state.map._visibleVariables = variables;
+  state.visibleCache.variables = variables;
   return variables;
 }
 
 function visibleClusterReps() {
-  if (state.map?._visibleClusterReps) return state.map._visibleClusterReps;
+  if (state.visibleCache.clusterReps) return state.visibleCache.clusterReps;
   const representatives = visibleVariables().filter((variable) => variable.is_cluster_rep);
-  if (state.map) state.map._visibleClusterReps = representatives;
+  state.visibleCache.clusterReps = representatives;
   return representatives;
 }
 
-function invalidateMapCaches() {
-  mapUiController.invalidateCaches();
-  if (!state.map) return;
-  state.map._visibleVariables = null;
-  state.map._visibleClusterReps = null;
-  state.map._worldSpan = null;
-  state.map._groupRegions = null;
+function invalidateVisibleCaches() {
+  state.visibleCache.variables = null;
+  state.visibleCache.clusterReps = null;
+  groupPalette.invalidate();
 }
+
+function groupColor(group) { return groupPalette.groupColor(group); }
 
 
 function initializeProject() {
@@ -393,31 +405,55 @@ function renderUndoRedo() {
     ? `Redo: ${state.undoHistory[state.undoPointer + 1]?.description}` : "Nothing to redo";
   const next = state.undoPointer < state.undoHistory.length - 1
     ? state.undoHistory[state.undoPointer + 1]?.description : null;
-  const status = [last && `Undo: ${last}`, next && `Redo: ${next}`].filter(Boolean).join(" · ") || "No edits to undo or redo";
-  for (const element of [els.historyStatus, els.dag2HistoryStatus]) {
-    if (element) element.textContent = status;
-  }
+  if (els.historyStatus) els.historyStatus.textContent = [last && `Undo: ${last}`, next && `Redo: ${next}`].filter(Boolean).join(" · ");
+  const shortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
+  if (last) els.undoBtn.title = `${els.undoBtn.title} (${shortcut}Z)`;
+  if (next) els.redoBtn.title = `${els.redoBtn.title} (${shortcut}Shift+Z)`;
   els.undoBtn.setAttribute("aria-label", els.undoBtn.title);
   els.redoBtn.setAttribute("aria-label", els.redoBtn.title);
-  if (els.dag2UndoBtn) {
-    els.dag2UndoBtn.disabled = els.undoBtn.disabled;
-    els.dag2UndoBtn.title = els.undoBtn.title;
-    els.dag2RedoBtn.disabled = els.redoBtn.disabled;
-    els.dag2RedoBtn.title = els.redoBtn.title;
-    els.dag2UndoBtn.setAttribute("aria-label", els.undoBtn.title);
-    els.dag2RedoBtn.setAttribute("aria-label", els.redoBtn.title);
-  }
+  if (state.showActionHistory) renderActionHistory();
 }
 
+/** Undo or redo until the given step is the current one (-1 is before any edit). */
+function jumpToHistory(pointer) {
+  let guard = state.undoHistory.length + 1;
+  while (state.undoPointer > pointer && guard-- > 0) projectController.undo();
+  while (state.undoPointer < pointer && guard-- > 0) projectController.redo();
+  void persistentViewer.commitDecision().catch(error => console.error("Could not save history jump", error));
+}
+
+/** "Today, 4:29 PM", "Yesterday, 4:12 PM", "Oct 30, 9:05 AM", or with the year when it isn't this one. */
+function formatSessionTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const daysAgo = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86_400_000);
+  if (daysAgo === 0) return `Today, ${time}`;
+  if (daysAgo === 1) return `Yesterday, ${time}`;
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  const day = date.toLocaleDateString(undefined, sameYear ? { month: "short", day: "numeric" } : { year: "numeric", month: "short", day: "numeric" });
+  return `${day}, ${time}`;
+}
+
+/** The edit-history menu: newest first; steps after the current one are undone and can be redone. */
 function renderActionHistory() {
-  if (!state.showActionHistory) return;
-  if (!state.actionLog.length) {
-    replaceChildren(els.actionHistory, h("div", { className: "ah-empty", textContent: "No actions yet." }));
+  if (!state.showActionHistory || !els.actionHistory) return;
+  if (!state.undoHistory.length) {
+    replaceChildren(els.actionHistory, h("p", { className: "menu-note", textContent: "No edits yet" }));
     return;
   }
-  replaceChildren(els.actionHistory, state.actionLog.map(entry => h("div", { className: "ah-entry" },
-    h("span", { className: "ah-desc", textContent: entry.description }),
-    h("span", { className: "ah-time", textContent: entry.time.slice(11, 19) }))));
+  const entry = (pointer, description) => {
+    const current = pointer === state.undoPointer;
+    return h("li", {},
+      h("button", { type: "button", className: `menu-item edit-history-entry${pointer > state.undoPointer ? " undone" : ""}`,
+        attrs: current ? { "aria-current": "step" } : {},
+        title: current ? "Current state" : pointer > state.undoPointer ? "Redo to here" : "Undo to here",
+        onclick: () => { if (!current) jumpToHistory(pointer); } },
+      h("span", { textContent: description })));
+  };
+  const rows = state.undoHistory.map((item, index) => entry(index, item.description)).reverse();
+  replaceChildren(els.actionHistory, h("ol", { className: "edit-history-steps" }, rows, entry(-1, "Start of this session")));
 }
 
 // ─── Mode management ──────────────────────────────────────────────────────────
@@ -454,8 +490,8 @@ const renderCoordinator = createRenderCoordinator({
   buildCandidateQueue, aggregateGroupLinks, computeVisibleLinks, renderConfounderStatuses, renderGroupList,
   renderRejectedVariablesPanel, renderDag, refreshDagEdgeSelection,
   renderVariableComparison,
-  renderSelectedEdge, renderExportStatus, renderMapModeControls,
-  renderMapToolbarToggles, renderUndoRedo, drawMap, saveProjectLocally,
+  renderSelectedEdge, renderExportStatus,
+  renderMapToolbarToggles, renderUndoRedo, saveProjectLocally,
   renderModeUI, renderAnchorBar, renderStatus, renderUoaStep, renderUoaFilterBar,
   renderVariablePanel: () => setupGroupController.renderVariablePanel(),
   renderSearch, renderSetupGroupPickers, renderSeedRows, renderGroupingSetControls,
@@ -488,11 +524,8 @@ function rebuildLinkDecision() {
   renderCoordinator.rebuildLinkDecision();
 }
 
-function renderMapToolbarToggles(options) { return toolbarController.render(options); }
+function renderMapToolbarToggles() { return toolbarController.render(); }
 
-function assignmentCoverage() { return toolbarController.assignmentCoverage(); }
-
-function renderAssignmentCoverage() { return toolbarController.renderAssignmentCoverage(); }
 
 // ─── Mode UI rendering ────────────────────────────────────────────────────────
 
@@ -515,8 +548,6 @@ function changeAnchor(side) {
   Object.assign(state, workflow.transition(state, { type: "change-anchor", side, groupId: gid }));
   const input = side === "dv" ? els.dvInput : side === "instrument" ? els.instrumentInput : els.ivInput;
   if (input) input.value = "";
-  setMapMode("select");
-  if (group) fitMap(group.variable_ids);
   renderAll({ rebuild: false });
   setTimeout(() => { input?.focus(); }, 60);
 }
@@ -526,54 +557,66 @@ function renderRightPanel() {
   renderConfounderStatuses();
 }
 
+/** Which status list applies: confounders or colliders, in the view that shows them. */
+function statusKind() {
+  return state.showConfoundersOnly ? "confounders" : state.showCollidersOnly ? "colliders" : null;
+}
+
+/** Record how a confounder or collider is handled; shared by the side panel and the table. Undoable. */
+function setDiagnosticStatus(kind, groupId, status, text = "") {
+  const spec = DIAGNOSTIC_STATUSES[kind];
+  const row = diagnosticStatusRows(state.project, [groupId], kind)[0];
+  if (!spec || !row || !Object.hasOwn(spec.statuses, status)) return;
+  const note = status === "other" ? text.trim() : "";
+  if (row.status === status && row.text === note) return;
+  const before = takeSnapshot();
+  state.project[spec.field] = { ...(state.project[spec.field] || {}),
+    [row.key]: { status, ...(note ? { text: note } : {}) } };
+  projectController.record(`Set ${spec.noun} status: ${row.label}`, before);
+  publicationController.workingCopyChanged();
+  void persistentViewer.commitDecision().catch(error => console.error(`Could not save ${spec.noun} status`, error));
+  renderConfounderStatuses();
+  if (dagNetworkController.dagDisplay() === "table") void dagNetworkController.renderDag({ reuseGeometry: true });
+}
+
 function renderConfounderStatuses() {
-  const visible = state.interfaceMode === "dag2" && state.showConfoundersOnly
+  const kind = statusKind();
+  const visible = state.interfaceMode === "dag2" && Boolean(kind)
     && !els.dagWorkspaceSection.hidden && !state.project.instrument_group_id
     && Boolean(groupById(state.project.iv_group_id)?.variable_ids?.length)
     && Boolean(groupById(state.project.dv_group_id)?.variable_ids?.length);
   els.confounderConfig.hidden = !visible;
   if (!visible) return;
-  const rows = confounderRows(state.project, state.confounderGroupIds);
-  els.confounderSummary.textContent = `Confounder status (${rows.length})`;
+  const spec = DIAGNOSTIC_STATUSES[kind];
+  const rows = diagnosticStatusRows(state.project, kind === "confounders" ? state.confounderGroupIds : state.colliderGroupIds, kind);
+  const title = kind === "confounders" ? "Confounder" : "Collider";
+  els.confounderSummary.textContent = `${title} status (${rows.length})`;
+  const note = els.confounderDisclosure.querySelector(".small-note");
+  if (note) note.textContent = `Record how each potential ${spec.noun} is handled in this study.`;
   if (!els.confounderDisclosure.open) {
     els.confounderStatusList.replaceChildren();
     return;
   }
   if (!rows.length) {
     replaceChildren(els.confounderStatusList,
-      h("p", { className: "small-note", textContent: "No potential confounders in this view." }));
+      h("p", { className: "small-note", textContent: `No potential ${spec.noun}s in this view.` }));
     return;
   }
   replaceChildren(els.confounderStatusList, rows.map(row => {
     const select = h("select", { className: "select-input", attrs: { "aria-label": `Status for ${row.label}` } },
-      Object.entries(CONFOUNDER_STATUSES).map(([value, label]) =>
-        h("option", { value, textContent: value === "accounted_for_by_design"
-          ? "Accounted for by design" : label })));
+      Object.entries(spec.statuses).map(([value, label]) =>
+        h("option", { value, textContent: STATUS_MENU_LABELS[value] || label })));
     select.value = row.status;
-    select.title = CONFOUNDER_STATUSES[row.status];
+    select.title = spec.statuses[row.status];
     const explanation = h("input", { className: "search-input", type: "text",
-      value: row.text, placeholder: "Describe how this confounder is handled",
+      value: row.text, placeholder: `Describe how this ${spec.noun} is handled`,
       attrs: { "aria-label": `Other status for ${row.label}` } });
     explanation.hidden = row.status !== "other";
-    const save = () => {
-      const before = takeSnapshot();
-      state.project.confounder_statuses ||= {};
-      state.project.confounder_statuses[row.key] = {
-        status: select.value,
-        ...(select.value === "other" && explanation.value.trim()
-          ? { text: explanation.value.trim() } : {}),
-      };
-      projectController.record(`Set confounder status: ${row.label}`, before);
-      publicationController.workingCopyChanged();
-      void persistentViewer.commitDecision().catch(error =>
-        console.error("Could not save confounder status", error));
-    };
     select.addEventListener("change", () => {
-      select.title = CONFOUNDER_STATUSES[select.value];
       explanation.hidden = select.value !== "other";
-      save();
+      setDiagnosticStatus(kind, row.groupId, select.value, explanation.value);
     });
-    explanation.addEventListener("change", save);
+    explanation.addEventListener("change", () => setDiagnosticStatus(kind, row.groupId, select.value, explanation.value));
     return h("div", { className: "confounder-status-row" },
       h("label", { textContent: row.label }, select), explanation);
   }));
@@ -609,15 +652,11 @@ function assignGroupAsInstrument(groupId) {
   Object.assign(state, workflow.transition(state, {
     type: "anchor-selected", side: "instrument", groupId,
   }));
-  setMapMode("select");
-  if (group) fitMap(group.variable_ids);
   // Instrument selection changes the view, but not group membership or link
   // aggregation. Keep the existing project graph and candidate queue.
   renderAll({ rebuild: false });
   updateDagFilters();
-  renderMapModeControls();
   renderUndoRedo();
-  drawMap();
   shellController.showMobilePanel("dag");
 }
 
@@ -641,12 +680,32 @@ function cancelDefinition() { return definitionWorkflowController.cancelDefiniti
 function definitionSources() { return definitionWorkflowController.definitionSources(); }
 function continueDefinition() { return definitionWorkflowController.continueDefinition(); }
 function definitionResidualIds(source) { return definitionWorkflowController.definitionResidualIds(source); }
-function toggleDefinitionVariable(variableId, add = null) { return definitionWorkflowController.toggleDefinitionVariable(variableId, add); }
 function definitionCanReview() { return definitionWorkflowController.definitionCanReview(); }
-function definitionNeighbors() { return definitionWorkflowController.definitionNeighbors(); }
-function renderDefinition() { return definitionWorkflowController.renderDefinition(); }
+function renderDefinition() {
+  definitionWorkflowController.renderDefinition();
+  customVariablesPresenter.render();
+}
 function saveDefinition() { return definitionWorkflowController.saveDefinition(); }
-function installDefinitionHandlers() { return definitionWorkflowController.installDefinitionHandlers(); }
+function installDefinitionHandlers() {
+  definitionWorkflowController.installDefinitionHandlers();
+  customVariablesPresenter.install();
+}
+
+/** Delete a custom variable: its concepts return to where they came from. Undoable. */
+async function deleteCustomVariable(groupId) {
+  const group = groupById(groupId);
+  const before = takeSnapshot();
+  const next = projectOps.deleteSplitCategories(state.project, { groupId, timestamp: nowIso() });
+  if (applyProjectOperation(next) === false) throw new Error("Variable memberships are still loading. Try again in a moment.");
+  for (const key of ["focusedGroupId", "activeGroupId", "selectedEvidenceGroupId"]) {
+    if (state[key] === groupId) state[key] = null;
+  }
+  addToUndoHistory(`Deleted variable "${group?.label || groupId}"`, before);
+  invalidateVisibleCaches();
+  renderAll();
+  await persistentViewer.commitDecision();
+  publicationController.workingCopyChanged();
+}
 
 // ─── Search ───────────────────────────────────────────────────────────────────
 
@@ -693,16 +752,9 @@ function renderSearch(side, { renderPicker = true } = {}) {
         const group = activeGroup();
         if (group && group.type === side) addVariableToGroup(group, variableId);
         renderAll();
-        fitNeighborhood([...selected]);
       }
     });
   });
-}
-
-function fitSearchContext(side) {
-  const previewIds = (state.searchMatches[side] || []).slice(0, 5);
-  if (previewIds.length) fitNeighborhood(previewIds, 12);
-  else drawMap();
 }
 
 function searchVariables(query, limit = 20) {
@@ -781,6 +833,28 @@ function groupedVariableIds(excludeGroupId = null) {
   return grouped;
 }
 
+function restoreRejectedVariable(variableId) {
+  const repId = clusterRep(variableId);
+  const entry = rejectedVariableEntries().find((item) => clusterRep(item.variable_id) === repId);
+  if (!entry) return;
+  const memberIds = entry.member_variable_ids || [entry.variable_id];
+  for (const groupId of entry.previous_group_ids || []) {
+    const group = groupById(groupId);
+    if (!group) continue;
+    for (const memberId of memberIds) {
+      if (!group.variable_ids.includes(memberId)) group.variable_ids.push(memberId);
+    }
+  }
+  state.project = visibility.restoreRejection(state.project, repId, state.clusterOf, state.clusterMembers);
+  invalidateVisibleCaches();
+  addDecision("rejected_variable_restored", {
+    variable_id: repId,
+    member_variable_ids: memberIds,
+    restored_group_ids: entry.previous_group_ids || [],
+  });
+  void persistentViewer.commitDecision().catch(error => console.error("Could not save restored variable", error));
+}
+
 function renderRejectedVariablesPanel() {
   if (!els.rejectedVariablesPanel || !els.rejectedVariablesList || !els.rejectedVariableSearch) return;
   const entries = rejectedVariableEntries().slice().sort((a, b) =>
@@ -802,7 +876,7 @@ function renderRejectedVariablesPanel() {
         h("span", { className: "group-row-meta", textContent: `${entry.member_variable_ids?.length || 1} vars` })),
       h("span", { textContent: entry.reason || "low_quality" }), h("div", { className: "group-row-footer" },
         h("span", { className: "group-status-label rejected", textContent: "rejected variable" }),
-        h("button", { className: "action-button", type: "button", dataset: { action: "restore" }, textContent: "Restore" }))))
+        h("button", { className: "btn btn--sm", type: "button", dataset: { action: "restore" }, textContent: "Restore" }))))
     : h("div", { className: "small-note", textContent: "No rejected variables match this search." }));
   els.rejectedVariablesList.querySelectorAll("button[data-action='restore']").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -851,6 +925,49 @@ function renderSeedRows() {
 function beginTargetGroup(side) { return groupEditorController.beginTargetGroup(side); }
 function promoteGroupToAnchor(side, groupId) { return groupEditorController.promoteGroupToAnchor(side, groupId); }
 function assignGroupAsAnchor(side, groupId) { return groupEditorController.assignGroupAsAnchor(side, groupId); }
+
+/**
+ * Identify's Cause, Outcome and Instrument fields. Each choice replaces that role
+ * directly, so there is no step-by-step setup: the map appears as soon as both
+ * a cause and an outcome are chosen.
+ */
+function chooseIdentifyVariable(side, groupId) {
+  if (side === "instrument") {
+    assignGroupAsInstrument(groupId);
+    // Choosing an instrument ends setup; with the cause or outcome still empty it has not ended.
+    if (!state.project.iv_group_id || !state.project.dv_group_id) {
+      state.workflowMode = "setup";
+      state.phase = state.project.iv_group_id ? "select_dv" : "select_iv";
+      persistentViewer.viewerChanged();
+    }
+    return;
+  }
+  if (!groupId) {
+    // The × in a Cause or Outcome field: the role is left empty until another variable is chosen.
+    const label = groupById(state.project?.[`${side}_group_id`])?.label;
+    const before = takeSnapshot("anchors");
+    if (!applyProjectOperation(projectOps.clearAnchor(state.project, side))) return;
+    state.identifyExclusion = null;
+    // A link with a role missing must say it is mid-setup, or reopening it is refused.
+    state.workflowMode = "setup";
+    state.phase = state.project.iv_group_id ? "select_dv" : "select_iv";
+    state.selectedEdgeId = null;
+    state.selectedEvidenceGroupId = null;
+    addToUndoHistory(`Remove "${label || side}" as ${side === "iv" ? "cause" : "outcome"}`, before, "anchors");
+    renderAll({ reuseLinks: true });
+    setupGroupController.renderIdentifyPicker();
+    return;
+  }
+  if (groupId === state.project?.[`${side}_group_id`] && groupById(groupId)?.variable_ids?.length) {
+    renderAll({ rebuild: false });
+    return;
+  }
+  // Replacing a role, rather than stepping through setup, goes straight to the map.
+  state.changingAnchorSide = side;
+  assignGroupAsAnchor(side, groupId);
+  state.changingAnchorSide = null;
+  setupGroupController.renderIdentifyPicker();
+}
 function seedLabel(side) { return groupEditorController.seedLabel(side); }
 // Event handlers retain group references through edits. Apply pure results while
 // preserving those identities; snapshots deliberately replace them on undo.
@@ -1064,7 +1181,7 @@ async function hydrateVariableDetails(variableIds, { skipNeighbors = false } = {
     }
     state.variables = [...state.variableById.values()].sort((a, b) => Number(a.index || 0) - Number(b.index || 0));
     buildDuplicateClusters();
-    invalidateMapCaches();
+    invalidateVisibleCaches();
     if (!skipNeighbors) applyVariableNeighbors(variables, neighbors);
   }
   if (!skipNeighbors) await hydrateVariableNeighbors(requested);
@@ -1101,18 +1218,16 @@ function renderGroupEditor() {
 function renderGroupSeedSearch() { return groupEditorController.renderGroupSeedSearch(); }
 function renderNeighborSuggestions(group) { return groupEditorController.renderNeighborSuggestions(group); }
 function addVariableToGroup(group, variableId) {
-  if (group?.group_id === "__definition_new__") return toggleDefinitionVariable(variableId, true);
+  // The new variable's members come from the AI or an existing split, never from the map.
+  if (group?.group_id === "__definition_new__") return;
   return groupEditorController.addVariableToGroup(group, variableId);
 }
 function addVariableSetToGroup(group, ids) {
-  if (group?.group_id === "__definition_new__") {
-    for (const id of ids) toggleDefinitionVariable(id, true);
-    return;
-  }
+  if (group?.group_id === "__definition_new__") return;
   return groupEditorController.addVariableSetToGroup(group, ids);
 }
 function removeVariableFromGroup(group, variableId) {
-  if (group?.group_id === "__definition_new__") return toggleDefinitionVariable(variableId, false);
+  if (group?.group_id === "__definition_new__") return;
   return groupEditorController.removeVariableFromGroup(group, variableId);
 }
 function addTopNeighborsToActiveGroup() { return groupEditorController.addTopNeighborsToActiveGroup(); }
@@ -1125,6 +1240,19 @@ function finishSchemaChoice(loadSchema) { return groupEditorController.finishSch
 function activeGroupingSet() { return groupingSetController.active(); }
 
 function copyPermalink() { return groupingSetController.copyPermalink(); }
+
+// A temporary note beside the brand for completed operations. It clears itself
+// unless something else has written to the status in the meantime.
+let briefNoticeTimer = null;
+function notifyBriefly(message) {
+  const status = els.localSaveStatus;
+  if (!status) return;
+  clearTimeout(briefNoticeTimer);
+  status.textContent = message;
+  briefNoticeTimer = setTimeout(() => {
+    if (status.textContent === message) status.textContent = "";
+  }, 5000);
+}
 
 function currentWorkingGroupingSchema() { return groupingSetController.workingSchema(); }
 
@@ -1140,12 +1268,23 @@ const persistentViewer = createPersistentViewer({
       ? { scale, position: network.getViewPosition() } : null;
   },
   status: message => {
-    if (els.localSaveStatus) els.localSaveStatus.textContent = message;
+    // Routine saves show as a small icon; anything else (errors, editing, notices) as text.
+    const saving = message.startsWith("Saving");
+    const saved = message.startsWith("Saved");
+    const indicator = document.getElementById("localSaveIndicator");
+    if (indicator) {
+      indicator.hidden = !saving && !saved;
+      indicator.dataset.state = saving ? "saving" : "saved";
+      const label = saving ? "Saving in this browser…" : "Saved in this browser";
+      indicator.title = label;
+      indicator.setAttribute("aria-label", label);
+    }
+    if (els.localSaveStatus) els.localSaveStatus.textContent = saving || saved || message === "Published schema" ? "" : message;
     if (els.retryLocalSave) els.retryLocalSave.hidden = !message.startsWith("Not saved");
     if (els.saveIndependentCopy) els.saveIndependentCopy.hidden =
       !message.includes("Schema revision changed");
   },
-  onDiscard: invalidateMapCaches,
+  onDiscard: invalidateVisibleCaches,
 });
 
 const taskViews = createTaskViews({
@@ -1166,6 +1305,29 @@ const taskViews = createTaskViews({
     if (bothExplore) renderExploreFocus(); else renderAll({ reuseLinks: true });
   },
   openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
+  onRowHover: row => dagNetworkController.hoverExploreRow(row),
+  onChooseIdentify: (side, groupId) => chooseIdentifyVariable(side, groupId),
+  onIdentifyPicking: () => { setupGroupController.renderIdentifyPicker(); taskViews.render(); },
+  onIdentifyRowHover: groupId => groupId ? dagNetworkController.highlightConfounderPaths(groupId)
+    : dagNetworkController.clearConfounderPathHover(),
+  onIdentifyExcludedChange: () => updateDagFilters(),
+  // A row opens the variable's definition and concepts in the evidence pane, as clicking its node does.
+  onOpenIdentifyVariable: groupId => {
+    if (state.fullscreenPanel) setFullscreenPanel(null);
+    state.selectedEdgeId = null;
+    state.comparisonVariableIds = [];
+    state.selectedEvidenceGroupId = groupId;
+    renderCoordinator.selectEdge();
+    taskViews.refreshSelection();
+    persistentViewer.viewerChanged();
+    shellController.showMobilePanel("dag");
+  },
+  canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
+  onEditCustom: groupId => startEditSplit(groupId),
+  onDeleteCustom: deleteCustomVariable,
+  onCreateCustom: () => startDefinition("candidate"),
+
+  placeEvidencePane: () => shellController.placeEvidencePane(),
   onChange: () => persistentViewer.viewerChanged(), prepareReset: () => persistentViewer.prepareReset(), whenReady: () => persistentViewer.whenReady(),
 });
 taskViews.install();
@@ -1199,20 +1361,6 @@ function applyActiveGroupingSet() { return groupingSetController.applyActive(); 
 function candidateInputs() {
   return { variables: state.variableById, similarityEdgeMap: state.similarityEdgeMap, linkLookup: state.linkLookup };
 }
-
-function createDensityCandidateGroup() {
-  const group = candidates.createDensityCandidateGroup(state.project, candidateInputs(), {
-    visibleVariables: visibleVariables(), transform: state.map.transform,
-    width: canvasWidth(), height: canvasHeight(), groupId: `density_${Date.now()}`,
-    createdAt: nowIso(), updatedAt: nowIso(),
-  });
-  if (!group) return null;
-  ensureGroup(group);
-  addDecision("density_candidate_created", { group_id: group.group_id, variable_ids: group.variable_ids });
-  return group;
-}
-
-
 
 // ─── Candidate queue ──────────────────────────────────────────────────────────
 
@@ -1383,10 +1531,13 @@ function computeExploreLinks() {
 function computeVisibleLinks() {
   if (taskViews.exploring()) { computeExploreLinks(); return; }
   ensureDiagnosticFilter(state);
-  const missingSparseEvidence = state.excludeSparseEdges ? missingLinkSupportIds() : [];
+  // Links carry their papers per direction; only those an edit stripped of
+  // paper keys need their findings fetched before sparse edges can be judged.
+  const sparseNeeding = state.excludeSparseEdges ? linksNeedingExactCounts(state.project?.links || []) : [];
+  const missingSparseEvidence = sparseNeeding.length ? missingLinkSupportIds(sparseNeeding) : [];
   if (missingSparseEvidence.length && !sparseWaitingForSupport) {
     sparseWaitingForSupport = true;
-    void loadLinkSupport(state.project?.links).then(loaded => {
+    void loadLinkSupport(sparseNeeding).then(loaded => {
       sparseWaitingForSupport = false;
       if (!loaded && linkSupportFailed) state.excludeSparseEdges = false;
       updateDagFilters();
@@ -1407,9 +1558,14 @@ function computeVisibleLinks() {
   const excludedFindingCount = Object.keys(state.project.finding_decisions || {}).length;
   els.showExcludedFindings.hidden = excludedFindingCount === 0;
   els.showExcludedFindings.textContent = `Excluded findings (${excludedFindingCount})`;
+  // Variables unticked in Identify's list are left off the map, and no path runs through them.
+  const studyIds = new Set([state.project.iv_group_id, state.project.dv_group_id, state.project.instrument_group_id]);
+  const identifyExcluded = new Set([...taskViews.identifyExcluded()].filter(id => !studyIds.has(id)));
   const view = deriveDagView({
-    groups: dagGroups(),
-    links: state.project.links,
+    groups: identifyExcluded.size
+      ? dagGroups().filter(group => !identifyExcluded.has(group.group_id)) : dagGroups(),
+    links: identifyExcluded.size ? state.project.links.filter(link =>
+      !identifyExcluded.has(link.group_a) && !identifyExcluded.has(link.group_b)) : state.project.links,
     ivId: state.project.iv_group_id,
     dvId: state.project.dv_group_id,
     instrumentId: state.project.instrument_group_id,
@@ -1464,7 +1620,7 @@ function showExcludedLinks() {
     h("strong", { textContent: "Excluded links" }),
     ...links.map(link => {
       const model = inspector.edgeInspector(link, state.project);
-      const button = h("button", { className: "action-button", type: "button",
+      const button = h("button", { className: "btn btn--sm", type: "button",
         textContent: `${model.sourceLabel} ${model.arrow} ${model.targetLabel}` });
       button.addEventListener("click", () => inspectDagEdge(link.edge_id));
       return button;
@@ -1511,7 +1667,7 @@ async function showExcludedFindings() {
       const reason = code === "not_relevant_to_target_population" ? "Not relevant to target population"
         : code === "concept_miscategorized" ? "Concept miscategorized"
           : code === "other" ? "Other" : "";
-      const restore = h("button", { className: "text-button", type: "button", textContent: "Restore" });
+      const restore = h("button", { className: "btn btn--ghost", type: "button", textContent: "Restore" });
       restore.addEventListener("click", () => {
         const before = takeSnapshot();
         if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
@@ -1645,7 +1801,6 @@ function renderSelectedEdge() {
 // The open evidence is per task; clear what the old task showed so the pane
 // matches the new task's selection (restored by the task views).
 function dismissEvidenceForTask() {
-  inspectorController.clearPendingExclude();
   state.selectedVariableIds.clear();
   state.comparisonVariableIds = [];
   if (!state.selectedEdgeId) {
@@ -1656,7 +1811,6 @@ function dismissEvidenceForTask() {
 }
 
 function dismissEvidencePane() {
-  inspectorController.clearPendingExclude();
   els.provenancePanel.scrollLeft = 0;
   els.closeEvidencePane.closest(".dag-ws-footer").scrollLeft = 0;
   state.selectedEdgeId = null;
@@ -1700,9 +1854,10 @@ function initializeProjectShape() {
 function renderExportStatus() {
   const cycle = detectDirectedCycle();
   const bidirectional = state.project.links.some((l) => l.direction_type === "BIDIRECTIONAL" && l.display_status !== "excluded");
-  els.strictDagStatus.textContent = cycle || bidirectional
-    ? "Strict DAG export unavailable until bidirectional links and cycles are resolved."
-    : "Strict DAG export conditions are currently satisfied.";
+  // Shown as the Causal diagram export's tooltip.
+  els.exportWorkingMap.title = cycle || bidirectional
+    ? "Not a strict DAG: has cycles or two-way links"
+    : "Valid strict DAG";
 }
 
 // ─── Decision log ──────────────────────────────────────────────────────────────
@@ -1731,8 +1886,6 @@ function selectedEdge() {
   return inspectorController.selectedEdge();
 }
 
-// ─── Map helpers ──────────────────────────────────────────────────────────────
-
 
 function detectDirectedCycle(groups = dagGroups(), links = state.project.links) {
   const graph = new Map();
@@ -1758,108 +1911,6 @@ function detectDirectedCycle(groups = dagGroups(), links = state.project.links) 
   return false;
 }
 
-// ─── Map mode controls ────────────────────────────────────────────────────────
-
-function setMapMode(mode) {
-  mapViewController.setMode(mode);
-}
-
-function isDrawMode(mode = state.map.mode) {
-  return mapViewController.isDrawMode(mode);
-}
-
-// During Dep var/Ind var selection the user can draw a boundary before picking a seed; the
-// enclosed variables become the seed set and open the target group directly.
-function isSeedSelectionPhase() {
-  return mapViewController.isSeedSelectionPhase();
-}
-
-function renderMapModeControls() {
-  mapViewController.renderModeControls();
-}
-
-// ─── Map rendering ────────────────────────────────────────────────────────────
-
-function resizeMap() {
-  mapViewController.resize();
-}
-
-function canvasWidth() { return mapViewController.canvasWidth(); }
-function canvasHeight() { return mapViewController.canvasHeight(); }
-
-function visibleVariableBounds() {
-  return mapViewController.visibleBounds();
-}
-
-function constrainMapTransform(transform) {
-  return mapViewController.constrain(transform);
-}
-
-function globalWorldSpan() {
-  return mapViewController.worldSpan();
-}
-
-function fitMap(variableIds = null, options = {}) {
-  mapViewController.fit(variableIds, options);
-}
-
-function fitNeighborhood(variableIds, neighborLimit = 48) {
-  mapViewController.fitNeighborhood(variableIds, neighborLimit);
-}
-
-function zoomMap(screenX, screenY, factor, interactive = false) {
-  mapViewController.zoom(screenX, screenY, factor, interactive);
-}
-
-function worldToScreen(x, y) {
-  return mapViewController.worldToScreen(x, y);
-}
-
-function screenToWorld(x, y) {
-  return mapViewController.screenToWorld(x, y);
-}
-
-function scheduleMapDraw(includeLabels = false) {
-  mapViewController.schedule(includeLabels);
-}
-
-function scheduleSettledMapDraw(delayMs = 100) {
-  mapViewController.scheduleSettled(delayMs);
-}
-
-function drawMap(options) {
-  // The variable map is not shown in the causes and consequences views.
-  if (taskViews.exploring()) return undefined;
-  const result = mapUiController.drawMap(options);
-  persistentViewer.viewerChanged(true);
-  return result;
-}
-function drawMapPoints(ctx, width, height) { return mapUiController.drawMapPoints(ctx, width, height); }
-function ensureGlobalVoronoiCells() { return mapUiController.ensureGlobalVoronoiCells(); }
-function applyBrush() {
-  schemaBatchDepth += 1;
-  try { return mapUiController.applyBrush(); }
-  finally {
-    schemaBatchDepth -= 1;
-    if (!schemaBatchDepth && !state.definitionDraft && !state.activeGroupId) {
-      void persistentViewer.commitDecision().catch(error =>
-        console.error("Could not save brush edits", error));
-    }
-  }
-}
-function groupColor(group) { return mapUiController.groupColor(group); }
-function repAtPoint(clientX, clientY) { return mapUiController.repAtPoint(clientX, clientY); }
-function clearHoverIntent() { return mapUiController.clearHoverIntent(); }
-function updateMapHover(event) { return mapUiController.updateMapHover(event); }
-function nearestVariable(clientX, clientY, threshold) { return mapUiController.nearestVariable(clientX, clientY, threshold); }
-function showMapTooltip(variable, clientX, clientY) { return mapUiController.showMapTooltip(variable, clientX, clientY); }
-function hideMapContextMenu() { return mapUiController.hideMapContextMenu(); }
-function flagVariableLowQuality(variableId) { return mapUiController.flagVariableLowQuality(variableId); }
-function restoreRejectedVariable(variableId) { return mapUiController.restoreRejectedVariable(variableId); }
-function showMapContextMenu(variable, clientX, clientY, variableIds = null) {
-  return mapUiController.showMapContextMenu(variable, clientX, clientY, variableIds);
-}
-
 // ─── Geometry helpers ──────────────────────────────────────────────────────────
 
 function groupCoherence(variableIds) {
@@ -1868,27 +1919,19 @@ function groupCoherence(variableIds) {
 
 
 
-function groupCentroid(variableIds) { return mapGeometry.centroid(variableIds, state.variableById); }
-
-function distance(a, b) { return mapGeometry.distance(a, b); }
-
 const uoaController = createUoaController({
   state, elements: els, visibleVariables, groupById, clusterRep, truncate, renderAll,
 });
 
-const toolbarController = createToolbarController({
-  state, elements: els, dagGroups, groupById, visibleVariables, uoaMatches,
-  clusterRep, rejectedVariableIdSet,
-});
+const toolbarController = createToolbarController({ state, elements: els, dagGroups, groupById });
 
 const definitionWorkflowController = createDefinitionWorkflowController({
-  state, elements: els, activeGroup, clusterRep, invalidateMapCaches, renderAll, drawMap, renderAssignmentCoverage,
-  setMapMode, fitMap, groupById, persistProjectLocally, getReturnUrl: () => persistentViewer.currentUrl() || location.href, visibleVariables,
+  state, elements: els, activeGroup, clusterRep, invalidateVisibleCaches, renderAll,
+  groupById, persistProjectLocally, getReturnUrl: () => persistentViewer.currentUrl() || location.href, visibleVariables,
   searchVariables: searchVisibleVariables, searchSourceGroups: searchDefinitionSourceGroups,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
-  takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
+  takeSnapshot, addToUndoHistory, clean, normalized, truncate,
   hydrateVariableDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),
-  hydrateNeighbors: hydrateVariableNeighbors,
   commitSchema: async () => {
     await persistentViewer.commitDecision();
     publicationController.workingCopyChanged();
@@ -1905,9 +1948,22 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   },
 });
 
+const customVariablesPresenter = createCustomVariablesPresenter({
+  state, elements: els, truncate, normalized,
+  customVariables: () => (state.project?.groups || []).filter(group => group.source === "user_split")
+    .sort((a, b) => String(a.label || "").localeCompare(String(b.label || ""))),
+  sourceLabels: group => (group.provenance?.source_group_ids || []).map(id => groupById(id)?.label).filter(Boolean),
+  canChange: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
+  onCreate: () => startDefinition("candidate"),
+  onEdit: groupId => startEditSplit(groupId),
+  onDelete: deleteCustomVariable,
+  canExplore: () => taskViews.exploring(),
+  onExplore: groupId => taskViews.chooseFocus(groupId),
+});
+
 const projectController = createDagProjectController({
   state, storage: window.localStorage, storagePrefix: PROJECT_STORAGE_PREFIX,
-  nowIso, invalidateMapCaches, renderAll, rebuildLinkDecision, renderUndoRedo, renderActionHistory,
+  nowIso, invalidateVisibleCaches, renderAll, rebuildLinkDecision, renderUndoRedo, renderActionHistory,
 });
 
 const inspectorController = createDagInspectorController({
@@ -1919,44 +1975,28 @@ const inspectorController = createDagInspectorController({
   excludeConcept: excludeGroupConcept,
 });
 
-const mapViewController = createDagMapViewController({
-  state, elements: els, activeGroup, visibleVariables, isRejectedVariable, drawMap,
-});
-
 const groupEditorController = createDagGroupEditorController({
   state, elements: els, applyProjectOperation, groupById, takeSnapshot,
-  expandToClusterMembers, nowIso, clean, setMapMode, fitNeighborhood, fitMap,
+  expandToClusterMembers, nowIso, clean,
   addToUndoHistory, renderAll, addDecision, setWorkflowMode, groupedVariableIds,
   searchVariables, clusterMemberIds, rejectedVariableIdSet, uoaMatches,
-  fitSearchContext, applyActiveGroupingSet, rebuildProject, createDensityCandidateGroup,
+  applyActiveGroupingSet, rebuildProject,
   escapeHtml, truncate, hydrateVariableDetails,
   beginEditor: () => persistentViewer.beginEditor(),
   onAnchorsReady: () => shellController.showMobilePanel("dag"),
 });
 
-const mapUiController = createDagMapUiController({
-  state, elements: els,
-  beginDraw: (includeLabels) => mapViewController.beginDraw(includeLabels),
-  canvasWidth, canvasHeight, worldToScreen, screenToWorld, visibleClusterReps,
-  dagGroups, activeGroup, uoaMatches, clusterRep, clusterMemberIds,
-  clusterDisplayVariable, clusterExactStringGroups, expandToClusterMembers, groupById,
-  applyProjectOperation, nowIso, takeSnapshot, addToUndoHistory, addDecision, addVariableToGroup,
-  addVariableSetToGroup, removeVariableFromGroup, beginTargetGroup, setMapMode,
-  renderAll, rebuildProject, invalidateMapCaches, rejectedVariableEntries,
-  rejectedVariableIdSet, isRejectedVariable, clean, escapeHtml, truncate,
-  groupColors: GROUP_COLORS, groupPalette: GROUP_PALETTE,
-  schemaChanged: () => { void persistentViewer.commitDecision().catch(error =>
-    console.error("Could not save restored variable", error)); },
-});
-
 const setupGroupController = createDagSetupGroupController({
   state, elements: els, escapeHtml, normalized, truncate, groupById,
-  assignGroupAsAnchor, assignGroupAsInstrument, setMapMode, renderAll,
+  assignGroupAsAnchor, assignGroupAsInstrument, renderAll,
   roleLabels: ROLE_LABELS, dagProjectView, startDefinition, startEditSplit,
   canEditSplit: group => Boolean(projectOps.editableSplitContext(state.project, group)),
   searchAnchorGroups, beginEditor: () => persistentViewer.beginEditor(),
   exploreFocus: () => taskViews.focus(), searchFocusGroups: query => taskViews.searchFocusGroups(query),
   onChooseFocus: groupId => taskViews.chooseFocus(groupId),
+  identifyPicking: () => taskViews.identifySide(), onChooseIdentify: (side, groupId) => taskViews.chooseIdentify(side, groupId),
+  canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
+  deleteCustom: deleteCustomVariable,
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
   excludeConcept: excludeGroupConcept,
@@ -1964,7 +2004,9 @@ const setupGroupController = createDagSetupGroupController({
 
 const dagNetworkController = createDagNetworkController({
   state, elements: els, visApi: vis, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, exploreRows: () => taskViews.neighborhood().rows,
+  renderAll, exploreRows: () => taskViews.neighborhood().included,
+  onNodeHover: id => taskViews.highlightRow(id),
+  onSetStatus: (kind, groupId, status, text) => setDiagnosticStatus(kind, groupId, status, text),
   onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
   selectEdge: () => {
     if (state.fullscreenPanel) setFullscreenPanel(null);
@@ -2005,7 +2047,7 @@ export function renderedDagEdgeIds() {
 }
 
 const shellController = createDagShellController({
-  state, elements: els, resizeMap, fitMap, renderDag,
+  state, elements: els, renderDag,
   getNetwork: () => dagNetworkController.getNetwork(),
   isDagFullyVisible: () => dagNetworkController.isFullyVisible(),
   dismissEvidencePane,
@@ -2073,13 +2115,16 @@ publicationController = createPublicationController({
     get publish() { return els.publishSchema; },
     get status() { return els.publicationStatus; },
     get badge() { return els.schemaPublicationBadge; },
+    get menuButton() { return document.querySelector("#schemaMenu > summary"); },
     get confirmation() { return els.publishSchemaDialog; },
+    get shareWarning() { return els.shareUnpublishedDialog; },
     get share() { return els.copyPermalink; },
   },
   getWorkingSchema: currentWorkingGroupingSchema,
   getCompiledDag: () => state.compiledDagValid && !state.compiledDagUpdating ? state.compiledDag : null,
   canPublish: () => !state.publishedSchemaHydrating && !state.publishedSchemaLoadFailed
     && persistentViewer.canPublish,
+  notify: notifyBriefly,
   getCompileInput: async () => {
     if (state.compiledDagValid && !state.compiledDagUpdating) {
       return { project: dagProjectView(), linkLookup: state.linkLookup, rawLinksById: state.rawLinksById };
@@ -2107,10 +2152,10 @@ const groupingSetController = createGroupingSetController({
 });
 
 const projectBootstrap = createProjectBootstrap({
-  state, initElements, installHandlers, installDefinitionHandlers, resizeMap,
+  state, initElements, installHandlers, installDefinitionHandlers,
   restoreProjectLocally, initializeProject, loadLatestSchemaGroups,
   normalizeProjectDuplicateAssignments, saveProjectLocally, publicationController,
-  renderAll, constrainMapTransform, drawMap, fitMap, dagNetworkController,
+  renderAll, dagNetworkController,
   buildDuplicateClusters, linkKey, pairKey, loadVariableSearchCatalog,
   onLocalSchemaLoaded: record => persistentViewer.setLoadedRecord(record),
   onReady: () => {
@@ -2133,23 +2178,19 @@ const exportProject = () => exportController.exportProject();
 const exportWorkingMap = () => exportController.exportWorkingMap();
 const eventController = createDagEventController({
   state, elements: els, dagNetwork: dagNetworkController,
-  renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
-  renderSearch, fitSearchContext, prefetchVariableSearch: loadVariableSearchCatalog,
+  activeGroup, renderNeighborSuggestions, renderAll,
+  renderSearch, prefetchVariableSearch: loadVariableSearchCatalog,
   toggleAnchorSearchMode, finishSchemaChoice, changeAnchor, renderSetupGroupPicker,
   setWorkflowMode, renderGroupList, closeGroupEditor, discardGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
-  renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
+  renderGroupSeedSearch, renderRejectedVariablesPanel, applyProjectOperation,
   saveProjectLocally, applyActiveGroupingSet, rebuildProject, updateDagFilters, exportGroupingFolder,
-  copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
-  canvasHeight, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber, setMapMode,
+  copyPermalink, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber,
   undo, redo, renderActionHistory, renderDag, setFullscreenPanel,
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,
-  exportTex, resizeMap, installDagHandlers, initPanelResizers, hideMapContextMenu,
-  showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,
-  isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
-  addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean,
+  exportTex, installDagHandlers, initPanelResizers, takeSnapshot,
+  addToUndoHistory, clusterRep, addVariableToGroup, clean,
   startEditSplit, startDefinition, dismissEvidencePane,
-  toggleDefinitionVariable,
   showExcludedLinks, showExcludedFindings,
 });
 

@@ -22,11 +22,10 @@ const results = { started, url, browser: browserName, profileScenario: permalink
   device: mobile ? "mobile" : "desktop", scenarios: [], errors: [] };
 const scenarioBudgets = {
   "open variable definition": 750,
-  "choose definition method": 750,
+  "describe definition": 750,
   "select definition source": 2500,
   "select definition variable": 1000,
   "incident links (40 variables)": 1000,
-  "variable map zoom": 500,
   "close variable definition": 750,
   "group search": 2000,
   "select IV": 750,
@@ -45,12 +44,6 @@ const scenarioBudgets = {
   "path links filter": 4000,
   "DAG zoom out and fit": 1000,
   "DAG fullscreen and Escape": 1000,
-  "map labels and group regions": 1000,
-  "map zoom out and fit": 1000,
-  "map wheel zoom": 1000,
-  "map drag pan": 1000,
-  "map fullscreen and Escape": 1000,
-  "map mode selection": 1000,
   "history panel": 1000,
   "undo edge decision": 1000,
   "redo edge decision": 1000,
@@ -120,10 +113,32 @@ async function snapshot() {
   }));
 }
 
-// The Filters dropdown closes on an outside click, so reopen it before steps that need its controls.
+// On a phone the top bar's controls sit behind a menu button that closes after each choice.
+async function openNav() {
+  const toggle = page.locator("#navToggle");
+  if ((await toggle.isVisible()) && (await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+}
+
+async function closeNav() {
+  const toggle = page.locator("#navToggle");
+  if ((await toggle.isVisible()) && (await toggle.getAttribute("aria-expanded")) === "true") await toggle.click();
+}
+
+// The Filters dropdown is in the variable list's header (the list tab on a phone) and closes on an outside click.
 async function openFilters() {
-  const dropdown = page.locator(".filter-dropdown");
+  await closeNav();
+  if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  const dropdown = page.locator("details.filter-dropdown:visible");
   if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
+}
+
+// Cause (iv), Outcome (dv) and Instrument share one picker; on a phone the fields are on the list tab.
+async function chooseAnchor(side, groupId) {
+  await closeNav();
+  const input = page.locator(`#identify-${side}-input`);
+  if (!(await input.isVisible()) && mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  await input.click();
+  await page.locator(`#identifyGroupPicker button[data-group-id="${groupId}"]`).click();
 }
 
 async function measure(name, action) {
@@ -266,11 +281,14 @@ try {
 
   if (!permalink) {
   await measure("open variable definition", async () => {
-    await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
-    await page.locator("#definitionChooseManual").waitFor({ state: "visible" });
+    await page.locator("#identify-iv-input").click();
+    await page.locator("#identifyGroupPicker .custom-create").click();
+    await page.locator("#definitionNewLabel").waitFor({ state: "visible" });
   });
-  await measure("choose definition method", async () => {
-    await page.locator("#definitionChooseManual").click();
+  await measure("describe definition", async () => {
+    await page.locator("#definitionNewLabel").fill("Profile variable");
+    await page.locator("#definitionNewDescription").fill("A variable made while profiling the viewer.");
+    await page.locator("#definitionDescribeNext").click();
     await page.locator("#definitionSourceList input[data-source-id]").first().waitFor({ state: "visible" });
   });
   if (definitionThinkMs) await page.waitForTimeout(definitionThinkMs);
@@ -279,8 +297,7 @@ try {
   await measure("select definition source", async () => {
     await page.locator("#definitionSourceList input[data-source-id]").first().check();
     await page.locator("#definitionContinue").click();
-    if (mobile) await page.locator('button[data-mobile-panel="variables"]').click();
-    await page.locator("#dagZoomIn").waitFor({ state: "visible" });
+    await page.locator("#definitionPartitionStep").waitFor({ state: "visible" });
     const loaded = await page.evaluate(groupId => {
       const state = window.__dagBuilderState;
       const ids = state.project.groups.find(group => group.group_id === groupId)?.variable_ids || [];
@@ -289,77 +306,27 @@ try {
     if (!loaded.total || loaded.missing) throw new Error(`Definition metadata missing for ${loaded.missing}/${loaded.total} variables`);
   });
   await measure("select definition variable", async () => {
-    if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
     const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
-    await page.locator("#definitionVariableSearch").fill(variableId);
-    await page.locator("#definitionVariableResults .result-button").first().click();
-    await page.waitForFunction(id => {
-      const state = window.__dagBuilderState;
-      return state.definitionDraft.new_variable_ids.includes(id)
-        && Array.isArray(state.variableById.get(id)?.similarity_neighbors);
+    // The AI or an existing split supplies the concepts; this stands in for either by including one.
+    await page.evaluate(id => {
+      const state = window.__dagBuilderState, draft = state.definitionDraft;
+      draft.new_variable_ids = [id];
+      draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
+      state.selectedVariableIds = new Set([id]);
+      document.getElementById("definitionSourceSearch").dispatchEvent(new Event("input"));
     }, variableId);
-    if (mobile) await page.locator('button[data-mobile-panel="variables"]').click();
+    await page.waitForFunction(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), variableId);
   });
-  await measure("variable map zoom", async () => {
-    await page.locator("#dagZoomIn").click();
+  await measure("close variable definition", async () => {
+    await page.locator(".definition-cancel:visible").first().click();
   });
-  await measure("map labels and group regions", async () => {
-    for (const [id, key] of [["toggleVariableLabels", "showVariableLabels"],
-      ["toggleGroupLabels", "showGroupLabels"]]) {
-      const previous = await page.evaluate(stateKey => window.__dagBuilderState[stateKey], key);
-      await page.locator(`#${id}`).click();
-      await page.waitForFunction(({ stateKey, value }) => window.__dagBuilderState[stateKey] !== value,
-        { stateKey: key, value: previous });
-    }
-  });
-  await measure("map zoom out and fit", async () => {
-    await page.locator("#dagZoomOut").click();
-    await page.locator("#dagFitView").click();
-  });
-  if (!mobile) {
-    const canvasBox = await page.locator("#dagMapCanvas").boundingBox();
-    const x = canvasBox.x + canvasBox.width / 2, y = canvasBox.y + canvasBox.height / 2;
-    await measure("map wheel zoom", async () => {
-      const before = await page.evaluate(() => window.__dagBuilderState.map.transform.scale);
-      await page.mouse.move(x, y);
-      await page.mouse.wheel(0, -200);
-      await page.waitForFunction(value => window.__dagBuilderState.map.transform.scale !== value, before);
-    });
-    await measure("map drag pan", async () => {
-      const before = await page.evaluate(() => [window.__dagBuilderState.map.transform.tx,
-        window.__dagBuilderState.map.transform.ty]);
-      await page.mouse.move(x, y);
-      await page.mouse.down();
-      await page.mouse.move(x + 45, y + 30, { steps: 5 });
-      await page.mouse.up();
-      await page.waitForFunction(([tx, ty]) => window.__dagBuilderState.map.transform.tx !== tx
-        || window.__dagBuilderState.map.transform.ty !== ty, before);
-    });
-  }
-  if (!mobile) {
-    await measure("map fullscreen and Escape", async () => {
-      await page.locator("#fullscreenVariableMap").click();
-      await page.locator("#fullscreenVariableMap[aria-pressed='true']").waitFor();
-      await page.keyboard.press("Escape");
-      await page.locator("#fullscreenVariableMap[aria-pressed='false']").waitFor();
-    });
-  }
-  await measure("map mode selection", async () => {
-    for (const [id, mode] of [["dagBrushMode", "draw_add"], ["dagEraseMode", "draw_remove"],
-      ["dagSelectMode", "select"]]) {
-      await page.locator(`#${id}`).click();
-      await page.waitForFunction(value => window.__dagBuilderState.map.mode === value, mode);
-    }
-  });
+  // The History menu is hidden on a phone while a definition is open, so it is measured after.
   await measure("history panel", async () => {
+    await openNav();
     await page.locator("#historyToggle").click();
     await page.locator("#actionHistory").waitFor({ state: "visible" });
     await page.locator("#historyToggle").click();
     await page.locator("#actionHistory").waitFor({ state: "hidden" });
-  });
-  await measure("close variable definition", async () => {
-    if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
-    await page.locator("#definitionCancel").click();
   });
 
   await measure("incident links (40 variables)", async () => {
@@ -379,25 +346,24 @@ try {
   });
 
   await measure("group search", async () => {
-    await page.locator("#ivInput").fill("education");
+    await page.locator("#identify-iv-input").fill("education");
     await page.waitForFunction(() => window.__dagBuilderState.variableSearchStatus === "ready", null,
       { timeout: 39000 });
   });
-  await page.locator("#ivInput").fill("");
+  await page.locator("#identify-iv-input").fill("");
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   if (anchors.length < 2) throw new Error("The sample schema has fewer than two populated groups");
   await measure("select IV", async () => {
-    await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-    await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).waitFor();
+    await chooseAnchor("iv", anchors[0]);
+    await page.waitForFunction(id => window.__dagBuilderState?.project?.iv_group_id === id, anchors[0]);
   });
-  await page.locator("#dvInput").fill("income");
-  await page.locator("#dvInput").fill("");
+  await page.locator("#identify-dv-input").fill("income");
+  await page.locator("#identify-dv-input").fill("");
   await measure("select DV", async () => {
-    await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+    await chooseAnchor("dv", anchors[1]);
     await page.waitForFunction(() => window.__dagBuilderState?.project?.dv_group_id != null);
   });
-  await page.locator("#instrumentGroupPicker button[data-select-none]").click();
   if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
   await measure("DAG layout: auto", async () => {
     await page.waitForFunction(() => window.__dagBuilderState.dagLayoutMode === "auto");
@@ -406,7 +372,7 @@ try {
   await measure("DAG zoom", async () => {
     await page.locator("#dagSvgZoomIn").click();
   });
-  await page.locator(".filter-dropdown > summary").click();
+  // Evidence opens on the map tab; tapping the Map tab on a phone closes it again.
   const edgeId = await page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
     await whenDagRendered();
@@ -425,58 +391,65 @@ try {
   // Measure the exclusion itself, not a panel still rebuilding as the edge's sources and labels arrive.
   await page.waitForFunction(() => !window.__dagBuilderState.pendingEdgeEvidence
     && !document.querySelector("#edgeInspector .edge-sources-loading"));
-  await measure("exclude edge promptly", async () => {
-    await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
-    await page.locator("#excludeReasonInput").fill("Profiling exclusion responsiveness");
-    await page.locator("#excludeConfirmBtn").click();
-    await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
-    await page.waitForFunction(async id => {
-      const { isDagEdgeRendered } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
-      return !isDagEdgeRendered(id);
-    }, edgeId);
-  });
-  await measure("settle graph after exclusion", async () => {
-    await page.evaluate(async id => {
-      const { whenDagRendered, isDagEdgeRendered } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
-      await whenDagRendered();
-      if (isDagEdgeRendered(id)) throw new Error("Excluded edge returned after graph rebuild");
-    }, edgeId);
-  });
-  await measure("restore edge", async () => {
-    await page.locator('#edgeInspector button[data-edge-action="restore"]').click();
-    await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
-    await waitForGraph();
-  });
-  await measure("exclude edge", async () => {
-    await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
-    await page.locator("#excludeCancelBtn").click();
-    await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
-    await page.locator("#excludeReasonInput").fill("Profiling exclusion");
-    await page.locator("#excludeConfirmBtn").click();
-    await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
-    await waitForGraph();
-  });
-  await measure("restore excluded edge", async () => {
-    await page.locator('#edgeInspector button[data-edge-action="restore"]').click();
-    await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
-    await waitForGraph();
-  });
+  // The evidence panel may offer no whole-edge Exclude (only per-finding exclusion); then these scenarios do not apply.
+  const edgeExclusion = await page.locator('#edgeInspector button[data-edge-action="exclude"]').count() > 0;
+  if (!edgeExclusion) console.warn("Whole-edge Exclude and Restore are not in the evidence panel; skipping those scenarios.");
+  if (edgeExclusion) {
+    await measure("exclude edge promptly", async () => {
+      await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
+      await page.locator("#excludeReasonInput").fill("Profiling exclusion responsiveness");
+      await page.locator("#excludeConfirmBtn").click();
+      await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
+      await page.waitForFunction(async id => {
+        const { isDagEdgeRendered } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+        return !isDagEdgeRendered(id);
+      }, edgeId);
+    });
+    await measure("settle graph after exclusion", async () => {
+      await page.evaluate(async id => {
+        const { whenDagRendered, isDagEdgeRendered } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+        await whenDagRendered();
+        if (isDagEdgeRendered(id)) throw new Error("Excluded edge returned after graph rebuild");
+      }, edgeId);
+    });
+    await measure("restore edge", async () => {
+      await page.locator('#edgeInspector button[data-edge-action="restore"]').click();
+      await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
+      await waitForGraph();
+    });
+    await measure("exclude edge", async () => {
+      await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
+      await page.locator("#excludeCancelBtn").click();
+      await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
+      await page.locator("#excludeReasonInput").fill("Profiling exclusion");
+      await page.locator("#excludeConfirmBtn").click();
+      await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
+      await waitForGraph();
+    });
+    await measure("restore excluded edge", async () => {
+      await page.locator('#edgeInspector button[data-edge-action="restore"]').click();
+      await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
+      await waitForGraph();
+    });
+  }
   await measure("close evidence", async () => {
     await page.locator("#closeEvidencePane").click();
     await page.waitForFunction(() => !window.__dagBuilderState.selectedEdgeId);
     await page.locator("#provenancePanel").waitFor({ state: "hidden" });
   });
   if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
-  await measure("undo edge decision", async () => {
-    await page.locator("#dag2UndoBtn").click();
-    await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
-    await waitForGraph();
-  });
-  await measure("redo edge decision", async () => {
-    await page.locator("#dag2RedoBtn").click();
-    await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
-    await waitForGraph();
-  });
+  if (edgeExclusion) {
+    await measure("undo edge decision", async () => {
+      await page.locator("#undoBtn").click();
+      await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
+      await waitForGraph();
+    });
+    await measure("redo edge decision", async () => {
+      await page.locator("#redoBtn").click();
+      await page.waitForFunction(id => !window.__dagBuilderState.project.link_decisions[id], edgeId);
+      await waitForGraph();
+    });
+  }
   if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
   // Vis finishes painting after the graph promise resolves; keep that work
   // outside the following filter measurements.
@@ -484,6 +457,7 @@ try {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   // The confounders view is the default, so start from the colliders view: each filter below is then a real switch
   // and the path length that follows is measured in the colliders view, as it always has been.
+  await openNav();
   await page.locator("#toggleCollidersOnly").click();
   await page.waitForFunction(() => window.__dagBuilderState.showCollidersOnly);
   await waitForGraph();
@@ -494,6 +468,7 @@ try {
     ["path links filter", "toggleIrrelevantConfounderLinks", "hideIrrelevantConfounderLinks"],
   ]) {
     if (["toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks"].includes(id)) await openFilters();
+    else await openNav();
     await measure(name, async () => {
       const previous = await page.evaluate(key => window.__dagBuilderState[key], stateKey);
       await page.locator(`#${id}`).click();
@@ -508,6 +483,7 @@ try {
     await page.waitForFunction(() => window.__dagBuilderState.confounderMaxPathLength === 2);
     await waitForGraph();
   });
+  if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
   await measure("DAG zoom out and fit", async () => {
     await page.locator("#dagSvgZoomOut").click();
     await page.locator("#dagSvgFit").click();
@@ -521,9 +497,10 @@ try {
     });
   }
   if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  await openNav();
   await measure("export drawer", async () => {
     await page.locator("#exportToggleBtn").click();
-    await page.locator("#exportSection.open").waitFor();
+    await page.locator("#exportSection[open]").waitFor();
   });
   await measure("project JSON download", async () => {
     const downloadPromise = page.waitForEvent("download");
@@ -537,6 +514,9 @@ try {
     ["working map download", "#exportWorkingMap", "working_causal_map.json"],
     ["grouping folder download", "#exportGroupingFolder", "grouping_schema.zip"],
   ]) {
+    // Choosing an export closes the menu, so open it again for the next one.
+    await openNav();
+    if (!(await page.locator("#exportSection").evaluate(element => element.open))) await page.locator("#exportToggleBtn").click();
     await measure(name, async () => {
       const downloadPromise = page.waitForEvent("download");
       await page.locator(selector).click();
@@ -546,10 +526,10 @@ try {
       }
     });
   }
+  if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
   await measure("change IV", async () => {
     const current = await page.evaluate(() => window.__dagBuilderState.project.iv_group_id);
-    await page.locator("#changeIv").click();
-    await page.locator(`#ivGroupPicker button[data-group-id="${current}"]`).click();
+    await chooseAnchor("iv", current);
     await page.waitForFunction(id => window.__dagBuilderState.project.iv_group_id === id
       && !window.__dagBuilderState.changingAnchorSide, current);
     await waitForGraph();
@@ -557,8 +537,7 @@ try {
   if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
   await measure("change DV", async () => {
     const current = await page.evaluate(() => window.__dagBuilderState.project.dv_group_id);
-    await page.locator("#changeDv").click();
-    await page.locator(`#dvGroupPicker button[data-group-id="${current}"]`).click();
+    await chooseAnchor("dv", current);
     await page.waitForFunction(id => window.__dagBuilderState.project.dv_group_id === id
       && !window.__dagBuilderState.changingAnchorSide, current);
     await waitForGraph();

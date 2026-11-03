@@ -131,7 +131,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
       committedSchema = structuredClone(schema);
       unsavedSchema = false;
       replaceUrl(url);
-      status("Saved locally · Unpublished changes");
+      status("Saved locally");
       return true;
     }).catch(error => {
       unsavedSchema = true;
@@ -186,7 +186,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     editorBaseline = null;
     unsavedSchema = false;
     replaceUrl(url);
-    status("Saved independent local copy · Unpublished changes");
+    status("Saved independent local copy");
     return record;
   }
 

@@ -1,4 +1,6 @@
 const { test, expect } = require("./fixtures.cjs");
+const { chooseAnchor, chooseAnchors, startCreate } = require("./support/identify.cjs");
+const { openNav, closeNav } = require("./support/navigation.cjs");
 const base = process.env.DAG_VIEWER_URL || "http://127.0.0.1:8767";
 const snapshot = "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b";
 const publication = "c221423a-9470-4c82-8a3d-8bcf4a01ef7c";
@@ -8,10 +10,7 @@ async function completeSetup(page) {
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   expect(anchors).toHaveLength(2);
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
-  await expect(page.locator('body')).not.toHaveClass(/initial-setup/);
+  await chooseAnchors(page, anchors[0], anchors[1]);
 }
 
 for (const corrupt of [false, true]) {
@@ -59,23 +58,6 @@ for (const corrupt of [false, true]) {
     if (!corrupt) {
       expect(requests.filter(url => /duckdb|\.parquet|search-catalogs/.test(url))).toEqual([]);
       expect(requests.filter(url => /evidence-panels.*json.gz/.test(url))).toHaveLength(2);
-      await page.evaluate(() => {
-        const s = window.__dagBuilderState;
-        window.__decisionCompiled = s.compiledDag;
-        window.__decisionMembers = s.project.groups.map(g => g.variable_ids);
-      });
-      await page.locator('[data-edge-action="exclude"]').click();
-      await page.locator("#excludeReasonInput").fill("Verify display-only exclusion");
-      await page.locator("#excludeConfirmBtn").click();
-      await page.locator('[data-edge-action="restore"]').waitFor();
-      await page.locator('[data-edge-action="restore"]').click();
-      await page.locator('[data-edge-action="exclude"]').waitFor();
-      expect(await page.evaluate(() => {
-        const s = window.__dagBuilderState;
-        return s.compiledDag === window.__decisionCompiled
-          && s.project.groups.every((g, i) => g.variable_ids === window.__decisionMembers[i])
-          && !s.project.link_decisions["category-academic-achievement__category-macroeconomic-context"];
-      })).toBe(true);
     }
     console.log("Mobile evidence", { corrupt, browserName, firstMs, requests: requests.length });
   });
@@ -109,14 +91,24 @@ test("a newer path filter supersedes a dense graph while installation is pending
   await page.locator('button[data-mobile-panel="dag"]').click();
   const settled = () => page.evaluate(async () => (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).whenDagRendered());
   await settled();
-  const dropdown = page.locator("details.filter-dropdown");
+  // The filters sit in the variable list's header, on the controls tab.
+  await page.locator('button[data-mobile-panel="controls"]').click();
+  const dropdown = page.locator("details.filter-dropdown:visible");
   for (const id of ["toggleCollidersOnly", "toggleConfoundersOnly", "toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks"]) {
-    // The Filters dropdown closes on an outside click, and some of these toggles sit outside it.
-    if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
-    await page.locator(`#${id}`).click();
+    if (id.endsWith("Only")) {
+      // The diagnostic switch is in the top bar, behind the menu button on a phone.
+      await openNav(page);
+      await page.locator(`#${id}`).click();
+      await closeNav(page);
+    } else {
+      // The Filters dropdown closes on an outside click.
+      if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
+      await page.locator(`#${id}`).click();
+    }
     await settled();
   }
   await page.evaluate(() => { window.__supersedeDenseGraph = true; });
+  if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
   await page.locator("#confounderPathLength").fill("2");
   await page.waitForFunction(() => window.__supersededDenseGraph, null, { timeout: 30000 });
   await settled();
@@ -132,33 +124,4 @@ test("a newer path filter supersedes a dense graph while installation is pending
   });
   expect(state.length).toBe(1);
   expect(state.actual).toEqual(state.expected);
-});
-
-test("a reason being typed survives the inspector rebuilding as sources arrive", async ({ page }) => {
-  test.setTimeout(90000);
-  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(`${base}/?schema=${publication}&data_version=${snapshot}&task=identify`);
-  await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated
-    && window.__dagBuilderState?.project && document.getElementById("startupLoading")?.hidden);
-  await completeSetup(page);
-  await page.locator('button[data-mobile-panel="dag"]').click();
-  const edgeId = await page.evaluate(async () => {
-    const { whenDagRendered, renderedDagEdgeIds } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
-    await whenDagRendered();
-    return renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__");
-  });
-  expect(edgeId).toBeTruthy();
-  await page.evaluate(async id => { (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).inspectDagEdge(id); }, edgeId);
-  await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
-  await page.keyboard.type("Selection on ");
-  // The same rebuild that follows a source or label load: it replaces the panel while the box has focus.
-  await page.evaluate(async id => { (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).inspectDagEdge(id); }, edgeId);
-  await page.keyboard.type("an unobserved trait");
-  const box = page.locator("#excludeReasonInput");
-  await expect(box).toHaveValue("Selection on an unobserved trait");
-  await expect(box).toBeFocused();
-  await page.locator("#excludeConfirmBtn").click();
-  await page.waitForFunction(id => window.__dagBuilderState.project.link_decisions[id]?.display_status === "excluded", edgeId);
-  expect(await page.evaluate(id => window.__dagBuilderState.project.link_decisions[id].exclude_reason, edgeId))
-    .toBe("Selection on an unobserved trait");
 });

@@ -1330,7 +1330,9 @@ function relaxDagLayoutPositions(
 }
 
 export function wrapDagLabel(label, maxChars = 20) {
+  // "/" is a soft break point, kept at the end of the line it closes.
   const words = String(label || "")
+    .replace(/\s*\/\s*/g, " / ")
     .split(/\s+/)
     .filter(Boolean);
 
@@ -1338,6 +1340,10 @@ export function wrapDagLabel(label, maxChars = 20) {
   let current = "";
 
   for (const word of words) {
+    if (word === "/" && current) {
+      current += " /";
+      continue;
+    }
     const next = current
       ? `${current} ${word}`
       : word;

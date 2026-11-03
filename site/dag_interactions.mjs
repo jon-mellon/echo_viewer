@@ -106,12 +106,14 @@ export function attachDagInteractions(network, element, actions) {
     dragging: () => { constrainViewport(); actions.onViewportChange?.(true); },
     dragEnd: () => { constrainViewport(); actions.onViewportChange?.(false); },
     beforeDrawing: context => actions.drawPathLanes(context),
+    afterDrawing: context => actions.drawRouteJoins?.(context),
     hoverEdge: event => actions.highlightEdge(event.edge),
     // Ignore a late blur for an old edge after a newer hover has already won.
     blurEdge: event => actions.clearEdgeHover(event.edge),
     hoverNode(event) {
       if (tappedCandidateId && isTouchGesture(event)) return;
       clearTappedCandidate();
+      actions.onNodeHover?.(event.node);
       if (actions.isDiagnosticCandidate(event.node)) {
         actions.clearEdgeHover();
         actions.highlightPaths(event.node);
@@ -121,6 +123,7 @@ export function attachDagInteractions(network, element, actions) {
       }
     },
     blurNode: () => {
+      actions.onNodeHover?.(null);
       if (!tappedCandidateId) actions.clearPathHover();
       actions.clearEdgeHover();
     },
@@ -174,6 +177,7 @@ export function attachDagInteractions(network, element, actions) {
     },
   };
   const leave = () => {
+    actions.onNodeHover?.(null);
     if (!tappedCandidateId) actions.clearPathHover();
     actions.clearEdgeHover();
   };
