@@ -112,9 +112,9 @@ test("exogeneity colors common causes while keeping the three study anchors", ()
   const mediator = display.visNodeData(group("via"), null, {}, view);
   const instrument = display.visNodeData(group("z"), null, {}, view);
   const iv = display.visNodeData(group("iv", "iv"), null, {}, view);
-  assert.equal(candidate.color.background, "#D55E00");
-  assert.equal(mediator.color.background, "#999999");
-  assert.equal(instrument.color.background, "#009E73");
+  assert.equal(candidate.color.background, "#c62828");
+  assert.equal(mediator.color.background, "#6b7280");
+  assert.equal(instrument.color.background, "#166534");
   assert.equal(iv.color.background, "#123456");
   assert.equal(instrument.shape, "ellipse");
 });
@@ -135,7 +135,7 @@ test("overlapping diagnostic roles retain the opposite role outline", () => {
   const group = { group_id: "both", label: "Both", variable_ids: [] };
   const base = { confounderGroupIds: new Set(["both"]), colliderGroupIds: new Set(["both"]),
     confounderPathGroupIds: new Set(), colliderPathGroupIds: new Set(), groupColor: "#123456" };
-  for (const [mode, color] of [["showConfoundersOnly", "#CC79A7"], ["showCollidersOnly", "#D55E00"]]) {
+  for (const [mode, color] of [["showConfoundersOnly", "#801744"], ["showCollidersOnly", "#c62828"]]) {
     const node = display.visNodeData(group, null, {}, { ...base, [mode]: true, activeGroupId: "both" });
     assert.equal(node.color.border, color);
     assert.equal(node.color.highlight.border, color);

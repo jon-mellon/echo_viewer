@@ -72,11 +72,11 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const isPathMediator = (view.showConfoundersOnly || view.showCollidersOnly || view.showExogeneity)
     && diagnosticRole === "mediator" && !isIv && !isDv && !isInstrument;
   const overlapBorder = !isIv && !isDv && !isInstrument
-    ? view.showConfoundersOnly && view.colliderGroupIds?.has(group.group_id) ? OKABE_ITO.purple
-      : view.showCollidersOnly && view.confounderGroupIds?.has(group.group_id) ? OKABE_ITO.vermillion : null
+    ? view.showConfoundersOnly && view.colliderGroupIds?.has(group.group_id) ? "#801744"
+      : view.showCollidersOnly && view.confounderGroupIds?.has(group.group_id) ? "#c62828" : null
     : null;
   const isSelected = group.group_id === view.activeGroupId;
-  const color = isViolation ? OKABE_ITO.vermillion : isInstrument ? OKABE_ITO.green : isExogeneityCandidate ? OKABE_ITO.vermillion : isConfounder ? OKABE_ITO.vermillion : isCollider ? OKABE_ITO.purple : isPathMediator ? OKABE_ITO.grey : view.groupColor;
+  const color = isViolation ? "#c62828" : isInstrument ? "#166534" : isExogeneityCandidate ? "#c62828" : isConfounder ? "#c62828" : isCollider ? "#801744" : isPathMediator ? "#6b7280" : view.groupColor;
   const roleTag = view.focusId && group.group_id === view.focusId ? " (focus)" : isIv ? " (Ind var)" : isDv ? " (Dep var)" : isInstrument ? " (instrument)" : isViolation ? " (exclusion restriction violation)" : isExogeneityCandidate ? " (potential common cause of instrument and Dep var)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
@@ -92,9 +92,9 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     mass: 1 + Math.min(3, Math.sqrt(group.variable_ids.length || group.member_count || 1) / 6),
     color: {
       background: color,
-      border: overlapBorder || (isSelected ? OKABE_ITO.orange : isViolation || isConfounder || isExogeneityCandidate || isCollider || isPathMediator || isInstrument ? mixHex(color, "#000000", 0.35) : "#fbfcfa"),
-      highlight: { background: color, border: overlapBorder || OKABE_ITO.orange },
-      hover: { background: color, border: overlapBorder || OKABE_ITO.blue },
+      border: overlapBorder || (isSelected ? "#b83b5e" : isViolation ? "#7f1d1d" : isConfounder || isExogeneityCandidate ? "#7f1d1d" : isCollider ? "#550f2d" : isPathMediator ? "#374151" : "#fbfcfa"),
+      highlight: { background: color, border: overlapBorder || (isConfounder || isExogeneityCandidate ? "#4c0d0d" : isCollider ? "#380a1e" : isPathMediator ? "#1f2937" : "#b83b5e") },
+      hover: { background: color, border: overlapBorder || "#ffffff" },
     },
     font: { color: isDark(color) ? "#ffffff" : "#1b2420" },
     chosen: { node: chosenNodeHover, label: false },
@@ -103,13 +103,13 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
     ...(overlapBorder ? { borderWidthSelected: 4 } : {}),
     // Light outline keeps dense links visually separated from node bodies.
     shadow: isSelected
-      ? { enabled: true, color: "rgba(230,159,0,0.5)", size: 12, x: 0, y: 0 }
+      ? { enabled: true, color: "rgba(184,59,94,0.45)", size: 12, x: 0, y: 0 }
       : isConfounder || isExogeneityCandidate
-        ? { enabled: true, color: "rgba(213,94,0,0.30)", size: 11, x: 0, y: 2 }
+        ? { enabled: true, color: "rgba(198,40,40,0.34)", size: 11, x: 0, y: 2 }
         : isCollider
-          ? { enabled: true, color: "rgba(204,121,167,0.36)", size: 11, x: 0, y: 2 }
+          ? { enabled: true, color: "rgba(128,23,68,0.34)", size: 11, x: 0, y: 2 }
         : isPathMediator
-          ? { enabled: true, color: "rgba(153,153,153,0.34)", size: 9, x: 0, y: 2 }
+          ? { enabled: true, color: "rgba(55,65,81,0.28)", size: 9, x: 0, y: 2 }
       : { enabled: true, color: "rgba(25, 38, 34, 0.14)", size: 7, x: 0, y: 2 },
   };
 }
