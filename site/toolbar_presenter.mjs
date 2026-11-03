@@ -30,12 +30,10 @@ export function createToolbarPresenter({ state, elements, groupById }) {
         keyItem("diagnostic-key-dv", "Outcome")];
       replaceChildren(elements.diagnosticOverlapKey, state.showExogeneity
         ? [...anchorItems, keyItem("diagnostic-key-instrument", "Instrument"),
-          keyItem("diagnostic-key-cause", "Potential common cause"),
-          keyItem("diagnostic-key-path", "Path on hover")]
+          keyItem("diagnostic-key-cause", "Potential common cause")]
         : state.showExclusionViolations
           ? [...anchorItems, keyItem("diagnostic-key-instrument", "Instrument"),
-            keyItem("diagnostic-key-violation", "Potential violation"),
-            keyItem("diagnostic-key-path", "Path on hover")]
+            keyItem("diagnostic-key-violation", "Potential violation")]
           : [...anchorItems, keyItem("diagnostic-key-fill", state.showConfoundersOnly ? "Confounder" : "Collider"),
             keyItem("diagnostic-key-outline", state.showConfoundersOnly ? "Also a collider" : "Also a confounder")]);
     }

@@ -74,9 +74,12 @@ test("browser-v2 supports group detail, auto layout, fullscreen and project expo
   expect(anchors).toHaveLength(2);
   await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator('#groupingPanel summary').click();
-  await expect.poll(async () => page.getByRole('link', { name: 'Open public version' }).getAttribute('href'))
-    .toContain(`iv=${anchors[0]}`);
-  const publicView = await page.getByRole('link', { name: 'Open public version' }).getAttribute('href');
+  const publicView = await page.evaluate(async () => {
+    const { publicationPermalink } = await import("/published_schema_loader.mjs");
+    const state = window.__dagBuilderState;
+    return publicationPermalink(state.project.publication.publication_id, window.location, state);
+  });
+  expect(publicView).toContain(`iv=${anchors[0]}`);
   expect(new URL(publicView).searchParams.get('dv')).toBe(anchors[1]);
   await page.goto(publicView, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated

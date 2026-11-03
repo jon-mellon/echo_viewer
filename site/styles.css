@@ -2538,14 +2538,6 @@ h2 {
   color: var(--surface);
 }
 
-.published-schema-permalink {
-  display: inline-block;
-  margin-top: var(--space-1);
-  color: var(--accent);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-normal);
-}
-
 .publication-dialog {
   width: min(520px, calc(100vw - 40px));
   padding: var(--space-6);
@@ -2785,7 +2777,6 @@ h2 {
 .diagnostic-key-dv { background: color-mix(in srgb, var(--dag-dv) 60%, var(--surface)); }
 .diagnostic-key-instrument { background: color-mix(in srgb, var(--dag-instrument) 60%, var(--surface)); }
 .diagnostic-key-violation, .diagnostic-key-cause { background: color-mix(in srgb, var(--dag-confounder) 60%, var(--surface)); }
-.diagnostic-key-path { background: var(--diag-path); height: 3px; border-radius: 0; }
 
 .instrument-none-row {
   margin: var(--space-3) 0;
