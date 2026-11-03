@@ -1995,6 +1995,7 @@ const setupGroupController = createDagSetupGroupController({
   exploreFocus: () => taskViews.focus(), searchFocusGroups: query => taskViews.searchFocusGroups(query),
   onChooseFocus: groupId => taskViews.chooseFocus(groupId),
   identifyPicking: () => taskViews.identifySide(), onChooseIdentify: (side, groupId) => taskViews.chooseIdentify(side, groupId),
+  onCancelIdentify: () => taskViews.cancelIdentify(),
   canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
   deleteCustom: deleteCustomVariable,
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),

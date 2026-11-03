@@ -2800,7 +2800,9 @@ h2 {
   background: var(--surface);
 }
 .task-bar[hidden] { display: none; }
-.task-bar-brand { font-weight: var(--weight-strong); letter-spacing: 0.02em; }
+.task-bar-brand { padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-weight: var(--weight-strong); letter-spacing: 0.02em; cursor: pointer; }
+.task-bar-brand:hover { color: var(--accent); }
+.task-bar-brand:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; border-radius: var(--radius-sm); }
 /* Task selector: "Task" label, current task and chevron form one compact,
    bordered control, quieter than the Causes / Consequences switch. */
 .task-selector {
@@ -3104,25 +3106,16 @@ h2 {
 .dag-body.task-identify .dag-left-panel > #anchorBar { display: none; }
 .identify-fields[hidden], .identify-fields .setup-group-picker[hidden] { display: none; }
 .identify-fields { display: grid; gap: var(--space-3); margin-bottom: var(--space-6); }
+.identify-field { position: relative; }
 .identify-field-label { display: block; margin: 0 0 var(--space-1); color: var(--text); font-weight: var(--weight-strong); }
 .identify-field .search-input { width: 100%; margin-bottom: 0; padding-right: var(--control-md); }
 .identify-field .search-input::-webkit-search-cancel-button { display: none; }
 .identify-field.has-focus .search-input:not(:focus) { font-weight: var(--weight-normal); }
-.identify-fields > #identifyGroupPicker { margin-top: var(--space-3); }
-/* The field whose list is open (focused, or the first one still empty) is plainly marked; the rest sit back. */
-.identify-field.is-picking .search-input,
-.identify-field.is-picking .search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); background: var(--surface); }
-.identify-field.is-picking .identify-field-label { color: var(--accent); }
-.identify-field.is-picking .identify-field-label::after {
-  content: "Choose from the list below";
-  margin-left: var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-normal);
-}
-.identify-fields:has(.is-picking) .identify-field:not(.is-picking) { opacity: 0.65; }
-.identify-fields:has(.is-picking) .identify-field:not(.is-picking):hover,
-.identify-fields:has(.is-picking) .identify-field:not(.is-picking):focus-within { opacity: 1; }
+#identifyGroupPicker { position: absolute; top: calc(100% + var(--space-1)); left: 0; right: 0; z-index: 8; width: 100%; height: min(45vh, 340px); overflow-y: auto; margin: 0; padding: 0 var(--space-2) var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-sm); }
+:is(.identify-browser-intro, .identify-picker-head) { margin-bottom: var(--space-3); padding-bottom: var(--space-2); border-bottom: 1px solid var(--border); }
+.identify-browser-intro h2, .identify-picker-head h2 { margin: 0; font-size: var(--text-lg); }
+.identify-picker-head { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); padding-top: var(--space-2); background: var(--surface); }
+:is(#identifyGroupPicker, #focusGroupPicker) .explore-picker-section { margin-top: var(--space-3); }
 /* The map's filters sit beside the list's first heading, as a quiet icon button. */
 .identify-tools .filter-dropdown { position: relative; }
 .identify-tools .filter-dropdown > summary { border-color: transparent; background: transparent; color: var(--text-muted); }

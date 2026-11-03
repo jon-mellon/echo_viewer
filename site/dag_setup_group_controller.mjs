@@ -35,7 +35,7 @@ export function createDagSetupGroupController({
   // Causes and consequences reuse the anchor bar and picker for their one variable.
   exploreFocus = () => ({ active: false }), searchFocusGroups = () => [], onChooseFocus = () => {},
   // Identify's Cause, Outcome and Instrument fields share the Explore picker list.
-  identifyPicking = () => null, onChooseIdentify = () => {},
+  identifyPicking = () => null, onChooseIdentify = () => {}, onCancelIdentify = () => {},
   canChangeCustom = () => true, deleteCustom = async () => {},
 }) {
   const variablePageSize = 10;
@@ -466,13 +466,17 @@ export function createDagSetupGroupController({
       : "Search group or constituent variable";
     if (chosen && !picking && document.activeElement !== elements.focusInput) elements.focusInput.value = focus.label;
     if (!picking) { container.hidden = true; container.replaceChildren(); elements.focusPickerCancel.hidden = true; return; }
+    const newPicker = container.hidden;
     elements.focusPickerCancel.hidden = !focus.groupId;
+    const noun = state.task === "causes" ? "causes" : "consequences";
     renderPickerList(container, { query: normalized(elements.focusInput.value), input: elements.focusInput,
+      pick: { title: "Choose variable", action: `See ${noun}` },
       onChoose: onChooseFocus, onCreate: () => startDefinition?.("candidate") });
+    if (newPicker) container.scrollTop = 0;
   }
 
   /** The Custom and Built-in variable lists a search field opens, in the Explore row style. */
-  function renderPickerList(container, { query, input, onChoose, onCreate, exclude = new Set() }) {
+  function renderPickerList(container, { query, input, onChoose, onCreate, exclude = new Set(), pick = null, onCancel = null, replacing = false }) {
     const groups = searchFocusGroups(query).filter(({ group }) => !exclude.has(group.group_id));
     container.hidden = false;
     const row = ({ group, variableMatch }) => {
@@ -481,7 +485,7 @@ export function createDagSetupGroupController({
       const custom = group.source === "user_split";
       return h("li", { className: `explore-row${custom ? " has-actions" : ""}` },
         h("button", { type: "button", className: "explore-row-open", dataset: { groupId: group.group_id },
-          title: group.description || "", attrs: { "aria-label": `${label}, ${count} variables` } },
+          title: group.description || "", attrs: { "aria-label": pick ? `${pick.action}: ${label}, ${count} variables` : `${label}, ${count} variables` } },
         h("span", { className: "explore-row-text" },
           h("span", { className: "explore-row-label", textContent: label }),
           variableMatch ? h("span", { className: "explore-row-path", textContent: `matches ${truncate(variableMatch, 70)}` }) : null),
@@ -500,12 +504,15 @@ export function createDagSetupGroupController({
         h("h2", {}, title, " ", h("span", { className: "explore-subsection-count", textContent: `(${items.length})` })),
         tools),
       items.length ? h("ol", { className: "explore-list" }, items.map(row))
-        : h("p", { className: "explore-subsection-empty", textContent: emptyText }));
+        : emptyText ? h("p", { className: "explore-subsection-empty", textContent: emptyText }) : null);
     const custom = groups.filter(({ group }) => group.source === "user_split");
     const builtIn = groups.filter(({ group }) => group.source !== "user_split");
     replaceChildren(container,
+      pick ? h("div", { className: "identify-picker-head" },
+        h("h2", { textContent: pick.title }),
+        replacing ? h("button", { className: "btn btn--ghost btn--sm", type: "button", textContent: "Cancel", onclick: onCancel }) : null) : null,
       status ? h("p", { className: "explore-subsection-empty", role: "status", textContent: status }) : null,
-      section("Custom variables", custom, query ? "No custom variable matches." : "You have not made any custom variables yet.",
+      section("Custom variables", custom, pick ? null : query ? "No custom variable matches." : "You have not made any custom variables yet.",
         createVariableButton(onCreate)),
       section("Built-in variables", builtIn, query ? "No built-in variable matches." : "None available."),
       query && !groups.length ? h("div", { className: "explore-subsection-empty" }, clearButton()) : null);
@@ -523,13 +530,20 @@ export function createDagSetupGroupController({
     const container = document.getElementById("identifyGroupPicker");
     if (!container) return;
     const side = identifyPicking();
-    if (!side || state.definitionDraft) { container.hidden = true; container.replaceChildren(); return; }
+    if (!side || state.definitionDraft) { container.hidden = true; container.replaceChildren(); container.dataset.pickerSide = ""; return; }
+    const newPicker = container.hidden || container.dataset.pickerSide !== side;
     const input = document.getElementById(`identify-${side}-input`);
+    input?.closest(".identify-field")?.append(container);
     // A variable can play one role at a time, so the other roles' variables are left out.
     const exclude = new Set(["iv", "dv", "instrument"].filter(other => other !== side)
       .map(other => state.project?.[`${other}_group_id`]).filter(Boolean));
+    const role = { iv: "cause", dv: "outcome", instrument: "instrument" }[side];
     renderPickerList(container, { query: normalized(input?.value || ""), input, exclude,
+      pick: { title: `Choose ${role}`, action: `Use as ${role}` },
+      replacing: Boolean(state.project?.[`${side}_group_id`]), onCancel: onCancelIdentify,
       onChoose: groupId => onChooseIdentify(side, groupId), onCreate: () => startDefinition?.(side) });
+    container.dataset.pickerSide = side;
+    if (newPicker) container.scrollTop = 0;
   }
 
   function renderGroupList() {
