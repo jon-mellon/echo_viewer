@@ -119,7 +119,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   navigate = (url) => window.location.assign(url) }) {
   const el = id => document.getElementById(id);
   const els = {
-    bar: el("taskBar"), reset: el("taskReset"), direction: el("exploreDirection"), explore: el("exploreView"),
+    bar: el("taskBar"), reset: el("taskReset"), direction: el("exploreDirection"), landing: el("taskLanding"), explore: el("exploreView"),
     resultsBlock: el("exploreResultsBlock"), summary: el("exploreSummary"),
     results: el("exploreResults"), dialog: el("resetDialog"), graphHint: el("exploreGraphHint"),
     graphTitle: el("dagViewTitle"), focusInput: el("focusInput"), focusClear: el("focusClear"), pickerCancel: el("focusPickerCancel"),
@@ -823,6 +823,8 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     }
     placeViewControls();
     els.reset.hidden = !task;
+    // The start page covers the app until a task is chosen.
+    if (els.landing) els.landing.hidden = Boolean(task);
     els.explore.hidden = !task;
     const identifyFields = el("identifyFields");
     if (identifyFields) identifyFields.hidden = !identifying();
@@ -850,6 +852,9 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   }
 
   function install() {
+    for (const button of document.querySelectorAll("#taskLanding button[data-task]")) {
+      button.addEventListener("click", () => setTask(button.dataset.task));
+    }
     for (const button of document.querySelectorAll("#taskBar button[data-task]")) {
       button.addEventListener("click", () => {
         const menu = button.closest("details");

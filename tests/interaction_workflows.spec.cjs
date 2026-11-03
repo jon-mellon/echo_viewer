@@ -26,15 +26,25 @@ async function completeSetup(page) {
   return anchors;
 }
 
-test("the privacy policy is linked and served", async ({ page }) => {
+test("privacy policy opens without resetting the viewer", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(viewer);
+  await page.goto(new URL("/", viewer).href);
   await ready(page);
-  // The link is in the page but not shown in any view since the start page went away.
-  await expect(page.locator(".legal-link")).toHaveAttribute("href", "/privacy.html");
-  await expect(page.locator(".legal-link")).toHaveAttribute("target", "_blank");
-  await page.goto(new URL("privacy.html", viewer).href);
-  await expect(page.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
+  // The Privacy link is shown on the start page only.
+  await expect(page.locator("#taskLanding")).toBeVisible();
+  await page.evaluate(() => { window.__privacyViewerState = window.__dagBuilderState; });
+
+  const [policy] = await Promise.all([
+    page.waitForEvent("popup"),
+    page.locator(".legal-link").click(),
+  ]);
+  await expect(policy).toHaveURL(new URL("privacy.html", viewer).href);
+  await expect(policy.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
+  expect(await page.evaluate(() => window.__dagBuilderState === window.__privacyViewerState)).toBe(true);
+  await policy.close();
+  await expect(page.locator("#taskLanding")).toBeVisible();
+  await chooseTask(page, "identify");
+  await expect(page.locator(".legal-link")).toBeHidden();
 });
 
 test("selecting evidence in full screen returns to the standard layout", async ({ page }) => {
