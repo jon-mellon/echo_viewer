@@ -1,15 +1,15 @@
-/** Fills the Describe step that now opens every definition: a name and a definition of at least 20 characters. */
+/** Fills the Describe step that follows choosing sources: a name and a definition of at least 20 characters. */
 async function describeVariable(page, { label = "Browser test variable", description = "A browser test variable with enough definition." } = {}) {
   await page.locator("#definitionNewLabel").fill(label);
   await page.locator("#definitionNewDescription").fill(description);
   await page.locator("#definitionDescribeNext").click();
 }
 
-/** From the Create click to the AI panel: describe, pick a source, Next. */
+/** From the Create click to the AI panel: pick a source, Next, describe, Next. */
 async function startAiSplit(page, { source = "academic achievement", label, description } = {}) {
-  await describeVariable(page, { label, description });
   await page.locator("#definitionSourceList .definition-source-row").filter({ hasText: source }).first().click();
   await page.locator("#definitionContinue").click();
+  await describeVariable(page, { label, description });
   await page.locator("#definitionPartitionStep").waitFor();
   await page.locator("#definitionJevPanel").waitFor();
 }

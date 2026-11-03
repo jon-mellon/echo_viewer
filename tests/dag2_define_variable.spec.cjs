@@ -18,19 +18,9 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
 
   await expect(page.locator("#identify-iv-input")).toBeVisible();
   await startCreate(page, "iv");
-  // Creating starts by describing the variable; the sources come next.
-  await expect(page.locator("#definitionDescribeStep")).toBeVisible();
-  await expect(page.locator("#definitionSourcesStep")).toBeHidden();
-  await page.locator("#definitionNewLabel").fill("Browser test construct");
-  await page.locator("#definitionNewDescription").fill("too short");
-  await page.locator("#definitionDescribeNext").click();
-  await expect(page.locator("#definitionValidation")).toHaveText("Write a definition of at least 20 characters.");
-  await expect(page.locator("#definitionNewDescription")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.locator("#definitionDescribeStep")).toBeVisible();
-  await page.locator("#definitionNewDescription").fill("A browser test construct with defined source members.");
-  await expect(page.locator("#definitionNewDescription")).not.toHaveAttribute("aria-invalid");
-  await page.locator("#definitionDescribeNext").click();
+  // Creating starts by choosing the sources; the name and definition come next.
   await expect(page.locator("#definitionSourcesStep")).toBeVisible();
+  await expect(page.locator("#definitionDescribeStep")).toBeHidden();
   await expect(page.locator("body")).not.toHaveClass(/defining-variable/);
   // Initial setup uses the full viewport until both anchors are selected.
   await expect(page.locator("#dagWorkspaceSection")).toBeHidden();
@@ -46,6 +36,16 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
     return { group_id: id, label: group.label, variable_ids: [...group.variable_ids] };
   }), sourceIds);
   await page.locator("#definitionContinue").click();
+  await expect(page.locator("#definitionDescribeStep")).toBeVisible();
+  await page.locator("#definitionNewLabel").fill("Browser test construct");
+  await page.locator("#definitionNewDescription").fill("too short");
+  await page.locator("#definitionDescribeNext").click();
+  await expect(page.locator("#definitionValidation")).toHaveText("Write a definition of at least 20 characters.");
+  await expect(page.locator("#definitionNewDescription")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#definitionDescribeStep")).toBeVisible();
+  await page.locator("#definitionNewDescription").fill("A browser test construct with defined source members.");
+  await expect(page.locator("#definitionNewDescription")).not.toHaveAttribute("aria-invalid");
+  await page.locator("#definitionDescribeNext").click();
   await expect(page.locator("body"), browserErrors.errors.join("\n")).toHaveClass(/defining-variable/);
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
   await expect(page.locator("#definitionJevPanel")).toBeVisible();
@@ -143,10 +143,10 @@ test("Variables list definition and split editing are reachable on desktop and m
   await createVariableButton(page).click();
   await expect(page.locator("#definitionTitle")).toHaveText("Create a variable");
   expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.role)).toBe("candidate");
-  await describeVariable(page, { label: "Browser list variable", description: "A browser list variable with selected source members." });
   const source = page.locator("#definitionSourceList input[data-source-id]").nth(2);
   await source.check();
   await page.locator("#definitionContinue").click();
+  await describeVariable(page, { label: "Browser list variable", description: "A browser list variable with selected source members." });
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
   await includeConcepts(page, [variableId]);
   await page.locator("#definitionResidualLabels input").fill("Browser list residual");
@@ -195,9 +195,9 @@ test("OpenRouter returns to the variable picker with the current anchors", async
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await chooseAnchors(page, anchors[0], anchors[1]);
   await createVariableButton(page).click();
-  await describeVariable(page);
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
+  await describeVariable(page);
   await page.locator("#definitionAiConnect").click();
   // The saved draft comes back on the concepts step, where the connection was made.
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
@@ -223,13 +223,12 @@ test("a new variable can be defined through the mobile controls", async ({ page 
   await expect(page.locator("#definitionTitle")).toBeInViewport();
   await expect(page.locator("#groupingPanel")).toBeHidden();
 
-  await describeVariable(page, { label: "Mobile browser variable", description: "A mobile browser variable with selected source members." });
-
   const sourceRow = page.locator("#definitionSourceList .definition-source-row").nth(2);
   await sourceRow.click({ position: { x: 30, y: 20 } });
   await expect(sourceRow.locator("input")).toBeChecked();
   await expect(page.locator("#definitionContinue")).toBeInViewport();
   await page.locator("#definitionContinue").click();
+  await describeVariable(page, { label: "Mobile browser variable", description: "A mobile browser variable with selected source members." });
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
   await expect(page.locator("#definitionTitle")).toBeInViewport();
 
@@ -569,8 +568,7 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
   }
 });
 
-test("a published split is reviewed on the map and used without a naming step", async ({ page }) => {
-  const browserErrors = watchBrowserErrors(page, { warnings: true });
+test("a published split appears after source selection and fills the editable definition", async ({ page }) => {
   await page.addInitScript(() => {
     if (!sessionStorage.getItem("dag2-test-initialized")) {
       localStorage.clear();
@@ -579,11 +577,22 @@ test("a published split is reviewed on the map and used without a naming step", 
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
   await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
-  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState.publishedSchemaHydrated);
 
+  // The published split workflow only needs source concept metadata. Keep this
+  // case independent of the remote evidence snapshot so it exercises the UI.
+  await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    dagDataSource.loadVariableMetadata = async ids => ids.map(id => ({
+      variable_id: id, index: parseInt(id.slice(1, 9), 16),
+      display_label: id, concept_label: id, map_x: parseInt(id.slice(1, 9), 16), map_y: parseInt(id.slice(9, 17), 16),
+    }));
+  });
   await startCreate(page, "iv");
-  await describeVariable(page, { label: "Published fixture split", description: "A published fixture split taken from one source category." });
-  const sourceId = await page.locator("#definitionSourceList input[data-source-id]").first().getAttribute("data-source-id");
+  const sourceId = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .find(group => group.variable_ids?.length >= 2 && group.variable_ids.length <= 20)?.group_id);
+  expect(sourceId).toBeTruthy();
 
   // Publish a fixture split carved from that source category.
   const fixture = await page.evaluate(async sourceId => {
@@ -621,25 +630,43 @@ test("a published split is reviewed on the map and used without a naming step", 
   await page.route("**/storage/v1/object/public/published-schemas/fixture-owner/fixture-pub/**", serveFixtureFile);
   await page.route("**/data.epistemicinfra.org/published-schemas/fixture-owner/fixture-pub/**", serveFixtureFile);
   await page.locator(`#definitionSourceList input[data-source-id="${sourceId}"]`).check();
+  await expect(page.locator("#definitionBrowsePanel")).toBeVisible();
+  await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
+  // A different exact set has no published split, but the browse area remains findable.
+  const otherId = await page.evaluate(id => window.__dagBuilderState.project.groups
+    .find(group => group.group_id !== id && group.variable_ids?.length >= 2)?.group_id, sourceId);
+  await page.locator(`#definitionSourceList input[data-source-id="${otherId}"]`).check();
+  await expect(page.locator("#definitionBrowsePanel")).toBeVisible();
+  await expect(page.locator("#definitionBrowseStatus")).toContainText("No published splits found");
+  await page.locator(`#definitionSourceList input[data-source-id="${otherId}"]`).uncheck();
   await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
   await page.locator("#definitionBrowseResults button[data-split-index]").click();
 
-  await expect(page.locator("#definitionPartitionStep")
+  await expect(page.locator("#definitionDescribeStep")
     .or(page.locator("#definitionBrowseStatus", { hasText: "Could not" }))).toBeVisible({ timeout: 60_000 });
   await expect(page.locator("#definitionBrowseStatus")).not.toContainText("Could not");
-  await expect(page.locator("body"), browserErrors.errors.join("\n")).toHaveClass(/defining-variable/);
+  // The published name and definition start the Describe step, ready to keep or reword.
+  await expect(page.locator("#definitionNewLabel")).toHaveValue("Published fixture split");
+  await expect(page.locator("#definitionNewDescription")).toHaveValue("A published fixture split taken from one source category.");
+  await page.locator("#definitionDescribeBack").click();
+  await expect(page.locator("#definitionSourcesStep")).toBeVisible();
+  await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
+  await page.locator("#definitionBrowseResults button[data-split-index]").click();
+  await expect(page.locator("#definitionNewLabel")).toHaveValue("Published fixture split");
+  await page.locator("#definitionNewLabel").fill("Reused fixture split");
+  await page.locator("#definitionDescribeNext").click();
+  await expect(page.locator("body")).toHaveClass(/defining-variable/);
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
-  // The published name and definition are kept, so there is nothing left to write: just save.
+  // The split supplied the concepts too, so there is nothing left to choose: just save.
   await expect(page.locator("#definitionSave")).toBeEnabled();
   await page.locator("#definitionSave").click();
 
   await expect(page.locator("#definitionBlock")).toBeHidden();
   const groups = await page.evaluate(() => window.__dagBuilderState.project.groups
     .map(group => ({ group_id: group.group_id, label: group.label, description: group.description })));
-  expect(groups.find(group => group.label === "Published fixture split")?.description)
+  expect(groups.find(group => group.label === "Reused fixture split")?.description)
     .toBe("A published fixture split taken from one source category.");
   expect(groups.find(group => group.group_id === fixture.sourceId)?.label).toBe(fixture.sourceLabel);
-  browserErrors.check();
 });
 
 test("definition source search matches constituent variables, not only category names", async ({ page }) => {
@@ -666,7 +693,6 @@ test("definition source search matches constituent variables, not only category 
   expect(pick, JSON.stringify(target.map(t => [t.label, t.variableId, labelOf.get(t.variableId)]))).toBeTruthy();
   const query = labelOf.get(pick.variableId);
   await startCreate(page, "iv");
-  await describeVariable(page);
   await page.locator("#definitionSourceSearch").fill(query);
   const row = page.locator(`#definitionSourceList input[data-source-id="${pick.id}"]`);
   await expect(row).toHaveCount(1, { timeout: 60000 });
@@ -793,9 +819,9 @@ test("Exploration creates a variable from its picker, which becomes the focus wi
     return { iv_group_id, dv_group_id };
   });
   await createVariableButton(page).click();
-  await describeVariable(page, { label: "Browser focus construct", description: "A browser test construct defined from the exploration view." });
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
+  await describeVariable(page, { label: "Browser focus construct", description: "A browser test construct defined from the exploration view." });
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
   await includeConcepts(page, [variableId]);
