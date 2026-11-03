@@ -20,7 +20,6 @@ export function createDagEventController({
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean, startEditSplit,
   dismissEvidencePane, showExcludedLinks, showExcludedFindings, startDefinition,
-  toggleDefinitionVariable,
 }) {
 function installHandlers() {
   els.closeEvidencePane.addEventListener("click", dismissEvidencePane);
@@ -467,7 +466,7 @@ function installMapHandlers() {
       // Draw is allowed with an active group, or with "Draw +" during seed selection.
       const action = mapInteractions.brushAction({
         mode: state.map.mode,
-        hasActiveGroup: Boolean(activeGroup() || state.definitionDraft?.step === "partition"),
+        hasActiveGroup: Boolean(activeGroup()),
         seedSelectionPhase: isSeedSelectionPhase(),
       });
       state.map.brush = { action, points: [{ x, y }] };
@@ -532,7 +531,7 @@ function installMapHandlers() {
       }
     }
     if (state.map.brush) {
-      if (state.map.brush.action === "select_vars" || state.definitionDraft?.step === "partition") {
+      if (state.map.brush.action === "select_vars") {
         applyBrush();
       } else {
         const before = takeSnapshot();
@@ -551,8 +550,8 @@ function installMapHandlers() {
       const point = nearestVariable(event.clientX, event.clientY,
         event.pointerType === "touch" ? 28 : 16);
       if (point) {
+        // The concepts in a new variable are not chosen on the map.
         if (state.definitionDraft?.step === "partition") {
-          toggleDefinitionVariable(point.variable_id);
           state.map.dragging = false;
           state.map.dragStart = null;
           canvas.classList.remove("dragging");

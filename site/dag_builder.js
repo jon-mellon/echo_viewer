@@ -124,11 +124,10 @@ function initElements() {
     "definitionBlock", "definitionTitle", "definitionCancel", "definitionDescribeStep", "definitionDescribeNext", "definitionResumeList",
     "definitionAiWork", "definitionSourcesStep", "definitionSourcesBack",
     "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults",
-    "definitionPartitionStep", "definitionMethodJev", "definitionMethodManual", "definitionLoadStatus", "definitionJevPanel", "definitionManualPanel",
+    "definitionPartitionStep", "definitionLoadStatus", "definitionJevPanel", "definitionIncludedPanel",
     "definitionConceptsIntro", "definitionCountIncluded", "definitionCountExcluded", "definitionCountUnreviewed",
-    "definitionSourcesSummary", "definitionTermSummary",
-    "definitionConceptSearch", "definitionStatusFilter", "definitionTermSelect", "definitionActiveFilters",
-    "definitionIncludedFilter", "definitionRelated", "definitionSaveHint",
+    "definitionSourcesSummary",
+    "definitionIncludedFilter", "definitionSaveHint",
     "definitionAiStepConnect", "definitionAiStepLimit", "definitionAiStepSample", "definitionAiStepFull",
     "definitionAiConnectSummary", "definitionAiLimitSummary", "definitionAiSampleSummary", "definitionAiFullSummary",
     "definitionAiLimitText", "definitionAiSettingsLink", "definitionAiSampleHost", "definitionAiFullHost",
@@ -137,9 +136,7 @@ function initElements() {
     "definitionAiRun", "definitionAiPreview", "definitionAiSummary", "definitionAiRows", "definitionAiFullRun", "definitionAiMore",
     "definitionAiReviewTools", "definitionAiReviewFilter", "definitionAiReviewPage", "definitionAiReviewPrev", "definitionAiReviewNext",
     "definitionAiApply", "definitionAiDiscard",
-    "definitionTermItems", "definitionTermPrev", "definitionTermPage", "definitionTermNext",
-    "definitionTermToNew", "definitionTermToLeftover", "definitionUndoBatch",
-    "definitionSelectedVariables", "definitionAddNeighbors", "definitionNeighborResults",
+    "definitionSelectedVariables",
     "definitionBack", "definitionSelectedTitle", "definitionSaveStatus",
     "definitionNewLabel", "definitionNewDescription", "definitionResidualLabels",
     "definitionValidation", "definitionSave",
@@ -696,9 +693,7 @@ function cancelDefinition() { return definitionWorkflowController.cancelDefiniti
 function definitionSources() { return definitionWorkflowController.definitionSources(); }
 function continueDefinition() { return definitionWorkflowController.continueDefinition(); }
 function definitionResidualIds(source) { return definitionWorkflowController.definitionResidualIds(source); }
-function toggleDefinitionVariable(variableId, add = null) { return definitionWorkflowController.toggleDefinitionVariable(variableId, add); }
 function definitionCanReview() { return definitionWorkflowController.definitionCanReview(); }
-function definitionNeighbors() { return definitionWorkflowController.definitionNeighbors(); }
 function renderDefinition() {
   definitionWorkflowController.renderDefinition();
   customVariablesPresenter.render();
@@ -1221,19 +1216,16 @@ function renderGroupEditor() {
 function renderGroupSeedSearch() { return groupEditorController.renderGroupSeedSearch(); }
 function renderNeighborSuggestions(group) { return groupEditorController.renderNeighborSuggestions(group); }
 function addVariableToGroup(group, variableId) {
-  if (group?.group_id === "__definition_new__") return toggleDefinitionVariable(variableId, true);
+  // The new variable's members come from the AI or an existing split, never from the map.
+  if (group?.group_id === "__definition_new__") return;
   return groupEditorController.addVariableToGroup(group, variableId);
 }
 function addVariableSetToGroup(group, ids) {
-  if (group?.group_id === "__definition_new__") {
-    // One change for the whole lasso, so a single Undo reverts it.
-    if (state.definitionMethod === "manual") definitionWorkflowController.classifyDefinitionVariables(ids, "in");
-    return;
-  }
+  if (group?.group_id === "__definition_new__") return;
   return groupEditorController.addVariableSetToGroup(group, ids);
 }
 function removeVariableFromGroup(group, variableId) {
-  if (group?.group_id === "__definition_new__") return toggleDefinitionVariable(variableId, false);
+  if (group?.group_id === "__definition_new__") return;
   return groupEditorController.removeVariableFromGroup(group, variableId);
 }
 function addTopNeighborsToActiveGroup() { return groupEditorController.addTopNeighborsToActiveGroup(); }
@@ -2063,7 +2055,6 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
   takeSnapshot, addToUndoHistory, clean, normalized, truncate, resizeMap,
   hydrateVariableDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),
-  hydrateNeighbors: hydrateVariableNeighbors,
   commitSchema: async () => {
     await persistentViewer.commitDecision();
     publicationController.workingCopyChanged();
@@ -2345,7 +2336,6 @@ const eventController = createDagEventController({
   isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
   addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean,
   startEditSplit, startDefinition, dismissEvidencePane,
-  toggleDefinitionVariable,
   showExcludedLinks, showExcludedFindings,
 });
 

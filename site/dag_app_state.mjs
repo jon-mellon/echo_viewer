@@ -43,7 +43,7 @@ export function createDagAppState(interfaceMode = "classic") {
     phase: "select_dv", workflowMode: "setup", changingAnchorSide: null,
     anchorSearchMode: { iv: "existing", dv: "existing", instrument: "existing" }, groupListSort: "relevance",
     undoHistory: [], undoPointer: -1, actionLog: [], showActionHistory: false,
-    definitionDraft: null, definitionAiPreviewIds: null, definitionMethod: null,
+    definitionDraft: null, definitionAiPreviewIds: null,
     showVariableLabels: true, showGroupLabels: true, variableLayoutSource: "",
     projectStorageVariableCount: null, dagLayoutMode: "auto",
     showConfoundersOnly: true, showCollidersOnly: false,

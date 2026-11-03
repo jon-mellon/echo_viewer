@@ -148,7 +148,6 @@
  * @property {string} workflowMode
  * @property {Set<string>} selectedVariableIds
  * @property {Set<string> | null} [definitionAiPreviewIds]
- * @property {"jev" | "manual" | null} [definitionMethod]
  * @property {"identify" | "causes" | "consequences" | null} [task]
  * @property {Record<"causes" | "consequences", ExploreView>} [explore]
  * @property {Record<string, unknown>} map

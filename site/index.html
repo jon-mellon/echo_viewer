@@ -307,16 +307,11 @@
                 <button id="definitionContinue" class="btn btn--primary" type="button" disabled>Next</button>
               </div>
             </div>
-            <!-- 3 · Choose concepts: by hand or with AI, then save. Both modes share
-                 the heading, mode switch, progress summary and footer. -->
+            <!-- 3 · Choose concepts: the AI suggests them (or an existing split supplies them), then save. -->
             <div id="definitionPartitionStep" hidden>
               <div class="definition-concepts-head">
                 <h2>Choose concepts</h2>
                 <p id="definitionConceptsIntro" class="small-note"></p>
-              </div>
-              <div class="definition-method-switch segmented" role="group" aria-label="How to choose concepts">
-                <button id="definitionMethodManual" class="btn" type="button" aria-pressed="true">Choose manually</button>
-                <button id="definitionMethodJev" class="btn" type="button" aria-pressed="false">Suggest with AI</button>
               </div>
               <div class="definition-progress" aria-live="polite">
                 <span class="definition-progress-item"><strong id="definitionCountIncluded">0</strong> included</span>
@@ -325,7 +320,7 @@
               </div>
               <div id="definitionLoadStatus" class="small-note" role="status" hidden></div>
               <!-- Suggest with AI: connect, check the limit, try a sample, then classify the rest. -->
-              <section id="definitionJevPanel" class="definition-ai" aria-labelledby="definitionAiTitle" hidden>
+              <section id="definitionJevPanel" class="definition-ai" aria-labelledby="definitionAiTitle">
                 <div class="definition-ai-intro">
                   <h3 id="definitionAiTitle">Suggest concepts with AI</h3>
                   <p>The AI reads your definition and suggests which concepts belong in the new variable. You check a sample before it classifies the rest, and nothing changes in your choices until you use its suggestions.</p>
@@ -403,49 +398,14 @@
                   <div id="definitionAiRows" class="definition-ai-rows" role="list"></div>
                 </div>
               </section>
-              <!-- Choose manually: browse and classify on the left, what is included on the right. -->
-              <div id="definitionManualPanel" class="definition-manual" hidden>
-                <section class="definition-browse" aria-labelledby="definitionBrowseTitle">
-                  <div class="definition-panel-head">
-                    <h3 id="definitionBrowseTitle">Browse concepts</h3>
-                  </div>
-                  <input id="definitionConceptSearch" class="search-input" type="search" placeholder="Search concepts by name…" aria-label="Search concepts by name" autocomplete="off">
-                  <div class="definition-browse-controls">
-                    <div id="definitionStatusFilter" class="segmented definition-status-filter" role="group" aria-label="Show concepts"></div>
-                    <select id="definitionTermSelect" class="select-input-sm" aria-label="Filter by a common term"></select>
-                  </div>
-                  <div id="definitionActiveFilters" class="definition-active-filters"></div>
-                  <div class="definition-list-meta">
-                    <span id="definitionTermSummary" class="small-note" aria-live="polite"></span>
-                    <span class="definition-list-batch">
-                      <button id="definitionUndoBatch" class="btn btn--sm" type="button" hidden>Undo</button>
-                      <button id="definitionTermToNew" class="btn btn--sm" type="button">Include shown</button>
-                      <button id="definitionTermToLeftover" class="btn btn--sm" type="button">Exclude shown</button>
-                    </span>
-                  </div>
-                  <div id="definitionTermItems" class="definition-term-items" role="list"></div>
-                  <div class="definition-page-actions">
-                    <button id="definitionTermPrev" class="btn btn--sm" type="button">Previous</button>
-                    <span id="definitionTermPage" class="small-note"></span>
-                    <button id="definitionTermNext" class="btn btn--sm" type="button">Next</button>
-                  </div>
-                </section>
-                <aside class="definition-sort-side" aria-labelledby="definitionSelectedTitle">
-                  <div class="definition-panel-head">
-                    <h3 id="definitionSelectedTitle">Included concepts (0)</h3>
-                  </div>
-                  <input id="definitionIncludedFilter" class="search-input" type="search" placeholder="Filter included…" aria-label="Filter included concepts" autocomplete="off" hidden>
-                  <div id="definitionSelectedVariables" class="definition-selected-variables" role="list"></div>
-                  <section id="definitionRelated" class="definition-related" hidden>
-                    <div class="definition-panel-head definition-related-head">
-                      <h3>Related concepts</h3>
-                      <button id="definitionAddNeighbors" class="btn btn--sm" type="button">Include all</button>
-                    </div>
-                    <p class="small-note">Based on your included concepts: similar wording or nearby on the map.</p>
-                    <div id="definitionNeighborResults" class="definition-related-list" role="list"></div>
-                  </section>
-                </aside>
-              </div>
+              <!-- The concepts now included, whether they came from the AI or an existing split. -->
+              <section id="definitionIncludedPanel" class="definition-included" aria-labelledby="definitionSelectedTitle">
+                <div class="definition-panel-head">
+                  <h3 id="definitionSelectedTitle">Included concepts (0)</h3>
+                </div>
+                <input id="definitionIncludedFilter" class="search-input" type="search" placeholder="Filter included…" aria-label="Filter included concepts" autocomplete="off" hidden>
+                <div id="definitionSelectedVariables" class="definition-selected-variables" role="list"></div>
+              </section>
               <!-- What happens to the variables the concepts come from: always shown, above Save. -->
               <section id="definitionSourcesSection" class="definition-sources" aria-labelledby="definitionSourcesSummary">
                 <h3 id="definitionSourcesSummary">What stays in the original variables</h3>

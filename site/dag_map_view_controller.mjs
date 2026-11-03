@@ -39,32 +39,33 @@ export function createDagMapViewController({
   const isSeedSelectionPhase = () => state.phase === "select_dv" || state.phase === "select_iv";
 
   function renderModeControls() {
-    if (state.map.mode === "draw_remove" && !activeGroup() && state.definitionDraft?.step !== "partition") state.map.mode = "select";
+    const defining = state.definitionDraft?.step === "partition";
+    if (defining || (state.map.mode === "draw_remove" && !activeGroup())) state.map.mode = "select";
     elements.dagMapCanvas.classList.toggle("brush-mode", isDrawMode());
     elements.dagSelectMode.disabled = false;
-    elements.dagBrushMode.disabled = false;
-    elements.dagEraseMode.disabled = !activeGroup() && state.definitionDraft?.step !== "partition";
+    elements.dagBrushMode.disabled = defining;
+    elements.dagEraseMode.disabled = defining || !activeGroup();
     for (const [element, mode] of [[elements.dagSelectMode, "select"], [elements.dagBrushMode, "draw_add"], [elements.dagEraseMode, "draw_remove"]]) {
       const active = state.map.mode === mode;
       element.classList.toggle("active", active);
       element.setAttribute("aria-pressed", active ? "true" : "false");
     }
-    elements.dagBrushMode.title = state.definitionDraft?.step === "partition"
-      ? "Draw around variables to add them to the new variable"
+    elements.dagBrushMode.title = defining
+      ? "The concepts in a new variable come from the AI or an existing split"
       : activeGroup()
       ? "Draw a boundary to add visible variables to the active group"
       : isSeedSelectionPhase()
         ? "Draw a boundary to pick the enclosed variables as the seed set"
         : "Draw a boundary to select visible variables for bulk actions";
-    elements.dagEraseMode.title = state.definitionDraft?.step === "partition"
-      ? "Draw around variables to return them to the source categories"
+    elements.dagEraseMode.title = defining
+      ? "The concepts in a new variable come from the AI or an existing split"
       : activeGroup()
       ? "Draw a boundary to remove visible variables from the active group"
       : "Open a group first to use erase mode";
   }
 
   function setMode(mode) {
-    state.map.mode = mode === "draw_remove" && !activeGroup() && state.definitionDraft?.step !== "partition" ? "select" : mode;
+    state.map.mode = state.definitionDraft?.step === "partition" || (mode === "draw_remove" && !activeGroup()) ? "select" : mode;
     renderModeControls();
   }
 

@@ -48,15 +48,15 @@ function drawVoronoiBackground(ctx, width, height) {
 function displayGroups() {
   const draft = state.definitionDraft;
   if (!draft || !["partition", "review"].includes(draft.step)) return state.project?.groups || [];
-  const jevMode = draft.step === "partition" && state.definitionMethod !== "manual";
-  const carved = new Set(jevMode ? state.definitionAiPreviewIds || [] : draft.new_variable_ids || []);
+  // The AI's preview while it is showing one, otherwise the concepts included so far.
+  const carved = new Set(state.definitionAiPreviewIds || draft.new_variable_ids || []);
   const sources = new Set(draft.source_group_ids || []);
   const residuals = (state.project?.groups || []).map(group => sources.has(group.group_id)
     ? { ...group, variable_ids: (group.variable_ids || []).filter(id => !carved.has(clusterRep(id))) }
     : group);
   return [...residuals, {
     group_id: "__definition_new__",
-    label: jevMode ? "AI preview" : "New group",
+    label: state.definitionAiPreviewIds ? "AI preview" : "New group",
     type: "custom",
     variable_ids: [...carved],
   }];
@@ -138,8 +138,7 @@ function drawGroupRegion(ctx, group, region, active) {
 
 function drawMapPoints(ctx, width, height) {
   const groups = displayGroups();
-  const previewSize = state.definitionMethod !== "manual" ? state.definitionAiPreviewIds?.size
-    : state.definitionDraft?.new_variable_ids?.length;
+  const previewSize = state.definitionAiPreviewIds?.size ?? state.definitionDraft?.new_variable_ids?.length;
   const definitionActiveId = previewSize
     ? "__definition_new__" : state.activeGroupId;
   const points = mapRenderModel.buildMapPointModels({
@@ -270,29 +269,9 @@ function drawBrush(ctx) {
 function applyBrush() {
   const brush = state.map.brush;
   if (!brush?.points || brush.points.length < 3) return;
-  if (state.definitionDraft?.step === "partition" && state.definitionMethod !== "manual") return;
+  // Which concepts join a new variable is not chosen on the map.
+  if (state.definitionDraft?.step === "partition") return;
   const group = activeGroup();
-  if (state.definitionDraft?.step === "partition") {
-    const selected = new Set(state.definitionDraft.new_variable_ids || []);
-    const eligible = new Set(state.definitionDraft.eligible_variable_ids || []);
-    const picked = [];
-    for (const variable of visibleClusterReps()) {
-      if (!brushHitsRepresentative(variable, brush.points)) continue;
-      const id = clusterRep(variable.variable_id);
-      if (!eligible.has(id)) continue;
-      picked.push(id);
-      if (brush.action === "remove") selected.delete(id); else selected.add(id);
-    }
-    state.definitionDraft.new_variable_ids = [...selected];
-    state.definitionDraft.reviewed_variable_ids = [...new Set([
-      ...(state.definitionDraft.reviewed_variable_ids || []), ...picked,
-    ])];
-    state.selectedVariableIds = new Set(selected);
-    state.selectedVariableId = picked[picked.length - 1] || state.selectedVariableId;
-    invalidateMapCaches();
-    renderAll({ rebuild: false, refreshView: true });
-    return;
-  }
   if (brush.action === "select_vars") {
     const picked = [];
     for (const v of visibleClusterReps()) {
@@ -655,7 +634,7 @@ function flagContextAction(action, title, description) {
 
 function renderMapContextMenu() {
   if (!els.dagMapContextMenu) return;
-  if (state.definitionDraft?.step === "partition" && state.definitionMethod !== "manual") {
+  if (state.definitionDraft?.step === "partition") {
     hideMapContextMenu();
     return;
   }
@@ -664,31 +643,6 @@ function renderMapContextMenu() {
   const variable = state.variableById.get(state.mapContextMenu.variableId || "");
   if (!variable && !isBatchSelection) {
     hideMapContextMenu();
-    return;
-  }
-  if (state.definitionDraft?.step === "partition") {
-    const ids = isBatchSelection ? selectedIds : [clusterRep(variable.variable_id)];
-    const selected = new Set(state.definitionDraft.new_variable_ids || []);
-    const allIncluded = ids.every(id => selected.has(id));
-    const rect = state.map.canvas.getBoundingClientRect();
-    replaceChildren(els.dagMapContextMenu,
-      h("div", { className: "map-context-menu-title", textContent: isBatchSelection ? `${ids.length} selected variables` : (clusterDisplayVariable(variable.variable_id)?.display_label || variable.variable_id) }),
-      contextMenuItem(allIncluded ? "Return to source leftovers" : "Add to new variable", "Applies only within this definition draft.", { definitionAction: allIncluded ? "remove" : "add" }));
-    els.dagMapContextMenu.querySelector("button[data-definition-action]").addEventListener("click", buttonEvent => {
-      const add = buttonEvent.currentTarget.dataset.definitionAction === "add";
-      for (const id of ids) {
-        if (add) selected.add(id); else selected.delete(id);
-      }
-      state.definitionDraft.new_variable_ids = [...selected];
-      state.selectedVariableIds = new Set(selected);
-      hideMapContextMenu();
-      renderAll({ rebuild: false, refreshView: true });
-    });
-    els.dagMapContextMenu.hidden = false;
-    const position = mapInteractions.contextMenuPosition({ ...state.mapContextMenu, rect,
-      menuWidth: Math.min(360, rect.width - 16), menuHeight: 140 });
-    els.dagMapContextMenu.style.left = `${position.left}px`;
-    els.dagMapContextMenu.style.top = `${position.top}px`;
     return;
   }
   if (isBatchSelection) {

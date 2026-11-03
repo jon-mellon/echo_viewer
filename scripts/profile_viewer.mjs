@@ -321,17 +321,15 @@ try {
   await measure("select definition variable", async () => {
     if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
     const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
-    const label = await page.evaluate(id => {
-      const variable = window.__dagBuilderState.variableById.get(id);
-      return variable?.display_label || variable?.concept_label || id;
+    // The AI or an existing split supplies the concepts; this stands in for either by including one.
+    await page.evaluate(id => {
+      const state = window.__dagBuilderState, draft = state.definitionDraft;
+      draft.new_variable_ids = [id];
+      draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
+      state.selectedVariableIds = new Set([id]);
+      document.getElementById("definitionSourceSearch").dispatchEvent(new Event("input"));
     }, variableId);
-    await page.locator("#definitionConceptSearch").fill(label);
-    await page.locator("#definitionTermItems button", { hasText: /^In$/ }).first().click();
-    await page.waitForFunction(id => {
-      const state = window.__dagBuilderState;
-      return state.definitionDraft.new_variable_ids.includes(id)
-        && Array.isArray(state.variableById.get(id)?.similarity_neighbors);
-    }, variableId);
+    await page.waitForFunction(id => window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), variableId);
     if (mobile) await page.locator('button[data-mobile-panel="variables"]').click();
   });
   // The variable map is part of defining only in the narrower layout, so it is profiled there.
