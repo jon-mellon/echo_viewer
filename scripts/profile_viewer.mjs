@@ -120,10 +120,32 @@ async function snapshot() {
   }));
 }
 
-// The Filters dropdown closes on an outside click, so reopen it before steps that need its controls.
+// On a phone the top bar's controls sit behind a menu button that closes after each choice.
+async function openNav() {
+  const toggle = page.locator("#navToggle");
+  if ((await toggle.isVisible()) && (await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+}
+
+async function closeNav() {
+  const toggle = page.locator("#navToggle");
+  if ((await toggle.isVisible()) && (await toggle.getAttribute("aria-expanded")) === "true") await toggle.click();
+}
+
+// The Filters dropdown is in the variable list's header (the list tab on a phone) and closes on an outside click.
 async function openFilters() {
-  const dropdown = page.locator(".filter-dropdown");
+  await closeNav();
+  if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  const dropdown = page.locator("details.filter-dropdown:visible");
   if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator("summary").click();
+}
+
+// Cause (iv), Outcome (dv) and Instrument share one picker; on a phone the fields are on the list tab.
+async function chooseAnchor(side, groupId) {
+  await closeNav();
+  const input = page.locator(`#identify-${side}-input`);
+  if (!(await input.isVisible()) && mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  await input.click();
+  await page.locator(`#identifyGroupPicker button[data-group-id="${groupId}"]`).click();
 }
 
 async function measure(name, action) {
@@ -266,7 +288,8 @@ try {
 
   if (!permalink) {
   await measure("open variable definition", async () => {
-    await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
+    await page.locator("#identify-iv-input").click();
+    await page.locator("#identifyGroupPicker .custom-create").click();
     await page.locator("#definitionNewLabel").waitFor({ state: "visible" });
   });
   await measure("describe definition", async () => {
@@ -339,10 +362,11 @@ try {
   }
   await measure("close variable definition", async () => {
     if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
-    await page.locator("#definitionCancel").click();
+    await page.locator(".definition-cancel:visible").first().click();
   });
   // The History menu is hidden on a phone while a definition is open, so it is measured after.
   await measure("history panel", async () => {
+    await openNav();
     await page.locator("#historyToggle").click();
     await page.locator("#actionHistory").waitFor({ state: "visible" });
     await page.locator("#historyToggle").click();
@@ -366,25 +390,24 @@ try {
   });
 
   await measure("group search", async () => {
-    await page.locator("#ivInput").fill("education");
+    await page.locator("#identify-iv-input").fill("education");
     await page.waitForFunction(() => window.__dagBuilderState.variableSearchStatus === "ready", null,
       { timeout: 39000 });
   });
-  await page.locator("#ivInput").fill("");
+  await page.locator("#identify-iv-input").fill("");
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   if (anchors.length < 2) throw new Error("The sample schema has fewer than two populated groups");
   await measure("select IV", async () => {
-    await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-    await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).waitFor();
+    await chooseAnchor("iv", anchors[0]);
+    await page.waitForFunction(id => window.__dagBuilderState?.project?.iv_group_id === id, anchors[0]);
   });
-  await page.locator("#dvInput").fill("income");
-  await page.locator("#dvInput").fill("");
+  await page.locator("#identify-dv-input").fill("income");
+  await page.locator("#identify-dv-input").fill("");
   await measure("select DV", async () => {
-    await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
+    await chooseAnchor("dv", anchors[1]);
     await page.waitForFunction(() => window.__dagBuilderState?.project?.dv_group_id != null);
   });
-  await page.locator("#instrumentGroupPicker button[data-select-none]").click();
   if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
   await measure("DAG layout: auto", async () => {
     await page.waitForFunction(() => window.__dagBuilderState.dagLayoutMode === "auto");
@@ -393,7 +416,7 @@ try {
   await measure("DAG zoom", async () => {
     await page.locator("#dagSvgZoomIn").click();
   });
-  await page.locator(".filter-dropdown > summary").click();
+  // Evidence opens on the map tab; tapping the Map tab on a phone closes it again.
   const edgeId = await page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds } = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
     await whenDagRendered();
@@ -478,6 +501,7 @@ try {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   // The confounders view is the default, so start from the colliders view: each filter below is then a real switch
   // and the path length that follows is measured in the colliders view, as it always has been.
+  await openNav();
   await page.locator("#toggleCollidersOnly").click();
   await page.waitForFunction(() => window.__dagBuilderState.showCollidersOnly);
   await waitForGraph();
@@ -488,6 +512,7 @@ try {
     ["path links filter", "toggleIrrelevantConfounderLinks", "hideIrrelevantConfounderLinks"],
   ]) {
     if (["toggleBottleneckedConfounders", "toggleIrrelevantConfounderLinks"].includes(id)) await openFilters();
+    else await openNav();
     await measure(name, async () => {
       const previous = await page.evaluate(key => window.__dagBuilderState[key], stateKey);
       await page.locator(`#${id}`).click();
@@ -502,6 +527,7 @@ try {
     await page.waitForFunction(() => window.__dagBuilderState.confounderMaxPathLength === 2);
     await waitForGraph();
   });
+  if (mobile) await page.locator('button[data-mobile-panel="dag"]').click();
   await measure("DAG zoom out and fit", async () => {
     await page.locator("#dagSvgZoomOut").click();
     await page.locator("#dagSvgFit").click();
@@ -515,6 +541,7 @@ try {
     });
   }
   if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+  await openNav();
   await measure("export drawer", async () => {
     await page.locator("#exportToggleBtn").click();
     await page.locator("#exportSection[open]").waitFor();
@@ -532,6 +559,7 @@ try {
     ["grouping folder download", "#exportGroupingFolder", "grouping_schema.zip"],
   ]) {
     // Choosing an export closes the menu, so open it again for the next one.
+    await openNav();
     if (!(await page.locator("#exportSection").evaluate(element => element.open))) await page.locator("#exportToggleBtn").click();
     await measure(name, async () => {
       const downloadPromise = page.waitForEvent("download");
@@ -545,8 +573,7 @@ try {
   if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
   await measure("change IV", async () => {
     const current = await page.evaluate(() => window.__dagBuilderState.project.iv_group_id);
-    await page.locator("#changeIv").click();
-    await page.locator(`#ivGroupPicker button[data-group-id="${current}"]`).click();
+    await chooseAnchor("iv", current);
     await page.waitForFunction(id => window.__dagBuilderState.project.iv_group_id === id
       && !window.__dagBuilderState.changingAnchorSide, current);
     await waitForGraph();
@@ -554,8 +581,7 @@ try {
   if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
   await measure("change DV", async () => {
     const current = await page.evaluate(() => window.__dagBuilderState.project.dv_group_id);
-    await page.locator("#changeDv").click();
-    await page.locator(`#dvGroupPicker button[data-group-id="${current}"]`).click();
+    await chooseAnchor("dv", current);
     await page.waitForFunction(id => window.__dagBuilderState.project.dv_group_id === id
       && !window.__dagBuilderState.changingAnchorSide, current);
     await waitForGraph();

@@ -81,7 +81,7 @@ try {
       } else await page.locator('#definitionPartitionStep').waitFor({ state: 'visible' });
     });
     if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
-    await page.locator('#definitionCancel').click();
+    await page.locator('.definition-cancel:visible').first().click();
     const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(g => g.variable_ids.length).slice(0, 2).map(g => g.group_id));
     await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
     await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();

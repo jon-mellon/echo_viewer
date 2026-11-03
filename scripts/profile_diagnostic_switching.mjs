@@ -61,7 +61,6 @@ try {
     }
     if (mobile) await page.locator('[data-mobile-panel="dag"]').click();
     await settled();
-    await page.locator('.filter-dropdown > summary').click();
     await page.evaluate(() => {
       const s = window.__dagBuilderState;
       window.__diagnosticBaseline = { compiled: s.compiledDag, links: s.project.links, groups: s.project.groups, evidence: s.rawLinksById.size };
@@ -70,9 +69,16 @@ try {
     report.runs.push(result);
     await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); profiling = true;
     async function measure(name, id, expectedMode) {
-      // The Filters dropdown closes on an outside click; reopen it for a control inside it.
-      const dropdown = page.locator('.filter-dropdown');
-      if (await dropdown.locator(`#${id}`).count() && !(await dropdown.evaluate(element => element.open))) await dropdown.locator('summary').click();
+      // The Filters dropdown is in the variable list's header (the list tab on a phone) and closes on an outside click;
+      // the view switches are in the top bar, behind a menu button on a phone.
+      const navToggle = page.locator('#navToggle');
+      const navOpen = async () => (await navToggle.isVisible()) && (await navToggle.getAttribute('aria-expanded')) === 'true';
+      if (await navOpen()) await navToggle.click();
+      if (await page.locator(`details.filter-dropdown #${id}`).count()) {
+        if (mobile) await page.locator('button[data-mobile-panel="controls"]').click();
+        const dropdown = page.locator('details.filter-dropdown:visible');
+        if (!(await dropdown.evaluate(element => element.open))) await dropdown.locator('summary').click();
+      } else if (await navToggle.isVisible()) await navToggle.click();
       const start = await page.evaluate(() => performance.now());
       await page.locator(`#${id}`).click();
       await settled();
