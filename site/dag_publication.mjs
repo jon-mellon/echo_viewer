@@ -1,6 +1,7 @@
 import { supabase } from "/supabase_client.mjs";
 import { publicationPermalink } from "/published_schema_loader.mjs";
 import { canonicalizeWorkingSchema, publishWorkingSchema, formatSupabaseError } from "./dag_publication_core.mjs";
+import { confirmPublicPublication } from "./publication_consent.mjs";
 export { CANONICAL_BASELINE_ID, CANONICAL_BASELINE_HASH, canonicalizeWorkingSchema, publishWorkingSchema, formatSupabaseError } from "./dag_publication_core.mjs";
 
 function showStatus(element, message, isError = false) {
@@ -160,19 +161,6 @@ export function createPublicationController({
     }, 2400);
   }
 
-  function confirmPublicPublication() {
-    const dialog = elements.confirmation;
-    if (!dialog?.showModal) {
-      return Promise.resolve(windowApi.confirm("Publish this schema publicly?\n\nPublishing creates an immutable public version that anyone with the link can view and download. Your unpublished local edits remain private until you publish them."));
-    }
-    return new Promise(resolve => {
-      const close = () => resolve(dialog.returnValue === "publish");
-      dialog.addEventListener("close", close, { once: true });
-      dialog.returnValue = "cancel";
-      dialog.showModal();
-    });
-  }
-
   async function publish() {
     if (busy) return null;
     if (!canPublish()) {
@@ -189,7 +177,7 @@ export function createPublicationController({
         reportSuccess("Already published: this working copy matches the public version.");
         return published;
       }
-      if (!await confirmPublicPublication()) return null;
+      if (!await confirmPublicPublication(elements.confirmation, windowApi)) return null;
       showStatus(elements.status, "Canonicalizing current working schema…");
       const result = await publishWorkingSchema({
         schema: getWorkingSchema(),
