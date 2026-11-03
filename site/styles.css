@@ -1656,6 +1656,10 @@ h2 {
   font-variant-numeric: tabular-nums;
 }
 .path-length-input:disabled { opacity: 0.45; }
+.dag-network .vis-tooltip {
+  display: none !important;
+}
+
 .dag-svg-wrapper,
 .dag-network-wrapper {
   flex: 1;
@@ -2317,10 +2321,6 @@ h2 {
     z-index: 2;
     padding-block: var(--space-2);
     background: var(--surface);
-  }
-
-  .dag-network .vis-tooltip {
-    display: none !important;
   }
 
   .dag-body {
