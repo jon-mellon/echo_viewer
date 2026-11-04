@@ -1,3 +1,4 @@
+import { listOwnPublishedSplits } from "/published_split_browser.mjs";
 "use strict";
 
 import * as projectOps from "/dag_project.mjs";
@@ -36,7 +37,7 @@ import { dagDataSource } from "/dag_data_source.mjs?v=browser-v2";
 import { incrementCompiledDag } from "/compiled_dag.mjs";
 import { createPersistentViewer } from "/persistent_viewer.mjs";
 import { importDraftFile, makeDraftExport } from "/draft_exchange.mjs";
-import { listPreviousSessions } from "/local_schema_store.mjs";
+import { listPreviousSessions, listLocalSchemas } from "/local_schema_store.mjs";
 import { escapeHtml } from "/text_utils.mjs";
 import { relevantExclusions } from "/dag_export_relevance.mjs";
 import { DIAGNOSTIC_STATUSES, STATUS_MENU_LABELS, diagnosticStatusRows } from "/confounder_status.mjs";
@@ -1927,6 +1928,7 @@ const toolbarController = createToolbarController({ state, elements: els, dagGro
 
 const definitionWorkflowController = createDefinitionWorkflowController({
   state, elements: els, activeGroup, clusterRep, invalidateVisibleCaches, renderAll,
+  previousSplits: () => previousSplitRows,
   groupById, persistProjectLocally, getReturnUrl: () => persistentViewer.currentUrl() || location.href, visibleVariables,
   searchVariables: searchVisibleVariables, searchSourceGroups: searchDefinitionSourceGroups,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
@@ -1934,6 +1936,7 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   hydrateVariableDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),
   commitSchema: async () => {
     await persistentViewer.commitDecision();
+    previousSplitsLoaded = false;
     publicationController.workingCopyChanged();
   },
   onCommitFailureRestored: () => persistentViewer.clearSaveFailure(),
@@ -1948,6 +1951,34 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   },
 });
 
+let previousSplitRows = [];
+let previousSplitsLoading = false;
+let previousSplitsLoaded = false;
+function loadPreviousSplits(force = false) {
+  if (previousSplitsLoading || (previousSplitsLoaded && !force)) return;
+  previousSplitsLoading = true;
+  void Promise.allSettled([listOwnPublishedSplits(), listLocalSchemas()]).then(([published, local]) => {
+    const localRows = local.status === "fulfilled" ? local.value.flatMap(record =>
+      (record.schema?.groups || []).filter(group => group.source === "user_split"
+        && group.provenance?.operation === "split_categories" && Array.isArray(group.provenance.source_group_ids))
+        .map(group => ({ group_id: group.group_id, split_id: group.provenance.split_id || group.group_id,
+          source_group_ids: group.provenance.source_group_ids, name: group.label, description: group.description,
+          local_variable_ids: group.variable_ids, published_at: record.updatedAt || "", is_local: true }))) : [];
+    const rows = [...localRows, ...(published.status === "fulfilled" ? published.value : [])];
+    const unique = new Map();
+    for (const row of rows) {
+      const key = row.split_id || row.group_id;
+      if (!unique.has(key) || row.published_at > unique.get(key).published_at) unique.set(key, row);
+    }
+    previousSplitRows = [...unique.values()];
+    previousSplitsLoaded = true;
+    setupGroupController.renderFocusPicker();
+    setupGroupController.renderIdentifyPicker();
+    customVariablesPresenter.render();
+  }).finally(() => { previousSplitsLoading = false; });
+}
+function reusePreviousSplit(role, row) { definitionWorkflowController.reusePreviousSplit(role, row); }
+
 const customVariablesPresenter = createCustomVariablesPresenter({
   state, elements: els, truncate, normalized,
   customVariables: () => (state.project?.groups || []).filter(group => group.source === "user_split")
@@ -1957,6 +1988,7 @@ const customVariablesPresenter = createCustomVariablesPresenter({
   onCreate: () => startDefinition("candidate"),
   onEdit: groupId => startEditSplit(groupId),
   onDelete: deleteCustomVariable,
+  previousSplits: () => previousSplitRows, loadPreviousSplits, reusePreviousSplit,
   canExplore: () => taskViews.exploring(),
   onExplore: groupId => taskViews.chooseFocus(groupId),
 });
@@ -1997,6 +2029,8 @@ const setupGroupController = createDagSetupGroupController({
   identifyPicking: () => taskViews.identifySide(), onChooseIdentify: (side, groupId) => taskViews.chooseIdentify(side, groupId),
   onCancelIdentify: () => taskViews.cancelIdentify(),
   canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
+  previousSplits: () => previousSplitRows, loadPreviousSplits, reusePreviousSplit,
+  browsePreviousForSource: (role, id) => definitionWorkflowController.browsePreviousForSource(role, id),
   deleteCustom: deleteCustomVariable,
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),

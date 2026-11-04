@@ -635,7 +635,7 @@ test("a published split appears after source selection and fills the editable de
     .find(group => group.group_id !== id && group.variable_ids?.length >= 2)?.group_id, sourceId);
   await page.locator(`#definitionSourceList input[data-source-id="${otherId}"]`).check();
   await expect(page.locator("#definitionBrowsePanel")).toBeVisible();
-  await expect(page.locator("#definitionBrowseStatus")).toContainText("You have no previous published splits");
+  await expect(page.locator("#definitionBrowseStatus")).toContainText("You have no previous splits");
   await expect(page.locator("#definitionBrowseJump")).toHaveText("No previous splits found");
   await page.locator(`#definitionSourceList input[data-source-id="${otherId}"]`).uncheck();
   await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
@@ -867,4 +867,40 @@ test("a saved AI split is not restored on load; Define offers it in Causes and r
     return { step: draft.step, role: draft.role, description: draft.ai_description };
   })).toEqual({ step: "partition", role: "candidate", description: "Seeded saved split" });
   await page.evaluate(async () => (await import("/definition_jev_checkpoint.mjs")).deleteJevRun("seeded-run"));
+});
+
+test("previous local splits can be reused without changing the active schema first", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/?task=identify`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.some(group => group.variable_ids?.length >= 2)
+    && window.__dagBuilderState.publishedSchemaHydrated);
+  const fixture = await page.evaluate(async () => {
+    const state = window.__dagBuilderState;
+    const source = state.project.groups.find(group => group.variable_ids?.length >= 2 && group.variable_ids.length <= 20);
+    const { commitLocalSchema } = await import("/local_schema_store.mjs");
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    dagDataSource.loadVariableMetadata = async ids => ids.map(id => ({ variable_id: id,
+      index: parseInt(id.slice(1, 9), 16), display_label: id, concept_label: id,
+      map_x: parseInt(id.slice(1, 9), 16), map_y: parseInt(id.slice(9, 17), 16) }));
+    await commitLocalSchema({ id: "previous-split-test", schema: { groups: [{ group_id: "previous-split-test-group",
+      label: "Previous local construct", description: "A construct saved in an earlier local draft.", source: "user_split",
+      provenance: { operation: "split_categories", split_id: "previous-split-test-id", source_group_ids: [source.group_id] },
+      variable_ids: [source.variable_ids[0]] }] }, url: location.href });
+    return { sourceId: source.group_id, sourceLabel: source.label, before: state.project.groups.length };
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated);
+  await page.waitForFunction(id => window.__dagBuilderState?.project?.groups?.find(g => g.group_id === id)?.variable_ids?.length >= 2, fixture.sourceId, { timeout: 15000 });
+  await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    dagDataSource.loadVariableMetadata = async ids => ids.map(id => ({ variable_id: id,
+      index: parseInt(id.slice(1, 9), 16), display_label: id, concept_label: id,
+      map_x: parseInt(id.slice(1, 9), 16), map_y: parseInt(id.slice(9, 17), 16) }));
+  });
+  await expect(page.getByRole("button", { name: `Browse your previous splits of ${fixture.sourceLabel}` })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reuse previous split Previous local construct" })).toBeVisible();
+  await page.getByRole("button", { name: "Reuse previous split Previous local construct" }).click();
+  await expect(page.locator("#definitionNewLabel")).toHaveValue("Previous local construct");
+  expect(await page.evaluate(() => window.__dagBuilderState.project.groups.length)).toBe(fixture.before);
+  expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.source_group_ids)).toEqual([fixture.sourceId]);
 });

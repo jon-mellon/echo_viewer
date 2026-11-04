@@ -83,6 +83,12 @@ export async function loadLocalSchema(id, indexedDb) {
   return requestResult(tx.objectStore(SCHEMAS).get(id), tx);
 }
 
+export async function listLocalSchemas(indexedDb) {
+  const db = await openLocalDatabase(indexedDb);
+  const tx = transaction(db, [SCHEMAS], "readonly");
+  return (await requestResult(tx.objectStore(SCHEMAS).getAll(), tx)) || [];
+}
+
 export async function listPreviousSessions(indexedDb) {
   const db = await openLocalDatabase(indexedDb);
   const tx = transaction(db, [META], "readonly");

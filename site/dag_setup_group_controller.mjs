@@ -37,6 +37,7 @@ export function createDagSetupGroupController({
   // Identify's Cause, Outcome and Instrument fields share the Explore picker list.
   identifyPicking = () => null, onChooseIdentify = () => {}, onCancelIdentify = () => {},
   canChangeCustom = () => true, deleteCustom = async () => {},
+  previousSplits = () => [], loadPreviousSplits = () => {}, reusePreviousSplit = () => {}, browsePreviousForSource = () => {},
 }) {
   const variablePageSize = 10;
   let variablePage = 0;
@@ -477,7 +478,10 @@ export function createDagSetupGroupController({
 
   /** The Custom and Built-in variable lists a search field opens, in the Explore row style. */
   function renderPickerList(container, { query, input, onChoose, onCreate, exclude = new Set(), pick = null, onCancel = null, replacing = false }) {
+    loadPreviousSplits();
     const groups = searchFocusGroups(query).filter(({ group }) => !exclude.has(group.group_id));
+    const previous = previousSplits().filter(item => !groups.some(({ group }) => group.group_id === item.group_id)
+      && (!query || normalized(`${item.name} ${item.description || ""}`).includes(query)));
     container.hidden = false;
     const row = ({ group, variableMatch }) => {
       const label = group.label || group.group_id;
@@ -490,6 +494,11 @@ export function createDagSetupGroupController({
           h("span", { className: "explore-row-label", textContent: label }),
           variableMatch ? h("span", { className: "explore-row-path", textContent: `matches ${truncate(variableMatch, 70)}` }) : null),
         h("span", { className: "explore-row-papers", textContent: String(count) })),
+        previousSplits().some(item => item.source_group_ids?.includes(group.group_id))
+          ? h("button", { type: "button", className: "btn btn--ghost btn--sm", textContent: "⑂",
+            title: `Browse your previous splits of ${label}`,
+            attrs: { "aria-label": `Browse your previous splits of ${label}` },
+            onclick: () => browsePreviousForSource(pick?.role || "candidate", group.group_id) }) : null,
         custom ? customVariableActions({ group, canChange: canChangeCustom,
           onEdit: id => startEditSplit?.(id), onDelete: deleteCustom }) : null);
     };
@@ -514,6 +523,12 @@ export function createDagSetupGroupController({
       status ? h("p", { className: "explore-subsection-empty", role: "status", textContent: status }) : null,
       section("Custom variables", custom, pick ? null : query ? "No custom variable matches." : "You have not made any custom variables yet.",
         createVariableButton(onCreate)),
+      previous.length ? h("section", { className: "explore-group explore-picker-section" },
+        h("div", { className: "explore-group-header" }, h("h2", { textContent: "Your previous splits" })),
+        h("ol", { className: "explore-list" }, previous.map(item => h("li", { className: "explore-row" },
+          h("button", { type: "button", className: "explore-row-open", title: "Review and reuse this split in the current schema",
+            attrs: { "aria-label": `Reuse previous split ${item.name}` }, onclick: () => reusePreviousSplit(pick?.role || "candidate", item) },
+            h("span", { className: "explore-row-label", textContent: item.name }), h("span", { textContent: "⑂" })))))) : null,
       section("Built-in variables", builtIn, query ? "No built-in variable matches." : "None available."),
       query && !groups.length ? h("div", { className: "explore-subsection-empty" }, clearButton()) : null);
     container.querySelectorAll("button[data-group-id]").forEach(button =>
@@ -539,7 +554,7 @@ export function createDagSetupGroupController({
       .map(other => state.project?.[`${other}_group_id`]).filter(Boolean));
     const role = { iv: "cause", dv: "outcome", instrument: "instrument" }[side];
     renderPickerList(container, { query: normalized(input?.value || ""), input, exclude,
-      pick: { title: `Choose ${role}`, action: `Use as ${role}` },
+      pick: { title: `Choose ${role}`, action: `Use as ${role}`, role: side },
       replacing: Boolean(state.project?.[`${side}_group_id`]), onCancel: onCancelIdentify,
       onChoose: groupId => onChooseIdentify(side, groupId), onCreate: () => startDefinition?.(side) });
     container.dataset.pickerSide = side;

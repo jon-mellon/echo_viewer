@@ -3,11 +3,8 @@ import { getOwnPublications } from "./cloudflare_api.mjs";
 import { publicSchemaBaseUrl } from "./publication_access.mjs";
 import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
 
-export async function browsePublishedSplits(sourceGroupIds, _client = null,
-  { apiUrl = CLOUDFLARE_API_URL, fetchImpl, storage } = {}) {
+export async function listOwnPublishedSplits({ apiUrl = CLOUDFLARE_API_URL, fetchImpl, storage } = {}) {
   if (!cloudflareApiConfigured(apiUrl)) throw new Error("Cloudflare publishing service is not configured.");
-  const ids = [...new Set(sourceGroupIds)].filter(Boolean);
-  if (!ids.length) return [];
   const pages = [];
   {
     const own = await getOwnPublications({ apiUrl, ...(fetchImpl ? { fetchImpl } : {}),
@@ -33,13 +30,18 @@ export async function browsePublishedSplits(sourceGroupIds, _client = null,
   }
   const unique = new Map();
   for (const row of pages.flat()) {
-    if (row.source_group_ids?.length !== ids.length
-      || !row.source_group_ids.every(id => ids.includes(id))) continue;
     const key = `${row.owner_id}:${row.split_id || row.group_id}`;
     if (!unique.has(key) || row.published_at > unique.get(key).published_at
       || row.published_at === unique.get(key).published_at && row.is_own) unique.set(key, row);
   }
   return [...unique.values()].sort((a, b) => b.published_at.localeCompare(a.published_at));
+}
+
+export async function browsePublishedSplits(sourceGroupIds, _client = null, options = {}) {
+  const ids = [...new Set(sourceGroupIds)].filter(Boolean);
+  if (!ids.length) return [];
+  return (await listOwnPublishedSplits(options)).filter(row => row.source_group_ids?.length === ids.length
+    && row.source_group_ids.every(id => ids.includes(id)));
 }
 
 export async function loadPublishedSplitMembership(row, _client = null, fetchImpl = fetch) {
