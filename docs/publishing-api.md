@@ -13,7 +13,7 @@ Base address: `CLOUDFLARE_API_URL` in `site/cloudflare_config.mjs`. All bodies a
 | `POST /v1/publications` | `x-owner-token` | `{ publication_id, content_hash, compiler_version, row: { title, description, evidence_snapshot, parent_schema_id, compiled_manifest_path, compiled_manifest_hash }, files: [{ path, size }] }` | `201 { reused: false, publication_id, storage_prefix }`, or `200 { reused: true, row }` when the owner already published the same content |
 | `PUT /v1/publications/:id/files/<path>` | `x-owner-token` | the file's bytes (`Content-Length` equals the declared size) | `204`; `403` if the file was not declared, `409` if it was already written |
 | `POST /v1/publications/:id/finish` | `x-owner-token` | none | `201 { row }`; `409 { error: "incomplete", missing }` if a declared file is absent or the wrong size |
-| `GET /v1/splits?group_id=…` | none | | approved split rows whose `source_group_ids` include the group |
+| `GET /v1/splits?group_id=…` | none | | approved split rows from publications created before 2026-11-04T00:16:28Z whose `source_group_ids` include the group |
 | `GET /v1/owners/publications` | `x-owner-token` | | up to 500 finished publications for that owner, newest first: `{ id, owner_id, storage_prefix, created_at }[]`; `Cache-Control: private, no-store` |
 
 Errors are `{ error, message }` with an HTTP status (`400` bad request, `401` owner, `403` Turnstile, `409`, `413`, `429`
@@ -30,5 +30,7 @@ rate limited, `507` storage full).
 - **Owners.** The owner token identifies an anonymous browser (or agent); it is created once behind a Turnstile check and kept
   in local storage.
 - **Split discovery.** The viewer reads an owner's finished schema folders for their own splits. Other visitors see only
-  quality-approved entries in the public split index. An owner can recover their list in another browser only if they retain the same owner token.
+  quality-approved entries from publications created before 2026-11-04T00:16:28Z. New publications remain accessible by direct link but are not publicly listed. An owner can recover their list in another browser only if they retain the same owner token.
+- **Legacy Supabase source.** The database allows broad reads only for older publications. A direct link uses
+  `lookup_published_schema(publication_id)` to retrieve one exact public row; anonymous Storage listing is denied.
 - **Integrity** is checked by the viewer when it reads: file bytes against the row's `content_hash`.

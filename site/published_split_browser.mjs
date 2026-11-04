@@ -4,6 +4,7 @@ import { CLOUDFLARE_API_URL, cloudflareApiConfigured } from "./cloudflare_config
 import { getOwnPublications, getSplits } from "./cloudflare_api.mjs";
 import { publicSchemaBaseUrl } from "./publication_access.mjs";
 import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
+import { PUBLIC_SPLIT_DISCOVERY_BEFORE } from "./publication_constants.mjs";
 
 export async function browsePublishedSplits(sourceGroupIds, client = supabase,
   { source = schemaSource(), apiUrl = CLOUDFLARE_API_URL, fetchImpl, storage } = {}) {
@@ -15,7 +16,8 @@ export async function browsePublishedSplits(sourceGroupIds, client = supabase,
     if (viaWorker) return getSplits(id, { apiUrl, ...(fetchImpl ? { fetchImpl } : {}) });
     const { data, error } = await client.from("published_split_index")
       .select("publication_id,group_id,split_id,source_group_ids,name,description,storage_prefix,membership_path,owner_id,published_at")
-      .eq("quality_status", "approved").contains("source_group_ids", [id])
+      .eq("quality_status", "approved").lt("published_at", PUBLIC_SPLIT_DISCOVERY_BEFORE)
+      .contains("source_group_ids", [id])
       .order("published_at", { ascending: false }).limit(100);
     if (error) throw error;
     return data || [];

@@ -124,6 +124,19 @@ test("splits and registry reads use the worker only on a Cloudflare page with th
   await assert.rejects(lookupPublishedSchema(PARENT, null, { source: "supabase", apiUrl: API }), /Supabase is not configured/);
 });
 
+test("a Supabase direct link uses an exact-ID lookup rather than a listable table query", async () => {
+  const row = { id: PARENT, storage_prefix: "owner/publication" };
+  const calls = [];
+  const client = { rpc: async (name, args) => {
+    calls.push({ name, args });
+    return { data: row, error: null };
+  } };
+  assert.deepEqual(await lookupPublishedSchema(PARENT, client, { source: "supabase" }), row);
+  assert.deepEqual(calls, [{ name: "lookup_published_schema", args: { publication_id: PARENT } }]);
+  await assert.rejects(lookupPublishedSchema(PARENT, { rpc: async () => ({ data: null, error: null }) },
+    { source: "supabase" }), /No published schema/);
+});
+
 test("a published schema that references its parent's files loads and verifies, even when both folder names are the same length", async () => {
   // Real folders are '<owner uuid>/<publication uuid>'. The loader once filed a parent's file under a slice of its address,
   // which for same-length folders was the real path, and then deleted it, so every such schema failed verification.

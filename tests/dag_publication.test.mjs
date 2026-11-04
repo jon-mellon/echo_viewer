@@ -52,6 +52,7 @@ test("successful sharing gives visible feedback on the share button", () => {
 test("publication explicitly confirms public immutable access", () => {
   assert.match(html, /Publish this schema publicly\?/);
   assert.match(html, /immutable public version/);
+  assert.match(html, /New publications are unlisted and do not appear in public split discovery/);
   assert.match(source, /confirmPublicPublication\(elements\.confirmation, windowApi\)/);
 });
 

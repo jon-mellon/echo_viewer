@@ -14,10 +14,14 @@ test("browse keeps approved splits, including the viewer's own, matching the exa
       source_group_ids: ["a"], published_at: "2026-10-04" },
     { publication_id: "two", group_id: "g2", split_id: "split-2", owner_id: "other",
       source_group_ids: ["a", "b"], published_at: "2026-10-02" },
+    { publication_id: "future", group_id: "future", split_id: "future", owner_id: "other",
+      source_group_ids: ["a"], published_at: "2026-11-04T00:16:28Z" },
   ];
   const client = { auth: { getSession: async () => ({ data: { session: { user: { id: "me" } } } }) }, from: () => ({
-    select() { return this; }, eq() { return this; }, contains(_column, [id]) { this.id = id; return this; },
-    order() { return this; }, async limit() { return { data: rows.filter(row => row.source_group_ids.includes(this.id)), error: null }; },
+    select() { return this; }, eq() { return this; }, lt(_column, cutoff) { this.cutoff = cutoff; return this; },
+    contains(_column, [id]) { this.id = id; return this; },
+    order() { return this; }, async limit() { return { data: rows.filter(row => row.source_group_ids.includes(this.id)
+      && row.published_at < this.cutoff), error: null }; },
   }) };
   assert.deepEqual((await browsePublishedSplits(["a"], client, { source: "supabase" })).map(row => row.group_id), ["own", "g1"]);
   assert.deepEqual((await browsePublishedSplits(["a"], client, { source: "supabase" })).map(row => row.publication_id), ["mine", "later"]);
@@ -34,7 +38,7 @@ test("Cloudflare browse finds the current owner's finished split when it is abse
   const files = await writeGroupingSchemaFolder({ schema_version: GROUPING_FORMAT_VERSION,
     membership_unit: GROUPING_MEMBERSHIP_UNIT, grouping_set_id: "test", label: "Test", groups: [group] });
   const publication = { id: "00000000-0000-4000-8000-000000000002", owner_id: ownerId,
-    storage_prefix: `${ownerId}/00000000-0000-4000-8000-000000000002`, created_at: "2026-11-01T00:00:00Z" };
+    storage_prefix: `${ownerId}/00000000-0000-4000-8000-000000000002`, created_at: "2026-11-05T00:00:00Z" };
   const seen = [];
   const fetchImpl = async (url, init = {}) => {
     const path = new URL(url).pathname;
