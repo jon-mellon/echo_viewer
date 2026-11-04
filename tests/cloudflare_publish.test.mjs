@@ -110,11 +110,8 @@ test("a service failure while writing files surfaces instead of registering a ha
 
 test("split browsing uses the worker and requires its address", async () => {
   const w = await world();
-  w.service.addSplit({ publication_id: PARENT, group_id: "g", split_id: "s", source_group_ids: ["a", "b"], name: "n",
-    description: "a long enough description", storage_prefix: "o/p", membership_path: "memberships/g.tsv", owner_id: "o", published_at: "2026-01-01T00:00:00Z" });
-  const rows = await browsePublishedSplits(["a", "b"], null, { apiUrl: API, fetchImpl: w.cloudflare.fetchImpl });
-  assert.deepEqual(rows.map(row => row.group_id), ["g"]);
-  assert.deepEqual(rows[0].source_group_ids, ["a", "b"]);
+  const rows = await browsePublishedSplits(["a", "b"], null, { apiUrl: API, fetchImpl: w.cloudflare.fetchImpl, storage: { getItem: () => null } });
+  assert.deepEqual(rows, []);
   await assert.rejects(browsePublishedSplits(["a"], null, { apiUrl: "" }), /Cloudflare publishing service is not configured/);
 });
 

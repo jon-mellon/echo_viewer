@@ -69,17 +69,12 @@ python3 -m http.server --directory site
 
 ### Browse published user splits
 
-The **Browse user splits** choice lists approved splits from publications created before
-2026-11-04T00:16:28Z for the selected source
-category or categories. The index stores a name, description, source IDs, and
-an immutable Storage pointer; it does not copy variable assignments. Choosing
-a split loads its one membership file and opens an editable draft. Source
-assignments must still match the current schema. New and edited split
-descriptions must contain at least 20 characters.
-
-Historical approved splits are served by the Cloudflare publishing Worker.
-Only publications created before the cutoff are publicly discoverable. An
-owner's newer splits are available to that owner using their saved owner token.
+The **Browse user splits** choice lists splits from the current owner's finished
+publications for the selected source category or categories. Choosing a split
+loads its membership file and opens an editable draft. Source assignments must
+still match the current schema. New and edited split descriptions must contain
+at least 20 characters. The owner token saved in this browser provides access
+to the owner's list; retain the token to recover it in another browser.
 
 In the variable definition partition step, describe the new side of the split
 and choose **Connect OpenRouter**. The browser uses OpenRouter's PKCE flow and

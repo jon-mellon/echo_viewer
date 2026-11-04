@@ -29,6 +29,5 @@ rate limited, `507` storage full).
   compiled_manifest_path, compiled_manifest_hash, compiler_version, created_at`; nothing else is public.
 - **Owners.** The owner token identifies an anonymous browser (or agent); it is created once behind a Turnstile check and kept
   in local storage.
-- **Split discovery.** The viewer reads an owner's finished schema folders for their own splits. Other visitors see only
-  quality-approved entries from publications created before 2026-11-04T00:16:28Z. New publications remain accessible by direct link but are not publicly listed. An owner can recover their list in another browser only if they retain the same owner token.
+- **Split discovery.** The viewer reads an owner's finished schema folders for their own splits and does not query the public split index. New publications remain accessible by direct link. An owner can recover their list in another browser only if they retain the same owner token.
 - **Integrity** is checked by the viewer when it reads: file bytes against the row's `content_hash`.

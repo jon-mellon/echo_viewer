@@ -1,5 +1,5 @@
 import { CLOUDFLARE_API_URL, cloudflareApiConfigured } from "./cloudflare_config.mjs";
-import { getOwnPublications, getSplits } from "./cloudflare_api.mjs";
+import { getOwnPublications } from "./cloudflare_api.mjs";
 import { publicSchemaBaseUrl } from "./publication_access.mjs";
 import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
 
@@ -8,7 +8,7 @@ export async function browsePublishedSplits(sourceGroupIds, _client = null,
   if (!cloudflareApiConfigured(apiUrl)) throw new Error("Cloudflare publishing service is not configured.");
   const ids = [...new Set(sourceGroupIds)].filter(Boolean);
   if (!ids.length) return [];
-  const pages = await Promise.all(ids.map(id => getSplits(id, { apiUrl, ...(fetchImpl ? { fetchImpl } : {}) })));
+  const pages = [];
   {
     const own = await getOwnPublications({ apiUrl, ...(fetchImpl ? { fetchImpl } : {}),
       ...(storage ? { storage } : {}) });

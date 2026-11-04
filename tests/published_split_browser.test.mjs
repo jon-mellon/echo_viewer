@@ -4,20 +4,7 @@ import { browsePublishedSplits, loadPublishedSplitMembership } from "../site/pub
 import { writeGroupingSchemaFolder } from "../site/grouping_schema_writer.mjs";
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "../site/app_contracts.mjs";
 
-test("browse returns approved public splits matching the selected sources", async () => {
-  const rows = [
-    { publication_id: "one", group_id: "g1", source_group_ids: ["a"], published_at: "2026-10-01" },
-    { publication_id: "later", group_id: "g1", source_group_ids: ["a"], published_at: "2026-10-03" },
-    { publication_id: "two", group_id: "g2", source_group_ids: ["a", "b"], published_at: "2026-10-02" },
-  ];
-  const fetchImpl = async url => Response.json(rows.filter(row =>
-    row.source_group_ids.includes(new URL(url).searchParams.get("group_id"))));
-  const options = { apiUrl: "https://api.test", fetchImpl };
-  assert.deepEqual((await browsePublishedSplits(["a"], null, options)).map(row => row.publication_id), ["later"]);
-  assert.deepEqual((await browsePublishedSplits(["a", "b"], null, options)).map(row => row.group_id), ["g2"]);
-});
-
-test("Cloudflare browse finds the current owner's finished split when it is absent from the approved index", async () => {
+test("Cloudflare browse finds the current owner's finished split without a public lookup", async () => {
   const ownerId = "00000000-0000-4000-8000-000000000001";
   const token = `${ownerId}.${"a".repeat(64)}`;
   const group = { group_id: "populist-voting", label: "Populist voting",
@@ -32,7 +19,6 @@ test("Cloudflare browse finds the current owner's finished split when it is abse
   const fetchImpl = async (url, init = {}) => {
     const path = new URL(url).pathname;
     seen.push(path);
-    if (path === "/v1/splits") return Response.json([]);
     if (path === "/v1/owners/publications") {
       assert.equal(init.headers["x-owner-token"], token);
       return Response.json([publication]);
@@ -47,6 +33,7 @@ test("Cloudflare browse finds the current owner's finished split when it is abse
   assert.equal(rows[0].is_own, true);
   assert.deepEqual(await loadPublishedSplitMembership(rows[0], null, fetchImpl, "cloudflare"), ["v1"]);
   assert.ok(seen.includes("/v1/owners/publications"));
+  assert.ok(!seen.includes("/v1/splits"));
   assert.deepEqual(await browsePublishedSplits(["another-source"], null, options), []);
 });
 

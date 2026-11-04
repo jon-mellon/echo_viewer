@@ -206,7 +206,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
           ? "Looking for variables others made from these…"
           : browseState.rows.length
             ? "Use a published split to fill in the name, definition and concepts. You can edit them next."
-            : "No published splits found for these source variables. You can still create your own.");
+            : "No previous published splits found for these source variables. You can still create a new split.");
         replaceChildren(els.definitionBrowseResults, browseState.rows.map((row, index) =>
           h("article", { className: "definition-browse-card" },
             h("strong", { textContent: row.name }),
