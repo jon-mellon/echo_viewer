@@ -191,7 +191,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       els.definitionContinue.disabled = !selected.size;
       els.definitionContinue.textContent = selected.size
         ? `Next: name it, using ${count} concepts in ${selected.size} variable${selected.size === 1 ? "" : "s"}` : "Pick at least one variable";
-      // Splits others published from the same variables: offered, never required.
+      // Previous splits from the same variables: offered, never required.
       const showBrowse = Boolean(selected.size);
       els.definitionBrowsePanel.hidden = !showBrowse;
       els.definitionBrowseJump.hidden = !showBrowse;
@@ -203,13 +203,14 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
             : "No previous splits found";
       if (showBrowse) {
         els.definitionBrowseStatus.textContent = browseState.error || (browseState.loading
-          ? "Looking for variables others made from these…"
+          ? "Looking for your previous splits from these variables…"
           : browseState.rows.length
-            ? "Use a published split to fill in the name, definition and concepts. You can edit them next."
-            : "No published splits found for these source variables. You can still create your own.");
+            ? "Reuse a previous split to fill in the name, definition and concepts. You can edit them next."
+            : "You have no previous splits for these source variables. You can still create a new split.");
         replaceChildren(els.definitionBrowseResults, browseState.rows.map((row, index) =>
           h("article", { className: "definition-browse-card" },
             h("strong", { textContent: row.name }),
+            ...(row.is_own ? [h("span", { className: "small-note", textContent: "Your published split" })] : []),
             h("p", { textContent: row.description }),
             h("button", { type: "button", className: "btn", dataset: { splitIndex: String(index) },
               textContent: "Start from this", disabled: browseState.loading }))));

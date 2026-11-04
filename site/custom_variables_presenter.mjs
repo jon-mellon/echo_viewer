@@ -9,7 +9,8 @@ import { h, replaceChildren } from "./dom_builder.mjs";
  */
 export function createCustomVariablesPresenter({ state, elements: els, truncate, normalized,
   customVariables, sourceLabels, canChange, onCreate, onEdit, onDelete,
-  canExplore = () => false, onExplore = () => {} }) {
+  canExplore = () => false, onExplore = () => {}, previousSplits = () => [],
+  loadPreviousSplits = () => {}, reusePreviousSplit = () => {} }) {
   let confirmingId = null;
   let deleting = false;
   let status = "";
@@ -18,6 +19,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     state.customVariablesOpen = true;
     confirmingId = null;
     status = "";
+    loadPreviousSplits(true);
     render();
     els.customVariablesFilter.focus();
   }
@@ -38,6 +40,8 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     if (!showing) return;
     const all = customVariables();
     const query = normalized(els.customVariablesFilter.value);
+    const previous = previousSplits().filter(item => !all.some(group => group.group_id === item.group_id)
+      && (!query || normalized([item.name, item.description].join(" ")).includes(query)));
     const rows = all.filter(group => !query || normalized([group.label, group.description,
       ...sourceLabels(group)].join(" ")).includes(query));
     const highlight = state.customVariablesHighlight;
@@ -45,16 +49,16 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       status = `Saved “${all.find(group => group.group_id === highlight).label}”.`;
     }
     els.customVariablesTitle.textContent = `Custom variables${all.length ? ` (${all.length})` : ""}`;
-    els.customVariablesFilter.hidden = !all.length;
+    els.customVariablesFilter.hidden = !all.length && !previous.length;
     els.customVariablesStatus.textContent = status;
     els.customVariablesStatus.hidden = !status;
-    if (!all.length) {
+    if (!all.length && !previous.length) {
       replaceChildren(els.customVariablesTable, h("div", { className: "custom-variables-empty" },
         h("p", { textContent: "You have not made any custom variables yet." }),
         h("p", { className: "small-note", textContent: "Make one when an existing variable mixes things you want to study separately — for example, to take school grades out of academic achievement." })));
       return;
     }
-    if (!rows.length) {
+    if (!rows.length && !previous.length) {
       replaceChildren(els.customVariablesTable, h("div", { className: "custom-variables-empty" },
         h("p", { textContent: "No custom variables match this filter." }),
         h("button", { className: "btn btn--sm", type: "button", dataset: { action: "clear-filter" }, textContent: "Clear filter" })));
@@ -73,6 +77,17 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
         h("th", { scope: "col", className: "num", textContent: "Concepts" }),
         h("th", { scope: "col", className: "actions" }, h("span", { className: "sr-only", textContent: "Actions" })))),
       h("tbody", {}, rows.map(group => row(group, { busy, highlight })))));
+    if (previous.length) {
+      els.customVariablesTable.append(h("section", { className: "custom-variables-previous" },
+        h("h2", { textContent: "Your previous splits" }),
+        h("p", { className: "small-note", textContent: "Reuse a previous split in the current schema." }),
+        ...previous.map(item => h("div", { className: "setup-group-picker-row" },
+          h("div", {}, h("strong", { textContent: item.name }),
+            h("span", { textContent: item.is_local ? "Saved local draft" : "Published" })),
+          h("button", { type: "button", className: "btn btn--sm", textContent: "⑂ Reuse",
+            attrs: { "aria-label": `Reuse previous split ${item.name}` },
+            onclick: () => reusePreviousSplit("candidate", item) })))));
+    }
     els.customVariablesTable.querySelectorAll("button[data-action]").forEach(button =>
       button.addEventListener("click", () => act(button.dataset.action, button.dataset.groupId)));
   }

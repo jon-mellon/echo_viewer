@@ -1,7 +1,7 @@
 import * as projectOps from "./dag_project.mjs";
 import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
 import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
-import { browsePublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
+import { listOwnPublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
   invalidateVisibleCaches, renderAll, groupById, persistProjectLocally, getReturnUrl = () => location.href,
@@ -10,7 +10,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate,
   hydrateVariableDetails = async () => {},
   prewarmEvidence = async () => {}, commitSchema = async () => {},
-  onCommitFailureRestored = () => {}, onInstrumentReady = () => {}, onFocusDefined = null }) {
+  onCommitFailureRestored = () => {}, onInstrumentReady = () => {}, onFocusDefined = null, previousSplits = () => [] }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
   let browseRevision = 0;
@@ -23,9 +23,12 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     renderDefinition();
     if (!browseState.loading) return;
     try {
-      const rows = await browsePublishedSplits(state.definitionDraft.source_group_ids);
+      const ids = state.definitionDraft.source_group_ids;
+      const rows = [...previousSplits()];
+      if (!rows.length) rows.push(...await listOwnPublishedSplits());
+      const matching = rows.filter(row => ids.every(id => row.source_group_ids?.includes(id)));
       if (revision !== browseRevision || state.definitionDraft?.step !== "sources") return;
-      browseState.rows = rows;
+      browseState.rows = matching;
     } catch (error) {
       if (revision !== browseRevision || state.definitionDraft?.step !== "sources") return;
       browseState.error = `Could not browse splits: ${error.message || error}`;
@@ -36,11 +39,18 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   async function choosePublishedSplit(row) {
     if (!row || browseState.loading || state.definitionDraft?.step !== "sources") return;
     const draft = state.definitionDraft;
+    const available = new Set((state.project?.groups || []).filter(group => group.variable_ids?.length).map(group => group.group_id));
+    if (!row.source_group_ids?.length || row.source_group_ids.some(id => !available.has(id))) {
+      browseState.error = "This split's source variables are not available in the current schema.";
+      renderDefinition();
+      return;
+    }
+    draft.source_group_ids = [...row.source_group_ids];
     browseState.loading = true;
-    browseState.error = "Loading the published assignments…";
+    browseState.error = "Loading the previous split…";
     renderDefinition();
     try {
-      const ids = await loadPublishedSplitMembership(row);
+      const ids = row.local_variable_ids || await loadPublishedSplitMembership(row);
       if (state.definitionDraft !== draft) return;
       const sources = definitionSources();
       const eligible = new Set(sources.flatMap(group => group.variable_ids));
@@ -104,6 +114,25 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     renderDraft();
     els.definitionSourceSearch.focus();
     void renderSavedRuns();
+  }
+
+  function browsePreviousForSource(role, sourceId) {
+    startDefinition(role);
+    if (state.definitionDraft) setSourceSelection(sourceId, true);
+  }
+
+  function reusePreviousSplit(role, row) {
+    startDefinition(role);
+    if (!state.definitionDraft) return;
+    const available = new Set((state.project?.groups || []).filter(group => group.variable_ids?.length).map(group => group.group_id));
+    if (!row.source_group_ids?.length || row.source_group_ids.some(id => !available.has(id))) {
+      state.definitionDraft.source_group_ids = [...(row.source_group_ids || [])];
+      browseState.error = "This split's source variables are not available in the current schema.";
+      renderDefinition();
+      return;
+    }
+    state.definitionDraft.source_group_ids = [...row.source_group_ids];
+    void choosePublishedSplit(row);
   }
 
   async function startEditSplit(groupId = null) {
@@ -494,7 +523,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     },
   });
 
-  return { startDefinition, startEditSplit, cancelDefinition, definitionSources, continueDefinition,
+  return { startDefinition, browsePreviousForSource, reusePreviousSplit, startEditSplit, cancelDefinition, definitionSources, continueDefinition,
     definitionResidualIds,
     definitionCanReview, renderDefinition, saveDefinition, installDefinitionHandlers,
     resumeAfterOAuth };

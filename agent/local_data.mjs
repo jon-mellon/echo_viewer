@@ -4,8 +4,6 @@ import { promisify } from "node:util";
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
 import { pathToFileURL } from "node:url";
-import { createClient } from "@supabase/supabase-js";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "../site/supabase_config.mjs";
 import { PRODUCTION_EVIDENCE_MANIFEST,
   PRODUCTION_EVIDENCE_SNAPSHOT_BASE, evidenceSnapshotIdFromManifestUrl } from "../site/dag_data_config.mjs";
 import { AGENT_DEFAULT_PUBLICATION_ID, agentDataSelection } from "./default_data.mjs";
@@ -16,6 +14,7 @@ import { validateCompiledArtifact } from "../site/compiled_dag.mjs";
 import { validateGroupingSchema } from "../site/data_validation.mjs";
 import { pairKey } from "../site/dag_link_aggregation.mjs";
 import { lookupPublishedSchema, publicSchemaBaseUrl } from "../site/publication_access.mjs";
+import { publishedReferenceUrl } from "../site/schema_source.mjs";
 import { fetchPublishedFile } from "../site/published_schema_loader.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -52,12 +51,6 @@ async function eachLimited(items, limit, fn) {
     while (index < items.length) await fn(items[index++]);
   }));
 }
-function publicClient() {
-  return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-}
-
 // Materialize transport references as a canonical, self-contained local folder.
 export async function downloadSchemaFolder(baseUrl, manifest, publicationDir, expectedHash, fetchImpl = fetch) {
   const references = manifest.group_membership_references || {};
@@ -67,8 +60,8 @@ export async function downloadSchemaFolder(baseUrl, manifest, publicationDir, ex
   }
   const referenceByPath = new Map();
   for (const [groupId, reference] of Object.entries(references)) {
-    const url = new URL(reference, baseUrl);
-    if (url.origin !== new URL(baseUrl).origin || !url.pathname.startsWith("/storage/v1/object/public/published-schemas/")) {
+    const url = publishedReferenceUrl(reference, baseUrl);
+    if (!url) {
       throw new Error(`Invalid published membership reference for ${groupId}.`);
     }
     referenceByPath.set(memberships[groupId], url.href);
@@ -95,8 +88,7 @@ export async function clonePublication(options = {}) {
   const { home = agentHome(), onProgress = () => {} } = options;
   const { publicationId, snapshotId } = agentDataSelection(options);
   if (!ID.test(publicationId)) throw new Error("Invalid publication ID.");
-  const client = publicClient();
-  const publication = await lookupPublishedSchema(publicationId, client, { source: "supabase" });
+  const publication = await lookupPublishedSchema(publicationId, null);
   // Publication evidence_snapshot can be a logical record signature, so the
   // physical retrieval layout is independently selectable and then validated.
   const selectedId = snapshotId || evidenceSnapshotIdFromManifestUrl(PRODUCTION_EVIDENCE_MANIFEST);
@@ -128,7 +120,7 @@ export async function clonePublication(options = {}) {
     expectedRecordSignature: publication.evidence_snapshot });
 
   const publicationDir = join(home, "publications", publicationId);
-  const baseUrl = publicSchemaBaseUrl(client, publication.storage_prefix, "supabase");
+  const baseUrl = publicSchemaBaseUrl(null, publication.storage_prefix);
   const publicUrl = path => new URL(path, baseUrl).href;
   const schemaManifestResponse = await fetchPublishedFile(publicUrl("manifest.json"), undefined, fetch);
   if (!schemaManifestResponse.ok) throw new Error("Could not download publication manifest.");

@@ -1,6 +1,6 @@
 # Publishing API (the contract the viewer relies on)
 
-On a page that uses the Cloudflare schema source, the viewer publishes through a Worker and reads registry rows and
+The viewer publishes through a Worker and reads registry rows and
 files from R2. The Worker, its database and its setup live outside this repo (in `harvest_abstracts`,
 `analysis/10k/echo_viewer_bundle/publish_worker`). This is the contract the client in `site/cloudflare_api.mjs` depends
 on; `tests/support/fake_publish_service.mjs` is a small in-memory stand-in that follows it, used by the client's tests.
@@ -13,7 +13,7 @@ Base address: `CLOUDFLARE_API_URL` in `site/cloudflare_config.mjs`. All bodies a
 | `POST /v1/publications` | `x-owner-token` | `{ publication_id, content_hash, compiler_version, row: { title, description, evidence_snapshot, parent_schema_id, compiled_manifest_path, compiled_manifest_hash }, files: [{ path, size }] }` | `201 { reused: false, publication_id, storage_prefix }`, or `200 { reused: true, row }` when the owner already published the same content |
 | `PUT /v1/publications/:id/files/<path>` | `x-owner-token` | the file's bytes (`Content-Length` equals the declared size) | `204`; `403` if the file was not declared, `409` if it was already written |
 | `POST /v1/publications/:id/finish` | `x-owner-token` | none | `201 { row }`; `409 { error: "incomplete", missing }` if a declared file is absent or the wrong size |
-| `GET /v1/splits?group_id=…` | none | | public split rows whose `source_group_ids` include the group, including Cloudflare publications from other owners |
+| `GET /v1/splits?group_id=…` | none | | approved split rows from publications created before 2026-11-04T00:16:28Z whose `source_group_ids` include the group |
 | `GET /v1/owners/publications` | `x-owner-token` | | up to 500 finished publications for that owner, newest first: `{ id, owner_id, storage_prefix, created_at }[]`; `Cache-Control: private, no-store` |
 
 Errors are `{ error, message }` with an HTTP status (`400` bad request, `401` owner, `403` Turnstile, `409`, `413`, `429`
@@ -29,8 +29,5 @@ rate limited, `507` storage full).
   compiled_manifest_path, compiled_manifest_hash, compiler_version, created_at`; nothing else is public.
 - **Owners.** The owner token identifies an anonymous browser (or agent); it is created once behind a Turnstile check and kept
   in local storage.
-- **Split discovery.** Every visitor can browse user splits from finished public schemas. The Worker indexes a new
-  Cloudflare split when its publication finishes and keeps only metadata and a pointer to its immutable membership file.
-- **Owner lookup.** The authenticated publication listing remains available to the client for future owner-specific features;
-  public split browsing does not call it.
+- **Split discovery.** The viewer reads an owner's finished schema folders for their own splits and does not query the public split index. New publications remain accessible by direct link. An owner can recover their list in another browser only if they retain the same owner token.
 - **Integrity** is checked by the viewer when it reads: file bytes against the row's `content_hash`.

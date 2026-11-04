@@ -301,7 +301,7 @@
               <label class="dag-label" for="definitionSourceSearch">Search variables</label>
               <input id="definitionSourceSearch" class="search-input" type="search" placeholder="Search variables or the concepts in them">
               <div id="definitionBrowsePanel" hidden>
-                <h3>Previous published splits from these variables</h3>
+                <h3>Your previous splits from these variables</h3>
                 <p id="definitionBrowseStatus" class="small-note" role="status"></p>
                 <div id="definitionBrowseResults" class="definition-browse-results"></div>
               </div>
@@ -508,11 +508,16 @@
       <dialog id="publishSchemaDialog" class="publication-dialog">
         <form method="dialog">
           <h2>Publish this schema publicly?</h2>
-          <p>Publishing creates an immutable public version of this schema. Anyone with the link can view and download it, and it may appear in public schema discovery or recommendation features.</p>
+          <p>Publishing creates an immutable public version of this schema. Anyone with the link can view and download it. New publications are unlisted and do not appear in public split discovery.</p>
           <p>Your unpublished local edits remain private until you publish them.</p>
+          <p>Titles and descriptions you contribute to this publication are dedicated to the public domain under <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer">CC0 1.0 Universal</a>. Anyone may reuse them without permission or attribution.</p>
+          <label class="publication-consent">
+            <input type="checkbox" data-publication-consent>
+            <span>I agree to dedicate my contributed titles and descriptions under CC0. I confirm that I have the rights to do so and that my contributions contain no third-party copyrighted material or unsuitable content.</span>
+          </label>
           <div class="publication-dialog-actions">
             <button class="btn" value="cancel" type="submit">Cancel</button>
-            <button class="btn btn--primary" value="publish" type="submit">Publish publicly</button>
+            <button class="btn btn--primary" value="publish" type="submit" disabled>Publish publicly</button>
           </div>
         </form>
       </dialog>

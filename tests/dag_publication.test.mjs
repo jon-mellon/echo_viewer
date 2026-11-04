@@ -1,25 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { confirmPublicPublication } from "../site/publication_consent.mjs";
 
 const source = await readFile(new URL("../site/dag_publication.mjs", import.meta.url), "utf8");
 const core = await readFile(new URL("../site/dag_publication_core.mjs", import.meta.url), "utf8");
-
-test("working publication deduplicates before allocating or uploading", () => {
-  const lookup = core.indexOf("findOwnedPublication(client, user.id, canonical.contentHash)");
-  const allocation = core.indexOf("cryptoApi.randomUUID()", lookup);
-  const upload = core.indexOf(".upload(", lookup);
-  assert.ok(lookup > 0 && allocation > lookup && upload > allocation);
-  assert.match(core, /if \(existing\) return .*reused: true/);
-});
-
-test("registry insert follows every upload and preserves baseline lineage", () => {
-  const upload = core.indexOf(".upload(");
-  const insert = core.indexOf('.from("published_schemas").insert', upload);
-  assert.ok(insert > upload);
-  assert.match(core, /CANONICAL_BASELINE_ID = "a0118906-2366-4cc8-8809-bafdf3860c23"/);
-  assert.match(core, /parent_schema_id: parentSchemaId/);
-});
+const html = await readFile(new URL("../site/index.html", import.meta.url), "utf8");
 
 test("share warns when the schema is unpublished and offers to publish first", () => {
   assert.match(source, /canonical\.contentHash !== published\.content_hash/);
@@ -48,15 +34,65 @@ test("successful sharing gives visible feedback on the share button", () => {
 });
 
 test("publication explicitly confirms public immutable access", () => {
-  assert.match(source, /Publish this schema publicly\?/);
-  assert.match(source, /immutable public version/);
-  assert.match(source, /confirmPublicPublication\(\)/);
+  assert.match(html, /Publish this schema publicly\?/);
+  assert.match(html, /immutable public version/);
+  assert.match(html, /New publications are unlisted and do not appear in public split discovery/);
+  assert.match(source, /confirmPublicPublication\(elements\.confirmation, windowApi\)/);
 });
 
 test("publication requests authentication only after immutable-public confirmation", () => {
   const publish = source.slice(source.indexOf("async function publish()"), source.indexOf("async function share()"));
-  assert.ok(publish.indexOf("confirmPublicPublication()") < publish.indexOf("publishWorkingSchema({"));
-  assert.match(core, /ensureAnonymousPublicationUser\(client\)/);
+  assert.ok(publish.indexOf("confirmPublicPublication(elements.confirmation, windowApi)") < publish.indexOf("publishWorkingSchema({"));
+  assert.match(core, /ensureOwner\(cloudflare\)/);
+});
+
+test("publication requires a fresh CC0 agreement for every attempt", async () => {
+  assert.match(html, /creativecommons\.org\/publicdomain\/zero\/1\.0\//);
+  assert.match(html, /without permission or attribution/);
+  assert.match(html, /no third-party copyrighted material or unsuitable content/);
+
+  const consent = Object.assign(new EventTarget(), { checked: true });
+  const publishButton = { disabled: false };
+  const dialog = Object.assign(new EventTarget(), {
+    returnValue: "publish",
+    querySelector(selector) {
+      return selector === "[data-publication-consent]" ? consent : publishButton;
+    },
+    showModal() {},
+  });
+
+  const first = confirmPublicPublication(dialog, {});
+  assert.equal(consent.checked, false);
+  assert.equal(publishButton.disabled, true);
+  dialog.returnValue = "publish";
+  dialog.dispatchEvent(new Event("close"));
+  assert.equal(await first, false);
+
+  const second = confirmPublicPublication(dialog, {});
+  consent.checked = true;
+  consent.dispatchEvent(new Event("change"));
+  assert.equal(publishButton.disabled, false);
+  dialog.returnValue = "publish";
+  dialog.dispatchEvent(new Event("close"));
+  assert.equal(await second, true);
+
+  const third = confirmPublicPublication(dialog, {});
+  assert.equal(consent.checked, false);
+  assert.equal(publishButton.disabled, true);
+  dialog.returnValue = "cancel";
+  dialog.dispatchEvent(new Event("close"));
+  assert.equal(await third, false);
+});
+
+test("publication fallback includes the CC0 agreement", async () => {
+  let message = "";
+  const accepted = await confirmPublicPublication(null, {
+    confirm(text) { message = text; return true; },
+  });
+  assert.equal(accepted, true);
+  assert.match(message, /CC0 1\.0 Universal/);
+  assert.match(message, /without an attribution requirement/);
+  assert.match(message, /no third-party copyrighted material or unsuitable content/);
 });
 
 test("published state distinguishes private working-copy changes", () => {
@@ -66,7 +102,7 @@ test("published state distinguishes private working-copy changes", () => {
   assert.match(source, /setBadge\(publicationStatus\(published, hasLocalChanges\)\)/);
   assert.match(source, /workingCopyChanged/);
   assert.match(source, /hasPublishableChanges = !published\?\.publication_id \|\| hasLocalChanges/);
-  assert.match(source, /elements\.publish\.hidden = !client \|\| !hasPublishableChanges/);
+  assert.match(source, /elements\.publish\.hidden = !hasPublishableChanges/);
 });
 
 test("completed schema hydration clears the loading status instead of logging success", () => {

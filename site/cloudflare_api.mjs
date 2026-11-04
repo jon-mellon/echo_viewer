@@ -55,7 +55,7 @@ export async function getSplits(groupId, { apiUrl = CLOUDFLARE_API_URL, fetchImp
   return (await request(apiUrl, fetchImpl, `/v1/splits?group_id=${encodeURIComponent(groupId)}`)).json();
 }
 
-/** Finished publications belonging to the anonymous owner in this browser. Available for owner-specific features. */
+/** Finished publications belonging to the anonymous owner in this browser. */
 export async function getOwnPublications({ apiUrl = CLOUDFLARE_API_URL,
   fetchImpl = globalThis.fetch.bind(globalThis), storage = globalThis.localStorage } = {}) {
   let owner = null;
@@ -66,7 +66,7 @@ export async function getOwnPublications({ apiUrl = CLOUDFLARE_API_URL,
       headers: { "x-owner-token": owner.token }, cache: "no-store",
     })).json();
   } catch (error) {
-    // Older Workers do not have this endpoint. Public split browsing uses /v1/splits regardless.
+    // Older Workers do not have this endpoint. Public approved splits still load while it rolls out.
     if (error.status === 404) return [];
     throw error;
   }

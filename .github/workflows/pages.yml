@@ -34,13 +34,13 @@ jobs:
       - name: Install profiling browser
         run: npx playwright install --with-deps chromium
       # Published schema files are immutable; keep them between runs instead of
-      # downloading about 5 MB per test every time; a miss is fetched from the Cloudflare mirror, never Supabase.
+      # downloading about 5 MB per test every time; a miss is fetched from Cloudflare R2.
       - name: Restore published schema cache
         uses: actions/cache@v4
         with:
-          path: .cache/supabase-published
-          key: supabase-published-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/supabase_cache.cjs') }}
-          restore-keys: supabase-published-
+          path: .cache/published-schemas
+          key: published-schemas-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/published_schema_cache.cjs') }}
+          restore-keys: published-schemas-
       - name: Check browser workflows
         run: npm run test:browser
       - name: Build cache-versioned site

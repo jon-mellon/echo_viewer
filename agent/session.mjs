@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { join } from "node:path";
-import { createClient } from "@supabase/supabase-js";
 import * as projectOps from "../site/dag_project.mjs";
 import * as visibility from "../site/variable_visibility.mjs";
 import { confounderKey } from "../site/confounder_status.mjs";
@@ -11,7 +10,6 @@ import { buildCandidateQueue } from "../site/dag_candidates.mjs";
 import { groupNeighborSuggestions } from "../site/dag_search.mjs";
 import { validateGroupingSchema } from "../site/data_validation.mjs";
 import { canonicalizeWorkingSchema, publishWorkingSchema } from "../site/dag_publication_core.mjs";
-import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from "../site/supabase_config.mjs";
 import { agentDataSelection } from "./default_data.mjs";
 import { publicationPermalink } from "../site/published_schema_loader.mjs";
 import { browsePublishedSplits, loadPublishedSplitMembership } from "../site/published_split_browser.mjs";
@@ -70,23 +68,16 @@ export class EchoAgentSession {
   get schema() { return this.record.schema; }
   get project() { return projectFromSchema(this.schema, this.record.anchors); }
   get status() { return this.record.status; }
-  publishedSplitClient() {
-    return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth: { persistSession: false, detectSessionInUrl: false },
-    });
+  ownerStorage() {
+    return { getItem: key => key === "echo-owner-token" ? process.env.ECHO_OWNER_TOKEN || null : null };
   }
   async browseSplits({ sourceGroupIds }) {
     const ids = [...new Set(sourceGroupIds || [])];
     if (!ids.length || ids.some(id => !ownGroup(this.schema, id))) {
       throw new Error("Choose existing source groups before browsing published splits.");
     }
-    const client = this.publishedSplitClient();
-    if (process.env.ECHO_SUPABASE_ACCESS_TOKEN && process.env.ECHO_SUPABASE_REFRESH_TOKEN) {
-      const { error } = await client.auth.setSession({ access_token: process.env.ECHO_SUPABASE_ACCESS_TOKEN,
-        refresh_token: process.env.ECHO_SUPABASE_REFRESH_TOKEN });
-      if (error) throw error;
-    }
-    return browsePublishedSplits(ids, client, { source: "supabase" });
+    return browsePublishedSplits(ids, null, { storage: this.ownerStorage(),
+      ...(this.publishedSplitFetch ? { fetchImpl: this.publishedSplitFetch } : {}) });
   }
   async applyPublishedSplit({ sourceGroupIds, publicationId, groupId, newGroupId, residualLabels,
     role = "candidate", edit = false }) {
@@ -94,7 +85,7 @@ export class EchoAgentSession {
     const rows = await this.browseSplits({ sourceGroupIds });
     const row = rows.find(candidate => candidate.publication_id === publicationId && candidate.group_id === groupId);
     if (!row) throw new Error("The selected approved split is not available for these source groups.");
-    const ids = await loadPublishedSplitMembership(row, this.publishedSplitClient(), this.publishedSplitFetch || fetch, "supabase");
+    const ids = await loadPublishedSplitMembership(row, null, this.publishedSplitFetch || fetch);
     const sources = sourceGroupIds.map(id => ownGroup(this.schema, id));
     const eligible = new Set(sources.flatMap(group => group.variable_ids));
     if (!ids.length || ids.some(id => !eligible.has(id))
@@ -449,20 +440,17 @@ export class EchoAgentSession {
     const current = await canonicalizeWorkingSchema(this.schema);
     if (current.contentHash !== this.record.readyHash) throw new Error("Schema changed after review.");
     const variableLayoutSource = await this.evidence.layoutSource();
-    const client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth: { persistSession: false, detectSessionInUrl: false },
-    });
-    if (process.env.ECHO_SUPABASE_ACCESS_TOKEN && process.env.ECHO_SUPABASE_REFRESH_TOKEN) {
-      const { error } = await client.auth.setSession({ access_token: process.env.ECHO_SUPABASE_ACCESS_TOKEN,
-        refresh_token: process.env.ECHO_SUPABASE_REFRESH_TOKEN });
-      if (error) throw error;
-    }
+    if (!process.env.ECHO_OWNER_TOKEN) throw new Error("Set ECHO_OWNER_TOKEN to a Cloudflare publication owner token before publishing from the agent.");
     const rawLinks = await this.evidence.rawLinks();
     this.record.status = "publishing";
     await this.save();
     try {
-      const result = await publishWorkingSchema({ schema: this.schema, client, source: "supabase",
-        previousPublication: { publication_id: this.record.sourcePublication.id },
+      const result = await publishWorkingSchema({ schema: this.schema,
+        previousPublication: { publication_id: this.record.sourcePublication.id,
+          storage_prefix: this.record.sourcePublication.storage_prefix },
+        cloudflare: { storage: this.ownerStorage(),
+          ...(this.publicationFetch ? { fetchImpl: this.publicationFetch } : {}),
+          solve: async () => { throw new Error("ECHO_OWNER_TOKEN is invalid."); } },
         compileInput: { project: projectFromSchema(this.schema, this.record.anchors), rawLinks } });
       this.record.status = "published";
       const state = { project: this.project, data: { snapshot: { snapshot_id: this.record.snapshotId } },

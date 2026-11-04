@@ -119,7 +119,7 @@ export function createEchoTools({ getSession, setSession }) {
       a => session().jevApplySplit(a)),
     define("echo_diff", "Show the working schema's changes and canonical public content hash.", obj({}), () => session().diff()),
     define("echo_ready", "Validate the complete schema and freeze it for a single final publication action.", obj({}), () => session().ready()),
-    define("echo_publish", "Publish once through Echo's normal Supabase Storage and registry path and return a view permalink. This is public and immutable.",
+    define("echo_publish", "Publish once through Echo's Cloudflare publishing service and return a view permalink. Set ECHO_OWNER_TOKEN first. This is public and immutable.",
       obj({ maxPathLength: num, showConfoundersOnly: bool }), a => session().publish(a)),
   ];
 }

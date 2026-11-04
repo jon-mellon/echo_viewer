@@ -1,7 +1,7 @@
-import { supabase } from "/supabase_client.mjs";
 import { publicationPermalink } from "/published_schema_loader.mjs";
-import { canonicalizeWorkingSchema, publishWorkingSchema, formatSupabaseError } from "./dag_publication_core.mjs";
-export { CANONICAL_BASELINE_ID, CANONICAL_BASELINE_HASH, canonicalizeWorkingSchema, publishWorkingSchema, formatSupabaseError } from "./dag_publication_core.mjs";
+import { canonicalizeWorkingSchema, publishWorkingSchema, formatPublicationError } from "./dag_publication_core.mjs";
+import { confirmPublicPublication } from "./publication_consent.mjs";
+export { CANONICAL_BASELINE_ID, CANONICAL_BASELINE_HASH, canonicalizeWorkingSchema, publishWorkingSchema, formatPublicationError } from "./dag_publication_core.mjs";
 
 function showStatus(element, message, isError = false) {
   element.textContent = message;
@@ -46,7 +46,6 @@ export function createPublicationController({
   canPublish = () => true,
   // Temporary notification for completed operations, which do not belong in the menu.
   notify = () => {},
-  client = supabase,
   cryptoApi = globalThis.crypto,
   navigatorApi = globalThis.navigator,
   windowApi = globalThis.window,
@@ -58,17 +57,14 @@ export function createPublicationController({
   const initialPublication = getPublicationState();
   let hasPublishableChanges = !(initialPublication?.publication_id && initialPublication?.content_hash);
 
-  let signedIn = false;
-
   function publishTitle() {
     if (busy) return "Publishing…";
     if (!canPublish()) return "Publishing is unavailable while the schema is loading or a group edit is unsaved";
-    return signedIn ? "Create an immutable public version"
-      : "Create an immutable public version; publishing will start a private anonymous session";
+    return "Create an immutable public version";
   }
 
   function refreshPublishVisibility() {
-    elements.publish.hidden = !client || !hasPublishableChanges;
+    elements.publish.hidden = !hasPublishableChanges;
     elements.publish.disabled = busy || !canPublish();
     elements.publish.title = publishTitle();
   }
@@ -93,18 +89,6 @@ export function createPublicationController({
 
   async function currentCanonical() {
     return canonicalizeWorkingSchema(getWorkingSchema(), cryptoApi);
-  }
-
-  async function refreshAuthVisibility() {
-    if (!client) {
-      refreshPublishVisibility();
-      showStatus(elements.status, "Supabase publication is not configured.", true);
-      return;
-    }
-    const { data, error } = await client.auth.getSession();
-    signedIn = Boolean(data?.session?.user);
-    refreshPublishVisibility();
-    if (error) showStatus(elements.status, formatSupabaseError(error), true);
   }
 
   function stablePermalink(published) {
@@ -160,19 +144,6 @@ export function createPublicationController({
     }, 2400);
   }
 
-  function confirmPublicPublication() {
-    const dialog = elements.confirmation;
-    if (!dialog?.showModal) {
-      return Promise.resolve(windowApi.confirm("Publish this schema publicly?\n\nPublishing creates an immutable public version that anyone with the link can view and download. Your unpublished local edits remain private until you publish them."));
-    }
-    return new Promise(resolve => {
-      const close = () => resolve(dialog.returnValue === "publish");
-      dialog.addEventListener("close", close, { once: true });
-      dialog.returnValue = "cancel";
-      dialog.showModal();
-    });
-  }
-
   async function publish() {
     if (busy) return null;
     if (!canPublish()) {
@@ -189,14 +160,13 @@ export function createPublicationController({
         reportSuccess("Already published: this working copy matches the public version.");
         return published;
       }
-      if (!await confirmPublicPublication()) return null;
+      if (!await confirmPublicPublication(elements.confirmation, windowApi)) return null;
       showStatus(elements.status, "Canonicalizing current working schema…");
       const result = await publishWorkingSchema({
         schema: getWorkingSchema(),
         previousPublication: getPublicationState(),
         compiledDag: getCompiledDag(),
         compileInput: await getCompileInput(),
-        client,
         cryptoApi,
         onProgress: (current, total, path) => showStatus(elements.status, `Uploading ${current}/${total}: ${path}`),
       });
@@ -215,7 +185,7 @@ export function createPublicationController({
         : `Published ${result.fileCount} files as ${result.publicationId}.`);
       return publication;
     } catch (error) {
-      const message = `Publish failed: ${formatSupabaseError(error)}`;
+      const message = `Publish failed: ${formatPublicationError(error)}`;
       showStatus(elements.status, message, true);
       console.error(message, error);
       return null;
@@ -258,7 +228,7 @@ export function createPublicationController({
       }
       return permalink;
     } catch (error) {
-      const message = `Could not share: ${formatSupabaseError(error)}`;
+      const message = `Could not share: ${formatPublicationError(error)}`;
       showStatus(elements.status, message, true);
       console.error(message, error);
       return null;
@@ -300,7 +270,7 @@ export function createPublicationController({
       }
       return { permalink: stablePermalink(published), hasLocalChanges: false };
     } catch (error) {
-      const message = `Could not create a public permalink: ${formatSupabaseError(error)}`;
+      const message = `Could not create a public permalink: ${formatPublicationError(error)}`;
       showStatus(elements.status, message, true);
       console.error(message, error);
       return null;
@@ -309,7 +279,6 @@ export function createPublicationController({
 
   function initialize() {
     elements.publish.addEventListener("click", publish);
-    if (client) client.auth.onAuthStateChange(() => setTimeout(() => void refreshAuthVisibility(), 0));
     const published = getPublicationState();
     hasPublishableChanges = !published?.publication_id;
     refreshPublishVisibility();
@@ -318,7 +287,6 @@ export function createPublicationController({
       setBadge(publicationStatus(published, false));
     }
     if (canPublish()) void refreshPublicationState();
-    void refreshAuthVisibility();
   }
 
   function setSchemaReady(ready) {
@@ -334,5 +302,5 @@ export function createPublicationController({
     showStatus(elements.status, "Group memberships could not be verified. Editing and publishing remain disabled.", true);
   }
 
-  return { initialize, publish, share, publicPermalink, currentCanonical, refreshAuthVisibility, refreshPublicationState, workingCopyChanged, setSchemaReady, setSchemaLoadFailed };
+  return { initialize, publish, share, publicPermalink, currentCanonical, refreshPublicationState, workingCopyChanged, setSchemaReady, setSchemaLoadFailed };
 }
