@@ -20,11 +20,10 @@ test('referenced memberships are verified and materialized for offline loading',
   const manifest = JSON.parse(new TextDecoder().decode(files.get('manifest.json')));
   const membershipPath = manifest.group_membership_files.g;
   const base = 'https://data.epistemicinfra.org/published-schemas/new/';
-  const reference = 'https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/old/memberships/g.tsv';
-  const mirroredReference = 'https://data.epistemicinfra.org/published-schemas/old/memberships/g.tsv';
+  const reference = 'https://data.epistemicinfra.org/published-schemas/old/memberships/g.tsv';
   manifest.group_membership_references = { g: reference };
   const fetchImpl = async url => {
-    const path = String(url) === mirroredReference ? membershipPath : String(url).slice(base.length);
+    const path = String(url) === reference ? membershipPath : String(url).slice(base.length);
     return files.has(path) ? new Response(files.get(path)) : new Response(null, { status: 404 });
   };
   await downloadSchemaFolder(base, manifest, dir, hash, fetchImpl);

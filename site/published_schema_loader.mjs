@@ -190,7 +190,7 @@ export async function loadPublishedSchema(publicationId, client = null, fetchImp
       delete logicalManifest.group_membership_references;
       schemaFiles.set("manifest.json", new TextEncoder().encode(stableJson(logicalManifest)));
       for (const [groupId, reference] of Object.entries(references)) {
-        // Manifests may name a parent's file by an old Storage address; the key is resolved through R2.
+        // Resolve a parent's membership reference through R2.
         const referenceUrl = publishedReferenceUrl(reference, baseUrl)?.href;
         const bytes = referenceUrl && memory.get(referenceUrl);
         if (!bytes || !staged.manifest.group_membership_files[groupId]) throw new Error(`Missing referenced membership for ${groupId}.`);

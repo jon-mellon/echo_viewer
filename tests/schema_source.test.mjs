@@ -8,21 +8,18 @@ import { freshProjectUrl } from "../site/task_views.mjs";
 
 const key = "o/p/memberships/a.tsv";
 const r2 = `https://data.epistemicinfra.org/published-schemas/${key}`;
-const legacy = `https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/${key}`;
 
-test("public files use R2 and historical references resolve to the same key", () => {
+test("public files and references use R2", () => {
   assert.equal(publishedFileUrl(key), r2);
   assert.equal(publishedFileKey(r2), key);
-  assert.equal(publishedFileKey(legacy), key);
-  assert.equal(publishedReferenceUrl(legacy, "https://data.epistemicinfra.org/published-schemas/o/child/").href, r2);
-  assert.equal(canonicalPublishedReference(legacy), r2);
+  assert.equal(publishedReferenceUrl(r2, "https://data.epistemicinfra.org/published-schemas/o/child/").href, r2);
   assert.equal(canonicalPublishedReference(r2), r2);
   assert.equal(publicSchemaBaseUrl(null, "o/p"), "https://data.epistemicinfra.org/published-schemas/o/p/");
   assert.equal(isPublishedFileUrl(new URL(r2), new URL("https://data.epistemicinfra.org/published-schemas/o/child/")), true);
 });
 
 test("unknown and unsafe addresses are not accepted as published files", () => {
-  for (const address of ["https://evil.example/a.tsv", "https://data.epistemicinfra.org/other/a.tsv",
+  for (const address of ["https://evil.example/a.tsv", "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/a.tsv", "https://data.epistemicinfra.org/other/a.tsv",
     "https://data.epistemicinfra.org/published-schemas/o/%2E%2E/a.tsv"]) {
     assert.equal(publishedFileKey(address), null);
     assert.equal(publishedReferenceUrl(address, r2), null);

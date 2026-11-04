@@ -31,5 +31,4 @@ rate limited, `507` storage full).
   in local storage.
 - **Split discovery.** The viewer reads an owner's finished schema folders for their own splits. Other visitors see only
   quality-approved entries from publications created before 2026-11-04T00:16:28Z. New publications remain accessible by direct link but are not publicly listed. An owner can recover their list in another browser only if they retain the same owner token.
-- **Historical references.** Old immutable manifests may contain retired Storage URLs. The viewer maps those object keys to R2.
 - **Integrity** is checked by the viewer when it reads: file bytes against the row's `content_hash`.

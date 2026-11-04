@@ -116,9 +116,7 @@ Published schema files and registry rows are read from Cloudflare R2 at
 `published-schemas/_registry/<id>.json`; publishing and split browsing use the
 Cloudflare Worker described in `docs/publishing-api.md`. Browser tests cache
 immutable R2 files on disk in `.cache/published-schemas` to avoid repeated
-large downloads. Old immutable manifests may contain Supabase Storage URLs;
-the viewer translates those references to the same object keys in R2 without
-contacting Supabase.
+large downloads. Publication references must use Cloudflare R2 URLs.
 
 ## Performance profiling
 

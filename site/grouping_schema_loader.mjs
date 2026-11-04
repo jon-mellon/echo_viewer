@@ -139,7 +139,7 @@ export async function loadGroupingSchemaStructure(baseUrl, fetchImpl = fetch) {
     const membershipRows = await mapWithConcurrency(wanted, 16, async groupId => {
       const relative = manifest.group_membership_files[groupId];
       const reference = manifest.group_membership_references?.[groupId];
-      // A parent's file may use an old Storage address; resolve its key through R2.
+      // Resolve a parent's membership reference through R2.
       const url = reference ? publishedReferenceUrl(reference, base) : new URL(relative, base);
       if (!url) throw new Error(`Invalid published membership reference for ${groupId}.`);
       return { groupId, rows: parseTsv(await fetchText(url, fetchImpl), relative) };
