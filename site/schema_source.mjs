@@ -1,81 +1,48 @@
-import { PUBLISHED_SCHEMA_BUCKET } from "./publication_constants.mjs";
-import { SUPABASE_URL } from "./supabase_config.mjs";
-
-// Where published schema files are read from. The R2 bucket behind data.epistemicinfra.org
-// (see harvest_abstracts mirror_published_schemas_r2.py) is the default, so loading a page
-// makes no Supabase requests; `?schema_source=supabase` reads the same files, byte for byte,
-// from Supabase Storage. Publishing still writes to Supabase. Once nothing needs the opt-in,
-// Supabase support can be removed.
-export const SCHEMA_SOURCES = ["supabase", "cloudflare"];
+// Public schema files and registry rows are served from Cloudflare R2.
 export const DEFAULT_SCHEMA_SOURCE = "cloudflare";
-export const SCHEMA_SOURCE_PARAM = "schema_source";
 
-const CLOUDFLARE_ORIGIN = "https://data.epistemicinfra.org";
-const CLOUDFLARE_PATH = "/published-schemas/";
-const SUPABASE_PATH = `/storage/v1/object/public/${PUBLISHED_SCHEMA_BUCKET}/`;
-
-/** The source a page asks for, or the default when it names none or one that is unknown. */
-export function schemaSource(location = globalThis.location) {
-  if (!location) return DEFAULT_SCHEMA_SOURCE;
-  const value = new URL(location.href).searchParams.get(SCHEMA_SOURCE_PARAM);
-  return SCHEMA_SOURCES.includes(value) ? value : DEFAULT_SCHEMA_SOURCE;
-}
-
-/** True when the page names a source itself, so links made from it keep naming it. */
-export function schemaSourceRequested(location = globalThis.location) {
-  return Boolean(location) && SCHEMA_SOURCES.includes(new URL(location.href).searchParams.get(SCHEMA_SOURCE_PARAM));
-}
-
+const PUBLIC_ORIGIN = "https://data.epistemicinfra.org";
+const PUBLIC_PATH = "/published-schemas/";
+// Old immutable manifests contain these addresses. Parse them only to recover
+// the object key; no request is sent to this retired service.
+const LEGACY_ORIGIN = "https://xfsivvvmsgzbdnthupzg.supabase.co";
+const LEGACY_PATH = "/storage/v1/object/public/published-schemas/";
 const encodeKey = key => key.split("/").map(encodeURIComponent).join("/");
 
-/** The address of one object, named by its bucket key (`<owner>/<publication>/<file>`), on a source. */
-export function publishedFileUrl(key, source = schemaSource()) {
-  return source === "cloudflare"
-    ? `${CLOUDFLARE_ORIGIN}${CLOUDFLARE_PATH}${encodeKey(key)}`
-    : `${SUPABASE_URL}${SUPABASE_PATH}${encodeKey(key)}`;
+export function publishedFileUrl(key) {
+  return `${PUBLIC_ORIGIN}${PUBLIC_PATH}${encodeKey(key)}`;
 }
 
-/** The bucket key an address points at, on either source; null for any other address. */
-export function publishedFileKey(url) {
-  const { origin, pathname } = new URL(url);
-  const prefix = origin === CLOUDFLARE_ORIGIN ? CLOUDFLARE_PATH
-    : origin === new URL(SUPABASE_URL).origin ? SUPABASE_PATH : null;
+function hasUnsafePathSegment(address) {
+  const rawPath = String(address).match(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]+([^?#]*)/i)?.[1];
+  if (!rawPath) return false;
+  try { return rawPath.split("/").some(part => [".", ".."].includes(decodeURIComponent(part)) || decodeURIComponent(part).includes("/")); }
+  catch { return true; }
+}
+
+export function publishedFileKey(address) {
+  if (hasUnsafePathSegment(address)) return null;
+  const { origin, pathname } = new URL(address);
+  const prefix = origin === PUBLIC_ORIGIN ? PUBLIC_PATH : origin === LEGACY_ORIGIN ? LEGACY_PATH : null;
   if (!prefix || !pathname.startsWith(prefix)) return null;
   const key = decodeURIComponent(pathname.slice(prefix.length));
   return key && !key.split("/").some(part => part === ".." || part === "") ? key : null;
 }
 
-/** Which source an address belongs to. */
-export function schemaSourceOfUrl(url) {
-  return new URL(url).origin === CLOUDFLARE_ORIGIN ? "cloudflare" : "supabase";
+export function isPublishedFileUrl(address, base) {
+  const candidate = new URL(address), root = new URL(base);
+  return candidate.origin === root.origin && Boolean(publishedFileKey(candidate));
 }
 
-const underPublishedPath = url => url.pathname.startsWith(SUPABASE_PATH) || url.pathname.startsWith(CLOUDFLARE_PATH);
-
-/** True for an address inside the published schema area of the host `base` is on. */
-export function isPublishedFileUrl(url, base) {
-  const candidate = new URL(url), root = new URL(base);
-  return candidate.origin === root.origin && underPublishedPath(candidate);
-}
-
-/**
- * A membership reference in a manifest, as an address on the same source as `base`;
- * null when it is not a published schema file. Manifests store the Supabase address
- * of a parent's file; the same file is at the same key on Cloudflare. A reference
- * on the host `base` is already on is used as it is.
- */
 export function publishedReferenceUrl(reference, base) {
+  if (hasUnsafePathSegment(reference)) return null;
   const url = new URL(reference, base);
-  if (isPublishedFileUrl(url, base)) return url;
   const key = publishedFileKey(url);
-  return key ? new URL(publishedFileUrl(key, schemaSourceOfUrl(base))) : null;
+  return key ? new URL(publishedFileUrl(key)) : null;
 }
 
-/** The form a reference is stored in: the Supabase address, whichever source it was read from. */
-export function canonicalPublishedReference(url) {
-  const key = publishedFileKey(url);
-  if (key) return publishedFileUrl(key, "supabase");
-  const own = new URL(url);
-  if (own.pathname.startsWith(SUPABASE_PATH)) return own.href;
-  throw new Error("Not a published schema file address.");
+export function canonicalPublishedReference(address) {
+  const key = publishedFileKey(address);
+  if (!key) throw new Error("Not a published schema file address.");
+  return publishedFileUrl(key);
 }

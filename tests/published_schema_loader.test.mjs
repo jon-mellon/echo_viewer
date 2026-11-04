@@ -8,7 +8,7 @@ const accessSource = await readFile(new URL("../site/publication_access.mjs", im
 const bootstrapSource = await readFile(new URL("../site/project_bootstrap.mjs", import.meta.url), "utf8");
 
 test("publication loader resolves the registry before loading the public folder", () => {
-  assert.match(accessSource, /rpc\("lookup_published_schema", \{ publication_id: publicationId \}\)/);
+  assert.match(accessSource, /getPublishedRow\(publicationId/);
   assert.match(source, /lookupPublishedSchema\(publicationId, client\)/);
   assert.match(source, /loadGroupingSchemaStructure\(baseUrl, schemaFetch\)/);
   assert.match(source, /canonicalFolderHash\(schemaFiles\)/);

@@ -51,7 +51,7 @@ test("a schema published from a Cloudflare page lands in R2 with its registry ro
   assert.equal(result.fileCount, written.length);
 
   const manifest = JSON.parse(new TextDecoder().decode(w.service.objects.get(`published-schemas/${prefix}manifest.json`).bytes));
-  // References are stored in the one canonical (Supabase) form, even though the parent was read from R2.
+  // References use the R2 address of the immutable parent file.
   assert.equal(manifest.group_membership_references.health,
     canonicalPublishedReference(`${FILES}old/memberships/health.tsv`));
 
@@ -88,15 +88,12 @@ test("the owner is created once and remembered, and publishing the same content 
   assert.notEqual(third.owner_id, first.owner_id);
 });
 
-test("publishing from a Cloudflare page without the worker configured is refused, not sent to Supabase", async () => {
+test("publishing requires the Cloudflare worker", async () => {
   const w = await world();
   const changed = schema([group("verbal", ["a"]), group("health", ["c"])]);
-  const calls = [];
-  const client = new Proxy({}, { get: (_, name) => { calls.push(name); throw new Error("Supabase must not be used"); } });
-  await assert.rejects(publishWorkingSchema({ schema: changed, source: "cloudflare", cloudflare: { apiUrl: "" }, client,
-    previousPublication: { publication_id: PARENT, storage_prefix: "old" }, fetchImpl: w.readFetch, compileInput: { rawLinks: [] } }),
-  /not set up yet/);
-  assert.deepEqual(calls, []);
+  await assert.rejects(publishWorkingSchema({ schema: changed, cloudflare: { apiUrl: "" },
+    previousPublication: { publication_id: PARENT, storage_prefix: "old" }, fetchImpl: w.readFetch,
+    compileInput: { rawLinks: [] } }), /Cloudflare publishing is not configured/);
 });
 
 test("a service failure while writing files surfaces instead of registering a half-written publication", async () => {
@@ -111,30 +108,14 @@ test("a service failure while writing files surfaces instead of registering a ha
   assert.equal(w.service.rows.size, 0, "nothing registered");
 });
 
-test("splits and registry reads use the worker only on a Cloudflare page with the worker configured", async () => {
+test("split browsing uses the worker and requires its address", async () => {
   const w = await world();
   w.service.addSplit({ publication_id: PARENT, group_id: "g", split_id: "s", source_group_ids: ["a", "b"], name: "n",
     description: "a long enough description", storage_prefix: "o/p", membership_path: "memberships/g.tsv", owner_id: "o", published_at: "2026-01-01T00:00:00Z" });
-  const rows = await browsePublishedSplits(["a", "b"], null, { source: "cloudflare", apiUrl: API, fetchImpl: w.cloudflare.fetchImpl });
+  const rows = await browsePublishedSplits(["a", "b"], null, { apiUrl: API, fetchImpl: w.cloudflare.fetchImpl });
   assert.deepEqual(rows.map(row => row.group_id), ["g"]);
   assert.deepEqual(rows[0].source_group_ids, ["a", "b"]);
-  // On the default source, or without the worker's address, the Supabase client is still required.
-  await assert.rejects(browsePublishedSplits(["a"], null, { source: "supabase", apiUrl: API }), /Supabase is not configured/);
-  await assert.rejects(browsePublishedSplits(["a"], null, { source: "cloudflare", apiUrl: "" }), /Supabase is not configured/);
-  await assert.rejects(lookupPublishedSchema(PARENT, null, { source: "supabase", apiUrl: API }), /Supabase is not configured/);
-});
-
-test("a Supabase direct link uses an exact-ID lookup rather than a listable table query", async () => {
-  const row = { id: PARENT, storage_prefix: "owner/publication" };
-  const calls = [];
-  const client = { rpc: async (name, args) => {
-    calls.push({ name, args });
-    return { data: row, error: null };
-  } };
-  assert.deepEqual(await lookupPublishedSchema(PARENT, client, { source: "supabase" }), row);
-  assert.deepEqual(calls, [{ name: "lookup_published_schema", args: { publication_id: PARENT } }]);
-  await assert.rejects(lookupPublishedSchema(PARENT, { rpc: async () => ({ data: null, error: null }) },
-    { source: "supabase" }), /No published schema/);
+  await assert.rejects(browsePublishedSplits(["a"], null, { apiUrl: "" }), /Cloudflare publishing service is not configured/);
 });
 
 test("a published schema that references its parent's files loads and verifies, even when both folder names are the same length", async () => {

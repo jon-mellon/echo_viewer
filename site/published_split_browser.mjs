@@ -1,32 +1,19 @@
-import { supabase } from "./supabase_client.mjs";
-import { schemaSource } from "./schema_source.mjs";
 import { CLOUDFLARE_API_URL, cloudflareApiConfigured } from "./cloudflare_config.mjs";
 import { getOwnPublications, getSplits } from "./cloudflare_api.mjs";
 import { publicSchemaBaseUrl } from "./publication_access.mjs";
 import { loadGroupingSchemaStructure } from "./grouping_schema_loader.mjs";
-import { PUBLIC_SPLIT_DISCOVERY_BEFORE } from "./publication_constants.mjs";
 
-export async function browsePublishedSplits(sourceGroupIds, client = supabase,
-  { source = schemaSource(), apiUrl = CLOUDFLARE_API_URL, fetchImpl, storage } = {}) {
-  const viaWorker = source === "cloudflare" && cloudflareApiConfigured(apiUrl);
-  if (!client && !viaWorker) throw new Error("Supabase is not configured.");
+export async function browsePublishedSplits(sourceGroupIds, _client = null,
+  { apiUrl = CLOUDFLARE_API_URL, fetchImpl, storage } = {}) {
+  if (!cloudflareApiConfigured(apiUrl)) throw new Error("Cloudflare publishing service is not configured.");
   const ids = [...new Set(sourceGroupIds)].filter(Boolean);
   if (!ids.length) return [];
-  const pages = await Promise.all(ids.map(async id => {
-    if (viaWorker) return getSplits(id, { apiUrl, ...(fetchImpl ? { fetchImpl } : {}) });
-    const { data, error } = await client.from("published_split_index")
-      .select("publication_id,group_id,split_id,source_group_ids,name,description,storage_prefix,membership_path,owner_id,published_at")
-      .eq("quality_status", "approved").lt("published_at", PUBLIC_SPLIT_DISCOVERY_BEFORE)
-      .contains("source_group_ids", [id])
-      .order("published_at", { ascending: false }).limit(100);
-    if (error) throw error;
-    return data || [];
-  }));
-  if (viaWorker) {
+  const pages = await Promise.all(ids.map(id => getSplits(id, { apiUrl, ...(fetchImpl ? { fetchImpl } : {}) })));
+  {
     const own = await getOwnPublications({ apiUrl, ...(fetchImpl ? { fetchImpl } : {}),
       ...(storage ? { storage } : {}) });
     const ownRows = await Promise.all(own.map(async publication => {
-      const base = publicSchemaBaseUrl(client, publication.storage_prefix, "cloudflare");
+      const base = publicSchemaBaseUrl(null, publication.storage_prefix);
       const staged = await loadGroupingSchemaStructure(base, fetchImpl || fetch);
       return staged.schema.groups.filter(group => group.source === "user_split"
         && group.provenance?.operation === "split_categories"
@@ -55,9 +42,8 @@ export async function browsePublishedSplits(sourceGroupIds, client = supabase,
   return [...unique.values()].sort((a, b) => b.published_at.localeCompare(a.published_at));
 }
 
-export async function loadPublishedSplitMembership(row, client = supabase, fetchImpl = fetch, source = schemaSource()) {
-  if (!client && source !== "cloudflare") throw new Error("Supabase is not configured.");
-  const base = publicSchemaBaseUrl(client, row.storage_prefix, source);
+export async function loadPublishedSplitMembership(row, _client = null, fetchImpl = fetch) {
+  const base = publicSchemaBaseUrl(null, row.storage_prefix);
   const staged = await loadGroupingSchemaStructure(base, fetchImpl);
   if (staged.manifest.group_membership_files[row.group_id] !== row.membership_path) {
     throw new Error("The published split pointer no longer matches its schema.");

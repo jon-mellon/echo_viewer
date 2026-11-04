@@ -7,22 +7,6 @@ const source = await readFile(new URL("../site/dag_publication.mjs", import.meta
 const core = await readFile(new URL("../site/dag_publication_core.mjs", import.meta.url), "utf8");
 const html = await readFile(new URL("../site/index.html", import.meta.url), "utf8");
 
-test("working publication deduplicates before allocating or uploading", () => {
-  const lookup = core.indexOf("findOwnedPublication(client, user.id, canonical.contentHash)");
-  const allocation = core.indexOf("cryptoApi.randomUUID()", lookup);
-  const upload = core.indexOf(".upload(", lookup);
-  assert.ok(lookup > 0 && allocation > lookup && upload > allocation);
-  assert.match(core, /if \(existing\) return .*reused: true/);
-});
-
-test("registry insert follows every upload and preserves baseline lineage", () => {
-  const upload = core.indexOf(".upload(");
-  const insert = core.indexOf('.from("published_schemas").insert', upload);
-  assert.ok(insert > upload);
-  assert.match(core, /CANONICAL_BASELINE_ID = "a0118906-2366-4cc8-8809-bafdf3860c23"/);
-  assert.match(core, /parent_schema_id: parentSchemaId/);
-});
-
 test("share warns when the schema is unpublished and offers to publish first", () => {
   assert.match(source, /canonical\.contentHash !== published\.content_hash/);
   assert.match(source, /confirmPublishBeforeShare\(neverPublished\)/);
@@ -59,7 +43,7 @@ test("publication explicitly confirms public immutable access", () => {
 test("publication requests authentication only after immutable-public confirmation", () => {
   const publish = source.slice(source.indexOf("async function publish()"), source.indexOf("async function share()"));
   assert.ok(publish.indexOf("confirmPublicPublication(elements.confirmation, windowApi)") < publish.indexOf("publishWorkingSchema({"));
-  assert.match(core, /ensureAnonymousPublicationUser\(client\)/);
+  assert.match(core, /ensureOwner\(cloudflare\)/);
 });
 
 test("publication requires a fresh CC0 agreement for every attempt", async () => {
@@ -118,7 +102,7 @@ test("published state distinguishes private working-copy changes", () => {
   assert.match(source, /setBadge\(publicationStatus\(published, hasLocalChanges\)\)/);
   assert.match(source, /workingCopyChanged/);
   assert.match(source, /hasPublishableChanges = !published\?\.publication_id \|\| hasLocalChanges/);
-  assert.match(source, /elements\.publish\.hidden = !client \|\| !hasPublishableChanges/);
+  assert.match(source, /elements\.publish\.hidden = !hasPublishableChanges/);
 });
 
 test("completed schema hydration clears the loading status instead of logging success", () => {

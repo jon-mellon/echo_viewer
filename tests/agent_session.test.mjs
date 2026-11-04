@@ -80,11 +80,8 @@ test("agent checks approved published splits before Jev and can apply a selected
     storage_prefix: "owner/publication", membership_path: "memberships/published.tsv",
     owner_id: "other", published_at: "2026-10-15T00:00:00Z" };
   session.browseSplits = async () => [row];
-  session.publishedSplitClient = () => ({ storage: { from: () => ({ getPublicUrl: path => ({
-    data: { publicUrl: `https://example.test/published/${path}` },
-  }) }) } });
   session.publishedSplitFetch = async url => {
-    const path = new URL(url).pathname.split("/published/owner/publication/")[1];
+    const path = new URL(url).pathname.split("/published-schemas/owner/publication/")[1];
     return new Response(files.get(path), { status: files.has(path) ? 200 : 404 });
   };
   const tools = createEchoTools({ getSession: () => session, setSession: () => {} });

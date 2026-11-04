@@ -1,6 +1,6 @@
 # Publishing API (the contract the viewer relies on)
 
-On a page that uses the Cloudflare schema source, the viewer publishes through a Worker and reads registry rows and
+The viewer publishes through a Worker and reads registry rows and
 files from R2. The Worker, its database and its setup live outside this repo (in `harvest_abstracts`,
 `analysis/10k/echo_viewer_bundle/publish_worker`). This is the contract the client in `site/cloudflare_api.mjs` depends
 on; `tests/support/fake_publish_service.mjs` is a small in-memory stand-in that follows it, used by the client's tests.
@@ -31,6 +31,5 @@ rate limited, `507` storage full).
   in local storage.
 - **Split discovery.** The viewer reads an owner's finished schema folders for their own splits. Other visitors see only
   quality-approved entries from publications created before 2026-11-04T00:16:28Z. New publications remain accessible by direct link but are not publicly listed. An owner can recover their list in another browser only if they retain the same owner token.
-- **Legacy Supabase source.** The database allows broad reads only for older publications. A direct link uses
-  `lookup_published_schema(publication_id)` to retrieve one exact public row; anonymous Storage listing is denied.
+- **Historical references.** Old immutable manifests may contain retired Storage URLs. The viewer maps those object keys to R2.
 - **Integrity** is checked by the viewer when it reads: file bytes against the row's `content_hash`.

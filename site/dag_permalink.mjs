@@ -1,5 +1,4 @@
 import { MAX_NEIGHBORHOOD_DEPTH } from "./causal_neighborhood.mjs";
-import { SCHEMA_SOURCE_PARAM, schemaSource, schemaSourceRequested } from "./schema_source.mjs";
 
 export const PERMALINK_VERSION = "1";
 export const TASKS = ["identify", "causes", "consequences"];
@@ -61,7 +60,6 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state,
   // "home" marks the start page, so a reload there does not open a task.
   values.task = state.task || "home";
   // A page that named its schema source keeps naming it in the links it makes.
-  if (schemaSourceRequested(location)) values[SCHEMA_SOURCE_PARAM] = schemaSource(location);
   if (state.dagDisplay === "table") values.dag_view = "table";
   for (const [view, [focusKey, depthKey, papersKey]] of Object.entries(exploreKeys)) {
     const explore = state.explore?.[view];
