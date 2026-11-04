@@ -24,36 +24,36 @@ test("browse keeps approved splits, including the viewer's own, matching the exa
   assert.deepEqual((await browsePublishedSplits(["a", "b"], client, { source: "supabase" })).map(row => row.group_id), ["g2"]);
 });
 
-test("Cloudflare browse finds the current owner's finished split when it is absent from the approved index", async () => {
+test("Cloudflare browse shows another person's public split without an owner token", async () => {
   const ownerId = "00000000-0000-4000-8000-000000000001";
-  const token = `${ownerId}.${"a".repeat(64)}`;
   const group = { group_id: "populist-voting", label: "Populist voting",
     description: "Voting for parties with populist political platforms.", source: "user_split",
     provenance: { operation: "split_categories", split_id: "split-populist",
       source_group_ids: ["category-vote"] }, variable_ids: ["v1"] };
   const files = await writeGroupingSchemaFolder({ schema_version: GROUPING_FORMAT_VERSION,
     membership_unit: GROUPING_MEMBERSHIP_UNIT, grouping_set_id: "test", label: "Test", groups: [group] });
+  const membershipPath = JSON.parse(new TextDecoder().decode(files.get("manifest.json")))
+    .group_membership_files[group.group_id];
   const publication = { id: "00000000-0000-4000-8000-000000000002", owner_id: ownerId,
     storage_prefix: `${ownerId}/00000000-0000-4000-8000-000000000002`, created_at: "2026-11-01T00:00:00Z" };
   const seen = [];
-  const fetchImpl = async (url, init = {}) => {
+  const fetchImpl = async url => {
     const path = new URL(url).pathname;
     seen.push(path);
-    if (path === "/v1/splits") return Response.json([]);
-    if (path === "/v1/owners/publications") {
-      assert.equal(init.headers["x-owner-token"], token);
-      return Response.json([publication]);
-    }
+    if (path === "/v1/splits") return Response.json([{ publication_id: publication.id,
+      group_id: group.group_id, split_id: group.provenance.split_id,
+      source_group_ids: group.provenance.source_group_ids, name: group.label,
+      description: group.description, membership_path: membershipPath,
+      owner_id: ownerId, storage_prefix: publication.storage_prefix, published_at: publication.created_at }]);
     const name = path.split(`/${publication.storage_prefix}/`)[1];
     return new Response(files.get(name), { status: files.has(name) ? 200 : 404 });
   };
-  const options = { source: "cloudflare", apiUrl: "https://api.test", fetchImpl,
-    storage: { getItem: () => token } };
+  const options = { source: "cloudflare", apiUrl: "https://api.test", fetchImpl };
   const rows = await browsePublishedSplits(["category-vote"], null, options);
   assert.deepEqual(rows.map(row => row.name), ["Populist voting"]);
-  assert.equal(rows[0].is_own, true);
   assert.deepEqual(await loadPublishedSplitMembership(rows[0], null, fetchImpl, "cloudflare"), ["v1"]);
-  assert.ok(seen.includes("/v1/owners/publications"));
+  assert.ok(seen.includes("/v1/splits"));
+  assert.ok(!seen.includes("/v1/owners/publications"));
   assert.deepEqual(await browsePublishedSplits(["another-source"], null, options), []);
 });
 
