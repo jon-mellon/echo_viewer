@@ -609,25 +609,20 @@ test("a published split appears after source selection and fills the editable de
     return { sourceId, sourceLabel: source.label,
       membershipPath: JSON.parse(text["manifest.json"]).group_membership_files.published_new, files: text };
   }, sourceId);
-  await page.route("**/rest/v1/published_split_index**", route => route.fulfill({ contentType: "application/json",
-    body: JSON.stringify([{ publication_id: "00000000-0000-0000-0000-000000000001", group_id: "published_new",
-      split_id: "published_new", source_group_ids: [fixture.sourceId], name: "Published fixture split",
-      description: "A published fixture split taken from one source category.", storage_prefix: "fixture-owner/fixture-pub",
-      membership_path: fixture.membershipPath, owner_id: "someone", published_at: "2026-10-15T00:00:00Z" }]) }));
-  // The viewer runs on the Cloudflare source in tests (as staging ships it): the splits list comes from the worker and
-  // the publication's files from the Cloudflare address. Both sources are answered, so the test stands on either.
-  await page.route("**/echo-api.epistemicinfra.org/v1/splits**", route => route.fulfill({ contentType: "application/json",
-    headers: { "access-control-allow-origin": "*" },
-    body: JSON.stringify([{ publication_id: "00000000-0000-0000-0000-000000000001", group_id: "published_new",
-      split_id: "published_new", source_group_ids: [fixture.sourceId], name: "Published fixture split",
-      description: "A published fixture split taken from one source category.", storage_prefix: "fixture-owner/fixture-pub",
-      membership_path: fixture.membershipPath, owner_id: "someone", published_at: "2026-10-15T00:00:00Z" }]) }));
+  const ownerId = "00000000-0000-4000-8000-000000000001";
+  const ownerToken = `${ownerId}.${"a".repeat(64)}`;
+  await page.evaluate(token => localStorage.setItem("echo-owner-token", token), ownerToken);
+  await page.route("**/echo-api.epistemicinfra.org/v1/owners/publications", route => {
+    expect(route.request().headers()["x-owner-token"]).toBe(ownerToken);
+    return route.fulfill({ contentType: "application/json", headers: { "access-control-allow-origin": "*" },
+      body: JSON.stringify([{ id: "00000000-0000-4000-8000-000000000002", owner_id: ownerId,
+        storage_prefix: "fixture-owner/fixture-pub", created_at: "2026-10-15T00:00:00Z" }]) });
+  });
   const serveFixtureFile = route => {
     const path = new URL(route.request().url()).pathname.split("/fixture-pub/")[1];
     return fixture.files[path] === undefined ? route.fulfill({ status: 404, body: "" })
       : route.fulfill({ body: fixture.files[path], headers: { "access-control-allow-origin": "*" } });
   };
-  await page.route("**/storage/v1/object/public/published-schemas/fixture-owner/fixture-pub/**", serveFixtureFile);
   await page.route("**/data.epistemicinfra.org/published-schemas/fixture-owner/fixture-pub/**", serveFixtureFile);
   await page.locator(`#definitionSourceList input[data-source-id="${sourceId}"]`).check();
   await expect(page.locator("#definitionBrowsePanel")).toBeVisible();
@@ -640,7 +635,7 @@ test("a published split appears after source selection and fills the editable de
     .find(group => group.group_id !== id && group.variable_ids?.length >= 2)?.group_id, sourceId);
   await page.locator(`#definitionSourceList input[data-source-id="${otherId}"]`).check();
   await expect(page.locator("#definitionBrowsePanel")).toBeVisible();
-  await expect(page.locator("#definitionBrowseStatus")).toContainText("No published splits found");
+  await expect(page.locator("#definitionBrowseStatus")).toContainText("No previous published splits found");
   await expect(page.locator("#definitionBrowseJump")).toHaveText("No previous splits found");
   await page.locator(`#definitionSourceList input[data-source-id="${otherId}"]`).uncheck();
   await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
