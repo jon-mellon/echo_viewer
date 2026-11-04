@@ -26,6 +26,7 @@ const WORKER_REGISTRY = /^https:\/\/echo-api\.epistemicinfra\.org\/v1\/(schemas|
 // A publication's registry row in Supabase's table (read only by a page that asks for the Supabase source). Rows never change, so
 // they are kept on disk too and a warm run makes no Supabase call at all.
 const SUPABASE_REGISTRY_ROW = /^https:\/\/xfsivvvmsgzbdnthupzg\.supabase\.co\/rest\/v1\/published_schemas\?/;
+const SUPABASE_REGISTRY_RPC = /^https:\/\/xfsivvvmsgzbdnthupzg\.supabase\.co\/rest\/v1\/rpc\/lookup_published_schema$/;
 const SUPABASE_OBJECT_BASE = "https://xfsivvvmsgzbdnthupzg.supabase.co/storage/v1/object/public/published-schemas/";
 
 /** A file's one canonical (Supabase-form) address, whichever address the page asked for. */
@@ -83,6 +84,38 @@ async function installSupabaseCache(context) {
   await context.route(STORAGE_OBJECT, route => serve(route, route.request().url()));
   await context.route(WORKER_REGISTRY, route => serve(route, route.request().url()));
   await context.route(SUPABASE_REGISTRY_ROW, route => serve(route, route.request().url()));
+  // The legacy Supabase source looks up one registry row by UUID. Its live project
+  // can be quota-restricted during CI, so answer from the same public R2 mirror
+  // that supplies the immutable schema files. The request still exercises the RPC path.
+  await context.route(SUPABASE_REGISTRY_RPC, async route => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204,
+      headers: { "access-control-allow-origin": "*", "access-control-allow-methods": "POST, OPTIONS",
+        "access-control-allow-headers": "apikey, authorization, content-type, x-client-info" } });
+    if (request.method() !== "POST") return route.fulfill({ status: 405 });
+    let id;
+    try { id = JSON.parse(request.postData() || "{}").publication_id; } catch { /* invalid request */ }
+    if (typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id)) return route.fulfill({ status: 400 });
+    const url = `${CLOUDFLARE_BASE}_registry/${id.toLowerCase()}.json`;
+    const canonical = canonicalUrl(url);
+    const key = crypto.createHash("sha256").update(canonical).digest("hex");
+    const bodyPath = path.join(directory, `${key}.body`);
+    const metaPath = path.join(directory, `${key}.json`);
+    let body;
+    if (fs.existsSync(bodyPath) && fs.existsSync(metaPath)) body = fs.readFileSync(bodyPath);
+    else {
+      const response = await route.fetch({ url, method: "GET" });
+      if (!response.ok()) return route.fulfill({ status: response.status(), body: await response.body() });
+      body = await response.body();
+      const stamp = `${process.pid}.${Date.now()}`;
+      fs.writeFileSync(`${bodyPath}.${stamp}`, body);
+      fs.renameSync(`${bodyPath}.${stamp}`, bodyPath);
+      fs.writeFileSync(`${metaPath}.${stamp}`, JSON.stringify({ url: canonical,
+        headers: { "content-type": "application/json", "access-control-allow-origin": "*" }, wire: body.length }));
+      fs.renameSync(`${metaPath}.${stamp}`, metaPath);
+    }
+    return route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*", "content-type": "application/json" }, body });
+  });
   await context.route(CLOUDFLARE_OBJECT, route => serve(route, route.request().url()));
 }
 

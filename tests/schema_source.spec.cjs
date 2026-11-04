@@ -1,7 +1,7 @@
 const { test, expect } = require("./fixtures.cjs");
 const { testDefaultSource } = require("./support/default_source.cjs");
 
-const viewer = "http://127.0.0.1:8767/";
+const viewer = `http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/`;
 const CLOUDFLARE = "https://data.epistemicinfra.org/published-schemas/";
 const SUPABASE_STORAGE = "/storage/v1/object/public/published-schemas/";
 const REGISTRY_FILE = "/published-schemas/_registry/";
@@ -16,7 +16,7 @@ function watchSources(page) {
     else if (url.startsWith(CLOUDFLARE)) seen.cloudflare.add(url);
     else if (url.includes(SUPABASE_STORAGE)) seen.supabase.add(url);
     else if (url.startsWith("https://echo-api.epistemicinfra.org/v1/")) seen.workerRegistry.add(url);
-    else if (url.includes("/rest/v1/published_schemas")) seen.supabaseRegistry.add(url);
+    else if (url.includes("/rest/v1/rpc/lookup_published_schema")) seen.supabaseRegistry.add(url);
   });
   return seen;
 }
@@ -46,7 +46,7 @@ test("a page that names no source reads from the source the tests run on (Cloudf
   expect(seen.workerRegistry.size).toBe(0);
 });
 
-test("?schema_source=supabase still reads files and the registry from Supabase", async ({ page }) => {
+test("?schema_source=supabase reads files from Supabase URLs and requests an exact registry lookup", async ({ page }) => {
   const seen = watchSources(page);
   await open(page, `${viewer}?task=causes&schema_source=supabase`);
   expect(seen.supabase.size).toBeGreaterThan(10);
