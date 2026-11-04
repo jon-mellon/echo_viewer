@@ -3,6 +3,7 @@
 // serves immutable Cloudflare schema files from the disk cache.
 const base = require("playwright/test");
 const { installPublishedSchemaCache } = require("./support/published_schema_cache.cjs");
+const { installPublishingApiFixture } = require("./support/publishing_api_fixture.cjs");
 
 const test = base.test.extend({
   browser: [async ({ browser }, use) => {
@@ -10,6 +11,7 @@ const test = base.test.extend({
     browser.newContext = async (...args) => {
       const context = await newContext(...args);
       await installPublishedSchemaCache(context);
+      await installPublishingApiFixture(context);
       return context;
     };
     await use(browser);

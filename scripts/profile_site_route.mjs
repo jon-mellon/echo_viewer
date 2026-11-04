@@ -5,12 +5,14 @@ import { resolve } from "node:path";
 // rather than downloading the same files on every cold page load.
 const require = createRequire(import.meta.url);
 const { installPublishedSchemaCache } = require("../tests/support/published_schema_cache.cjs");
+const { installPublishingApiFixture } = require("../tests/support/publishing_api_fixture.cjs");
 
 // An isolated browser context can test a working tree on an allowed evidence
 // origin without taking over another task's preview server. Remote data still
 // uses ordinary browser requests; only local application assets are fulfilled.
 export async function routeProfileSite(context, url, directory) {
   await installPublishedSchemaCache(context);
+  await installPublishingApiFixture(context);
   if (!directory) return;
   const root = resolve(directory);
   await context.route(`${new URL(url).origin}/**`, async route => {
