@@ -203,10 +203,10 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
             : "No previous splits found";
       if (showBrowse) {
         els.definitionBrowseStatus.textContent = browseState.error || (browseState.loading
-          ? "Looking for variables others made from these…"
+          ? "Looking for your published splits from these variables…"
           : browseState.rows.length
             ? "Use a published split to fill in the name, definition and concepts. You can edit them next."
-            : "No previous published splits found for these source variables. You can still create a new split.");
+            : "You have no previous published splits for these source variables. You can still create a new split.");
         replaceChildren(els.definitionBrowseResults, browseState.rows.map((row, index) =>
           h("article", { className: "definition-browse-card" },
             h("strong", { textContent: row.name }),

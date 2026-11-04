@@ -635,7 +635,7 @@ test("a published split appears after source selection and fills the editable de
     .find(group => group.group_id !== id && group.variable_ids?.length >= 2)?.group_id, sourceId);
   await page.locator(`#definitionSourceList input[data-source-id="${otherId}"]`).check();
   await expect(page.locator("#definitionBrowsePanel")).toBeVisible();
-  await expect(page.locator("#definitionBrowseStatus")).toContainText("No previous published splits found");
+  await expect(page.locator("#definitionBrowseStatus")).toContainText("You have no previous published splits");
   await expect(page.locator("#definitionBrowseJump")).toHaveText("No previous splits found");
   await page.locator(`#definitionSourceList input[data-source-id="${otherId}"]`).uncheck();
   await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
