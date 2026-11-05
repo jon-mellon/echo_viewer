@@ -1569,19 +1569,6 @@ function computeVisibleLinks() {
     hideIrrelevantDiagnosticLinks: state.hideIrrelevantConfounderLinks,
     showAllExclusionLinks: state.showAllExclusionLinks,
   });
-  // Keep a confirmed claim visible even when it removes its subject from the
-  // candidate set. Its dotted arrow explains the recorded rejection.
-  const claimKind = state.showExclusionViolations ? "exclusion" : state.showConfoundersOnly ? "confounders" : null;
-  const assertions = studyGraph.claims.filter(row => row.kind === claimKind).flatMap(row => row.asserted_effects || []);
-  for (const effect of assertions) {
-    if (studyGraph.removed.has(effect.sourceId) || studyGraph.removed.has(effect.targetId)) continue;
-    view.componentGroupIds.add(effect.sourceId); view.componentGroupIds.add(effect.targetId);
-    for (const link of studyGraph.links) {
-      const forward = link.group_a === effect.sourceId && link.group_b === effect.targetId && ["A_TO_B", "BIDIRECTIONAL"].includes(link.direction_type);
-      const backward = link.group_b === effect.sourceId && link.group_a === effect.targetId && ["B_TO_A", "BIDIRECTIONAL"].includes(link.direction_type);
-      if ((forward || backward) && link.display_status !== "excluded" && !view.visibleLinks.some(current => current.edge_id === link.edge_id)) view.visibleLinks.push(link);
-    }
-  }
   state.componentGroupIds = view.componentGroupIds;
   state.visibleLinks = view.visibleLinks;
   state.confounderGroupIds = view.confounders.confounderIds;

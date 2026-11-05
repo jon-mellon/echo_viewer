@@ -257,7 +257,7 @@ export function createDagInspectorController({
     elements.edgeInspector.hidden = false;
     elements.closeEvidencePane.hidden = false;
     const records = `${model.rawCount} evidence record${model.rawCount === 1 ? "" : "s"}`;
-    const meta = [link.is_user_claim ? "User-asserted direct effect · Study-specific claim, not an evidence record" : link.is_target_relation ? "Target relationship" : null,
+    const meta = [link.is_target_relation ? "Target relationship" : null,
       sourcesLoading ? null : model.rawCount ? records : "No evidence records"].filter(Boolean).join(" · ");
     replaceChildren(elements.edgeInspector,
       h("header", { className: "evidence-header" },

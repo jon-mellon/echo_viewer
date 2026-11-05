@@ -15,8 +15,9 @@ export const EXCLUSION_STATUSES = {
   removed_other: "Removed for other reason",
 };
 export const CONTROL_WARNING = "Controlling for exclusion restriction violations can induce post treatment bias.";
-export const CLAIM_STATUSES = new Set(["causes_y_only_via_x", "instrument_only_via_x", "variable_only_via_x"]);
-export const LIGHT_STATUSES = new Set(["explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set"]);
+// These dispositions keep the variable on the map and draw it faded.
+export const LIGHT_STATUSES = new Set(["explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set",
+  "causes_y_only_via_x", "instrument_only_via_x", "variable_only_via_x"]);
 
 // A collider biases the estimate only when the analysis conditions on it, so its
 // status records whether it was left out of the model and sample, or was not.
@@ -87,7 +88,7 @@ export function diagnosticReviewRows(project, groupIds, kind = "confounders") {
   const candidates = new Set(groupIds || []);
   const retained = scopedDecisions(project, kind).filter(row => row.status !== "unaddressed").map(row => row.groupId);
   return diagnosticStatusRows(project, new Set([...candidates, ...retained]), kind).map(row => ({ ...row,
-    rejected: row.status === "removed_other" || CLAIM_STATUSES.has(row.status) || !candidates.has(row.groupId),
+    rejected: row.status === "removed_other" || !candidates.has(row.groupId),
     noLongerCandidate: !candidates.has(row.groupId) }));
 }
 
@@ -95,10 +96,7 @@ export function diagnosticReviewRows(project, groupIds, kind = "confounders") {
 export function publicDiagnosticStatuses(decisions = {}, statuses = CONFOUNDER_STATUSES) {
   return Object.fromEntries(Object.entries(decisions).flatMap(([key, decision]) =>
     Object.hasOwn(statuses, decision?.status) || decision?.status === "other"
-      ? [[key, { status: decision.status,
-        ...(Array.isArray(decision.rejected_effects) ? { rejected_effects: decision.rejected_effects.map(({ sourceId, targetId }) => ({ sourceId, targetId })) } : {}),
-        ...(Array.isArray(decision.asserted_effects) ? { asserted_effects: decision.asserted_effects.map(({ sourceId, targetId }) => ({ sourceId, targetId })) } : {}),
-      }]] : []));
+      ? [[key, { status: decision.status }]] : []));
 }
 
 export function publicConfounderStatuses(decisions = {}) {
