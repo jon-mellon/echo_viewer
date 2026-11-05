@@ -41,7 +41,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     const all = customVariables();
     const query = normalized(els.customVariablesFilter.value);
     const previous = previousSplits().filter(item => !all.some(group => group.group_id === item.group_id)
-      && (!query || normalized([item.name, item.description].join(" ")).includes(query)));
+      && (!query || normalized([item.name, item.description, ...(item.source_labels || [])].join(" ")).includes(query)));
     const rows = all.filter(group => !query || normalized([group.label, group.description,
       ...sourceLabels(group)].join(" ")).includes(query));
     const highlight = state.customVariablesHighlight;
@@ -80,9 +80,10 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     if (previous.length) {
       els.customVariablesTable.append(h("section", { className: "custom-variables-previous" },
         h("h2", { textContent: "Your previous splits" }),
-        h("p", { className: "small-note", textContent: "Reuse a previous split in the current schema." }),
+        h("p", { className: "small-note", textContent: "Previous splits were saved in another schema. Reuse one to add it as a custom variable here." }),
         ...previous.map(item => h("div", { className: "setup-group-picker-row" },
           h("div", {}, h("strong", { textContent: item.name }),
+            h("span", { textContent: `From: ${(item.source_labels || item.source_group_ids || []).join(", ")}` }),
             h("span", { textContent: item.is_local ? "Saved local draft" : "Published" })),
           h("button", { type: "button", className: "btn btn--sm", textContent: "⑂ Reuse",
             attrs: { "aria-label": `Reuse previous split ${item.name}` },

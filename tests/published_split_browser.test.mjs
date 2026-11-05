@@ -12,7 +12,9 @@ test("Cloudflare browse finds the current owner's finished split without a publi
     provenance: { operation: "split_categories", split_id: "split-populist",
       source_group_ids: ["category-vote"] }, variable_ids: ["v1"] };
   const files = await writeGroupingSchemaFolder({ schema_version: GROUPING_FORMAT_VERSION,
-    membership_unit: GROUPING_MEMBERSHIP_UNIT, grouping_set_id: "test", label: "Test", groups: [group] });
+    membership_unit: GROUPING_MEMBERSHIP_UNIT, grouping_set_id: "test", label: "Test", groups: [group,
+      { group_id: "category-vote", label: "Other voting", variable_ids: ["v2"],
+        provenance: { operation: "split_categories", split_id: "split-populist", prior_label: "Voting" } }] });
   const publication = { id: "00000000-0000-4000-8000-000000000002", owner_id: ownerId,
     storage_prefix: `${ownerId}/00000000-0000-4000-8000-000000000002`, created_at: "2026-11-05T00:00:00Z" };
   const seen = [];
@@ -30,6 +32,7 @@ test("Cloudflare browse finds the current owner's finished split without a publi
     storage: { getItem: () => token } };
   const rows = await browsePublishedSplits(["category-vote"], null, options);
   assert.deepEqual(rows.map(row => row.name), ["Populist voting"]);
+  assert.deepEqual(rows[0].source_labels, ["Voting"]);
   assert.equal(rows[0].is_own, true);
   assert.deepEqual(await loadPublishedSplitMembership(rows[0], null, fetchImpl, "cloudflare"), ["v1"]);
   assert.ok(seen.includes("/v1/owners/publications"));
