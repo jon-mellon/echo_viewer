@@ -67,6 +67,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     browseState.error = "Loading the previous split…";
     draft.step = "loading_saved";
     renderDraft();
+    // Load the sources' variable details while the saved membership downloads; the review step needs both.
+    for (const source of definitionSources()) {
+      if (sourceHydrations.has(source.group_id) || !source.variable_ids?.length) continue;
+      const loading = hydrateVariableDetails(source.variable_ids, { skipNeighbors: true });
+      sourceHydrations.set(source.group_id, loading);
+      void loading.catch(() => sourceHydrations.delete(source.group_id));
+    }
     try {
       const ids = row.local_variable_ids || await loadPublishedSplitMembership(row);
       if (state.definitionDraft !== draft) return;
