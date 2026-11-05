@@ -2,6 +2,7 @@ import * as projectOps from "./dag_project.mjs";
 import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
 import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
 import { listOwnPublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
+import { eligiblePreviousSplits } from "./previous_split_candidates.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
   invalidateVisibleCaches, renderAll, groupById, persistProjectLocally, getReturnUrl = () => location.href,
@@ -25,7 +26,12 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     try {
       const ids = state.definitionDraft.source_group_ids;
       const rows = [...previousSplits()];
-      if (!rows.length) rows.push(...await listOwnPublishedSplits());
+      if (!rows.length) {
+        const published = await listOwnPublishedSplits();
+        const loaded = await Promise.allSettled(published.filter(row => row.source_group_by_variable)
+          .map(async row => ({ ...row, local_variable_ids: await loadPublishedSplitMembership(row) })));
+        rows.push(...eligiblePreviousSplits(loaded.flatMap(result => result.status === "fulfilled" ? [result.value] : []), state.project?.groups));
+      }
       const matching = rows.filter(row => ids.every(id => row.source_group_ids?.includes(id)));
       if (revision !== browseRevision || state.definitionDraft?.step !== "sources") return;
       browseState.rows = matching;
@@ -39,6 +45,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   async function choosePublishedSplit(row) {
     if (!row || browseState.loading || state.definitionDraft?.step !== "sources") return;
     const draft = state.definitionDraft;
+    if (!eligiblePreviousSplits([row], state.project?.groups).length) {
+      browseState.error = "This saved variable no longer fits the current schema.";
+      renderDefinition();
+      return;
+    }
     const available = new Set((state.project?.groups || []).filter(group => group.variable_ids?.length).map(group => group.group_id));
     if (!row.source_group_ids?.length || row.source_group_ids.some(id => !available.has(id))) {
       browseState.error = "This split's source variables are not available in the current schema.";
@@ -71,7 +82,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       els.definitionNewDescription.value = row.description;
       draft.new_variable_ids = [...new Set(ids.map(clusterRep))];
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
-      draft.published_split = { publication_id: row.publication_id, group_id: row.group_id };
+      draft.published_split = { publication_id: row.publication_id, group_id: row.origin_group_id || row.group_id,
+        split_id: row.origin_split_id || row.split_id };
       draft.step = "partition";
       state.selectedVariableIds = new Set(draft.new_variable_ids);
       persistProjectLocally();
@@ -342,6 +354,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         newVariableIds: expandToClusterMembers(draft.new_variable_ids), timestamp: nowIso(),
         role: draft.role,
         splitId: draft.split_id,
+        reusedFrom: draft.published_split || null,
       });
       applyProjectOperation(next);
       await commitSchema();
@@ -360,11 +373,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       if (fromManager) state.customVariablesHighlight = newGroupId;
       state.definitionDraft = null;
       state.selectedVariableIds.clear();
-      state.activeGroupId = null;
-      state.focusedGroupId = newGroupId;
+      if (!fromManager) {
+        state.activeGroupId = null;
+        state.focusedGroupId = newGroupId;
+      }
       if (draft.role === "candidate" && !forFocus && !fromManager) state.pendingVariablePanelGroupId = newGroupId;
       const initialAnchor = draft.mode !== "edit" && !state.changingAnchorSide;
-      if (!forFocus) {
+      if (!forFocus && !fromManager) {
         state.phase = initialAnchor && draft.role === "iv" ? "select_dv"
           : initialAnchor && draft.role === "dv" ? "select_instrument" : "build";
         state.workflowMode = state.phase === "build" ? "group_review" : "setup";
@@ -400,7 +415,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     els.definitionDescribeNext.addEventListener("click", () => goToStep("partition"));
     els.definitionDescribeBack.addEventListener("click", () => goToStep("sources"));
     presenter.install();
-    els.definitionBack.addEventListener("click", () => goToStep("describe"));
+    els.definitionBack.addEventListener("click", () => state.definitionDraft?.published_split ? cancelDefinition() : goToStep("describe"));
     els.definitionNewLabel.addEventListener("input", () => {
       if (state.definitionDraft) state.definitionDraft.new_label = els.definitionNewLabel.value;
       presenter.clearDescriptionValidation();

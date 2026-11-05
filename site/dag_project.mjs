@@ -291,7 +291,7 @@ export function setFindingDecision(project, rawId, decision) {
 
 export function splitCategories(project, {
   sourceGroupIds, newGroupId, newLabel, newDescription, residualLabels = {}, newVariableIds,
-  timestamp, role, splitId = null,
+  timestamp, role, splitId = null, reusedFrom = null,
 }) {
   splitId ||= `split_${newGroupId}`;
   const sourceIds = [...new Set(sourceGroupIds || [])];
@@ -336,6 +336,7 @@ export function splitCategories(project, {
     created_at: timestamp, updated_at: timestamp,
     provenance: { operation: "split_categories", split_id: splitId, source_group_ids: sourceIds,
       source_group_by_variable: sourceGroupByVariable,
+      ...(reusedFrom ? { reused_from_split_id: reusedFrom.split_id, reused_from_group_id: reusedFrom.group_id } : {}),
       source_group_ids_retained_as_residuals: true, edited_at: timestamp },
   };
   const next = { ...project, groups: [...nextGroups, newGroup],
