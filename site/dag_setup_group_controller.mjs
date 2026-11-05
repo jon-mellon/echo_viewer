@@ -494,11 +494,6 @@ export function createDagSetupGroupController({
           h("span", { className: "explore-row-label", textContent: label }),
           variableMatch ? h("span", { className: "explore-row-path", textContent: `matches ${truncate(variableMatch, 70)}` }) : null),
         h("span", { className: "explore-row-papers", textContent: String(count) })),
-        previousSplits().some(item => item.source_group_ids?.includes(group.group_id))
-          ? h("button", { type: "button", className: "btn btn--ghost btn--sm", textContent: "⑂",
-            title: `Browse your previous splits of ${label}`,
-            attrs: { "aria-label": `Browse your previous splits of ${label}` },
-            onclick: () => browsePreviousForSource(pick?.role || "candidate", group.group_id) }) : null,
         custom ? customVariableActions({ group, canChange: canChangeCustom,
           onEdit: id => startEditSplit?.(id), onDelete: deleteCustom }) : null);
     };
@@ -521,16 +516,16 @@ export function createDagSetupGroupController({
         h("h2", { textContent: pick.title }),
         replacing ? h("button", { className: "btn btn--ghost btn--sm", type: "button", textContent: "Cancel", onclick: onCancel }) : null) : null,
       status ? h("p", { className: "explore-subsection-empty", role: "status", textContent: status }) : null,
-      section("Custom variables", custom, pick ? null : query ? "No custom variable matches." : "You have not made any custom variables yet.",
+      section("In this schema", custom, pick ? null : query ? "No custom variable matches." : "You have not made any custom variables yet.",
         createVariableButton(onCreate)),
       previous.length ? h("section", { className: "explore-group explore-picker-section" },
-        h("div", { className: "explore-group-header" }, h("h2", { textContent: "Your previous splits" })),
+        h("div", { className: "explore-group-header" }, h("h2", { textContent: "Saved elsewhere" })),
         h("p", { className: "explore-subsection-empty", textContent: "Saved in another schema; reuse one to add it here." }),
         h("ol", { className: "explore-list" }, previous.map(item => h("li", { className: "explore-row" },
           h("button", { type: "button", className: "explore-row-open", title: "Review and reuse this split in the current schema",
-            attrs: { "aria-label": `Reuse previous split ${item.name}` }, onclick: () => reusePreviousSplit(pick?.role || "candidate", item) },
+            attrs: { "aria-label": `Review and add ${item.name}` }, onclick: () => reusePreviousSplit(pick?.role || "candidate", item) },
             h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: item.name }),
-              h("span", { className: "explore-row-path", textContent: `From: ${(item.source_labels || item.source_group_ids || []).join(", ")}` })), h("span", { textContent: "⑂" })))))) : null,
+              h("span", { className: "explore-row-path", textContent: `From: ${(item.source_labels || []).join(", ")} · ${item.is_local ? "Local" : "Published"}${item.published_at ? ` · ${item.published_at.slice(0, 10)}` : ""}` })), h("span", { textContent: "Review and add" })))))) : null,
       section("Built-in variables", builtIn, query ? "No built-in variable matches." : "None available."),
       query && !groups.length ? h("div", { className: "explore-subsection-empty" }, clearButton()) : null);
     container.querySelectorAll("button[data-group-id]").forEach(button =>

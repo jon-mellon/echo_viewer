@@ -601,7 +601,8 @@ test("a published split appears after source selection and opens for review", as
     const source = window.__dagBuilderState.project.groups.find(group => group.group_id === sourceId);
     const group = { group_id: "published_new", label: "Published fixture split",
       description: "A published fixture split taken from one source category.", source: "user_split",
-      provenance: { operation: "split_categories", source_group_ids: [source.group_id] },
+      provenance: { operation: "split_categories", source_group_ids: [source.group_id],
+        source_group_by_variable: Object.fromEntries(source.variable_ids.map(id => [id, source.group_id])) },
       variable_ids: source.variable_ids.slice(0, 1) };
     const files = await writeGroupingSchemaFolder({ schema_version: GROUPING_FORMAT_VERSION,
       membership_unit: GROUPING_MEMBERSHIP_UNIT, grouping_set_id: "fixture", label: "Fixture", groups: [group] });
@@ -660,6 +661,55 @@ test("a published split appears after source selection and opens for review", as
   expect(groups.find(group => group.label === "Published fixture split")?.description)
     .toBe("A published fixture split taken from one source category.");
   expect(groups.find(group => group.group_id === fixture.sourceId)?.label).toBe(fixture.sourceLabel);
+});
+
+test("add a saved variable to the schema without selecting an analysis role", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+  });
+  await page.goto(`http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/?task=identify`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState.publishedSchemaHydrated);
+  const before = await page.evaluate(async () => {
+    const state = window.__dagBuilderState;
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    dagDataSource.loadVariableMetadata = async ids => ids.map(id => ({ variable_id: id,
+      index: parseInt(id.slice(1, 9), 16), display_label: id, concept_label: id,
+      map_x: parseInt(id.slice(1, 9), 16), map_y: parseInt(id.slice(9, 17), 16) }));
+    const source = state.project.groups.find(group => group.variable_ids?.length >= 2 && group.variable_ids.length <= 20);
+    const { commitLocalSchema } = await import("/local_schema_store.mjs");
+    const group = { group_id: "saved-variable-fixture", label: "Saved test variable",
+      description: "A saved test variable with a clear definition.", source: "user_split",
+      provenance: { operation: "split_categories", split_id: "saved-split-fixture", source_group_ids: [source.group_id],
+        source_group_by_variable: Object.fromEntries(source.variable_ids.map(id => [id, source.group_id])) },
+      variable_ids: [source.variable_ids[0]] };
+    await commitLocalSchema({ id: "saved-fixture", schema: { groups: [group] }, url: location.href });
+    return { source: source.label, iv: state.project.iv_group_id, dv: state.project.dv_group_id,
+      instrument: state.project.instrument_group_id, focus: state.focusedGroupId, phase: state.phase };
+  });
+  await page.locator("#schemaMenu summary").click();
+  await page.locator("#openCustomVariables").click();
+  await expect(page.locator("#customVariablesView")).toBeVisible();
+  const saved = page.locator(".custom-variables-previous");
+  await expect(saved).toContainText("Saved test variable");
+  await expect(saved).toContainText(before.source);
+  await saved.getByRole("button", { name: "Add Saved test variable to schema" }).click();
+  await expect(page.locator("#definitionConceptsTitle")).toHaveText("Review saved variable");
+  await expect(page.locator("#definitionJevPanel")).toBeHidden();
+  await expect(page.locator("#definitionResidualLabels input")).toHaveCount(0);
+  await expect(page.locator("#definitionSave")).toHaveText("Add to schema");
+  await page.locator("#definitionSave").click();
+  await expect(page.locator("#customVariablesView")).toBeVisible();
+  await expect(page.locator("#customVariablesStatus")).toContainText("Saved test variable");
+  const after = await page.evaluate(() => {
+    const state = window.__dagBuilderState;
+    return { iv: state.project.iv_group_id, dv: state.project.dv_group_id,
+      instrument: state.project.instrument_group_id, focus: state.focusedGroupId, phase: state.phase,
+      origin: state.project.groups.find(group => group.label === "Saved test variable")?.provenance?.reused_from_split_id };
+  });
+  expect(after).toEqual({ iv: before.iv, dv: before.dv, instrument: before.instrument,
+    focus: before.focus, phase: before.phase, origin: "saved-split-fixture" });
 });
 
 test("definition source search matches constituent variables, not only category names", async ({ page }) => {
@@ -878,7 +928,8 @@ test("previous local splits can be reused without changing the active schema fir
       map_x: parseInt(id.slice(1, 9), 16), map_y: parseInt(id.slice(9, 17), 16) }));
     await commitLocalSchema({ id: "previous-split-test", schema: { groups: [{ group_id: "previous-split-test-group",
       label: "Previous local construct", description: "A construct saved in an earlier local draft.", source: "user_split",
-      provenance: { operation: "split_categories", split_id: "previous-split-test-id", source_group_ids: [source.group_id] },
+      provenance: { operation: "split_categories", split_id: "previous-split-test-id", source_group_ids: [source.group_id],
+        source_group_by_variable: Object.fromEntries(source.variable_ids.map(id => [id, source.group_id])) },
       variable_ids: [source.variable_ids[0]] }] }, url: location.href });
     return { sourceId: source.group_id, sourceLabel: source.label, before: state.project.groups.length };
   });
@@ -891,9 +942,8 @@ test("previous local splits can be reused without changing the active schema fir
       index: parseInt(id.slice(1, 9), 16), display_label: id, concept_label: id,
       map_x: parseInt(id.slice(1, 9), 16), map_y: parseInt(id.slice(9, 17), 16) }));
   });
-  await expect(page.getByRole("button", { name: `Browse your previous splits of ${fixture.sourceLabel}` })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Reuse previous split Previous local construct" })).toBeVisible();
-  await page.getByRole("button", { name: "Reuse previous split Previous local construct" }).click();
+  await expect(page.getByRole("button", { name: "Review and add Previous local construct" })).toBeVisible();
+  await page.getByRole("button", { name: "Review and add Previous local construct" }).click();
   await expect(page.locator("#definitionNewLabel")).toHaveValue("Previous local construct");
   expect(await page.evaluate(() => window.__dagBuilderState.project.groups.length)).toBe(fixture.before);
   expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.source_group_ids)).toEqual([fixture.sourceId]);
