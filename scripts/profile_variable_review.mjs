@@ -100,6 +100,9 @@ try {
         await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); profiling = true;
 
         async function measure(name, budget, action, done) {
+          // A decision schedules background work (saving it, then hashing the schema against the publication).
+          // That work has its own budget below; let it finish so each interaction is measured by itself.
+          await page.waitForTimeout(1200);
           const start = await page.evaluate(() => { performance.clearMeasures(); return performance.now(); });
           await action();
           await done();
