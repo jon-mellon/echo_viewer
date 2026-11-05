@@ -678,9 +678,8 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     els.summary.textContent = !active.length ? `No ${noun} at this path length and paper count. Reviewed decisions remain below.` : "";
     els.summary.hidden = Boolean(active.length);
     const sections = [
-      { key: "custom", title: "Custom variables", items: active.filter(row => groupFor(row.groupId)?.source === "user_split"),
-        empty: `None of your custom variables are ${noun} here.` },
-      { key: "builtin", title: "Built-in variables", items: active.filter(row => groupFor(row.groupId)?.source !== "user_split"), empty: "None." },
+      // Where a variable came from is a schema question; review treats every variable alike.
+      { key: "candidates", title: noun.charAt(0).toUpperCase() + noun.slice(1), items: active, empty: "None." },
       ...(rejected.length ? [{ key: "rejected", title: `Rejected candidates (${rejected.length})`, items: rejected, empty: "" }] : []),
     ];
     replaceChildren(els.results, ...sections.map(({ key, title, items, empty }) =>
