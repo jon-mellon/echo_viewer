@@ -39,6 +39,13 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
   }
 
   function render() {
+    const start = performance.now();
+    try { renderView(); } finally {
+      if (state.customVariablesOpen) performance.measure("echo:schema-page:render", { start, end: performance.now() });
+    }
+  }
+
+  function renderView() {
     const showing = Boolean(state.customVariablesOpen && !state.definitionDraft);
     document.body.classList.toggle("custom-variables-open", showing);
     els.openCustomVariables?.setAttribute("aria-pressed", String(Boolean(state.customVariablesOpen)));

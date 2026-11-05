@@ -27,6 +27,7 @@
     "profile:diagnostics": "node scripts/profile_diagnostic_switching.mjs",
     "profile:edge-evidence": "node scripts/profile_edge_evidence.mjs",
     "profile:explore": "node scripts/profile_explore_views.mjs",
+    "profile:review": "node scripts/profile_variable_review.mjs",
     "profile:selection-concept": "node scripts/profile_selection_and_concept.mjs",
     "agent:mcp": "node agent/mcp.mjs"
   },

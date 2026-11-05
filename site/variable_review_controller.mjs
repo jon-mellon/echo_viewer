@@ -126,9 +126,11 @@ export function createVariableReviewController({ state, onCommit, onCancel = () 
         content.append(h("p", { textContent: "This removes the whole variable and its links from this study's graph. The reusable variable schema is unchanged. Diagnostics will be recalculated." }),
           h("label", { className: "review-note-label", htmlFor: "variableReviewNote", textContent: "Reason (required; kept private)" }), note);
       } else {
+        const start = performance.now();
         const preview = graphClaimPreview(state.project, kind, groupId, status);
         pending.preview = preview;
         claimContent(preview, existing);
+        performance.measure("echo:review:preview", { start, end: performance.now() });
       }
     } catch (problem) { showProblem(problem); confirm.disabled = true; }
     dialog.showModal();

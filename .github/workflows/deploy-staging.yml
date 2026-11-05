@@ -56,6 +56,9 @@ jobs:
       - name: Enforce mobile causes and consequences budgets
         run: PROFILE_SITE_DIR=dist/site npm run profile:explore
 
+      - name: Enforce mobile variable review and schema page budgets
+        run: PROFILE_SITE_DIR=dist/site npm run profile:review
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -64,6 +67,7 @@ jobs:
             profile-results-diagnostics-mobile/
             profile-results-edge-evidence/
             profile-results-explore-mobile/
+            profile-results-review-mobile/
           if-no-files-found: ignore
           retention-days: 1
 

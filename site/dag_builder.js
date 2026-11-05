@@ -576,6 +576,7 @@ function commitDiagnosticReview(kind, groupId, decision) {
   const spec = DIAGNOSTIC_STATUSES[kind];
   if (!spec || !groupById(groupId)) return;
   const key = diagnosticKey(state.project, kind, groupId);
+  const start = performance.now();
   const before = takeSnapshot();
   state.project[spec.field] = { ...(state.project[spec.field] || {}),
     [key]: decision };
@@ -583,6 +584,8 @@ function commitDiagnosticReview(kind, groupId, decision) {
   publicationController.workingCopyChanged();
   void persistentViewer.commitDecision().catch(error => console.error(`Could not save ${spec.noun} status`, error));
   updateDagFilters({ allowRemovedGroups: true });
+  performance.measure("echo:review:commit", { start, end: performance.now() });
+  void dagNetworkController.whenRendered().then(() => performance.measure("echo:review:rendered", { start, end: performance.now() }));
   // Keep keyboard focus on the moved row. On touch, focusing a select reopens its picker, and there is no keyboard focus to keep.
   if (window.matchMedia?.("(pointer: coarse)").matches) return;
   void dagNetworkController.whenRendered().then(() => {
