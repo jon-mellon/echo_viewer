@@ -111,3 +111,19 @@ test("exclusion decisions are scoped to the instrument and controlled violations
   await expect(page.locator("#dagTable")).toContainText("Rejected candidates");
   await expect(page.locator('#dagTable select[data-group-id="c"]')).toHaveValue("instrument_only_via_x");
 });
+
+test("on a touch screen every field is at least 16px, so iOS does not zoom the page when one is focused", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${base}/?task=identify`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20 && window.__dagBuilderState.publishedSchemaHydrated);
+  await page.locator('[data-mobile-panel="controls"]').last().tap();
+  await expect(page.locator("#identify-iv-input")).toBeVisible();
+  const small = await page.evaluate(() => [...document.querySelectorAll("input, select, textarea")]
+    .filter(el => !["checkbox", "radio", "range", "file", "hidden"].includes(el.type) && el.offsetParent)
+    .map(el => ({ id: el.id || el.className, size: parseFloat(getComputedStyle(el).fontSize) }))
+    .filter(item => item.size < 16));
+  expect(small).toEqual([]);
+  await context.close();
+});

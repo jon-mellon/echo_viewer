@@ -2739,6 +2739,7 @@ h2 {
   position: absolute;
   top: 10px;
   left: 10px;
+  max-width: calc(100% - 20px);
   z-index: 2;
   display: flex;
   flex-wrap: wrap;
@@ -4302,3 +4303,12 @@ div.explore-subsection-empty p, .custom-variables-empty p { margin: 0 0 var(--sp
 .explore-subsection-empty .btn, .custom-variables-empty .btn { width: auto; margin: 0; }
 
 /* Identify's panel filter: every variable, or only the confounders or colliders. */
+
+/* iOS Safari zooms the whole page when a field under 16px is focused, and never zooms back out.
+   Choosing a variable focuses a search field, so on touch screens every field is at least 16px.
+   The chained :not() raises specificity above the per-component font sizes. */
+@media (pointer: coarse) {
+  :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
+    font-size: var(--text-lg);
+  }
+}
