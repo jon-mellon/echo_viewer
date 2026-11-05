@@ -1,3 +1,32 @@
+import { customVariableContext, deleteSplitCategories } from "./dag_project.mjs";
+
+/** A preview only: the live schema is changed when the replacement is saved. */
+export function projectWithoutRoleSplit(project, role, expectedGroupId = null) {
+  const id = role === "candidate" ? expectedGroupId : project?.[`${role}_group_id`];
+  if (!id || expectedGroupId && id !== expectedGroupId || !customVariableContext(project, id)) return null;
+  if (["iv", "dv", "instrument"].some(other => other !== role && project[`${other}_group_id`] === id)) return null;
+  try {
+    const restored = deleteSplitCategories(project, { groupId: id, timestamp: project.updated_at || "" });
+    // Reusing a split keeps the current source names.
+    return { ...restored, groups: restored.groups.map(group => ({ ...group,
+      label: project.groups.find(current => current.group_id === group.group_id)?.label || group.label })) };
+  } catch { return null; }
+}
+
+export function previousSplitsForRole(rows, project, role, selectedGroupId = null) {
+  const ordinary = eligiblePreviousSplits(rows, project?.groups);
+  const restored = projectWithoutRoleSplit(project, role, selectedGroupId);
+  if (!restored) return ordinary;
+  const id = role === "candidate" ? selectedGroupId : project[`${role}_group_id`];
+  const selected = project.groups.find(group => group.group_id === id);
+  const identity = new Set([id, selected.provenance?.split_id, selected.provenance?.reused_from_split_id,
+    selected.provenance?.reused_from_group_id].filter(Boolean));
+  const replacements = eligiblePreviousSplits(rows.filter(row =>
+    ![row.group_id, row.split_id, row.origin_group_id, row.origin_split_id].some(key => key && identity.has(key))), restored.groups)
+    .map(row => ({ ...row, replaces_group_id: id, replaces_label: selected.label }));
+  return newestByName([...ordinary, ...replacements]);
+}
+
 /** Verify saved assignments against the current schema before offering a split. */
 export function eligiblePreviousSplits(rows, groups) {
   const current = new Map((groups || []).map(group => [group.group_id, group]));
@@ -28,14 +57,18 @@ export function eligiblePreviousSplits(rows, groups) {
         && original.some(variable => !selectedSet.has(variable));
     });
   });
-  eligible.sort((a, b) => String(b.published_at || "").localeCompare(String(a.published_at || ""))
+  return newestByName(eligible.map(row => ({ ...row,
+    source_labels: row.source_group_ids.map(id => current.get(id).label) })));
+}
+
+function newestByName(rows) {
+  rows.sort((a, b) => String(b.published_at || "").localeCompare(String(a.published_at || ""))
     || String(a.group_id).localeCompare(String(b.group_id))
     || String(a.publication_id || "").localeCompare(String(b.publication_id || "")));
   const byName = new Map();
-  for (const row of eligible) {
+  for (const row of rows) {
     const name = row.name.trim().toLowerCase();
-    if (!byName.has(name)) byName.set(name, { ...row,
-      source_labels: row.source_group_ids.map(id => current.get(id).label) });
+    if (!byName.has(name)) byName.set(name, row);
   }
   return [...byName.values()];
 }

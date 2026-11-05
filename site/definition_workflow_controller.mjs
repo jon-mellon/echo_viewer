@@ -2,7 +2,7 @@ import * as projectOps from "./dag_project.mjs";
 import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
 import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
 import { listOwnPublishedSplits, loadPublishedSplitMembership } from "./published_split_browser.mjs";
-import { eligiblePreviousSplits } from "./previous_split_candidates.mjs";
+import { eligiblePreviousSplits, projectWithoutRoleSplit, previousSplitsForRole } from "./previous_split_candidates.mjs";
 
 export function createDefinitionWorkflowController({ state, elements: els, activeGroup, clusterRep,
   invalidateVisibleCaches, renderAll, groupById, persistProjectLocally, getReturnUrl = () => location.href,
@@ -11,7 +11,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   applyProjectOperation, takeSnapshot, addToUndoHistory, clean, normalized, truncate,
   hydrateVariableDetails = async () => {},
   prewarmEvidence = async () => {}, commitSchema = async () => {},
-  onCommitFailureRestored = () => {}, onInstrumentReady = () => {}, onFocusDefined = null, previousSplits = () => [] }) {
+  onCommitFailureRestored = () => {}, onInstrumentReady = () => {}, onFocusDefined = null, previousSplits = () => [],
+  selectedGroupForRole = role => state.project?.[`${role}_group_id`] }) {
   let hydrationRevision = 0;
   const sourceHydrations = new Map();
   let browseRevision = 0;
@@ -25,12 +26,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (!browseState.loading) return;
     try {
       const ids = state.definitionDraft.source_group_ids;
-      const rows = [...previousSplits()];
+      const rows = [...previousSplits(state.definitionDraft.role)];
       if (!rows.length) {
         const published = await listOwnPublishedSplits();
         const loaded = await Promise.allSettled(published.filter(row => row.source_group_by_variable)
           .map(async row => ({ ...row, local_variable_ids: await loadPublishedSplitMembership(row) })));
-        rows.push(...eligiblePreviousSplits(loaded.flatMap(result => result.status === "fulfilled" ? [result.value] : []), state.project?.groups));
+        rows.push(...previousSplitsForRole(loaded.flatMap(result => result.status === "fulfilled" ? [result.value] : []), state.project, state.definitionDraft.role,
+          selectedGroupForRole(state.definitionDraft.role)));
       }
       const matching = rows.filter(row => ids.every(id => row.source_group_ids?.includes(id)));
       if (revision !== browseRevision || state.definitionDraft?.step !== "sources") return;
@@ -45,21 +47,26 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   async function choosePublishedSplit(row) {
     if (!row || browseState.loading || state.definitionDraft?.step !== "sources") return;
     const draft = state.definitionDraft;
-    if (!eligiblePreviousSplits([row], state.project?.groups).length) {
+    const base = row.replaces_group_id ? selectedGroupForRole(draft.role) === row.replaces_group_id
+      && projectWithoutRoleSplit(state.project, draft.role, row.replaces_group_id) : state.project;
+    if (!base || !eligiblePreviousSplits([row], base.groups).length) {
       browseState.error = "This saved variable no longer fits the current schema.";
-      renderDefinition();
+      renderDraft();
       return;
     }
-    const available = new Set((state.project?.groups || []).filter(group => group.variable_ids?.length).map(group => group.group_id));
+    draft.replaces_group_id = row.replaces_group_id || null;
+    draft.replaces_label = row.replaces_label || "";
+    const available = new Set(base.groups.filter(group => group.variable_ids?.length).map(group => group.group_id));
     if (!row.source_group_ids?.length || row.source_group_ids.some(id => !available.has(id))) {
       browseState.error = "This split's source variables are not available in the current schema.";
-      renderDefinition();
+      renderDraft();
       return;
     }
     draft.source_group_ids = [...row.source_group_ids];
     browseState.loading = true;
     browseState.error = "Loading the previous split…";
-    renderDefinition();
+    draft.step = "loading_saved";
+    renderDraft();
     try {
       const ids = row.local_variable_ids || await loadPublishedSplitMembership(row);
       if (state.definitionDraft !== draft) return;
@@ -69,15 +76,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         || sources.some(group => group.variable_ids.every(id => ids.includes(id)))) {
         throw new Error("This split does not fit the current source category assignments.");
       }
-      await continueDefinition();
+      await continueDefinition({ saved: true });
       if (state.definitionDraft !== draft) return;
-      if (draft.step !== "describe") throw new Error("Could not load the current source variables.");
-      // The published split supplies which concepts move and starts the name
-      // and definition, which the next step lets the user rewrite.
+      if (draft.details_loading || draft.step !== "loading_saved") throw new Error("Could not load the current source variables.");
       draft.new_label = row.name;
       draft.new_description = row.description;
-      // Continue focused the empty name field. Keep its visible value in sync
-      // when adopting a published split, since the presenter preserves focus.
       els.definitionNewLabel.value = row.name;
       els.definitionNewDescription.value = row.description;
       draft.new_variable_ids = [...new Set(ids.map(clusterRep))];
@@ -92,9 +95,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       els.definitionSave.focus();
     } catch (error) {
       if (state.definitionDraft === draft) {
+        draft.step = "sources";
         browseState.error = `Could not use this split: ${error.message || error}`;
         browseState.loading = false;
-        renderDefinition();
+        renderDraft();
       }
     }
   }
@@ -105,7 +109,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     jevAssist.render();
   };
 
-  function startDefinition(role) {
+  function startDefinition(role, { render = true } = {}) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv", "instrument", "candidate"].includes(role)) return;
     jevAssist.clearPreview();
     browseRevision += 1;
@@ -124,9 +128,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     };
     state.selectedVariableIds.clear();
     invalidateVisibleCaches();
-    renderDraft();
-    els.definitionSourceSearch.focus();
-    void renderSavedRuns();
+    if (render) {
+      renderDraft();
+      els.definitionSourceSearch.focus();
+      void renderSavedRuns();
+    }
   }
 
   function browsePreviousForSource(role, sourceId) {
@@ -135,13 +141,13 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   }
 
   function reusePreviousSplit(role, row) {
-    startDefinition(role);
+    startDefinition(role, { render: false });
     if (!state.definitionDraft) return;
     const available = new Set((state.project?.groups || []).filter(group => group.variable_ids?.length).map(group => group.group_id));
     if (!row.source_group_ids?.length || row.source_group_ids.some(id => !available.has(id))) {
       state.definitionDraft.source_group_ids = [...(row.source_group_ids || [])];
       browseState.error = "This split's source variables are not available in the current schema.";
-      renderDefinition();
+      renderDraft();
       return;
     }
     state.definitionDraft.source_group_ids = [...row.source_group_ids];
@@ -202,10 +208,17 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   function definitionSources() {
     const ids = new Set(state.definitionDraft?.source_group_ids || []);
-    return (state.project?.groups || []).filter(group => ids.has(group.group_id));
+    return (definitionProject()?.groups || []).filter(group => ids.has(group.group_id));
   }
 
-  async function continueDefinition() {
+  function definitionProject() {
+    const draft = state.definitionDraft;
+    return draft?.replaces_group_id
+      ? selectedGroupForRole(draft.role) === draft.replaces_group_id
+        && projectWithoutRoleSplit(state.project, draft.role, draft.replaces_group_id) : state.project;
+  }
+
+  async function continueDefinition({ saved = false } = {}) {
     const draft = state.definitionDraft;
     const sources = definitionSources();
     if (!draft || draft.details_loading || !sources.length) return;
@@ -221,13 +234,14 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       [group.group_id, group.label || group.group_id]));
     draft.details_loading = true;
     state.selectedVariableIds.clear();
-    presenter.setContinueLoading();
+    if (!saved) presenter.setContinueLoading();
     try {
       await Promise.all(sources.map(source => sourceHydrations.get(source.group_id)
         || hydrateVariableDetails(source.variable_ids, { skipNeighbors: true })));
     } catch (error) {
       if (revision === hydrationRevision && state.definitionDraft === draft) {
         draft.details_loading = false;
+        if (saved) throw error;
         renderDefinition();
         presenter.showLoadError(error);
       }
@@ -235,6 +249,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     }
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     draft.details_loading = false;
+    if (saved) return;
     draft.step = "describe";
     invalidateVisibleCaches();
     renderDraft();
@@ -283,7 +298,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     const description = clean(draft?.new_description);
     if ([...description].length < 20) return "Write a definition of at least 20 characters.";
     const own = draft.existing_new_group_id;
-    const taken = (state.project?.groups || []).some(group => group.group_id !== own
+    const taken = (definitionProject()?.groups || []).some(group => group.group_id !== own
       && clean(group.label).toLowerCase() === label.toLowerCase());
     return taken ? `Another variable is already called “${label}”.` : "";
   }
@@ -338,8 +353,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     const previousProject = structuredClone(state.project);
     const previousCompiledDag = state.compiledDag ? structuredClone(state.compiledDag) : null;
     try {
+      const base = definitionProject();
+      if (!base) throw new Error("The selected variable changed while this replacement was open.");
       for (const snap of draft.source_snapshot) {
-        const current = groupById(snap.group_id);
+        const current = base.groups.find(group => group.group_id === snap.group_id);
         if (!current || JSON.stringify(current.variable_ids) !== JSON.stringify(snap.variable_ids)) {
           throw new Error(`Source category ${snap.label} changed while this definition was open.`);
         }
@@ -347,7 +364,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       const before = takeSnapshot();
       const newGroupId = draft.existing_new_group_id || `g_split_${Date.now()}`;
       const operation = draft.mode === "edit" ? projectOps.updateSplitCategories : projectOps.splitCategories;
-      const next = operation(state.project, {
+      const next = operation(base, {
         sourceGroupIds: draft.source_group_ids, newGroupId, newLabel: draft.new_label,
         newDescription: draft.new_description,
         residualLabels: draft.residual_labels,
@@ -378,7 +395,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         state.focusedGroupId = newGroupId;
       }
       if (draft.role === "candidate" && !forFocus && !fromManager) state.pendingVariablePanelGroupId = newGroupId;
-      const initialAnchor = draft.mode !== "edit" && !state.changingAnchorSide;
+      const initialAnchor = draft.mode !== "edit" && !draft.replaces_group_id && !state.changingAnchorSide;
       if (!forFocus && !fromManager) {
         state.phase = initialAnchor && draft.role === "iv" ? "select_dv"
           : initialAnchor && draft.role === "dv" ? "select_instrument" : "build";

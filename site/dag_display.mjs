@@ -88,7 +88,8 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const isSelected = group.group_id === view.activeGroupId;
   const role = isViolation || isExogeneityCandidate || isConfounder ? "confounder" : isInstrument ? "instrument" : isCollider ? "collider" : isPathMediator ? "mediator" : null;
   const color = role ? ROLE_COLORS[role] : view.groupColor;
-  const fill = mixHex(color, "#ffffff", NODE_FILL_SOFTNESS);
+  const addressed = isConfounder && ["explicitly_controlled", "accounted_for_by_design"].includes(view.confounderStatus);
+  const fill = mixHex(color, "#ffffff", addressed ? 0.8 : NODE_FILL_SOFTNESS);
   const roleBorder = deeper(color);
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
   return {

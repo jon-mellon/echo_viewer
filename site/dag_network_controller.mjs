@@ -10,7 +10,7 @@ import * as dagPathHighlights from "./dag_path_highlights.mjs";
 import { STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "./dag_inspector_controller.mjs";
 import { studyDesignEdgeData } from "./dag_study_edges.mjs";
 import { createDagTable, dagTableModel, pathView } from "./dag_table.mjs";
-import { DIAGNOSTIC_STATUSES, STATUS_MENU_LABELS, diagnosticStatusRows } from "./confounder_status.mjs";
+import { DIAGNOSTIC_STATUSES, STATUS_MENU_LABELS, diagnosticStatusRows, confounderKey } from "./confounder_status.mjs";
 
 export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId, links, visualData) {
   if (previousId === selectedId) return [];
@@ -208,6 +208,8 @@ function visNodeData(group, layoutPoint, layoutParams = {}) {
     colliderGroupIds: state.colliderGroupIds, colliderPathGroupIds: state.colliderPathGroupIds,
     confounderGroupIds: state.confounderGroupIds, confounderPathGroupIds: state.confounderPathGroupIds,
     ivId: studyAnchors().ivId, dvId: studyAnchors().dvId,
+    confounderStatus: exploring() ? null : state.project?.confounder_statuses?.[
+      confounderKey(state.project?.iv_group_id, state.project?.dv_group_id, group.group_id)]?.status,
     activeGroupId: state.activeGroupId,
     groupColor: exploring() && group.type === "candidate" ? EXPLORATION_NODE_COLORS[state.task] || groupColor(group) : groupColor(group),
   });
