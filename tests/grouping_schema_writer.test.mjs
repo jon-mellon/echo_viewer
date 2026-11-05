@@ -60,3 +60,10 @@ test("derived view files can be omitted to match publications made without them"
   assert.ok(!without.has("variable-schema.json") && !without.has("study-decisions.json"));
   assert.equal(JSON.parse(new TextDecoder().decode(without.get("manifest.json"))).variable_schema_file, undefined);
 });
+
+test("both working-schema hashes come from one write and match writing each way", async () => {
+  const { workingSchemaHashes } = await import("../site/dag_publication_core.mjs");
+  const [withViews, legacy] = await workingSchemaHashes(schema, webcrypto);
+  assert.equal(withViews, await canonicalFolderHash(await writeGroupingSchemaFolder(schema, webcrypto), webcrypto));
+  assert.equal(legacy, await canonicalFolderHash(await writeGroupingSchemaFolder(schema, webcrypto, { views: false }), webcrypto));
+});
