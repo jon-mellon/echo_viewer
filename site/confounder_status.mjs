@@ -2,7 +2,7 @@ export const CONFOUNDER_STATUSES = {
   unaddressed: "Unaddressed",
   explicitly_controlled: "Explicitly controlled",
   accounted_for_by_design: "Accounted for by design",
-  causes_y_only_via_x: "Causes Y only via X",
+  causes_y_only_via_x: "Affects outcome only via cause",
   not_in_minimal_adjustment_set: "Not in minimal adjustment set",
   removed_other: "Removed for other reason",
 };
