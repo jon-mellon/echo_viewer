@@ -86,7 +86,10 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
 
   function renderPartition(draft) {
     const name = String(draft.new_label || "").trim() || "the new variable";
-    els.definitionConceptsIntro.textContent = `Select which concepts belong in “${truncate(name, 60)}”.`;
+    els.definitionConceptsIntro.textContent = draft.published_split
+      ? `Review the saved concepts for “${truncate(name, 60)}”, then save the variable.`
+      : `Select which concepts belong in “${truncate(name, 60)}”.`;
+    els.definitionJevPanel.hidden = Boolean(draft.published_split);
     els.definitionConceptsIntro.title = name;
     const summary = classification(draft);
     const { counts } = summary;
@@ -205,15 +208,16 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
         els.definitionBrowseStatus.textContent = browseState.error || (browseState.loading
           ? "Looking for your previous splits from these variables…"
           : browseState.rows.length
-            ? "Reuse a previous split to fill in the name, definition and concepts. You can edit them next."
+            ? "Review and save a previous split with its saved concepts."
             : "You have no previous splits for these source variables. You can still create a new split.");
         replaceChildren(els.definitionBrowseResults, browseState.rows.map((row, index) =>
           h("article", { className: "definition-browse-card" },
             h("strong", { textContent: row.name }),
+            h("span", { className: "small-note", textContent: `From: ${(row.source_labels || row.source_group_ids || []).join(", ")}` }),
             ...(row.is_own ? [h("span", { className: "small-note", textContent: "Your published split" })] : []),
             h("p", { textContent: row.description }),
             h("button", { type: "button", className: "btn", dataset: { splitIndex: String(index) },
-              textContent: "Start from this", disabled: browseState.loading }))));
+              textContent: "Review split", disabled: browseState.loading }))));
         els.definitionBrowseResults.querySelectorAll("button[data-split-index]").forEach(button =>
           button.addEventListener("click", () => onChoosePublishedSplit(browseState.rows[Number(button.dataset.splitIndex)])));
       }

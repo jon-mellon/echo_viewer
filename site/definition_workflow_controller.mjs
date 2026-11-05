@@ -72,11 +72,12 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       draft.new_variable_ids = [...new Set(ids.map(clusterRep))];
       draft.reviewed_variable_ids = [...draft.eligible_variable_ids];
       draft.published_split = { publication_id: row.publication_id, group_id: row.group_id };
+      draft.step = "partition";
       state.selectedVariableIds = new Set(draft.new_variable_ids);
       persistProjectLocally();
       invalidateVisibleCaches();
       renderDraft();
-      els.definitionNewLabel.focus();
+      els.definitionSave.focus();
     } catch (error) {
       if (state.definitionDraft === draft) {
         browseState.error = `Could not use this split: ${error.message || error}`;

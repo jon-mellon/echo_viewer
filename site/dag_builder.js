@@ -1963,6 +1963,11 @@ function loadPreviousSplits(force = false) {
         && group.provenance?.operation === "split_categories" && Array.isArray(group.provenance.source_group_ids))
         .map(group => ({ group_id: group.group_id, split_id: group.provenance.split_id || group.group_id,
           source_group_ids: group.provenance.source_group_ids, name: group.label, description: group.description,
+          source_labels: group.provenance.source_group_ids.map(id => {
+            const source = record.schema.groups.find(candidate => candidate.group_id === id);
+            return source && group.provenance.split_id && source.provenance?.split_id === group.provenance.split_id
+              ? source.provenance.prior_label || source.label || id : source?.label || id;
+          }),
           local_variable_ids: group.variable_ids, published_at: record.updatedAt || "", is_local: true }))) : [];
     const rows = [...localRows, ...(published.status === "fulfilled" ? published.value : [])];
     const unique = new Map();

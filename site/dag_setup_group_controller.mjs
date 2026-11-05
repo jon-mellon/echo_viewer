@@ -481,7 +481,7 @@ export function createDagSetupGroupController({
     loadPreviousSplits();
     const groups = searchFocusGroups(query).filter(({ group }) => !exclude.has(group.group_id));
     const previous = previousSplits().filter(item => !groups.some(({ group }) => group.group_id === item.group_id)
-      && (!query || normalized(`${item.name} ${item.description || ""}`).includes(query)));
+      && (!query || normalized(`${item.name} ${item.description || ""} ${(item.source_labels || []).join(" ")}`).includes(query)));
     container.hidden = false;
     const row = ({ group, variableMatch }) => {
       const label = group.label || group.group_id;
@@ -525,10 +525,12 @@ export function createDagSetupGroupController({
         createVariableButton(onCreate)),
       previous.length ? h("section", { className: "explore-group explore-picker-section" },
         h("div", { className: "explore-group-header" }, h("h2", { textContent: "Your previous splits" })),
+        h("p", { className: "explore-subsection-empty", textContent: "Saved in another schema; reuse one to add it here." }),
         h("ol", { className: "explore-list" }, previous.map(item => h("li", { className: "explore-row" },
           h("button", { type: "button", className: "explore-row-open", title: "Review and reuse this split in the current schema",
             attrs: { "aria-label": `Reuse previous split ${item.name}` }, onclick: () => reusePreviousSplit(pick?.role || "candidate", item) },
-            h("span", { className: "explore-row-label", textContent: item.name }), h("span", { textContent: "⑂" })))))) : null,
+            h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: item.name }),
+              h("span", { className: "explore-row-path", textContent: `From: ${(item.source_labels || item.source_group_ids || []).join(", ")}` })), h("span", { textContent: "⑂" })))))) : null,
       section("Built-in variables", builtIn, query ? "No built-in variable matches." : "None available."),
       query && !groups.length ? h("div", { className: "explore-subsection-empty" }, clearButton()) : null);
     container.querySelectorAll("button[data-group-id]").forEach(button =>
