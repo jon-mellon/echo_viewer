@@ -644,10 +644,10 @@ test("in Identify each row is a confounder with its paths, a status, and links t
   await page.locator("#dagViewTable").click();
   await expect(page.locator("#diagnosticOverlapKey")).toBeHidden();
   await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Variable", "Path to cause", "Path to outcome", "Papers", "Concepts", "Status"]);
-  // One row per confounder, in Custom and Built-in sections, each with its shortest path to the cause and to the outcome.
+  // One row per confounder, in one section, each with its shortest path to the cause and to the outcome.
   const rows = page.locator("#dagPathsTable tbody tr:not(.dag-table-section)");
   expect(await rows.count()).toBeGreaterThan(0);
-  await expect(page.locator("#dagPathsTable tbody tr.dag-table-section")).toHaveCount(2);
+  await expect(page.locator("#dagPathsTable tbody tr.dag-table-section")).toHaveCount(1);
   const row = rows.first();
   const causeLinks = row.locator("td.dag-table-routes").nth(0).locator(".dag-table-link[data-edge-id]");
   const outcomeLinks = row.locator("td.dag-table-routes").nth(1).locator(".dag-table-link[data-edge-id]");

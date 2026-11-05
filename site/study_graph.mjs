@@ -82,6 +82,28 @@ export function bypassPath(effects, source, target, x) {
   return null;
 }
 
+/** Simple paths from source to target that avoid x, shortest first. Bounded, so dense or cyclic graphs stay quick. */
+export function bypassPaths(effects, source, target, x, { limit = 20, maxEdges = 6, budget = 20000 } = {}) {
+  if (source === x || target === x) return { paths: [], truncated: false };
+  const graph = adjacency(effects, x), found = [];
+  let steps = 0, truncated = false;
+  // Deepen one edge at a time so the shortest paths are found before the budget runs out.
+  for (let edges = 1; edges <= maxEdges && found.length <= limit && !truncated; edges++) {
+    const walk = (node, path, seen) => {
+      if (found.length > limit || ++steps > budget) { truncated = true; return; }
+      if (path.length - 1 === edges) { if (node === target) found.push([...path]); return; }
+      for (const next of graph.get(node) || []) {
+        if (seen.has(next) || (next === target && path.length !== edges)) continue;
+        seen.add(next); path.push(next);
+        walk(next, path, seen);
+        path.pop(); seen.delete(next);
+      }
+    };
+    walk(source, [source], new Set([source]));
+  }
+  return { paths: found.slice(0, limit), truncated: truncated || found.length > limit };
+}
+
 export function graphClaimPreview(project, kind, groupId, status) {
   if (!CLAIM_STATUSES.has(status)) throw new Error("Choose a graph-claim disposition.");
   const key = diagnosticKey(project, kind, groupId);
@@ -101,7 +123,8 @@ export function graphClaimPreview(project, kind, groupId, status) {
     && forward.has(effect.sourceId) && backward.has(effect.targetId));
   // Only a direct bypass has one unambiguous edge to reject.
   const suggested = candidates.filter(effect => effect.sourceId === source && effect.targetId === target);
-  return { key, kind, groupId, status, source, target, x, effects, candidates, suggested,
+  const assertedExists = effects.some(effect => effect.sourceId === source && effect.targetId === x);
+  return { key, kind, groupId, status, source, target, x, effects, candidates, suggested, assertedExists,
     asserted: [{ sourceId: source, targetId: x }],
     scope: [project.iv_group_id, project.dv_group_id, ...(kind === "exclusion" ? [project.instrument_group_id] : [])] };
 }

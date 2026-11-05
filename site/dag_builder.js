@@ -519,8 +519,8 @@ function renderExploreFocus() {
   updateDagFilters();
 }
 
-function updateDagFilters() {
-  renderCoordinator.updateDagFilters();
+function updateDagFilters(options) {
+  renderCoordinator.updateDagFilters(options);
   taskViews.render();
   persistentViewer.viewerChanged();
 }
@@ -582,7 +582,7 @@ function commitDiagnosticReview(kind, groupId, decision) {
   projectController.record(`Set ${spec.noun} status: ${groupById(groupId).label}`, before);
   publicationController.workingCopyChanged();
   void persistentViewer.commitDecision().catch(error => console.error(`Could not save ${spec.noun} status`, error));
-  updateDagFilters();
+  updateDagFilters({ allowRemovedGroups: true });
   // Keep keyboard focus on the moved row. On touch, focusing a select reopens its picker, and there is no keyboard focus to keep.
   if (window.matchMedia?.("(pointer: coarse)").matches) return;
   void dagNetworkController.whenRendered().then(() => {
