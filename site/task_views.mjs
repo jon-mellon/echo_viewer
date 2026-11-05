@@ -2,6 +2,8 @@ import { h, replaceChildren } from "./dom_builder.mjs";
 import { causalNeighborhood, MAX_NEIGHBORHOOD_DEPTH } from "./causal_neighborhood.mjs";
 import { createVariableButton, customVariableActions } from "./custom_variable_actions.mjs";
 import { pathView } from "./dag_table.mjs";
+import { DIAGNOSTIC_STATUSES, CONTROL_WARNING, CLAIM_STATUSES, diagnosticReviewRows } from "./confounder_status.mjs";
+import { claimConflicts } from "./study_graph.mjs";
 
 const TASK_CLASSES = { identify: "task-identify", causes: "task-causes", consequences: "task-consequences" };
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
@@ -108,7 +110,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   isDisplayGroup = () => true, onExploreChange = () => {}, onTaskChange = () => {},
   onFocusPicking = () => {}, onPickerInput = () => {}, onSetupNeeded = () => {}, openEvidence = () => {},
   onRowHover = () => {}, onChooseIdentify = () => {}, onIdentifyPicking = () => {}, onIdentifyRowHover = () => {},
-  onIdentifyExcludedChange = () => {}, onOpenIdentifyVariable = () => {}, canChangeCustom = () => true, onEditCustom = () => {}, onDeleteCustom = async () => {}, onCreateCustom = () => {},
+  onReviewVariable = () => {}, onEditVariableSchema = () => {}, onIdentifyExcludedChange = () => {}, onOpenIdentifyVariable = () => {}, canChangeCustom = () => true, onEditCustom = () => {}, onDeleteCustom = async () => {}, onCreateCustom = () => {},
   placeEvidencePane = () => {}, prepareReset = () => {}, whenReady = () => Promise.resolve(), openWindow = (url) => window.open(url, "_blank", "noopener"),
   navigate = (url) => window.location.assign(url) }) {
   const el = id => document.getElementById(id);
@@ -642,100 +644,84 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     const view = pathView({ ...state, exploring: false });
     const spec = IDENTIFY_VIEWS[view];
     const anchors = new Set(IDENTIFY_SIDES.map(anchorId).filter(Boolean));
-    const candidates = spec ? new Set(state[spec.ids] || []) : null;
-    const ids = groups().map(group => group.group_id)
-      .filter(id => !anchors.has(id) && (!candidates || candidates.has(id)));
-    const support = paperSupport();
-    const counter = support.papersFor ? cachedCounter(support) : null;
+    const candidates = spec ? new Set(state[spec.ids] || []) : new Set();
+    const reviewable = view === "confounders" || view === "exclusion";
+    const reviews = reviewable ? diagnosticReviewRows(state.project, candidates, view)
+      : [...candidates].map(groupId => ({ groupId, status: "unaddressed", text: "", rejected: false, noLongerCandidate: false }));
+    const counter = paperSupport().papersFor;
     const pairs = new Map((state.visibleLinks || []).map(link => [[link.group_a, link.group_b].sort().join("\u0000"), link]));
-    const hopPapers = (from, to) => {
-      const link = pairs.get([from, to].sort().join("\u0000"));
-      return link && counter ? counter(link, link.group_a === from) : null;
-    };
-    const excluded = identifyExcluded();
-    const rows = ids.filter(id => isDisplayGroup(groupFor(id))).map(id => {
-      const routes = witnessRoutes(spec && state[spec.paths]?.get(id));
-      // Which variables a route goes through is only listed once the filter narrows to candidates.
-      const between = candidates
-        ? [...new Set(routes.flatMap(route => route.slice(1, -1)).filter(step => step !== id && !anchors.has(step)))] : [];
-      const counts = routes.flatMap(route => route.slice(1).map((step, index) => hopPapers(route[index], step)))
-        .filter(count => Number.isFinite(count));
-      return { groupId: id, between, papers: counts.length ? Math.min(...counts) : null, excluded: excluded.has(id) };
+    const rows = reviews.filter(row => !anchors.has(row.groupId) && groupFor(row.groupId) && isDisplayGroup(groupFor(row.groupId))).map(row => {
+      const routes = witnessRoutes(spec && state[spec.paths]?.get(row.groupId));
+      const between = [...new Set(routes.flatMap(route => route.slice(1, -1)).filter(step => step !== row.groupId && !anchors.has(step)))];
+      const counts = routes.flatMap(route => route.slice(1).map((step, index) => {
+        const link = pairs.get([route[index], step].sort().join("\u0000"));
+        return link && counter && !link.is_user_claim ? counter(link, link.group_a === route[index]) : null;
+      })).filter(Number.isFinite);
+      const decision = reviewable ? state.project[DIAGNOSTIC_STATUSES[view].field]?.[row.key] : null;
+      const conflicts = decision && CLAIM_STATUSES.has(decision.status)
+        ? claimConflicts(state.project, { key: row.key, asserted: decision.asserted_effects || [] }, decision.rejected_effects || []) : [];
+      return { ...row, between, papers: counts.length ? Math.min(...counts) : null, conflicts: conflicts.length };
     });
-    // A variable left off the map drops out of the diagnostics, so the filtered list keeps it by hand.
-    const listed = new Set(rows.map(row => row.groupId));
-    for (const id of excluded) {
-      if (!listed.has(id) && !anchors.has(id) && groupFor(id)) rows.push({ groupId: id, between: [], papers: null, excluded: true });
-    }
     rows.sort((a, b) => labelFor(a.groupId).localeCompare(labelFor(b.groupId)));
-    return { view, noun: spec?.noun || "variables", rows };
+    return { view, noun: spec?.noun || "variables", reviewable, rows };
   }
 
   function renderIdentifyResults() {
-    const { view, noun, rows } = identifyRows();
-    const notice = text => { els.summary.textContent = text; els.summary.hidden = !text; };
-    notice(rows.length ? ""
-      : `No ${noun} at this path length and paper count. Try a longer path or fewer papers in the filters.`);
-    // Rebuild only when the rows change, so a filter being typed into keeps its focus.
+    const { view, noun, rows, reviewable } = identifyRows();
     const key = JSON.stringify([view, rows, state.selectedEvidenceGroupId, listFilter.query]);
-    const filter = document.querySelector(".dag-ws-controls > .filter-dropdown, #exploreResults .filter-dropdown");
-    if (key === identifyListKey && els.results.contains(filter)) return;
+    const toolbar = el("variableReviewTools");
+    const filter = document.querySelector(".dag-ws-controls > .filter-dropdown, #variableReviewTools .filter-dropdown, #exploreResults .filter-dropdown");
+    if (filter && toolbar && filter.parentElement !== toolbar) toolbar.append(filter);
+    if (key === identifyListKey) return;
     identifyListKey = key;
-    const refocus = filter?.contains(document.activeElement) ? document.activeElement : null;
-    const isCustom = id => groupFor(id)?.source === "user_split";
+    const active = rows.filter(row => !row.rejected), rejected = rows.filter(row => row.rejected);
+    els.summary.textContent = !active.length ? `No ${noun} at this path length and paper count. Reviewed decisions remain below.` : "";
+    els.summary.hidden = Boolean(active.length);
     const sections = [
-      { key: "custom", title: "Custom variables", items: rows.filter(row => isCustom(row.groupId)),
+      { key: "custom", title: "Custom variables", items: active.filter(row => groupFor(row.groupId)?.source === "user_split"),
         empty: `None of your custom variables are ${noun} here.` },
-      { key: "builtin", title: "Built-in variables", items: rows.filter(row => !isCustom(row.groupId)), empty: "None." },
+      { key: "builtin", title: "Built-in variables", items: active.filter(row => groupFor(row.groupId)?.source !== "user_split"), empty: "None." },
+      ...(rejected.length ? [{ key: "rejected", title: `Rejected candidates (${rejected.length})`, items: rejected, empty: "" }] : []),
     ];
-    replaceChildren(els.results, ...sections.map(({ key, title, items, empty }, sectionIndex) => {
-      const includedCount = items.filter(item => !item.excluded).length;
-      const all = h("input", { type: "checkbox", className: "explore-include",
-        checked: items.length > 0 && includedCount === items.length, disabled: !items.length, dataset: { section: key },
-        title: includedCount === items.length ? "Exclude all of these from the map" : "Include all of these in the map",
-        attrs: { "aria-label": `Include all ${title.toLowerCase()} in the map` },
-        onchange: event => setIdentifyIncluded(items.map(item => item.groupId), event.target.checked,
-          `.explore-include[data-section="${key}"]`) });
-      all.indeterminate = includedCount > 0 && includedCount < items.length;
-      return h("section", { className: "explore-group", dataset: { section: key } },
-        h("div", { className: "explore-group-header" },
-          all,
-          h("h3", { textContent: title }),
-          // Create and the map's filters sit beside the first heading, as Explore's do.
-          sectionIndex === 0 ? h("span", { className: "explore-group-tools identify-tools" }, createVariableButton(onCreateCustom))
-            : h("span"),
-          h("span", { className: "explore-papers-header", textContent: "Papers",
-            title: "Distinct papers supporting the weakest link on the paths shown for this variable" })),
+    replaceChildren(els.results, ...sections.map(({ key, title, items, empty }) =>
+      h("section", { className: "explore-group variable-review-section", dataset: { section: key } },
+        h("div", { className: "explore-group-header" }, h("h3", { textContent: title }),
+          h("span", { className: "explore-papers-header", textContent: "Papers" })),
         h("ol", { className: "explore-list" }, items.map(item => {
-          const group = groupFor(item.groupId);
           const label = labelFor(item.groupId);
-          return h("li", { className: `explore-row${item.excluded ? " is-excluded" : ""}${key === "custom" ? " has-actions" : ""}`,
-            dataset: { groupId: item.groupId } },
-          h("input", { type: "checkbox", className: "explore-include", checked: !item.excluded,
-            dataset: { groupId: item.groupId },
-            title: item.excluded ? "Show on the map" : "Leave off the map",
-            attrs: { "aria-label": `Include ${label} in the map` },
-            onchange: event => setIdentifyIncluded([item.groupId], event.target.checked,
-              `.explore-include[data-group-id="${CSS.escape(item.groupId)}"]`) }),
-          h("button", { type: "button", className: "explore-row-open",
-            attrs: { "aria-pressed": String(state.selectedEvidenceGroupId === item.groupId),
-              "aria-label": item.papers === null ? label : `${label}, ${plural(item.papers, "paper")} on the weakest link` },
-            title: `See the definition and concepts of ${label}`,
-            onclick: () => onOpenIdentifyVariable(item.groupId),
-            onmouseenter: () => onIdentifyRowHover(item.excluded ? null : item.groupId), onmouseleave: () => onIdentifyRowHover(null),
-            onfocus: () => onIdentifyRowHover(item.excluded ? null : item.groupId), onblur: () => onIdentifyRowHover(null) },
-          h("span", { className: "explore-row-text" },
-            h("span", { className: "explore-row-label", textContent: label }),
-            item.between.length ? h("span", { className: "explore-row-path", textContent: `via ${item.between.map(labelFor).join(", ")}` }) : null),
-          h("span", { className: "explore-row-papers", textContent: item.papers === null ? "" : String(item.papers) })),
-          key === "custom" && group ? customVariableActions({ group, canChange: canChangeCustom,
-            onEdit: onEditCustom, onDelete: onDeleteCustom }) : null);
+          const select = reviewable ? h("select", { className: "select-input variable-disposition", dataset: { groupId: item.groupId },
+            attrs: { "aria-label": `Disposition for ${label}` },
+            onchange: event => {
+              const chosen = event.target.value;
+              event.target.value = item.status;
+              onReviewVariable(view, item.groupId, chosen);
+            } },
+            Object.entries(DIAGNOSTIC_STATUSES[view].statuses).map(([value, textContent]) => h("option", { value, textContent })),
+            item.status === "other" ? h("option", { value: "other", textContent: "Other (previous decision)" }) : null) : null;
+          if (select) select.value = item.status;
+          const warning = view === "exclusion" && item.status === "explicitly_controlled"
+            ? h("span", { className: "review-warning", tabIndex: 0, title: CONTROL_WARNING,
+              attrs: { role: "img", "aria-label": CONTROL_WARNING } }, "⚠") : null;
+          return h("li", { className: "explore-row variable-review-row", dataset: { groupId: item.groupId } },
+            h("button", { type: "button", className: "explore-row-open",
+              attrs: { "aria-pressed": String(state.selectedEvidenceGroupId === item.groupId), "aria-label": label },
+              title: `See the definition and concepts of ${label}`,
+              onclick: () => onOpenIdentifyVariable(item.groupId),
+              onmouseenter: () => onIdentifyRowHover(item.rejected ? null : item.groupId), onmouseleave: () => onIdentifyRowHover(null),
+              onfocus: () => onIdentifyRowHover(item.rejected ? null : item.groupId), onblur: () => onIdentifyRowHover(null) },
+              h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: label }),
+                item.between.length ? h("span", { className: "explore-row-path", textContent: `via ${item.between.map(labelFor).join(", ")}` }) : null),
+              h("span", { className: "explore-row-papers", textContent: item.papers === null ? "" : String(item.papers) })),
+            select ? h("div", { className: "variable-disposition-line" }, select, warning) : null,
+            item.noLongerCandidate && item.rejected ? h("p", { className: "small-note review-row-note", textContent: "Not a candidate under the current study claims." }) : null,
+            item.text && ["removed_other", "other"].includes(item.status) ? h("p", { className: "small-note review-row-note", textContent: `Private note: ${item.text}` }) : null,
+            item.conflicts ? h("p", { className: "review-conflicts small-note", textContent: "⚠ Direct contradiction with another recorded claim. Review the claim to inspect it." }) : null,
+            CLAIM_STATUSES.has(item.status) ? h("button", { type: "button", className: "btn btn--ghost btn--sm review-edit-note", textContent: "Review claim",
+              onclick: () => onReviewVariable(view, item.groupId, item.status) }) : null,
+            item.status === "removed_other" ? h("button", { type: "button", className: "btn btn--ghost btn--sm review-edit-note", textContent: "Edit reason",
+              onclick: () => onReviewVariable(view, item.groupId, "removed_other") }) : null);
         })),
-        h("p", { className: "explore-subsection-empty list-filter-empty", dataset: { empty },
-          hidden: items.length > 0, textContent: empty }));
-    }));
-    if (filter) els.results.querySelector(".identify-tools")?.append(filter);
-    refocus?.focus();
+        h("p", { className: "explore-subsection-empty list-filter-empty", dataset: { empty }, hidden: items.length > 0, textContent: empty }))));
     applyListSearch();
   }
 
@@ -829,6 +815,8 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     els.explore.hidden = !task;
     const browserIntro = el("identifyBrowserIntro");
     if (browserIntro) browserIntro.hidden = !identifying();
+    const reviewTools = el("variableReviewTools");
+    if (reviewTools) reviewTools.hidden = !identifying();
     const identifyFields = el("identifyFields");
     if (identifyFields) identifyFields.hidden = !identifying();
     if (!identifying()) identifyPicking = null;
@@ -893,6 +881,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     els.pickerCancel.addEventListener("click", () => cancelChange());
     // Identify's fields: focusing one opens the variable list under them; Escape,
     // Tab or a click elsewhere closes it and shows the chosen variable again.
+    el("editVariableSchema")?.addEventListener("click", onEditVariableSchema);
     const identifyFields = el("identifyFields");
     for (const side of IDENTIFY_SIDES) {
       const input = identifyInput(side);

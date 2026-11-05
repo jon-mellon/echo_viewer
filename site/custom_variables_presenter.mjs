@@ -1,4 +1,6 @@
 import { h, replaceChildren } from "./dom_builder.mjs";
+import { variableSchema, studyDecisionBundle } from "./schema_views.mjs";
+import { publicSchemaProjection } from "./public_schema_projection.mjs";
 
 /**
  * The Custom variables page: a filterable table of the variables the user made
@@ -10,10 +12,13 @@ import { h, replaceChildren } from "./dom_builder.mjs";
 export function createCustomVariablesPresenter({ state, elements: els, truncate, normalized,
   customVariables, sourceLabels, canChange, onCreate, onEdit, onDelete,
   canExplore = () => false, onExplore = () => {}, previousSplits = () => [],
-  loadPreviousSplits = () => {}, reusePreviousSplit = () => {} }) {
+  loadPreviousSplits = () => {}, reusePreviousSplit = () => {}, schemaVariables = customVariables,
+  onSplitSource = () => {}, getSchema = () => ({}), loadDetails = async () => {}, conceptLabel = id => id }) {
   let confirmingId = null;
   let deleting = false;
   let status = "";
+  let expandedId = null;
+  let conceptLimit = 100;
 
   function open() {
     els.openCustomVariables?.closest("details")?.removeAttribute("open");
@@ -39,7 +44,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     els.openCustomVariables?.setAttribute("aria-pressed", String(Boolean(state.customVariablesOpen)));
     els.customVariablesView.hidden = !showing;
     if (!showing) return;
-    const all = customVariables();
+    const all = schemaVariables();
     const query = normalized(els.customVariablesFilter.value);
     const previous = previousSplits().filter(item => !all.some(group => group.group_id === item.group_id)
       && (!query || normalized([item.name, item.description, ...(item.source_labels || [])].join(" ")).includes(query)));
@@ -49,7 +54,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     if (highlight && all.some(group => group.group_id === highlight) && !status) {
       status = `Added “${all.find(group => group.group_id === highlight).label}” to this schema.`;
     }
-    els.customVariablesTitle.textContent = `Your variables${all.length ? ` (${all.length})` : ""}`;
+    els.customVariablesTitle.textContent = "Edit variable schema";
     els.customVariablesFilter.hidden = !all.length && !previous.length;
     els.customVariablesStatus.textContent = status;
     els.customVariablesStatus.hidden = !status;
@@ -77,7 +82,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
         h("th", { scope: "col", textContent: "Made from" }),
         h("th", { scope: "col", className: "num", textContent: "Concepts" }),
         h("th", { scope: "col", className: "actions" }, h("span", { className: "sr-only", textContent: "Actions" })))),
-      h("tbody", {}, rows.map(group => row(group, { busy, highlight })))));
+      h("tbody", {}, rows.flatMap(group => [row(group, { busy, highlight }), group.group_id === expandedId ? detailsRow(group) : null]))));
     if (previous.length) {
       els.customVariablesTable.append(h("section", { className: "custom-variables-previous" },
         h("h2", { textContent: "Saved elsewhere" }),
@@ -95,7 +100,8 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
 
   function row(group, { busy, highlight }) {
     const label = group.label || group.group_id;
-    const changeable = canChange(group);
+    const custom = group.source === "user_split";
+    const changeable = custom && canChange(group);
     const lockedTitle = "Changed by a later edit; it can no longer be edited or deleted here.";
     const sources = sourceLabels(group);
     if (confirmingId === group.group_id) {
@@ -114,17 +120,41 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       h("td", { textContent: sources.join(", ") || "—" }),
       h("td", { className: "num", textContent: String(group.variable_ids?.length || Number(group.member_count) || 0) }),
       h("td", { className: "actions" },
+        h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "inspect", groupId: group.group_id },
+          textContent: "Inspect", attrs: { "aria-expanded": String(expandedId === group.group_id) } }),
         canExplore() ? h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "explore", groupId: group.group_id },
           textContent: "Explore", title: `Show the causes or consequences of ${label}` }) : null,
-        h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "edit", groupId: group.group_id },
-          disabled: busy || !changeable, title: changeable ? `Edit ${label}` : lockedTitle, textContent: "Edit" }),
-        h("button", { className: "btn btn--ghost custom-variables-delete", type: "button", dataset: { action: "delete", groupId: group.group_id },
-          disabled: busy || !changeable, title: changeable ? `Delete ${label}` : lockedTitle, textContent: "Delete" })));
+        !custom ? h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "split", groupId: group.group_id }, disabled: busy,
+          textContent: "Create split" }) : null,
+        custom ? h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "edit", groupId: group.group_id },
+          disabled: busy || !changeable, title: changeable ? `Edit ${label}` : lockedTitle, textContent: "Edit" }) : null,
+        custom ? h("button", { className: "btn btn--ghost custom-variables-delete", type: "button", dataset: { action: "delete", groupId: group.group_id },
+          disabled: busy || !changeable, title: changeable ? `Delete ${label}` : lockedTitle, textContent: "Delete" }) : null));
+  }
+
+  function detailsRow(group) {
+    const ids = group.variable_ids || [];
+    return h("tr", { className: "schema-variable-details" }, h("td", { colSpan: 4 },
+      h("p", { textContent: group.description || "No definition recorded." }),
+      h("p", { className: "small-note", textContent: `${ids.length} concepts` }),
+      h("ul", {}, ids.slice(0, conceptLimit).map(id => h("li", { textContent: conceptLabel(id) }))),
+      ids.length > conceptLimit ? h("button", { type: "button", className: "btn btn--sm", textContent: "Show more concepts",
+        onclick: () => { conceptLimit += 100; render(); void loadDetails(ids.slice(0, conceptLimit)).then(render).catch(() => {}); } }) : null));
   }
 
   async function act(action, groupId) {
     status = "";
     state.customVariablesHighlight = null;
+    if (action === "inspect") {
+      expandedId = expandedId === groupId ? null : groupId;
+      conceptLimit = 100;
+      render();
+      const group = schemaVariables().find(group => group.group_id === groupId);
+      if (expandedId) try { await loadDetails((group?.variable_ids || []).slice(0, conceptLimit)); render(); }
+      catch (error) { status = `Some concept labels could not load: ${error.message || error}`; render(); }
+      return;
+    }
+    if (action === "split") { onSplitSource(groupId); return; }
     if (action === "delete") { confirmingId = groupId; render(); return; }
     if (action === "cancel-delete") { confirmingId = null; render(); return; }
     if (action === "edit") { confirmingId = null; onEdit(groupId); return; }
@@ -150,6 +180,13 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     els.customVariablesClose.addEventListener("click", close);
     els.customVariablesCreate.addEventListener("click", () => { status = ""; state.customVariablesHighlight = null; onCreate(); });
     els.customVariablesFilter.addEventListener("input", render);
+    const exportJson = (payload, filename) => {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+      const link = h("a", { href: url, download: filename });
+      link.click(); URL.revokeObjectURL(url);
+    };
+    document.getElementById("exportVariableSchema")?.addEventListener("click", () => exportJson(variableSchema(getSchema()), "variable-schema.json"));
+    document.getElementById("exportStudyDecisions")?.addEventListener("click", () => exportJson(studyDecisionBundle(publicSchemaProjection(getSchema())), "study-decisions.json"));
   }
 
   return { install, render, open, close };

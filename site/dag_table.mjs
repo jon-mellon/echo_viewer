@@ -1,4 +1,5 @@
 import { directedGroupLabels } from "./dag_exports.mjs";
+import { CONTROL_WARNING } from "./confounder_status.mjs";
 
 // A table of exactly what the graph draws. Each row is a path: the variables
 // along it are buttons that open their definitions, and the arrows between
@@ -192,14 +193,16 @@ export function dagTableModel({ view, groups, links, pathsByGroup = new Map(), e
         ...(statuses ? { status: statuses.byId[row.id] || { status: "unaddressed", text: "" } } : {}) };
     };
     const isCustom = row => byId.get(row.id)?.source === "user_split";
+    const rejected = new Set((statuses?.rejected || []).map(row => row.groupId));
     diagnostic = {
       title: spec.title({ iv: label(ivId), dv: label(dvId), instrument: label(instrumentId) }),
       headers: spec.headers,
       // Confounders and colliders: how the study handles each, set from a menu in its row.
       status: statuses ? { kind: statuses.kind, noun: statuses.noun, options: statuses.options } : null,
       sections: [
-        { title: "Custom variables", rows: rows.filter(isCustom).map(item) },
-        { title: "Built-in variables", rows: rows.filter(row => !isCustom(row)).map(item) },
+        { title: "Custom variables", rows: rows.filter(row => !rejected.has(row.id) && isCustom(row)).map(item) },
+        { title: "Built-in variables", rows: rows.filter(row => !rejected.has(row.id) && !isCustom(row)).map(item) },
+        ...(rejected.size ? [{ title: "Rejected candidates", rows: statuses.rejected.map(row => item({ id: row.groupId, label: row.label, lines: [], papers: null })) }] : []),
       ],
     };
   }
@@ -461,19 +464,22 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
 
   /** A confounder's or collider's status: a menu, and a note when it is "Other". Saved on change. */
   function statusCell(entry, spec) {
-    const select = el("select", { class: "select-input dag-table-status", "aria-label": `Status for ${entry.label}` },
+    const select = el("select", { class: "select-input dag-table-status", "data-group-id": entry.id, "aria-label": `Status for ${entry.label}` },
       ...spec.options.map(option => el("option", { value: option.value, title: option.title, text: option.label })));
+    if (entry.status.status === "other") select.append(el("option", { value: "other", text: "Other (previous decision)" }));
     select.value = entry.status.status;
     select.classList.toggle("is-unaddressed", entry.status.status === "unaddressed");
-    const note = el("input", { class: "search-input dag-table-status-note", type: "text", value: entry.status.text,
-      placeholder: `How is this ${spec.noun} handled?`, "aria-label": `Other status for ${entry.label}` });
-    note.hidden = entry.status.status !== "other";
+    const note = el("span", { class: "small-note", text: ["removed_other", "other"].includes(entry.status.status) && entry.status.text ? `Private note: ${entry.status.text}` : "" });
     select.addEventListener("change", () => {
-      note.hidden = select.value !== "other";
-      onSetStatus(spec.kind, entry.id, select.value, note.value);
+      const status = select.value;
+      select.value = entry.status.status;
+      onSetStatus(spec.kind, entry.id, status);
     });
-    note.addEventListener("change", () => onSetStatus(spec.kind, entry.id, select.value, note.value));
-    return el("td", { class: "dag-table-status-cell" }, select, note);
+    const warning = spec.kind === "exclusion" && entry.status.status === "explicitly_controlled"
+      ? el("span", { class: "review-warning", tabindex: "0", title: CONTROL_WARNING, "aria-label": CONTROL_WARNING, text: "⚠" }) : null;
+    const edit = entry.status.status === "removed_other" ? el("button", { type: "button", class: "btn btn--ghost btn--sm", text: "Edit reason" }) : null;
+    edit?.addEventListener("click", () => onSetStatus(spec.kind, entry.id, "removed_other"));
+    return el("td", { class: "dag-table-status-cell" }, select, note, warning, edit);
   }
 
   /** Identify: one row per candidate with its paths, laid out like Explore's table. */

@@ -52,3 +52,11 @@ test("folder writer rejects conflicting canonical memberships", async () => {
   invalid.groups[1].variable_ids.push("v001001");
   await assert.rejects(() => writeGroupingSchemaFolder(invalid, webcrypto), /conflicting group ownership/);
 });
+
+test("derived view files can be omitted to match publications made without them", async () => {
+  const withViews = await writeGroupingSchemaFolder(schema, webcrypto);
+  const without = await writeGroupingSchemaFolder(schema, webcrypto, { views: false });
+  assert.ok(withViews.has("variable-schema.json") && withViews.has("study-decisions.json"));
+  assert.ok(!without.has("variable-schema.json") && !without.has("study-decisions.json"));
+  assert.equal(JSON.parse(new TextDecoder().decode(without.get("manifest.json"))).variable_schema_file, undefined);
+});

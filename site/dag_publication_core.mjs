@@ -19,8 +19,8 @@ export function formatPublicationError(error) {
   return parts.join(" | ");
 }
 
-export async function canonicalizeWorkingSchema(schema, cryptoApi = globalThis.crypto) {
-  const files = await writeGroupingSchemaFolder(publicSchemaProjection(schema), cryptoApi);
+export async function canonicalizeWorkingSchema(schema, cryptoApi = globalThis.crypto, { views = true } = {}) {
+  const files = await writeGroupingSchemaFolder(publicSchemaProjection(schema), cryptoApi, { views });
   return { files, contentHash: await canonicalFolderHash(files, cryptoApi) };
 }
 

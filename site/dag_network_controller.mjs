@@ -10,7 +10,7 @@ import * as dagPathHighlights from "./dag_path_highlights.mjs";
 import { STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "./dag_inspector_controller.mjs";
 import { studyDesignEdgeData } from "./dag_study_edges.mjs";
 import { createDagTable, dagTableModel, pathView } from "./dag_table.mjs";
-import { DIAGNOSTIC_STATUSES, STATUS_MENU_LABELS, diagnosticStatusRows, confounderKey } from "./confounder_status.mjs";
+import { DIAGNOSTIC_STATUSES, STATUS_MENU_LABELS, diagnosticReviewRows, diagnosticKey } from "./confounder_status.mjs";
 
 export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId, links, visualData) {
   if (previousId === selectedId) return [];
@@ -208,8 +208,8 @@ function visNodeData(group, layoutPoint, layoutParams = {}) {
     colliderGroupIds: state.colliderGroupIds, colliderPathGroupIds: state.colliderPathGroupIds,
     confounderGroupIds: state.confounderGroupIds, confounderPathGroupIds: state.confounderPathGroupIds,
     ivId: studyAnchors().ivId, dvId: studyAnchors().dvId,
-    confounderStatus: exploring() ? null : state.project?.confounder_statuses?.[
-      confounderKey(state.project?.iv_group_id, state.project?.dv_group_id, group.group_id)]?.status,
+    confounderStatus: exploring() ? null : state.project?.[state.showExclusionViolations ? "exclusion_statuses" : "confounder_statuses"]?.[
+      diagnosticKey(state.project, state.showExclusionViolations ? "exclusion" : "confounders", group.group_id)]?.status,
     activeGroupId: state.activeGroupId,
     groupColor: exploring() && group.type === "candidate" ? EXPLORATION_NODE_COLORS[state.task] || groupColor(group) : groupColor(group),
   });
@@ -252,11 +252,13 @@ function tableRole(group) {
 /** Confounders and colliders carry a status the table can set, as the side panel does. */
 function tableStatuses(view) {
   const spec = DIAGNOSTIC_STATUSES[view];
-  if (!spec || state.project?.instrument_group_id) return null;
-  const ids = view === "confounders" ? state.confounderGroupIds : state.colliderGroupIds;
+  if (!spec || view === "colliders") return null;
+  const ids = view === "confounders" ? state.confounderGroupIds : state.exclusionViolationIds;
+  const rows = diagnosticReviewRows(state.project, ids, view);
   return { kind: view, noun: spec.noun,
     options: Object.entries(spec.statuses).map(([value, label]) => ({ value, label: STATUS_MENU_LABELS[value] || label, title: label })),
-    byId: Object.fromEntries(diagnosticStatusRows(state.project, ids, view).map(row => [row.groupId, { status: row.status, text: row.text }])) };
+    byId: Object.fromEntries(rows.map(row => [row.groupId, { status: row.status, text: row.text }])),
+    rejected: rows.filter(row => row.rejected).map(row => ({ ...row, group: groupById(row.groupId) })) };
 }
 
 async function renderDagTable(groups, links) {
@@ -268,10 +270,12 @@ async function renderDagTable(groups, links) {
   const view = pathView({ ...state, exploring: exploring() });
   const pathsByGroup = { exogeneity: state.exogeneityPathsByGroup, exclusion: state.exclusionPathsByGroup,
     colliders: state.colliderPathsByGroup, confounders: state.confounderPathsByGroup }[view];
-  const built = _dagTable.update(dagTableModel({ view, groups, links, pathsByGroup, exploreRows: view === "explore" ? exploreRows() : [],
+  const statuses = tableStatuses(view);
+  const withRejected = [...groups, ...(statuses?.rejected || []).map(row => row.group).filter(group => group && !groups.some(current => current.group_id === group.group_id))];
+  const built = _dagTable.update(dagTableModel({ view, groups: withRejected, links, pathsByGroup, exploreRows: view === "explore" ? exploreRows() : [],
     exploreDirection: state.task, exploreFocusId: view === "explore" ? state.explore?.[state.task]?.focusId || null : null,
     anchors: studyAnchors(), maxPathLength: view === "exclusion" ? state.exclusionMaxPathLength : state.confounderMaxPathLength,
-    roleFor: tableRole, studyLinks, statuses: tableStatuses(view) }));
+    roleFor: tableRole, studyLinks, statuses }));
   _dagTable.select({ edgeId: state.selectedEdgeId, groupId: state.selectedEvidenceGroupId });
   // The table builds in chunks; the render is done when every row is in.
   await built;
@@ -305,7 +309,7 @@ function refreshEdgeSelection({ redraw = true } = {}) {
   // the click event, especially for routed edges with synthetic bend nodes.
   clearLogicalDagEdgeHover();
   const updates = selectionUpdatesForSegments(_dagEdgeSegments, _renderedSelectedEdgeId,
-    state.selectedEdgeId, (exploring() ? state.visibleLinks : state.project?.links) || [], edgeVisualData);
+    state.selectedEdgeId, (exploring() ? state.visibleLinks : state.studyGraph?.links || state.project?.links) || [], edgeVisualData);
   _renderedSelectedEdgeId = state.selectedEdgeId;
   if (updates.length) _visEdges.update(updates);
   // DataSet updates already request a frame from vis. A synchronous redraw here
@@ -364,7 +368,7 @@ function drawRouteJoins(context) {
     const match = /::seg(\d+)$/.exec(segmentId);
     if (!match || match[1] === "0") continue;
     const edge = _visEdges.get(segmentId);
-    if (!edge || !String(edge.from).startsWith("__route__")) continue;
+    if (!edge || edge.dashes || !String(edge.from).startsWith("__route__")) continue;
     // vis rounds node positions, so read the live one rather than the dataset's.
     const bend = _visNetwork.getPosition(edge.from);
     const opacity = edge.color?.opacity ?? 1;
@@ -423,6 +427,7 @@ function drawEmphasizedRoutes(context) {
     context.globalAlpha = edges[0].color?.opacity ?? 1;
     context.strokeStyle = edges[0].color?.color || "#999999";
     context.lineWidth = Number(edges[0].width || 1);
+    context.setLineDash?.(Array.isArray(edges[0].dashes) ? edges[0].dashes : []);
     context.beginPath();
     ids.forEach((id, i) => (i ? context.lineTo(points[id].x, points[id].y) : context.moveTo(points[id].x, points[id].y)));
     context.stroke();

@@ -238,6 +238,9 @@
             <div id="identifyBrowserIntro" class="identify-browser-intro" hidden>
               <h2>Variables on map</h2>
             </div>
+            <div id="variableReviewTools" class="variable-review-tools">
+              <button id="editVariableSchema" class="btn btn--ghost btn--sm" type="button">Edit variable schema</button>
+            </div>
             <p id="exploreSummary" class="explore-summary" aria-live="polite" hidden></p>
             <div id="exploreResults" class="explore-results"></div>
           </div>
@@ -550,11 +553,13 @@
         <!-- Custom variables: replaces the graph while open (see custom_variables_presenter). -->
         <div id="customVariablesView" class="custom-variables-view" hidden>
           <div class="custom-variables-heading">
-            <h2 id="customVariablesTitle">Custom variables</h2>
+            <h2 id="customVariablesTitle">Edit variable schema</h2>
             <button id="customVariablesCreate" class="btn btn--primary" type="button">Create variable</button>
-            <button id="customVariablesClose" class="btn" type="button">Close</button>
+            <button id="exportVariableSchema" class="btn" type="button">Export variable schema</button>
+            <button id="exportStudyDecisions" class="btn" type="button" title="Exports scoped decisions and graph claims without private notes">Export study decisions</button>
+            <button id="customVariablesClose" class="btn" type="button">Back to analysis</button>
           </div>
-          <p class="small-note custom-variables-intro">Variables you made by moving concepts out of existing variables. Deleting one puts its concepts back where they came from.</p>
+          <p class="small-note custom-variables-intro">Variable definitions and splits are reusable across studies. Changes save in this browser; publishing is a separate action. Deleting a custom variable returns its concepts to its sources.</p>
           <input id="customVariablesFilter" class="search-input" type="search" placeholder="Filter by name, definition or source" aria-label="Filter custom variables">
           <p id="customVariablesStatus" class="small-note" role="status" aria-live="polite"></p>
           <div id="customVariablesTable" class="custom-variables-table"></div>

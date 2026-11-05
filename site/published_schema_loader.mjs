@@ -180,6 +180,10 @@ export async function loadPublishedSchema(publicationId, client = null, fetchImp
     if (priorityReady) await onPriorityReady({ schema: priorityReady, groupIds: displayed });
     performance.measure("echo:schema:priority", { start: loadingStart, end: performance.now() });
     const complete = await staged.loadComplete();
+    await Promise.all([staged.manifest.variable_schema_file, staged.manifest.study_decisions_file].filter(Boolean).map(async path => {
+      const response = await schemaFetch(new URL(path, baseUrl));
+      if (!response.ok) throw new Error(`Could not read schema view: ${path}`);
+    }));
     performance.measure("echo:schema:memberships", { start: priorityStart, end: performance.now() });
     const integrityStart = performance.now();
     // Restore the canonical logical folder before hashing: reference metadata is

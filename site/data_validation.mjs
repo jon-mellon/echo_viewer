@@ -140,8 +140,9 @@ export function validateGroupingSchema(schema) {
     }
   }
   for (const [field, noun, allowed] of [
-    ["confounder_statuses", "confounder", ["unaddressed", "explicitly_controlled", "accounted_for_by_design", "other"]],
+    ["confounder_statuses", "confounder", ["unaddressed", "explicitly_controlled", "accounted_for_by_design", "other", "causes_y_only_via_x", "not_in_minimal_adjustment_set", "removed_other"]],
     ["collider_statuses", "collider", ["unaddressed", "not_conditioned_on", "conditioned_by_design", "other"]],
+    ["exclusion_statuses", "exclusion restriction", ["unaddressed", "explicitly_controlled", "instrument_only_via_x", "variable_only_via_x", "removed_other"]],
   ]) {
     if (!Object.hasOwn(schema, field)) continue;
     if (!isRecord(schema[field])) throw new Error(`Grouping schema.${field} must be an object.`);
@@ -151,6 +152,11 @@ export function validateGroupingSchema(schema) {
       }
       if (Object.hasOwn(decision, "text") && (typeof decision.text !== "string" || !decision.text.trim())) {
         throw new Error(`Invalid ${noun} status text for ${key}.`);
+      }
+      for (const list of ["asserted_effects", "rejected_effects"]) if (Object.hasOwn(decision, list)) {
+        if (!Array.isArray(decision[list]) || decision[list].some(effect => !isRecord(effect)
+          || typeof effect.sourceId !== "string" || !effect.sourceId || typeof effect.targetId !== "string"
+          || !effect.targetId || effect.sourceId === effect.targetId)) throw new Error(`Invalid ${noun} graph claim for ${key}.`);
       }
     }
   }

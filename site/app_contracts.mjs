@@ -48,6 +48,7 @@
  * @property {Record<string, {display_status: string, reason_code?: string, reason_text?: string, timestamp?: string}>} finding_decisions
  * @property {Record<string, {status: string, text?: string}>} confounder_statuses
  * @property {Record<string, {status: string, text?: string}>} [collider_statuses]
+ * @property {Record<string, {status: string, text?: string, rejected_effects?: Array<{sourceId: string, targetId: string}>, asserted_effects?: Array<{sourceId: string, targetId: string}>}>} [exclusion_statuses]
  * @property {JsonValue[]} rejected_variables
  * @property {string[]} [restored_variable_ids]
  * @property {JsonValue | null} publication

@@ -1,5 +1,5 @@
 const { test, expect } = require("./fixtures.cjs");
-const { chooseAnchor, chooseAnchors, startCreate, openIdentifyField, createVariableButton, editVariableButton } = require("./support/identify.cjs");
+const { chooseAnchor, chooseAnchors, startCreate, openIdentifyField, closeSchemaWorkspace, editSchemaButton, createVariableFromSchema, editVariableButton } = require("./support/identify.cjs");
 const { watchBrowserErrors } = require("./browser_errors.cjs");
 const { describeVariable, startAiSplit, includeConcepts } = require("./support/definition.cjs");
 const { chooseTask, chooseFocus } = require("./support/navigation.cjs");
@@ -90,6 +90,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   const splitGroupId = result.iv.group_id;
 
   // A custom variable is edited with the pencil in its picker row.
+  await closeSchemaWorkspace(page);
   await openIdentifyField(page, "iv");
   await expect(editVariableButton(page, "Browser test construct")).toBeVisible();
   await editVariableButton(page, "Browser test construct").click();
@@ -138,9 +139,9 @@ test("Variables list definition and split editing are reachable on desktop and m
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await chooseAnchors(page, anchors[0], anchors[1]);
-  await expect(createVariableButton(page)).toBeVisible();
+  await expect(editSchemaButton(page)).toBeVisible();
 
-  await createVariableButton(page).click();
+  await createVariableFromSchema(page);
   await expect(page.locator("#definitionTitle")).toHaveText("Create a variable");
   expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.role)).toBe("candidate");
   const source = page.locator("#definitionSourceList input[data-source-id]").nth(2);
@@ -151,21 +152,23 @@ test("Variables list definition and split editing are reachable on desktop and m
   await includeConcepts(page, [variableId]);
   await page.locator("#definitionResidualLabels input").fill("Browser list residual");
   await page.locator("#definitionSave").click();
-  await expect(createVariableButton(page)).toBeVisible();
+  await expect(editSchemaButton(page)).toBeVisible();
   const splitId = await page.evaluate(() => window.__dagBuilderState.project.groups
     .find(group => group.label === "Browser list variable")?.group_id);
   expect(splitId).toBeTruthy();
   // A custom variable is edited with the pencil in its picker row.
+  await closeSchemaWorkspace(page);
   await openIdentifyField(page, "iv");
   await editVariableButton(page, "Browser list variable").click();
   await expect(page.locator("#definitionTitle")).toHaveText("Edit “Browser list variable”");
   await page.locator(".definition-cancel:visible").first().click();
 
   await page.setViewportSize({ width: 390, height: 800 });
-  await expect(createVariableButton(page)).toBeVisible();
-  await createVariableButton(page).click();
+  await expect(editSchemaButton(page)).toBeVisible();
+  await createVariableFromSchema(page);
   await expect(page.locator("#definitionTitle")).toHaveText("Create a variable");
   await page.locator(".definition-cancel:visible").first().click();
+  await closeSchemaWorkspace(page);
   await openIdentifyField(page, "iv");
   await editVariableButton(page, "Browser list variable").click();
   await expect(page.locator("#definitionTitle")).toHaveText("Edit “Browser list variable”");
@@ -194,7 +197,7 @@ test("OpenRouter returns to the variable picker with the current anchors", async
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20 && window.__dagBuilderState?.publishedSchemaHydrated);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await chooseAnchors(page, anchors[0], anchors[1]);
-  await createVariableButton(page).click();
+  await createVariableFromSchema(page);
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
   await describeVariable(page);
@@ -219,7 +222,7 @@ test("a new variable can be defined through the mobile controls", async ({ page 
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator('.mobile-panel-tab[data-mobile-panel="controls"]').click();
-  await createVariableButton(page).click();
+  await createVariableFromSchema(page);
   await expect(page.locator("#definitionTitle")).toBeInViewport();
   await expect(page.locator("#groupingPanel")).toBeHidden();
 
@@ -935,7 +938,7 @@ test("Exploration creates a variable from its picker, which becomes the focus wi
     const { iv_group_id, dv_group_id } = window.__dagBuilderState.project;
     return { iv_group_id, dv_group_id };
   });
-  await createVariableButton(page).click();
+  await page.locator(".custom-create:visible").first().click();
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
   await describeVariable(page, { label: "Browser focus construct", description: "A browser test construct defined from the exploration view." });
@@ -975,7 +978,7 @@ test("a saved AI split is not restored on load; Define offers it in Causes and r
   await ready();
   expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft)).toBeNull();
 
-  await createVariableButton(page).click();
+  await page.locator(".custom-create:visible").first().click();
   const row = page.locator("#definitionResumeList .definition-resume-row");
   await expect(row).toContainText("Seeded saved split");
   await row.getByRole("button", { name: "Resume" }).click();
