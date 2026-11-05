@@ -85,6 +85,7 @@
                   <div id="publicationStatus" class="menu-note publication-status" role="status" aria-live="polite"></div>
                 </div>
                 <div class="menu-separator" role="separator"></div>
+                <button id="openCustomVariables" class="menu-item" type="button">Your variables…</button>
                 <button id="importSchemaAction" class="menu-item" type="button"><svg class="lucide menu-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg><span>Import schema…</span></button>
                 <button id="publishSchema" class="menu-item" type="button" hidden><svg class="lucide menu-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg><span>Publish changes…</span></button>
               </div>
@@ -333,8 +334,9 @@
             <!-- 3 · Choose concepts: the AI suggests them (or an existing split supplies them), then save. -->
             <div id="definitionPartitionStep" hidden>
               <div class="definition-concepts-head">
-                <h2>Choose concepts</h2>
+                <h2 id="definitionConceptsTitle">Choose concepts</h2>
                 <p id="definitionConceptsIntro" class="small-note"></p>
+                <p id="definitionSavedDescription" class="small-note" hidden></p>
               </div>
               <div class="definition-progress" aria-live="polite">
                 <span class="definition-progress-item"><strong id="definitionCountIncluded">0</strong> included</span>
@@ -432,7 +434,7 @@
               <!-- What happens to the variables the concepts come from: always shown, above Save. -->
               <section id="definitionSourcesSection" class="definition-sources" aria-labelledby="definitionSourcesSummary">
                 <h3 id="definitionSourcesSummary">What stays in the original variables</h3>
-                <p class="small-note">Concepts you don't include stay where they are. Each original variable keeps its name unless you rename it here.</p>
+                <p id="definitionSourcesHelp" class="small-note">Concepts you don't include stay where they are. Each original variable keeps its name unless you rename it here.</p>
                 <div id="definitionResidualLabels" class="definition-sources-table"></div>
               </section>
               <p id="definitionSaveStatus" class="small-note definition-save-status" role="alert" hidden></p>

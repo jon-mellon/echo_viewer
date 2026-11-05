@@ -1,4 +1,5 @@
-import { listOwnPublishedSplits } from "/published_split_browser.mjs";
+import { listOwnPublishedSplits, loadPublishedSplitMembership } from "/published_split_browser.mjs";
+import { eligiblePreviousSplits } from "/previous_split_candidates.mjs";
 "use strict";
 
 import * as projectOps from "/dag_project.mjs";
@@ -143,7 +144,7 @@ function initElements() {
     "definitionBack", "definitionSelectedTitle", "definitionSaveStatus",
     "definitionNewLabel", "definitionNewDescription", "definitionResidualLabels",
     "definitionValidation", "definitionSave",
-    "customVariablesView", "customVariablesTitle", "customVariablesCreate", "customVariablesClose",
+    "openCustomVariables", "customVariablesView", "customVariablesTitle", "customVariablesCreate", "customVariablesClose",
     "customVariablesFilter", "customVariablesStatus", "customVariablesTable",
     "workflowHint", "dagStatusBadge",
     "variablePanel", "variableDefineNew", "variablePanelDisclosure", "variablePanelCount", "variablePanelList", "variablePanelPagination",
@@ -1928,7 +1929,7 @@ const toolbarController = createToolbarController({ state, elements: els, dagGro
 
 const definitionWorkflowController = createDefinitionWorkflowController({
   state, elements: els, activeGroup, clusterRep, invalidateVisibleCaches, renderAll,
-  previousSplits: () => previousSplitRows,
+  previousSplits: () => eligiblePreviousSplits(previousSplitRows, state.project?.groups),
   groupById, persistProjectLocally, getReturnUrl: () => persistentViewer.currentUrl() || location.href, visibleVariables,
   searchVariables: searchVisibleVariables, searchSourceGroups: searchDefinitionSourceGroups,
   clusterDisplayVariable, expandToClusterMembers, nowIso, applyProjectOperation,
@@ -1957,25 +1958,25 @@ let previousSplitsLoaded = false;
 function loadPreviousSplits(force = false) {
   if (previousSplitsLoading || (previousSplitsLoaded && !force)) return;
   previousSplitsLoading = true;
-  void Promise.allSettled([listOwnPublishedSplits(), listLocalSchemas()]).then(([published, local]) => {
+  void Promise.allSettled([listOwnPublishedSplits(), listLocalSchemas()]).then(async ([published, local]) => {
     const localRows = local.status === "fulfilled" ? local.value.flatMap(record =>
       (record.schema?.groups || []).filter(group => group.source === "user_split"
         && group.provenance?.operation === "split_categories" && Array.isArray(group.provenance.source_group_ids))
         .map(group => ({ group_id: group.group_id, split_id: group.provenance.split_id || group.group_id,
+          origin_split_id: group.provenance.reused_from_split_id || group.provenance.split_id || group.group_id,
+          origin_group_id: group.provenance.reused_from_group_id || group.group_id,
           source_group_ids: group.provenance.source_group_ids, name: group.label, description: group.description,
+          source_group_by_variable: group.provenance.source_group_by_variable,
           source_labels: group.provenance.source_group_ids.map(id => {
             const source = record.schema.groups.find(candidate => candidate.group_id === id);
             return source && group.provenance.split_id && source.provenance?.split_id === group.provenance.split_id
               ? source.provenance.prior_label || source.label || id : source?.label || id;
           }),
           local_variable_ids: group.variable_ids, published_at: record.updatedAt || "", is_local: true }))) : [];
-    const rows = [...localRows, ...(published.status === "fulfilled" ? published.value : [])];
-    const unique = new Map();
-    for (const row of rows) {
-      const key = row.split_id || row.group_id;
-      if (!unique.has(key) || row.published_at > unique.get(key).published_at) unique.set(key, row);
-    }
-    previousSplitRows = [...unique.values()];
+    const publishedRows = await Promise.allSettled((published.status === "fulfilled" ? published.value : [])
+      .filter(row => row.source_group_by_variable).map(async row => ({ ...row,
+        local_variable_ids: await loadPublishedSplitMembership(row) })));
+    previousSplitRows = [...localRows, ...publishedRows.flatMap(result => result.status === "fulfilled" ? [result.value] : [])];
     previousSplitsLoaded = true;
     setupGroupController.renderFocusPicker();
     setupGroupController.renderIdentifyPicker();
@@ -1993,7 +1994,7 @@ const customVariablesPresenter = createCustomVariablesPresenter({
   onCreate: () => startDefinition("candidate"),
   onEdit: groupId => startEditSplit(groupId),
   onDelete: deleteCustomVariable,
-  previousSplits: () => previousSplitRows, loadPreviousSplits, reusePreviousSplit,
+  previousSplits: () => eligiblePreviousSplits(previousSplitRows, state.project?.groups), loadPreviousSplits, reusePreviousSplit,
   canExplore: () => taskViews.exploring(),
   onExplore: groupId => taskViews.chooseFocus(groupId),
 });
@@ -2034,7 +2035,7 @@ const setupGroupController = createDagSetupGroupController({
   identifyPicking: () => taskViews.identifySide(), onChooseIdentify: (side, groupId) => taskViews.chooseIdentify(side, groupId),
   onCancelIdentify: () => taskViews.cancelIdentify(),
   canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
-  previousSplits: () => previousSplitRows, loadPreviousSplits, reusePreviousSplit,
+  previousSplits: () => eligiblePreviousSplits(previousSplitRows, state.project?.groups), loadPreviousSplits, reusePreviousSplit,
   browsePreviousForSource: (role, id) => definitionWorkflowController.browsePreviousForSource(role, id),
   deleteCustom: deleteCustomVariable,
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),

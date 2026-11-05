@@ -69,7 +69,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
           h("td", { className: "num", textContent: fmt(included) }),
           h("td", { className: "num", textContent: fmt(stays),
             title: stays ? "" : "At least one concept must stay; exclude one to save." }),
-          h("td", {}, h("input", { className: "search-input", dataset: { residualId: source.group_id },
+          h("td", {}, draft.published_split ? h("span", { textContent: label }) : h("input", { className: "search-input", dataset: { residualId: source.group_id },
             value: draft.residual_labels[source.group_id] || "", placeholder: `${label} (unchanged)`,
             attrs: { "aria-label": `Name for what stays in ${label}` } })));
       }))));
@@ -86,8 +86,15 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
 
   function renderPartition(draft) {
     const name = String(draft.new_label || "").trim() || "the new variable";
+    document.getElementById("definitionConceptsTitle").textContent = draft.published_split ? "Review saved variable" : "Choose concepts";
+    const savedDescription = document.getElementById("definitionSavedDescription");
+    savedDescription.hidden = !draft.published_split;
+    savedDescription.textContent = draft.published_split ? draft.new_description : "";
+    document.getElementById("definitionSourcesHelp").textContent = draft.published_split
+      ? "The remaining concepts stay in each original variable, which keeps its current name."
+      : "Concepts you don't include stay where they are. Each original variable keeps its name unless you rename it here.";
     els.definitionConceptsIntro.textContent = draft.published_split
-      ? `Review the saved concepts for “${truncate(name, 60)}”, then save the variable.`
+      ? `Adding “${truncate(name, 60)}” moves these concepts from the original variables into this variable.`
       : `Select which concepts belong in “${truncate(name, 60)}”.`;
     els.definitionJevPanel.hidden = Boolean(draft.published_split);
     els.definitionConceptsIntro.title = name;
@@ -101,8 +108,11 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     const hint = saveHint(draft, counts);
     els.definitionSave.disabled = Boolean(hint) || !definitionCanReview();
     els.definitionSaveHint.textContent = hint;
-    els.definitionSave.textContent = draft.mode === "edit" ? "Save changes"
-      : draft.role === "candidate" ? "Save variable" : `Save and use as ${draft.role.toUpperCase()}`;
+    const roleName = { iv: "cause", dv: "outcome", instrument: "instrument" }[draft.role];
+    els.definitionSave.textContent = draft.published_split
+      ? roleName ? `Add and use as ${roleName}` : state.customVariablesOpen ? "Add to schema" : "Add and use as focus"
+      : draft.mode === "edit" ? "Save changes" : draft.role === "candidate" ? "Save variable" : `Save and use as ${draft.role.toUpperCase()}`;
+    els.definitionBack.hidden = Boolean(draft.published_split);
     els.definitionBack.textContent = draft.mode === "edit" ? "Back to name" : "Back";
   }
 
@@ -151,8 +161,9 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       els.definitionSaveStatus.hidden = true;
     }
     const name = String(draft.new_label || "").trim();
-    els.definitionTitle.textContent = draft.mode === "edit" ? `Edit “${truncate(name || "variable", 48)}”`
+    els.definitionTitle.textContent = draft.published_split ? `Add “${truncate(name, 48)}” to this schema` : draft.mode === "edit" ? `Edit “${truncate(name || "variable", 48)}”`
       : draft.role === "candidate" ? "Create a variable" : `Create a new ${draft.role.toUpperCase()}`;
+    els.definitionBlock.querySelector(".definition-stepper").hidden = Boolean(draft.published_split);
     // Editing keeps the variables it came from, so its middle step is skipped.
     els.definitionBlock.classList.toggle("definition-editing", draft.mode === "edit");
     els.definitionDescribeStep.hidden = draft.step !== "describe";

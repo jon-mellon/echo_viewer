@@ -16,6 +16,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
   let status = "";
 
   function open() {
+    els.openCustomVariables?.closest("details")?.removeAttribute("open");
     state.customVariablesOpen = true;
     confirmingId = null;
     status = "";
@@ -46,9 +47,9 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       ...sourceLabels(group)].join(" ")).includes(query));
     const highlight = state.customVariablesHighlight;
     if (highlight && all.some(group => group.group_id === highlight) && !status) {
-      status = `Saved “${all.find(group => group.group_id === highlight).label}”.`;
+      status = `Added “${all.find(group => group.group_id === highlight).label}” to this schema.`;
     }
-    els.customVariablesTitle.textContent = `Custom variables${all.length ? ` (${all.length})` : ""}`;
+    els.customVariablesTitle.textContent = `Your variables${all.length ? ` (${all.length})` : ""}`;
     els.customVariablesFilter.hidden = !all.length && !previous.length;
     els.customVariablesStatus.textContent = status;
     els.customVariablesStatus.hidden = !status;
@@ -70,7 +71,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       return;
     }
     const busy = state.publishedSchemaHydrating || state.publishedSchemaLoadFailed || deleting;
-    replaceChildren(els.customVariablesTable, h("table", { className: "custom-variables-grid" },
+    replaceChildren(els.customVariablesTable, h("h2", { textContent: "In this schema" }), h("table", { className: "custom-variables-grid" },
       h("thead", {}, h("tr", {},
         h("th", { scope: "col", textContent: "Name" }),
         h("th", { scope: "col", textContent: "Made from" }),
@@ -79,14 +80,14 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       h("tbody", {}, rows.map(group => row(group, { busy, highlight })))));
     if (previous.length) {
       els.customVariablesTable.append(h("section", { className: "custom-variables-previous" },
-        h("h2", { textContent: "Your previous splits" }),
-        h("p", { className: "small-note", textContent: "Previous splits were saved in another schema. Reuse one to add it as a custom variable here." }),
+        h("h2", { textContent: "Saved elsewhere" }),
+        h("p", { className: "small-note", textContent: "Add a saved variable to this schema by splitting its source groups." }),
         ...previous.map(item => h("div", { className: "setup-group-picker-row" },
           h("div", {}, h("strong", { textContent: item.name }),
             h("span", { textContent: `From: ${(item.source_labels || item.source_group_ids || []).join(", ")}` }),
-            h("span", { textContent: item.is_local ? "Saved local draft" : "Published" })),
-          h("button", { type: "button", className: "btn btn--sm", textContent: "⑂ Reuse",
-            attrs: { "aria-label": `Reuse previous split ${item.name}` },
+            h("span", { textContent: `${item.is_local ? "Local schema" : "Published schema"}${item.published_at ? ` · ${item.published_at.slice(0, 10)}` : ""}` })),
+          h("button", { type: "button", className: "btn btn--sm", textContent: "Add to schema",
+            attrs: { "aria-label": `Add ${item.name} to schema` },
             onclick: () => reusePreviousSplit("candidate", item) })))));
     }
     els.customVariablesTable.querySelectorAll("button[data-action]").forEach(button =>
