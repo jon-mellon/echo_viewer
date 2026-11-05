@@ -229,7 +229,6 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await pick(page, "category-sleep").click();
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
 
-  await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
   const dialog = page.locator("#resetDialog");
   await expect(dialog).toBeVisible();
@@ -239,7 +238,6 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await expect(dialog).toBeHidden();
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
 
-  await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
   const [tab] = await Promise.all([context.waitForEvent("page"),
     dialog.getByRole("button", { name: "Open new project in a new tab" }).click()]);
@@ -250,7 +248,6 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
   await tab.close();
 
-  await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
   await dialog.getByRole("button", { name: "Reset in current tab" }).click();
   await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100
@@ -270,7 +267,6 @@ test("mobile reset keeps the previous project after navigating", async ({ browse
     await open(page, `${viewer}?task=causes`);
     await pick(page, "category-sleep").tap();
     await openNav(page, { tap: true });
-    await page.locator("#historyToggle").tap();
     await page.locator("#taskReset").tap();
     await page.locator("#resetHere").tap();
     await expect(page.locator("#taskLanding")).toBeVisible({ timeout: 60000 });

@@ -910,11 +910,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     document.addEventListener("pointerdown", event => {
       if (identifying() && identifyPicking && identifyFields && !identifyFields.contains(event.target)) cancelIdentifyPicking();
     });
-    els.reset.addEventListener("click", () => {
-      const menu = els.reset.closest("details");
-      if (menu) menu.open = false;
-      els.dialog.showModal();
-    });
+    els.reset.addEventListener("click", () => els.dialog.showModal());
     el("resetContinue").addEventListener("click", () => els.dialog.close());
     el("resetNewTab").addEventListener("click", () => {
       openWindow(freshProjectUrl(window.location.href));

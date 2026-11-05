@@ -1754,7 +1754,6 @@ h2 {
 }
 .dag-body.task-home .task-menu,
 .dag-body.task-home .history-edits { display: none; }
-.history-reset:has(> #taskReset[hidden]) { display: none; }
 
 .nav-menu-panel {
   right: 0;
@@ -1888,8 +1887,9 @@ h2 {
   text-transform: uppercase;
 }
 /* Reset stays quiet until pointed at: it is a rare action, not part of the history. */
-#previousSessionsPanel #taskReset { color: var(--text-muted); font-size: var(--text-md); }
-#previousSessionsPanel #taskReset:hover { color: var(--danger); }
+.task-reset { width: auto; margin: 0; border-color: transparent; background: transparent; color: var(--text-muted); }
+.task-reset:hover { color: var(--danger); }
+.task-reset[hidden] { display: none; }
 
 /* ── DAG SVG ── */
 #dagViewTitle:empty { display: none; }
@@ -3245,7 +3245,8 @@ h2 {
     border-top: 1px solid var(--border);
   }
   .task-bar-overflow .undo-group { display: flex; gap: var(--space-1); }
-  .task-bar-overflow .menu > summary.btn {
+  .task-bar-overflow .menu > summary.btn,
+  .task-bar-overflow .task-reset:not([hidden]) {
     display: flex;
     justify-content: flex-start;
     gap: var(--space-2);
