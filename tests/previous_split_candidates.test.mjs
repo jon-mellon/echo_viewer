@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { eligiblePreviousSplits } from "../site/previous_split_candidates.mjs";
+import { eligiblePreviousSplits, previousSplitsForRole } from "../site/previous_split_candidates.mjs";
+import { splitCategories } from "../site/dag_project.mjs";
 
 const parents = [{ group_id: "a", label: "Parent A", variable_ids: ["1", "2"] },
   { group_id: "b", label: "Parent B", variable_ids: ["3", "4"] }];
@@ -26,4 +27,23 @@ test("filters before choosing the newest name and recognizes reused origins", ()
   assert.deepEqual(eligiblePreviousSplits([row, newerGood], parents).map(item => item.group_id), ["newer"]);
   assert.deepEqual(eligiblePreviousSplits([row], [...parents, { group_id: "copy", label: "Renamed",
     provenance: { reused_from_split_id: "split" } }]), []);
+});
+
+test("role alternatives are checked with the currently selected split undone, without changing the project", () => {
+  const base = { groups: parents, decisions: [] };
+  const project = splitCategories(base, { sourceGroupIds: ["a", "b"], newGroupId: "current", newLabel: "Current split",
+    newDescription: "The current split description.", newVariableIds: ["1", "3"], residualLabels: { a: "Parent A", b: "Parent B" },
+    role: "dv", timestamp: "2026" });
+  const before = structuredClone(project);
+  assert.deepEqual(eligiblePreviousSplits([row], project.groups), []);
+  const alternatives = previousSplitsForRole([row], project, "dv");
+  assert.equal(alternatives[0].replaces_group_id, "current");
+  assert.deepEqual(previousSplitsForRole([row], project, "iv"), []);
+  assert.deepEqual(previousSplitsForRole([row], project, "candidate", "current"), []);
+  const focusProject = { ...project, dv_group_id: null };
+  assert.equal(previousSplitsForRole([row], focusProject, "candidate", "current")[0].replaces_group_id, "current");
+  assert.deepEqual(project, before);
+  const changed = { ...project, groups: project.groups.map(group => group.group_id === "a"
+    ? { ...group, variable_ids: ["unknown"] } : group) };
+  assert.deepEqual(previousSplitsForRole([row], changed, "dv"), []);
 });

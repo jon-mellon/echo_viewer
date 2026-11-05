@@ -2947,6 +2947,12 @@ h2 {
 }
 .explore-group-header { padding: 0 var(--space-2) var(--space-1); border-bottom: 1px solid var(--border); }
 .explore-group-header h2 { margin: 0;   }
+#exploreResults .explore-group-header h3 {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-strong);
+  line-height: var(--leading-tight);
+}
 .explore-papers-header { color: var(--text-muted); font-size: var(--text-sm); text-align: right; cursor: help; }
 .explore-list { margin: 0; padding: 0; list-style: none; }
 .explore-row + .explore-row { border-top: 1px solid var(--hover-bg); }
@@ -2965,6 +2971,8 @@ h2 {
 .explore-row-text { display: grid; gap: 2px; min-width: 0; }
 .explore-row-label {    overflow-wrap: anywhere; }
 .explore-row-path { color: var(--text-muted); font-size: var(--text-sm); line-height:  var(--leading-body); }
+.saved-variable-row { grid-template-columns: minmax(0, 1fr) auto; }
+.saved-variable-action { color: var(--accent); font-size: var(--text-sm); white-space: nowrap; }
 .explore-row-papers {
   color: var(--text-muted);
   font-size: var(--text-sm);
@@ -3111,7 +3119,10 @@ h2 {
 .identify-fields[hidden], .identify-fields .setup-group-picker[hidden] { display: none; }
 .identify-fields { display: grid; gap: var(--space-3); margin-bottom: var(--space-6); }
 .identify-field { position: relative; }
-.identify-field-label { display: block; margin: 0 0 var(--space-1); color: var(--text); font-weight: var(--weight-strong); }
+.identify-field-label { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-1); color: var(--text); font-weight: var(--weight-strong); }
+.identify-selection-status { color: var(--accent); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.identify-field.is-selected .search-input { background: var(--accent-subtle); border-color: var(--accent); cursor: pointer; }
+.identify-field.is-selected .search-input:not(:focus) { font-weight: var(--weight-medium); }
 .identify-field .search-input { width: 100%; margin-bottom: 0; padding-right: var(--control-md); }
 .identify-field .search-input::-webkit-search-cancel-button { display: none; }
 .identify-field.has-focus .search-input:not(:focus) { font-weight: var(--weight-normal); }

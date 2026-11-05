@@ -480,7 +480,7 @@ export function createDagSetupGroupController({
   function renderPickerList(container, { query, input, onChoose, onCreate, exclude = new Set(), pick = null, onCancel = null, replacing = false }) {
     loadPreviousSplits();
     const groups = searchFocusGroups(query).filter(({ group }) => !exclude.has(group.group_id));
-    const previous = previousSplits().filter(item => !groups.some(({ group }) => group.group_id === item.group_id)
+    const previous = previousSplits(pick?.role || "candidate").filter(item => !groups.some(({ group }) => group.group_id === item.group_id)
       && (!query || normalized(`${item.name} ${item.description || ""} ${(item.source_labels || []).join(" ")}`).includes(query)));
     container.hidden = false;
     const row = ({ group, variableMatch }) => {
@@ -522,10 +522,10 @@ export function createDagSetupGroupController({
         h("div", { className: "explore-group-header" }, h("h2", { textContent: "Saved elsewhere" })),
         h("p", { className: "explore-subsection-empty", textContent: "Saved in another schema; reuse one to add it here." }),
         h("ol", { className: "explore-list" }, previous.map(item => h("li", { className: "explore-row" },
-          h("button", { type: "button", className: "explore-row-open", title: "Review and reuse this split in the current schema",
+          h("button", { type: "button", className: "explore-row-open saved-variable-row", title: "Review and add this variable to the current schema",
             attrs: { "aria-label": `Review and add ${item.name}` }, onclick: () => reusePreviousSplit(pick?.role || "candidate", item) },
             h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: item.name }),
-              h("span", { className: "explore-row-path", textContent: `From: ${(item.source_labels || []).join(", ")} · ${item.is_local ? "Local" : "Published"}${item.published_at ? ` · ${item.published_at.slice(0, 10)}` : ""}` })), h("span", { textContent: "Review and add" })))))) : null,
+              h("span", { className: "explore-row-path", textContent: `From: ${(item.source_labels || []).join(", ")}` })), h("span", { className: "saved-variable-action", textContent: "Review and add" })))))) : null,
       section("Built-in variables", builtIn, query ? "No built-in variable matches." : "None available."),
       query && !groups.length ? h("div", { className: "explore-subsection-empty" }, clearButton()) : null);
     container.querySelectorAll("button[data-group-id]").forEach(button =>

@@ -70,6 +70,27 @@ test("display records preserve node roles, selection, edge styles and descriptio
   assert.deepEqual(groups, before);
 });
 
+test("controlled and design-addressed confounders have a lighter fill in every interaction state", () => {
+  const group = { group_id: "c", label: "Confounder", variable_ids: ["v"] };
+  const view = { showConfoundersOnly: true, confounderGroupIds: new Set(["c"]),
+    confounderPathGroupIds: new Set(), ivId: "iv", dvId: "dv", groupColor: "#123456" };
+  const node = status => display.visNodeData(group, null, {}, { ...view, confounderStatus: status });
+  const normal = node("unaddressed").color.background;
+  const lighter = display.mixHex(display.OKABE_ITO.vermillion, "#ffffff", 0.8);
+  for (const status of ["explicitly_controlled", "accounted_for_by_design"]) {
+    const styled = node(status);
+    assert.equal(styled.color.background, lighter);
+    assert.equal(styled.color.highlight.background, lighter);
+    assert.equal(styled.color.hover.background, lighter);
+    assert.notEqual(styled.color.background, normal);
+    assert.equal(styled.font.color, node("unaddressed").font.color);
+  }
+  assert.equal(node("other").color.background, normal);
+  const colliderView = { ...view, showConfoundersOnly: false, showCollidersOnly: true, colliderGroupIds: new Set(["c"]) };
+  assert.equal(display.visNodeData(group, null, {}, { ...colliderView, confounderStatus: "explicitly_controlled" }).color.background,
+    display.visNodeData(group, null, {}, colliderView).color.background);
+});
+
 test("edge descriptions use singular supporting-test grammar and tolerate missing evidence arrays", () => {
   const groups = [
     { group_id: "a", label: "A" },

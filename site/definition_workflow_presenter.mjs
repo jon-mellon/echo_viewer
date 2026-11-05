@@ -93,7 +93,9 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     document.getElementById("definitionSourcesHelp").textContent = draft.published_split
       ? "The remaining concepts stay in each original variable, which keeps its current name."
       : "Concepts you don't include stay where they are. Each original variable keeps its name unless you rename it here.";
-    els.definitionConceptsIntro.textContent = draft.published_split
+    els.definitionConceptsIntro.textContent = draft.replaces_group_id
+      ? `This replaces “${draft.replaces_label}” in this schema. Its concepts return to their source groups before “${truncate(name, 60)}” is added. Nothing changes until you confirm.`
+      : draft.published_split
       ? `Adding “${truncate(name, 60)}” moves these concepts from the original variables into this variable.`
       : `Select which concepts belong in “${truncate(name, 60)}”.`;
     els.definitionJevPanel.hidden = Boolean(draft.published_split);
@@ -110,7 +112,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     els.definitionSaveHint.textContent = hint;
     const roleName = { iv: "cause", dv: "outcome", instrument: "instrument" }[draft.role];
     els.definitionSave.textContent = draft.published_split
-      ? roleName ? `Add and use as ${roleName}` : state.customVariablesOpen ? "Add to schema" : "Add and use as focus"
+      ? roleName ? `${draft.replaces_group_id ? "Replace" : "Add"} and use as ${roleName}` : state.customVariablesOpen ? "Add to schema" : `${draft.replaces_group_id ? "Replace" : "Add"} and use as focus`
       : draft.mode === "edit" ? "Save changes" : draft.role === "candidate" ? "Save variable" : `Save and use as ${draft.role.toUpperCase()}`;
     els.definitionBack.hidden = Boolean(draft.published_split);
     els.definitionBack.textContent = draft.mode === "edit" ? "Back to name" : "Back";
@@ -161,13 +163,14 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       els.definitionSaveStatus.hidden = true;
     }
     const name = String(draft.new_label || "").trim();
-    els.definitionTitle.textContent = draft.published_split ? `Add “${truncate(name, 48)}” to this schema` : draft.mode === "edit" ? `Edit “${truncate(name || "variable", 48)}”`
+    els.definitionTitle.textContent = draft.step === "loading_saved" ? "Load saved variable" : draft.published_split ? `${draft.replaces_group_id ? "Replace with" : "Add"} “${truncate(name, 48)}”${draft.replaces_group_id ? "" : " to this schema"}` : draft.mode === "edit" ? `Edit “${truncate(name || "variable", 48)}”`
       : draft.role === "candidate" ? "Create a variable" : `Create a new ${draft.role.toUpperCase()}`;
-    els.definitionBlock.querySelector(".definition-stepper").hidden = Boolean(draft.published_split);
+    els.definitionBlock.querySelector(".definition-stepper").hidden = Boolean(draft.published_split || draft.step === "loading_saved");
     // Editing keeps the variables it came from, so its middle step is skipped.
     els.definitionBlock.classList.toggle("definition-editing", draft.mode === "edit");
     els.definitionDescribeStep.hidden = draft.step !== "describe";
     els.definitionSourcesStep.hidden = draft.step !== "sources";
+    document.getElementById("definitionSavedLoading").hidden = draft.step !== "loading_saved";
     els.definitionPartitionStep.hidden = draft.step !== "partition";
     els.definitionLoadStatus.hidden = !draft.details_loading && !draft.details_error;
     els.definitionLoadStatus.textContent = draft.details_error

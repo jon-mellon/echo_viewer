@@ -638,6 +638,12 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       input.placeholder = active && id ? `Search to replace ${label}` : side === "instrument" ? "Optional" : "Search group or constituent variable";
       input.closest(".identify-field")?.classList.toggle("has-focus", Boolean(id));
       input.closest(".identify-field")?.classList.toggle("is-picking", active);
+      const accepted = Boolean(id && !active);
+      const field = input.closest(".identify-field");
+      field?.classList.toggle("is-selected", accepted);
+      const selectionStatus = field?.querySelector(".identify-selection-status");
+      if (selectionStatus) selectionStatus.hidden = !accepted;
+      input.title = accepted ? `Selected: ${label}. Click to change.` : "";
       const clear = input.parentElement.querySelector(".identify-clear");
       if (clear) clear.hidden = !(input.value || (side === "instrument" && id));
     }
@@ -723,7 +729,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       return h("section", { className: "explore-group", dataset: { section: key } },
         h("div", { className: "explore-group-header" },
           all,
-          h("h2", { textContent: title }),
+          h("h3", { textContent: title }),
           // Create and the map's filters sit beside the first heading, as Explore's do.
           sectionIndex === 0 ? h("span", { className: "explore-group-tools identify-tools" }, createVariableButton(onCreateCustom))
             : h("span"),

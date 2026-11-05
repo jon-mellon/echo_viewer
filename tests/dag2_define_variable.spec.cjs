@@ -663,6 +663,25 @@ test("a published split appears after source selection and opens for review", as
   expect(groups.find(group => group.group_id === fixture.sourceId)?.label).toBe(fixture.sourceLabel);
 });
 
+test("choosing a cause confirms the selection until its picker is reopened", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/?task=identify`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState.publishedSchemaHydrated);
+  const option = page.locator("#identifyGroupPicker button[data-group-id]").first();
+  const groupId = await option.getAttribute("data-group-id");
+  await option.click();
+  const cause = page.locator('.identify-field[data-side="iv"]');
+  await expect(cause.locator(".identify-selection-status")).toBeVisible();
+  await expect(cause).toHaveClass(/is-selected/);
+  await page.locator("#identify-iv-input").click();
+  await expect(cause.locator(".identify-selection-status")).toBeHidden();
+  await expect(cause).not.toHaveClass(/is-selected/);
+  await page.locator("#identify-iv-input").press("Escape");
+  await expect(cause.locator(".identify-selection-status")).toBeVisible();
+  expect(await page.evaluate(() => window.__dagBuilderState.project.iv_group_id)).toBe(groupId);
+});
+
 test("add a saved variable to the schema without selecting an analysis role", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.clear();
@@ -674,9 +693,9 @@ test("add a saved variable to the schema without selecting an analysis role", as
   const before = await page.evaluate(async () => {
     const state = window.__dagBuilderState;
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
-    dagDataSource.loadVariableMetadata = async ids => ids.map(id => ({ variable_id: id,
+    dagDataSource.loadVariableMetadata = async ids => { await new Promise(resolve => setTimeout(resolve, 300)); return ids.map(id => ({ variable_id: id,
       index: parseInt(id.slice(1, 9), 16), display_label: id, concept_label: id,
-      map_x: parseInt(id.slice(1, 9), 16), map_y: parseInt(id.slice(9, 17), 16) }));
+      map_x: parseInt(id.slice(1, 9), 16), map_y: parseInt(id.slice(9, 17), 16) })); };
     const source = state.project.groups.find(group => group.variable_ids?.length >= 2 && group.variable_ids.length <= 20);
     const { commitLocalSchema } = await import("/local_schema_store.mjs");
     const group = { group_id: "saved-variable-fixture", label: "Saved test variable",
@@ -684,7 +703,9 @@ test("add a saved variable to the schema without selecting an analysis role", as
       provenance: { operation: "split_categories", split_id: "saved-split-fixture", source_group_ids: [source.group_id],
         source_group_by_variable: Object.fromEntries(source.variable_ids.map(id => [id, source.group_id])) },
       variable_ids: [source.variable_ids[0]] };
-    await commitLocalSchema({ id: "saved-fixture", schema: { groups: [group] }, url: location.href });
+    const alternative = { ...group, group_id: "alternative-fixture", label: "Alternative saved variable",
+      provenance: { ...group.provenance, split_id: "alternative-split" } };
+    await commitLocalSchema({ id: "saved-fixture", schema: { groups: [group, alternative] }, url: location.href });
     return { source: source.label, iv: state.project.iv_group_id, dv: state.project.dv_group_id,
       instrument: state.project.instrument_group_id, focus: state.focusedGroupId, phase: state.phase };
   });
@@ -695,6 +716,10 @@ test("add a saved variable to the schema without selecting an analysis role", as
   await expect(saved).toContainText("Saved test variable");
   await expect(saved).toContainText(before.source);
   await saved.getByRole("button", { name: "Add Saved test variable to schema" }).click();
+  await expect(page.locator("#definitionSavedLoading")).toBeVisible();
+  await expect(page.locator("#definitionDescribeStep")).toBeHidden();
+  await expect(page.locator("#definitionSourcesStep")).toBeHidden();
+  await expect(page.locator("#definitionJevPanel")).toBeHidden();
   await expect(page.locator("#definitionConceptsTitle")).toHaveText("Review saved variable");
   await expect(page.locator("#definitionJevPanel")).toBeHidden();
   await expect(page.locator("#definitionResidualLabels input")).toHaveCount(0);
@@ -710,6 +735,33 @@ test("add a saved variable to the schema without selecting an analysis role", as
   });
   expect(after).toEqual({ iv: before.iv, dv: before.dv, instrument: before.instrument,
     focus: before.focus, phase: before.phase, origin: "saved-split-fixture" });
+
+  // An overlapping saved definition is available when replacing this role's split.
+  await page.locator("#customVariablesClose").click();
+  const selectedId = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .find(group => group.label === "Saved test variable").group_id);
+  await chooseAnchor(page, "iv", "category-sleep");
+  await chooseAnchor(page, "dv", selectedId);
+  await openIdentifyField(page, "dv");
+  await page.getByRole("button", { name: "Review and add Alternative saved variable" }).click();
+  await expect(page.locator("#definitionSave")).toHaveText("Replace and use as outcome");
+  await expect(page.locator("#definitionConceptsIntro")).toContainText('This replaces “Saved test variable”');
+  await page.locator(".definition-cancel:visible").first().click();
+  expect(await page.evaluate(() => window.__dagBuilderState.project.dv_group_id)).toBe(selectedId);
+  await openIdentifyField(page, "dv");
+  await page.getByRole("button", { name: "Review and add Alternative saved variable" }).click();
+  await expect(page.locator("#definitionSave")).toBeEnabled();
+  await page.locator("#definitionSave").click();
+  await expect(page.locator("#definitionBlock")).toBeHidden();
+  const replaced = await page.evaluate(() => {
+    const project = window.__dagBuilderState.project;
+    return { outcome: project.groups.find(group => group.group_id === project.dv_group_id)?.label,
+      oldExists: project.groups.some(group => group.label === "Saved test variable"),
+      memberships: project.groups.flatMap(group => group.variable_ids) };
+  });
+  expect(replaced.outcome).toBe("Alternative saved variable");
+  expect(replaced.oldExists).toBe(false);
+  expect(new Set(replaced.memberships).size).toBe(replaced.memberships.length);
 });
 
 test("definition source search matches constituent variables, not only category names", async ({ page }) => {
