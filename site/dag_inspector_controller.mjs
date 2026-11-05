@@ -14,8 +14,9 @@ export function createDagInspectorController({
   loadVisibleLinkEndpoints = async () => [],
   excludeConcept = () => {},
 }) {
-  const selectedEdge = () => state.project?.links?.find(link => state.selectedEdgeId === STUDY_DESIGN_EDGE_ID
-    ? link.is_target_relation : link.edge_id === state.selectedEdgeId) || null;
+  const selectedEdge = () => state.studyGraph?.links?.find(link => link.edge_id === state.selectedEdgeId)
+    || state.project?.links?.find(link => state.selectedEdgeId === STUDY_DESIGN_EDGE_ID
+      ? link.is_target_relation : link.edge_id === state.selectedEdgeId) || null;
   let pendingFindingId = null;
   const conceptLabels = new Map();
   const resolvedConceptIds = new Set();
@@ -256,7 +257,7 @@ export function createDagInspectorController({
     elements.edgeInspector.hidden = false;
     elements.closeEvidencePane.hidden = false;
     const records = `${model.rawCount} evidence record${model.rawCount === 1 ? "" : "s"}`;
-    const meta = [link.is_target_relation ? "Target relationship" : null,
+    const meta = [link.is_user_claim ? "User-asserted direct effect · Study-specific claim, not an evidence record" : link.is_target_relation ? "Target relationship" : null,
       sourcesLoading ? null : model.rawCount ? records : "No evidence records"].filter(Boolean).join(" · ");
     replaceChildren(elements.edgeInspector,
       h("header", { className: "evidence-header" },

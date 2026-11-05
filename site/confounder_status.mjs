@@ -1,9 +1,22 @@
 export const CONFOUNDER_STATUSES = {
   unaddressed: "Unaddressed",
   explicitly_controlled: "Explicitly controlled",
-  accounted_for_by_design: "Accounted for by design (e.g. time invariance)",
-  other: "Other",
+  accounted_for_by_design: "Accounted for by design",
+  causes_y_only_via_x: "Causes Y only via X",
+  not_in_minimal_adjustment_set: "Not in minimal adjustment set",
+  removed_other: "Removed for other reason",
 };
+
+export const EXCLUSION_STATUSES = {
+  unaddressed: "Unaddressed",
+  explicitly_controlled: "Explicitly controlled for",
+  instrument_only_via_x: "Instrument only causes variable via X",
+  variable_only_via_x: "Variable only causes Y via X",
+  removed_other: "Removed for other reason",
+};
+export const CONTROL_WARNING = "Controlling for exclusion restriction violations can induce post treatment bias.";
+export const CLAIM_STATUSES = new Set(["causes_y_only_via_x", "instrument_only_via_x", "variable_only_via_x"]);
+export const LIGHT_STATUSES = new Set(["explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set"]);
 
 // A collider biases the estimate only when the analysis conditions on it, so its
 // status records whether it was left out of the model and sample, or was not.
@@ -18,6 +31,7 @@ export const COLLIDER_STATUSES = {
 export const DIAGNOSTIC_STATUSES = {
   confounders: { field: "confounder_statuses", statuses: CONFOUNDER_STATUSES, noun: "confounder" },
   colliders: { field: "collider_statuses", statuses: COLLIDER_STATUSES, noun: "collider" },
+  exclusion: { field: "exclusion_statuses", statuses: EXCLUSION_STATUSES, noun: "exclusion restriction violation" },
 };
 
 /** Shorter labels for the menus, where the full text does not fit. */
@@ -30,16 +44,34 @@ export function confounderKey(ivId, dvId, groupId) {
   return JSON.stringify([ivId, dvId, groupId]);
 }
 
+export function diagnosticKey(project, kind, groupId) {
+  return kind === "exclusion"
+    ? JSON.stringify([project.instrument_group_id, project.iv_group_id, project.dv_group_id, groupId])
+    : confounderKey(project.iv_group_id, project.dv_group_id, groupId);
+}
+
+export function scopedDecisions(project, kind) {
+  const spec = DIAGNOSTIC_STATUSES[kind];
+  if (!spec) return [];
+  return Object.entries(project[spec.field] || {}).flatMap(([key, decision]) => {
+    try {
+      const parts = JSON.parse(key);
+      const id = Array.isArray(parts) && parts.at(-1);
+      return id && diagnosticKey(project, kind, id) === key ? [{ groupId: id, key, ...decision }] : [];
+    } catch { return []; }
+  });
+}
+
 /** One row per candidate with its recorded status ("unaddressed" when none), sorted by name. */
 export function diagnosticStatusRows(project, groupIds, kind = "confounders") {
   const { field, statuses } = DIAGNOSTIC_STATUSES[kind];
   const groups = new Map((project.groups || []).map(group => [group.group_id, group]));
   return [...(groupIds || [])].filter(id => groups.has(id)).map(id => {
-    const key = confounderKey(project.iv_group_id, project.dv_group_id, id);
+    const key = diagnosticKey(project, kind, id);
     const decision = project[field]?.[key] || {};
     return { groupId: id, label: groups.get(id).label || id, key,
-      status: Object.hasOwn(statuses, decision.status) ? decision.status : "unaddressed",
-      text: decision.status === "other" ? (decision.text || "") : "" };
+      status: Object.hasOwn(statuses, decision.status) || decision.status === "other" ? decision.status : "unaddressed",
+      text: ["other", "removed_other"].includes(decision.status) ? (decision.text || "") : "" };
   }).sort((a, b) => a.label.localeCompare(b.label) || a.groupId.localeCompare(b.groupId));
 }
 
@@ -51,11 +83,22 @@ export function colliderRows(project, groupIds) {
   return diagnosticStatusRows(project, groupIds, "colliders");
 }
 
+export function diagnosticReviewRows(project, groupIds, kind = "confounders") {
+  const candidates = new Set(groupIds || []);
+  const retained = scopedDecisions(project, kind).filter(row => row.status !== "unaddressed").map(row => row.groupId);
+  return diagnosticStatusRows(project, new Set([...candidates, ...retained]), kind).map(row => ({ ...row,
+    rejected: row.status === "removed_other" || CLAIM_STATUSES.has(row.status) || !candidates.has(row.groupId),
+    noLongerCandidate: !candidates.has(row.groupId) }));
+}
+
 /** The statuses safe to publish: the choice only, never the private "Other" text. */
 export function publicDiagnosticStatuses(decisions = {}, statuses = CONFOUNDER_STATUSES) {
   return Object.fromEntries(Object.entries(decisions).flatMap(([key, decision]) =>
-    Object.hasOwn(statuses, decision?.status)
-      ? [[key, { status: decision.status }]] : []));
+    Object.hasOwn(statuses, decision?.status) || decision?.status === "other"
+      ? [[key, { status: decision.status,
+        ...(Array.isArray(decision.rejected_effects) ? { rejected_effects: decision.rejected_effects.map(({ sourceId, targetId }) => ({ sourceId, targetId })) } : {}),
+        ...(Array.isArray(decision.asserted_effects) ? { asserted_effects: decision.asserted_effects.map(({ sourceId, targetId }) => ({ sourceId, targetId })) } : {}),
+      }]] : []));
 }
 
 export function publicConfounderStatuses(decisions = {}) {

@@ -103,6 +103,8 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       || state.data.grouping_sets?.[0])?.confounder_statuses || {});
     state.project.collider_statuses = structuredClone((localRecord?.schema
       || state.data.grouping_sets?.[0])?.collider_statuses || {});
+    state.project.exclusion_statuses = structuredClone((localRecord?.schema
+      || state.data.grouping_sets?.[0])?.exclusion_statuses || {});
     normalizeProjectDuplicateAssignments();
     if (state.interfaceMode === "dag2") {
       state.phase = "select_iv";
@@ -171,6 +173,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.project.finding_decisions = structuredClone(schema.finding_decisions || {});
         state.project.confounder_statuses = structuredClone(schema.confounder_statuses || {});
         state.project.collider_statuses = structuredClone(schema.collider_statuses || {});
+        state.project.exclusion_statuses = structuredClone(schema.exclusion_statuses || {});
         loadLatestSchemaGroups();
         normalizeProjectDuplicateAssignments();
         // Membership hydration and the following DOM/canvas refresh are

@@ -1,6 +1,7 @@
 import { confounderPathNodeRole } from "./dag_graph.mjs";
 import { wrapDagLabel } from "./dag_layout.mjs";
 import { directedGroupLabels } from "./dag_exports.mjs";
+import { LIGHT_STATUSES } from "./confounder_status.mjs";
 
 // Display records only: no renderer, DOM or viewer-state access.
 
@@ -88,7 +89,7 @@ export function visNodeData(group, layoutPoint, layoutParams = {}, view) {
   const isSelected = group.group_id === view.activeGroupId;
   const role = isViolation || isExogeneityCandidate || isConfounder ? "confounder" : isInstrument ? "instrument" : isCollider ? "collider" : isPathMediator ? "mediator" : null;
   const color = role ? ROLE_COLORS[role] : view.groupColor;
-  const addressed = isConfounder && ["explicitly_controlled", "accounted_for_by_design"].includes(view.confounderStatus);
+  const addressed = (isConfounder || isViolation) && LIGHT_STATUSES.has(view.confounderStatus);
   const fill = mixHex(color, "#ffffff", addressed ? 0.8 : NODE_FILL_SOFTNESS);
   const roleBorder = deeper(color);
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
@@ -136,7 +137,7 @@ export function edgeVisualData(link, selectedEdgeId) {
       inherit: false,
       opacity: isSelected || isTarget ? 1 : PLAIN_EDGE_OPACITY,
     },
-    dashes: false,
+    dashes: link.is_user_claim ? [2, 5] : false,
     width: isSelected ? 3.6 : isTarget ? 2.6 : 1.0,
   };
 }

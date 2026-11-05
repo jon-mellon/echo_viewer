@@ -69,7 +69,8 @@ export async function downloadSchemaFolder(baseUrl, manifest, publicationDir, ex
   const logicalManifest = { ...manifest };
   delete logicalManifest.group_membership_references;
   const schemaFiles = new Map([["manifest.json", Buffer.from(stableJson(logicalManifest))]]);
-  const paths = [manifest.schema_file, manifest.groups_file, ...Object.values(memberships), manifest.rejected_file].filter(Boolean);
+  const paths = [manifest.schema_file, manifest.groups_file, ...Object.values(memberships), manifest.rejected_file,
+    manifest.variable_schema_file, manifest.study_decisions_file].filter(Boolean);
   await eachLimited([...new Set(paths)], 4, async relative => {
     safePath(publicationDir, relative);
     const response = await fetchPublishedFile(referenceByPath.get(relative) || new URL(relative, baseUrl).href, undefined, fetchImpl);
@@ -180,7 +181,8 @@ export async function openLocalPublication(publicationId = AGENT_DEFAULT_PUBLICA
   const schema = validateGroupingSchema(await loadGroupingSchemaFolder(pathToFileURL(`${publicationDir}/`).href, localFetch));
   const manifest = JSON.parse(await readFile(join(publicationDir, "manifest.json"), "utf8"));
   const schemaPaths = ["manifest.json", manifest.schema_file, manifest.groups_file,
-    ...Object.values(manifest.group_membership_files), manifest.rejected_file].filter(Boolean);
+    ...Object.values(manifest.group_membership_files), manifest.rejected_file,
+    manifest.variable_schema_file, manifest.study_decisions_file].filter(Boolean);
   const verified = await canonicalFolderHash(new Map(await Promise.all(schemaPaths
     .map(async path => [path, await readFile(safePath(publicationDir, path))]))));
   if (verified !== publication.content_hash) throw new Error("Cached publication hash mismatch.");

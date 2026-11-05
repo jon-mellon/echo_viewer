@@ -90,7 +90,8 @@ export function buildPathHighlightModel({
     const link = visibleLinkById.get(logicalEdgeId);
     const relevantTargets = directionTargetsByPair.get(link ? pairKey(link.group_a, link.group_b) : "");
     const arrows = highlightedSegmentArrows(edge, link, relevantTargets);
-    laneSegments.push({ logicalEdgeId, from: edge.from, to: edge.to, role, color: palette.color, arrows });
+    laneSegments.push({ logicalEdgeId, from: edge.from, to: edge.to, role, color: palette.color, arrows,
+      ...(link?.is_user_claim ? { dashes: [2, 5] } : {}) });
     edgeUpdates.push({
       id: edge.id,
       color: { color: palette.color, highlight: palette.color, hover: palette.color,
@@ -283,7 +284,7 @@ export function drawPathLanes(context, { segments = [], positions = {}, boxes = 
     if (points.some(point => !point) || points.length < 2) continue;
     const routed = separateHighlightRuns(points, occupied, scale, first.role === "iv" ? -1 : 1);
     occupied.push(...routed.slice(0, -1).map((point, index) => [point, routed[index + 1]]));
-    rendered.push({ points: routed, color: first.color,
+    rendered.push({ points: routed, color: first.color, dashes: first.dashes,
       to: edgeSegments.some(item => item.arrows?.to?.enabled),
       from: edgeSegments.some(item => item.arrows?.from?.enabled) });
   }
@@ -297,6 +298,7 @@ export function drawPathLanes(context, { segments = [], positions = {}, boxes = 
       for (const point of edge.points.slice(1)) context.lineTo(point.x, point.y);
       context.strokeStyle = casing ? "rgba(255,255,255,0.94)" : edge.color;
       context.lineWidth = (casing ? 8.5 : 4.4) / scale;
+      context.setLineDash?.(casing ? [] : (edge.dashes || []).map(value => value / scale));
       context.stroke();
     }
   }

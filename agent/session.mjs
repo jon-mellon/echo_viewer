@@ -6,6 +6,7 @@ import * as visibility from "../site/variable_visibility.mjs";
 import { confounderKey } from "../site/confounder_status.mjs";
 import { fullCompileDag } from "../site/compiled_dag.mjs";
 import { deriveDagView } from "../site/dag_view.mjs";
+import { effectiveStudyGraph } from "../site/study_graph.mjs";
 import { buildCandidateQueue } from "../site/dag_candidates.mjs";
 import { groupNeighborSuggestions } from "../site/dag_search.mjs";
 import { validateGroupingSchema } from "../site/data_validation.mjs";
@@ -31,6 +32,8 @@ function projectFromSchema(schema, anchors = {}) {
     link_decisions: structuredClone(schema.link_decisions || {}),
     finding_decisions: structuredClone(schema.finding_decisions || {}),
     confounder_statuses: structuredClone(schema.confounder_statuses || {}),
+    exclusion_statuses: structuredClone(schema.exclusion_statuses || {}),
+    collider_statuses: structuredClone(schema.collider_statuses || {}),
     rejected_variables: structuredClone(schema.rejected_variables || []) };
 }
 
@@ -376,10 +379,12 @@ export class EchoAgentSession {
     const dag = { ...compiled,
       nodes: compiled.nodes.filter(node => !CATCH_ALL_GROUP_IDS.has(node.group_id)),
       edges: compiled.edges.filter(edge => !CATCH_ALL_GROUP_IDS.has(edge.group_a) && !CATCH_ALL_GROUP_IDS.has(edge.group_b)) };
-    const view = deriveDagView({ groups: this.schema.groups.filter(group => !CATCH_ALL_GROUP_IDS.has(group.group_id)),
-      links: dag.edges, ivId: project.iv_group_id, dvId: project.dv_group_id,
+    const effective = effectiveStudyGraph({ ...project, links: dag.edges,
+      groups: this.schema.groups.filter(group => !CATCH_ALL_GROUP_IDS.has(group.group_id)) });
+    const view = deriveDagView({ groups: effective.groups,
+      links: effective.links, ivId: project.iv_group_id, dvId: project.dv_group_id,
       instrumentId: project.instrument_group_id, ...options });
-    return jsonSafe({ dag, view });
+    return jsonSafe({ dag: { ...dag, nodes: dag.nodes.filter(node => !effective.removed.has(node.group_id)), edges: effective.links }, baselineDag: dag, view });
   }
   async candidates() {
     return buildCandidateQueue(projectFromSchema(this.schema, this.record.anchors),

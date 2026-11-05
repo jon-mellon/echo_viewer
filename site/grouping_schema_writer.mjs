@@ -1,4 +1,5 @@
 import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contracts.mjs";
+import { variableSchema, studyDecisionBundle } from "./schema_views.mjs";
 export { GROUPING_FORMAT_VERSION } from "./app_contracts.mjs";
 const SCHEMA_KEYS = ["schema_version", "grouping_set_id", "label", "description"];
 const REJECTED_COLUMNS = [
@@ -122,7 +123,11 @@ export async function writeGroupingSchemaFolder(schema, cryptoApi = globalThis.c
     provenance: schema.migration_provenance || {},
     extra,
     top_level_fields: Object.keys(schema).sort(),
+    variable_schema_file: "variable-schema.json",
+    study_decisions_file: "study-decisions.json",
   };
+  textFiles.set("variable-schema.json", stableJson(variableSchema(schema)));
+  textFiles.set("study-decisions.json", stableJson(studyDecisionBundle(schema)));
   textFiles.set("manifest.json", stableJson(manifest));
   return new Map([...textFiles.entries()].map(([path, text]) => [path, encoder.encode(text)]));
 }

@@ -33,8 +33,12 @@ export function createToolbarPresenter({ state, elements, groupById }) {
           keyItem("diagnostic-key-cause", "Potential common cause")]
         : state.showExclusionViolations
           ? [...anchorItems, keyItem("diagnostic-key-instrument", "Instrument"),
-            keyItem("diagnostic-key-violation", "Potential violation")]
+            keyItem("diagnostic-key-violation", "Potential violation"),
+            keyItem("diagnostic-key-addressed", "Explicitly controlled for ⚠"),
+            keyItem("diagnostic-key-claim", "Study-claimed direct effect")]
           : [...anchorItems, keyItem("diagnostic-key-fill", state.showConfoundersOnly ? "Confounder" : "Collider"),
+            ...(state.showConfoundersOnly ? [keyItem("diagnostic-key-addressed", "Controlled / by design / outside minimal set")] : []),
+            keyItem("diagnostic-key-claim", "Study-claimed direct effect"),
             keyItem("diagnostic-key-outline", state.showConfoundersOnly ? "Also a collider" : "Also a confounder")]);
     }
     const confounderCount = state.confounderGroupIds?.size || 0;

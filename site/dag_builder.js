@@ -42,6 +42,9 @@ import { listPreviousSessions, listLocalSchemas } from "/local_schema_store.mjs"
 import { escapeHtml } from "/text_utils.mjs";
 import { relevantExclusions } from "/dag_export_relevance.mjs";
 import { DIAGNOSTIC_STATUSES, STATUS_MENU_LABELS, diagnosticStatusRows } from "/confounder_status.mjs";
+import { diagnosticKey } from "/confounder_status.mjs";
+import { effectiveStudyGraph } from "/study_graph.mjs";
+import { createVariableReviewController } from "/variable_review_controller.mjs";
 import { h, replaceChildren, safeUrl, setSafeUrl } from "/dom_builder.mjs";
 import { hydrateSearchResult, variableSearchCatalog } from "/variable_search_catalog.mjs";
 
@@ -566,62 +569,30 @@ function statusKind() {
 
 /** Record how a confounder or collider is handled; shared by the side panel and the table. Undoable. */
 function setDiagnosticStatus(kind, groupId, status, text = "") {
+  variableReviewController.edit(kind, groupId, status);
+}
+
+function commitDiagnosticReview(kind, groupId, decision) {
   const spec = DIAGNOSTIC_STATUSES[kind];
-  const row = diagnosticStatusRows(state.project, [groupId], kind)[0];
-  if (!spec || !row || !Object.hasOwn(spec.statuses, status)) return;
-  const note = status === "other" ? text.trim() : "";
-  if (row.status === status && row.text === note) return;
+  if (!spec || !groupById(groupId)) return;
+  const key = diagnosticKey(state.project, kind, groupId);
   const before = takeSnapshot();
   state.project[spec.field] = { ...(state.project[spec.field] || {}),
-    [row.key]: { status, ...(note ? { text: note } : {}) } };
-  projectController.record(`Set ${spec.noun} status: ${row.label}`, before);
+    [key]: decision };
+  projectController.record(`Set ${spec.noun} status: ${groupById(groupId).label}`, before);
   publicationController.workingCopyChanged();
   void persistentViewer.commitDecision().catch(error => console.error(`Could not save ${spec.noun} status`, error));
-  renderConfounderStatuses();
-  void dagNetworkController.renderDag({ reuseGeometry: true });
+  updateDagFilters();
+  void dagNetworkController.whenRendered().then(() => {
+    const selector = dagNetworkController.dagDisplay() === "table" ? ".dag-table-status" : ".variable-disposition";
+    document.querySelector(`${selector}[data-group-id="${CSS.escape(groupId)}"]`)?.focus();
+  });
 }
 
 function renderConfounderStatuses() {
-  const kind = statusKind();
-  const visible = state.interfaceMode === "dag2" && Boolean(kind)
-    && !els.dagWorkspaceSection.hidden && !state.project.instrument_group_id
-    && Boolean(groupById(state.project.iv_group_id)?.variable_ids?.length)
-    && Boolean(groupById(state.project.dv_group_id)?.variable_ids?.length);
-  els.confounderConfig.hidden = !visible;
-  if (!visible) return;
-  const spec = DIAGNOSTIC_STATUSES[kind];
-  const rows = diagnosticStatusRows(state.project, kind === "confounders" ? state.confounderGroupIds : state.colliderGroupIds, kind);
-  const title = kind === "confounders" ? "Confounder" : "Collider";
-  els.confounderSummary.textContent = `${title} status (${rows.length})`;
-  const note = els.confounderDisclosure.querySelector(".small-note");
-  if (note) note.textContent = `Record how each potential ${spec.noun} is handled in this study.`;
-  if (!els.confounderDisclosure.open) {
-    els.confounderStatusList.replaceChildren();
-    return;
-  }
-  if (!rows.length) {
-    replaceChildren(els.confounderStatusList,
-      h("p", { className: "small-note", textContent: `No potential ${spec.noun}s in this view.` }));
-    return;
-  }
-  replaceChildren(els.confounderStatusList, rows.map(row => {
-    const select = h("select", { className: "select-input", attrs: { "aria-label": `Status for ${row.label}` } },
-      Object.entries(spec.statuses).map(([value, label]) =>
-        h("option", { value, textContent: STATUS_MENU_LABELS[value] || label })));
-    select.value = row.status;
-    select.title = spec.statuses[row.status];
-    const explanation = h("input", { className: "search-input", type: "text",
-      value: row.text, placeholder: `Describe how this ${spec.noun} is handled`,
-      attrs: { "aria-label": `Other status for ${row.label}` } });
-    explanation.hidden = row.status !== "other";
-    select.addEventListener("change", () => {
-      explanation.hidden = select.value !== "other";
-      setDiagnosticStatus(kind, row.groupId, select.value, explanation.value);
-    });
-    explanation.addEventListener("change", () => setDiagnosticStatus(kind, row.groupId, select.value, explanation.value));
-    return h("div", { className: "confounder-status-row" },
-      h("label", { textContent: row.label }, select), explanation);
-  }));
+  // Review controls now live in the variable list.
+  els.confounderConfig.hidden = true;
+  els.confounderStatusList.replaceChildren();
 }
 
 // ─── Setup phase rendering ────────────────────────────────────────────────────
@@ -1289,6 +1260,9 @@ const persistentViewer = createPersistentViewer({
   onDiscard: invalidateVisibleCaches,
 });
 
+const variableReviewController = createVariableReviewController({ state, onCommit: commitDiagnosticReview,
+  onCancel: () => { taskViews.render(); if (dagNetworkController.dagDisplay() === "table") void dagNetworkController.renderDag({ reuseGeometry: true }); } });
+
 const taskViews = createTaskViews({
   state, searchGroups: searchExploreGroups, searchStatus: () => state.variableSearchStatus,
   paperSupport: linkPaperSupport, loadPaperSupport: () => void loadLinkSupport(linkPaperSupport().links),
@@ -1313,6 +1287,8 @@ const taskViews = createTaskViews({
   onIdentifyRowHover: groupId => groupId ? dagNetworkController.highlightConfounderPaths(groupId)
     : dagNetworkController.clearConfounderPathHover(),
   onIdentifyExcludedChange: () => updateDagFilters(),
+  onReviewVariable: (kind, id, status) => variableReviewController.edit(kind, id, status),
+  onEditVariableSchema: () => customVariablesPresenter.open(),
   // A row opens the variable's definition and concepts in the evidence pane, as clicking its node does.
   onOpenIdentifyVariable: groupId => {
     if (state.fullscreenPanel) setFullscreenPanel(null);
@@ -1515,6 +1491,7 @@ function linkPaperSupport() {
 // Causes and consequences draw one variable's neighborhood through the same
 // graph and evidence pane as Identify; the diagnostics belong to Identify.
 function computeExploreLinks() {
+  state.studyGraph = null;
   const { graph } = taskViews.neighborhood();
   state.componentGroupIds = graph.groupIds;
   state.visibleLinks = graph.links;
@@ -1560,14 +1537,11 @@ function computeVisibleLinks() {
   const excludedFindingCount = Object.keys(state.project.finding_decisions || {}).length;
   els.showExcludedFindings.hidden = excludedFindingCount === 0;
   els.showExcludedFindings.textContent = `Excluded findings (${excludedFindingCount})`;
-  // Variables unticked in Identify's list are left off the map, and no path runs through them.
-  const studyIds = new Set([state.project.iv_group_id, state.project.dv_group_id, state.project.instrument_group_id]);
-  const identifyExcluded = new Set([...taskViews.identifyExcluded()].filter(id => !studyIds.has(id)));
+  const studyGraph = effectiveStudyGraph({ ...state.project, groups: dagGroups() });
+  state.studyGraph = studyGraph;
   const view = deriveDagView({
-    groups: identifyExcluded.size
-      ? dagGroups().filter(group => !identifyExcluded.has(group.group_id)) : dagGroups(),
-    links: identifyExcluded.size ? state.project.links.filter(link =>
-      !identifyExcluded.has(link.group_a) && !identifyExcluded.has(link.group_b)) : state.project.links,
+    groups: studyGraph.groups,
+    links: studyGraph.links,
     ivId: state.project.iv_group_id,
     dvId: state.project.dv_group_id,
     instrumentId: state.project.instrument_group_id,
@@ -1586,6 +1560,19 @@ function computeVisibleLinks() {
     hideIrrelevantDiagnosticLinks: state.hideIrrelevantConfounderLinks,
     showAllExclusionLinks: state.showAllExclusionLinks,
   });
+  // Keep a confirmed claim visible even when it removes its subject from the
+  // candidate set. Its dotted arrow explains the recorded rejection.
+  const claimKind = state.showExclusionViolations ? "exclusion" : state.showConfoundersOnly ? "confounders" : null;
+  const assertions = studyGraph.claims.filter(row => row.kind === claimKind).flatMap(row => row.asserted_effects || []);
+  for (const effect of assertions) {
+    if (studyGraph.removed.has(effect.sourceId) || studyGraph.removed.has(effect.targetId)) continue;
+    view.componentGroupIds.add(effect.sourceId); view.componentGroupIds.add(effect.targetId);
+    for (const link of studyGraph.links) {
+      const forward = link.group_a === effect.sourceId && link.group_b === effect.targetId && ["A_TO_B", "BIDIRECTIONAL"].includes(link.direction_type);
+      const backward = link.group_b === effect.sourceId && link.group_a === effect.targetId && ["B_TO_A", "BIDIRECTIONAL"].includes(link.direction_type);
+      if ((forward || backward) && link.display_status !== "excluded" && !view.visibleLinks.some(current => current.edge_id === link.edge_id)) view.visibleLinks.push(link);
+    }
+  }
   state.componentGroupIds = view.componentGroupIds;
   state.visibleLinks = view.visibleLinks;
   state.confounderGroupIds = view.confounders.confounderIds;
@@ -1997,6 +1984,11 @@ const customVariablesPresenter = createCustomVariablesPresenter({
   state, elements: els, truncate, normalized,
   customVariables: () => (state.project?.groups || []).filter(group => group.source === "user_split")
     .sort((a, b) => String(a.label || "").localeCompare(String(b.label || ""))),
+  schemaVariables: () => [...(state.project?.groups || [])].sort((a, b) => String(a.label || "").localeCompare(String(b.label || ""))),
+  getSchema: currentWorkingGroupingSchema,
+  loadDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),
+  conceptLabel: id => state.variableById.get(id)?.display_label || state.variableById.get(id)?.concept_label || id,
+  onSplitSource: id => definitionWorkflowController.browsePreviousForSource("candidate", id),
   sourceLabels: group => (group.provenance?.source_group_ids || []).map(id => groupById(id)?.label).filter(Boolean),
   canChange: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
   onCreate: () => startDefinition("candidate"),
