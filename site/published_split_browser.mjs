@@ -21,7 +21,7 @@ export async function listOwnPublishedSplits({ apiUrl = CLOUDFLARE_API_URL, fetc
           source_group_ids: group.provenance.source_group_ids,
           source_labels: group.provenance.source_group_ids.map(id => {
             const source = staged.schema.groups.find(candidate => candidate.group_id === id);
-            return source?.provenance?.split_id === group.provenance.split_id
+            return source && group.provenance.split_id && source.provenance?.split_id === group.provenance.split_id
               ? source.provenance.prior_label || source.label || id : source?.label || id;
           }),
           name: group.label, description: group.description,

@@ -568,7 +568,7 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
   }
 });
 
-test("a published split appears after source selection and fills the editable definition", async ({ page }) => {
+test("a published split appears after source selection and opens for review", async ({ page }) => {
   await page.addInitScript(() => {
     if (!sessionStorage.getItem("dag2-test-initialized")) {
       localStorage.clear();
@@ -641,19 +641,13 @@ test("a published split appears after source selection and fills the editable de
   await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
   await page.locator("#definitionBrowseResults button[data-split-index]").click();
 
-  await expect(page.locator("#definitionDescribeStep")
+  await expect(page.locator("#definitionPartitionStep")
     .or(page.locator("#definitionBrowseStatus", { hasText: "Could not" }))).toBeVisible({ timeout: 60_000 });
   await expect(page.locator("#definitionBrowseStatus")).not.toContainText("Could not");
-  // The published name and definition start the Describe step, ready to keep or reword.
+  // The saved split opens directly for review, without the AI workflow.
   await expect(page.locator("#definitionNewLabel")).toHaveValue("Published fixture split");
   await expect(page.locator("#definitionNewDescription")).toHaveValue("A published fixture split taken from one source category.");
-  await page.locator("#definitionDescribeBack").click();
-  await expect(page.locator("#definitionSourcesStep")).toBeVisible();
-  await expect(page.locator("#definitionBrowseResults .definition-browse-card")).toHaveCount(1);
-  await page.locator("#definitionBrowseResults button[data-split-index]").click();
-  await expect(page.locator("#definitionNewLabel")).toHaveValue("Published fixture split");
-  await page.locator("#definitionNewLabel").fill("Reused fixture split");
-  await page.locator("#definitionDescribeNext").click();
+  await expect(page.locator("#definitionJevPanel")).toBeHidden();
   await expect(page.locator("body")).toHaveClass(/defining-variable/);
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
   // The split supplied the concepts too, so there is nothing left to choose: just save.
@@ -663,7 +657,7 @@ test("a published split appears after source selection and fills the editable de
   await expect(page.locator("#definitionBlock")).toBeHidden();
   const groups = await page.evaluate(() => window.__dagBuilderState.project.groups
     .map(group => ({ group_id: group.group_id, label: group.label, description: group.description })));
-  expect(groups.find(group => group.label === "Reused fixture split")?.description)
+  expect(groups.find(group => group.label === "Published fixture split")?.description)
     .toBe("A published fixture split taken from one source category.");
   expect(groups.find(group => group.group_id === fixture.sourceId)?.label).toBe(fixture.sourceLabel);
 });
