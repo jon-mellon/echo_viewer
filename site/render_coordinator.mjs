@@ -30,14 +30,15 @@ export function createRenderCoordinator(view) {
     view.renderUndoRedo();
     view.saveProjectLocally();
   }
-  function updateDagFilters() {
+  // allowRemovedGroups: a review decision that drops a variable keeps everyone else where they were.
+  function updateDagFilters({ allowRemovedGroups = false } = {}) {
     view.computeVisibleLinks();
     view.renderVariablePanel?.();
     view.renderConfounderStatuses?.();
     view.renderGroupList();
     // Graph filters do not change variable assignments, membership or UOA.
     view.renderMapToolbarToggles();
-    view.renderDag({ reuseGeometry: true });
+    view.renderDag({ reuseGeometry: true, ...(allowRemovedGroups ? { allowRemovedGroups } : {}) });
     view.renderSelectedEdge();
     view.renderExportStatus();
   }

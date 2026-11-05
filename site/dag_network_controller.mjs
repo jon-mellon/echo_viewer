@@ -63,9 +63,17 @@ export function fitDagNetwork(network) {
   if (!network) return;
   network.fit(DAG_FIT_OPTIONS);
   const minScale = MIN_READABLE_FONT_PX / _dagFontSize;
-  if (network.getScale() < minScale) {
-    network.moveTo({ position: network.getViewPosition(), scale: minScale, animation: false });
-  }
+  // The key floats over the top of the graph: fit into the space below it so it covers no node.
+  const key = globalThis.document?.getElementById?.("diagnosticOverlapKey");
+  const viewport = network.body?.container;
+  const reserved = key && viewport && key.offsetParent ? key.offsetTop + key.offsetHeight : 0;
+  const height = viewport?.clientHeight || 0;
+  let scale = network.getScale();
+  if (reserved && height > reserved * 2) scale *= (height - reserved) / height;
+  scale = Math.max(scale, minScale);
+  if (scale === network.getScale() && !reserved) return;
+  const center = network.getViewPosition();
+  network.moveTo({ position: { x: center.x, y: center.y - reserved / (2 * scale) }, scale, animation: false });
 }
 
 export function isDagDisplayGroup(group) {

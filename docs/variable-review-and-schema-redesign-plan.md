@@ -51,7 +51,7 @@ Use these user-facing labels:
 | Unaddressed | Normal fill; main list | No removal or rewiring from this disposition |
 | Explicitly controlled | Lighter fill; main list | No automatic graph change |
 | Accounted for by design | Lighter fill; main list | No automatic graph change |
-| Causes Y only via X | Preview the claim; move the review row to Rejected candidates after confirmation | Establish a direct arrow into X, apply confirmed edge removals, then recalculate |
+| Affects outcome only via cause | Preview the claim; move the review row to Rejected candidates after confirmation | Establish a direct arrow into X, apply confirmed edge removals, then recalculate |
 | Not in minimal adjustment set | Lighter fill; main list | No automatic graph change |
 | Removed for other reason | Remove the whole variable from the effective graph; move its row to Rejected candidates | Recalculate without the variable and its incident edges; require a note |
 
@@ -78,8 +78,8 @@ Use these user-facing labels:
 | --- | --- | --- |
 | Unaddressed | Normal fill; main list | Retain the baseline relationships |
 | Explicitly controlled for | Lighter fill, with a warning symbol | No automatic rewiring |
-| Instrument only causes variable via X | Preview the claim; move the review row to Rejected candidates after confirmation | Establish the instrument’s direct arrow into X where needed; apply confirmed edge removals and recalculate |
-| Variable only causes Y via X | Preview the claim; move the review row to Rejected candidates after confirmation | Establish the variable’s direct arrow into X; apply confirmed edge removals and recalculate |
+| Instrument affects variable only via cause | Preview the claim; move the review row to Rejected candidates after confirmation | Establish the instrument’s direct arrow into X where needed; apply confirmed edge removals and recalculate |
+| Affects outcome only via cause | Preview the claim; move the review row to Rejected candidates after confirmation | Establish the variable’s direct arrow into X; apply confirmed edge removals and recalculate |
 | Removed for other reason | Remove the whole variable; move its row to Rejected candidates; require a note | Recalculate without the variable and its incident edges |
 
 Use **Removed for other reason**, not **Other**, consistently in both diagnostics. Whole-variable removal is distinct from separately pruning particular edges.
@@ -136,11 +136,11 @@ Run confounder, collider, and exclusion-restriction calculations on the effectiv
 
 | Reason | Path claim |
 | --- | --- |
-| Causes Y only via X | No directed path from this variable to Y bypasses X |
-| Instrument only causes variable via X | No directed path from the instrument to this variable bypasses X |
-| Variable only causes Y via X | No directed path from this variable to Y bypasses X |
+| Affects outcome only via cause | No directed path from this variable to Y bypasses X |
+| Instrument affects variable only via cause | No directed path from the instrument to this variable bypasses X |
+| Affects outcome only via cause | No directed path from this variable to Y bypasses X |
 
-In addition to rejecting bypassing paths, these dispositions authorize a direct arrow into X as a user claim: C → X for Causes Y only via X, instrument → X for Instrument only causes variable via X, and variable → X for Variable only causes Y via X. Show a newly established effect as a dotted arrow, identified as a study-specific claim rather than new evidence. Reuse an existing direct effect rather than drawing a duplicate. This decision does not independently authorize inventing other direct effects, such as X → variable when only an indirect downstream path is known.
+In addition to rejecting bypassing paths, these dispositions authorize a direct arrow into X as a user claim: C → X for Affects outcome only via cause, instrument → X for Instrument affects variable only via cause, and variable → X for Affects outcome only via cause. Show a newly established effect as a dotted arrow, identified as a study-specific claim rather than new evidence. Reuse an existing direct effect rather than drawing a duplicate. This decision does not independently authorize inventing other direct effects, such as X → variable when only an indirect downstream path is known.
 
 ### Concrete example
 

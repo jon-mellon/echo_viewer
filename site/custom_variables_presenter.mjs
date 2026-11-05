@@ -39,6 +39,13 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
   }
 
   function render() {
+    const start = performance.now();
+    try { renderView(); } finally {
+      if (state.customVariablesOpen) performance.measure("echo:schema-page:render", { start, end: performance.now() });
+    }
+  }
+
+  function renderView() {
     const showing = Boolean(state.customVariablesOpen && !state.definitionDraft);
     document.body.classList.toggle("custom-variables-open", showing);
     els.openCustomVariables?.setAttribute("aria-pressed", String(Boolean(state.customVariablesOpen)));
@@ -79,7 +86,6 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     replaceChildren(els.customVariablesTable, h("h2", { textContent: "In this schema" }), h("table", { className: "custom-variables-grid" },
       h("thead", {}, h("tr", {},
         h("th", { scope: "col", textContent: "Name" }),
-        h("th", { scope: "col", textContent: "Made from" }),
         h("th", { scope: "col", className: "num", textContent: "Concepts" }),
         h("th", { scope: "col", className: "actions" }, h("span", { className: "sr-only", textContent: "Actions" })))),
       h("tbody", {}, rows.flatMap(group => [row(group, { busy, highlight }), group.group_id === expandedId ? detailsRow(group) : null]))));
@@ -105,7 +111,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     const lockedTitle = "Changed by a later edit; it can no longer be edited or deleted here.";
     const sources = sourceLabels(group);
     if (confirmingId === group.group_id) {
-      return h("tr", { className: "custom-variables-confirm" }, h("td", { colSpan: 4 },
+      return h("tr", { className: "custom-variables-confirm" }, h("td", { colSpan: 3 },
         h("div", { className: "custom-variables-confirm-body" },
           h("span", { textContent: `Delete “${label}”? Its ${group.variable_ids?.length || 0} concepts go back to ${sources.join(", ") || "where they came from"}. You can undo this.` }),
           h("button", { className: "btn btn--danger", type: "button", dataset: { action: "confirm-delete", groupId: group.group_id },
@@ -114,10 +120,12 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
             disabled: deleting, textContent: "Keep" }))));
     }
     return h("tr", { className: group.group_id === highlight ? "is-highlighted" : "" },
+      // Whether a variable is custom, and what it was split from, is what this page is for.
       h("td", {}, h("strong", { textContent: label }),
+        custom ? h("span", { className: "custom-variables-tag", textContent: "Custom" }) : null,
+        custom && sources.length ? h("span", { className: "custom-variables-sources", textContent: `Split from ${sources.join(", ")}` }) : null,
         group.description ? h("span", { className: "custom-variables-definition", title: group.description,
           textContent: truncate(group.description, 140) }) : null),
-      h("td", { textContent: sources.join(", ") || "—" }),
       h("td", { className: "num", textContent: String(group.variable_ids?.length || Number(group.member_count) || 0) }),
       h("td", { className: "actions" },
         h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "inspect", groupId: group.group_id },
@@ -134,7 +142,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
 
   function detailsRow(group) {
     const ids = group.variable_ids || [];
-    return h("tr", { className: "schema-variable-details" }, h("td", { colSpan: 4 },
+    return h("tr", { className: "schema-variable-details" }, h("td", { colSpan: 3 },
       h("p", { textContent: group.description || "No definition recorded." }),
       h("p", { className: "small-note", textContent: `${ids.length} concepts` }),
       h("ul", {}, ids.slice(0, conceptLimit).map(id => h("li", { textContent: conceptLabel(id) }))),

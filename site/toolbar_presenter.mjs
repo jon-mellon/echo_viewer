@@ -37,7 +37,7 @@ export function createToolbarPresenter({ state, elements, groupById }) {
             keyItem("diagnostic-key-addressed", "Explicitly controlled for ⚠"),
             keyItem("diagnostic-key-claim", "Study-claimed direct effect")]
           : [...anchorItems, keyItem("diagnostic-key-fill", state.showConfoundersOnly ? "Confounder" : "Collider"),
-            ...(state.showConfoundersOnly ? [keyItem("diagnostic-key-addressed", "Controlled / by design / outside minimal set")] : []),
+            ...(state.showConfoundersOnly ? [keyItem("diagnostic-key-addressed", "Accounted for")] : []),
             keyItem("diagnostic-key-claim", "Study-claimed direct effect"),
             keyItem("diagnostic-key-outline", state.showConfoundersOnly ? "Also a collider" : "Also a confounder")]);
     }

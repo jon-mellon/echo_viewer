@@ -95,8 +95,13 @@ export function createPublicationController({
   async function matchesPublished(published) {
     const hash = published?.content_hash;
     if (!hash) return false;
-    if ((await currentCanonical()).contentHash === hash) return true;
-    return (await canonicalizeWorkingSchema(getWorkingSchema(), cryptoApi, { views: false })).contentHash === hash;
+    const start = performance.now();
+    try {
+      if ((await currentCanonical()).contentHash === hash) return true;
+      return (await canonicalizeWorkingSchema(getWorkingSchema(), cryptoApi, { views: false })).contentHash === hash;
+    } finally {
+      performance.measure("echo:publication:compare", { start, end: performance.now() });
+    }
   }
 
   function stablePermalink(published) {

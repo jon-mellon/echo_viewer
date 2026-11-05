@@ -47,13 +47,13 @@
         <!-- Exploration: Causes | Consequences and Graph | Table move here from the graph header (task_views.mjs). -->
         <div id="taskBarViewControls" class="task-bar-view-controls"></div>
         <div class="task-bar-menus">
-          <!-- Undo, redo and History (edits, earlier sessions, reset) apply to the whole project. -->
+          <!-- Undo, redo and History (edits, earlier sessions) apply to the whole project. -->
           <div class="undo-group" role="group" aria-label="Undo and redo">
             <button id="undoBtn" class="btn btn--icon" type="button" title="Nothing to undo" aria-label="Nothing to undo" disabled><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></svg></button>
             <button id="redoBtn" class="btn btn--icon" type="button" title="Nothing to redo" aria-label="Nothing to redo" disabled><svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></svg></button>
           </div>
           <details id="historyMenu" class="nav-menu menu history-menu">
-            <summary id="historyToggle" class="btn" title="Edit history, earlier sessions and reset" aria-label="History"><svg class="lucide nav-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg><span class="nav-label">History</span></summary>
+            <summary id="historyToggle" class="btn" title="Edit history and earlier sessions" aria-label="History"><svg class="lucide nav-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg><span class="nav-label">History</span></summary>
             <div id="previousSessionsPanel" class="nav-menu-panel menu-panel menu-panel--list" aria-label="History">
               <div class="history-edits">
                 <p class="menu-section-label" title="Filters and view changes aren't recorded">This session</p>
@@ -62,10 +62,6 @@
               </div>
               <p class="menu-section-label" title="Saved in this browser only">Earlier sessions</p>
               <div id="previousSessionsList" class="menu-list"></div>
-              <div class="history-reset">
-                <div class="menu-separator" role="separator"></div>
-                <button id="taskReset" class="menu-item menu-item--danger" type="button" hidden>Reset project…</button>
-              </div>
             </div>
           </details>
           <span id="historyStatus" class="sr-only" aria-live="polite"></span>
@@ -116,6 +112,8 @@
               <button id="exportLocalDraft" class="menu-item" type="button" data-hint=".json" title="Includes your private exclusion reasons">Private schema draft</button>
             </div>
           </details>
+          <!-- Reset: a top-level item, inside the hamburger panel on a phone. -->
+          <button id="taskReset" class="btn task-reset" type="button" title="Reset project" aria-label="Reset project" hidden><svg class="lucide nav-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg><span class="nav-label">Reset</span></button>
         </div>
       </div>
       <!-- On narrow screens: switch between the panels of the current task. -->

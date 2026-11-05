@@ -238,7 +238,7 @@ function installHandlers() {
     const target = /** @type {Element} */ (event.target);
     // Switching view (Causes | Consequences, Graph | Table) shows the result at once.
     if (target.closest?.(".task-bar-view-controls button")) return setNavOpen(false);
-    const item = target.closest?.(".menu-item");
+    const item = target.closest?.(".menu-item, #taskReset");
     if (!item || item.matches("[data-keep-open], .file-button, .edit-history-entry")) return;
     setNavOpen(false);
   });

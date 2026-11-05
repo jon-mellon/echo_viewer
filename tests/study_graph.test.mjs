@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { graphClaimPreview, confirmGraphClaim, effectiveStudyGraph, directedEffects, bypassPath, claimConflicts } from "../site/study_graph.mjs";
+import { graphClaimPreview, confirmGraphClaim, effectiveStudyGraph, directedEffects, bypassPath, bypassPaths, claimConflicts } from "../site/study_graph.mjs";
 import { diagnosticKey, diagnosticReviewRows } from "../site/confounder_status.mjs";
 import { variableSchema } from "../site/schema_views.mjs";
 import { canonicalizeWorkingSchema } from "../site/dag_publication_core.mjs";
@@ -92,4 +92,10 @@ test("public artifacts expose independent schemas and reproducible study claims 
   assert.ok(decisions.confounder_statuses[diagnosticKey(p, "confounders", "c")].asserted_effects.length);
   for (const bytes of files.values()) assert.doesNotMatch(new TextDecoder().decode(bytes), /PRIVATE-NOTE/);
   validateGroupingSchema({ ...p, confounder_statuses: decisions.confounder_statuses });
+});
+
+test("bypass paths list the shortest first and terminate on cycles", () => {
+  const effects = [effect("c", "m"), effect("m", "c"), effect("m", "y"), effect("c", "y"), effect("c", "x"), effect("m", "n"), effect("n", "y")];
+  const { paths } = bypassPaths(effects, "c", "y", "x");
+  assert.deepEqual(paths, [["c", "y"], ["c", "m", "y"], ["c", "m", "n", "y"]]);
 });

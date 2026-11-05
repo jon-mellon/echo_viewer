@@ -229,7 +229,6 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await pick(page, "category-sleep").click();
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
 
-  await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
   const dialog = page.locator("#resetDialog");
   await expect(dialog).toBeVisible();
@@ -239,7 +238,6 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await expect(dialog).toBeHidden();
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
 
-  await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
   const [tab] = await Promise.all([context.waitForEvent("page"),
     dialog.getByRole("button", { name: "Open new project in a new tab" }).click()]);
@@ -250,7 +248,6 @@ test("Reset warns and offers to continue, open a new tab, or reset this tab", as
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
   await tab.close();
 
-  await page.locator("#historyToggle").click();
   await page.locator("#taskReset").click();
   await dialog.getByRole("button", { name: "Reset in current tab" }).click();
   await page.waitForFunction(() => window.__dagBuilderState?.project?.links?.length > 100
@@ -270,7 +267,6 @@ test("mobile reset keeps the previous project after navigating", async ({ browse
     await open(page, `${viewer}?task=causes`);
     await pick(page, "category-sleep").tap();
     await openNav(page, { tap: true });
-    await page.locator("#historyToggle").tap();
     await page.locator("#taskReset").tap();
     await page.locator("#resetHere").tap();
     await expect(page.locator("#taskLanding")).toBeVisible({ timeout: 60000 });
@@ -644,10 +640,10 @@ test("in Identify each row is a confounder with its paths, a status, and links t
   await page.locator("#dagViewTable").click();
   await expect(page.locator("#diagnosticOverlapKey")).toBeHidden();
   await expect(page.locator("#dagPathsTable thead th")).toHaveText(["Variable", "Path to cause", "Path to outcome", "Papers", "Concepts", "Status"]);
-  // One row per confounder, in Custom and Built-in sections, each with its shortest path to the cause and to the outcome.
+  // One row per confounder, in one section, each with its shortest path to the cause and to the outcome.
   const rows = page.locator("#dagPathsTable tbody tr:not(.dag-table-section)");
   expect(await rows.count()).toBeGreaterThan(0);
-  await expect(page.locator("#dagPathsTable tbody tr.dag-table-section")).toHaveCount(2);
+  await expect(page.locator("#dagPathsTable tbody tr.dag-table-section")).toHaveCount(1);
   const row = rows.first();
   const causeLinks = row.locator("td.dag-table-routes").nth(0).locator(".dag-table-link[data-edge-id]");
   const outcomeLinks = row.locator("td.dag-table-routes").nth(1).locator(".dag-table-link[data-edge-id]");

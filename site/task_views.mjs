@@ -2,7 +2,7 @@ import { h, replaceChildren } from "./dom_builder.mjs";
 import { causalNeighborhood, MAX_NEIGHBORHOOD_DEPTH } from "./causal_neighborhood.mjs";
 import { createVariableButton, customVariableActions } from "./custom_variable_actions.mjs";
 import { pathView } from "./dag_table.mjs";
-import { DIAGNOSTIC_STATUSES, CONTROL_WARNING, CLAIM_STATUSES, diagnosticReviewRows } from "./confounder_status.mjs";
+import { DIAGNOSTIC_STATUSES, CONTROL_WARNING, CLAIM_STATUSES, LIGHT_STATUSES, diagnosticReviewRows } from "./confounder_status.mjs";
 import { claimConflicts } from "./study_graph.mjs";
 
 const TASK_CLASSES = { identify: "task-identify", causes: "task-causes", consequences: "task-consequences" };
@@ -678,15 +678,15 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     els.summary.textContent = !active.length ? `No ${noun} at this path length and paper count. Reviewed decisions remain below.` : "";
     els.summary.hidden = Boolean(active.length);
     const sections = [
-      { key: "custom", title: "Custom variables", items: active.filter(row => groupFor(row.groupId)?.source === "user_split"),
-        empty: `None of your custom variables are ${noun} here.` },
-      { key: "builtin", title: "Built-in variables", items: active.filter(row => groupFor(row.groupId)?.source !== "user_split"), empty: "None." },
+      // Where a variable came from is a schema question; review treats every variable alike.
+      { key: "candidates", title: noun.charAt(0).toUpperCase() + noun.slice(1), items: active, empty: "None." },
       ...(rejected.length ? [{ key: "rejected", title: `Rejected candidates (${rejected.length})`, items: rejected, empty: "" }] : []),
     ];
     replaceChildren(els.results, ...sections.map(({ key, title, items, empty }) =>
       h("section", { className: "explore-group variable-review-section", dataset: { section: key } },
+        // Rejected rows have no paths, so no paper counts.
         h("div", { className: "explore-group-header" }, h("h3", { textContent: title }),
-          h("span", { className: "explore-papers-header", textContent: "Papers" })),
+          key === "rejected" ? null : h("span", { className: "explore-papers-header", textContent: "Papers" })),
         h("ol", { className: "explore-list" }, items.map(item => {
           const label = labelFor(item.groupId);
           const select = reviewable ? h("select", { className: "select-input variable-disposition", dataset: { groupId: item.groupId },
@@ -702,18 +702,19 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
           const warning = view === "exclusion" && item.status === "explicitly_controlled"
             ? h("span", { className: "review-warning", tabIndex: 0, title: CONTROL_WARNING,
               attrs: { role: "img", "aria-label": CONTROL_WARNING } }, "⚠") : null;
-          return h("li", { className: "explore-row variable-review-row", dataset: { groupId: item.groupId } },
+          // Accounted-for rows share the map's lighter shade, so the list and graph read the same way.
+          return h("li", { className: `explore-row variable-review-row${LIGHT_STATUSES.has(item.status) ? " is-accounted" : ""}`, dataset: { groupId: item.groupId } },
             h("button", { type: "button", className: "explore-row-open",
               attrs: { "aria-pressed": String(state.selectedEvidenceGroupId === item.groupId), "aria-label": label },
               title: `See the definition and concepts of ${label}`,
               onclick: () => onOpenIdentifyVariable(item.groupId),
               onmouseenter: () => onIdentifyRowHover(item.rejected ? null : item.groupId), onmouseleave: () => onIdentifyRowHover(null),
               onfocus: () => onIdentifyRowHover(item.rejected ? null : item.groupId), onblur: () => onIdentifyRowHover(null) },
-              h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: label }),
+              h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: label.replace(/\//g, "/\u200b") }),
                 item.between.length ? h("span", { className: "explore-row-path", textContent: `via ${item.between.map(labelFor).join(", ")}` }) : null),
               h("span", { className: "explore-row-papers", textContent: item.papers === null ? "" : String(item.papers) })),
             select ? h("div", { className: "variable-disposition-line" }, select, warning) : null,
-            item.noLongerCandidate && item.rejected ? h("p", { className: "small-note review-row-note", textContent: "Not a candidate under the current study claims." }) : null,
+            item.noLongerCandidate && item.rejected && item.status !== "removed_other" ? h("p", { className: "small-note review-row-note", textContent: "Not a candidate under the current study claims." }) : null,
             item.text && ["removed_other", "other"].includes(item.status) ? h("p", { className: "small-note review-row-note", textContent: `Private note: ${item.text}` }) : null,
             item.conflicts ? h("p", { className: "review-conflicts small-note", textContent: "⚠ Direct contradiction with another recorded claim. Review the claim to inspect it." }) : null,
             CLAIM_STATUSES.has(item.status) ? h("button", { type: "button", className: "btn btn--ghost btn--sm review-edit-note", textContent: "Review claim",
@@ -909,11 +910,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     document.addEventListener("pointerdown", event => {
       if (identifying() && identifyPicking && identifyFields && !identifyFields.contains(event.target)) cancelIdentifyPicking();
     });
-    els.reset.addEventListener("click", () => {
-      const menu = els.reset.closest("details");
-      if (menu) menu.open = false;
-      els.dialog.showModal();
-    });
+    els.reset.addEventListener("click", () => els.dialog.showModal());
     el("resetContinue").addEventListener("click", () => els.dialog.close());
     el("resetNewTab").addEventListener("click", () => {
       openWindow(freshProjectUrl(window.location.href));
