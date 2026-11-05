@@ -1,5 +1,5 @@
 import { publicationPermalink } from "/published_schema_loader.mjs";
-import { canonicalizeWorkingSchema, publishWorkingSchema, formatPublicationError } from "./dag_publication_core.mjs";
+import { canonicalizeWorkingSchema, publishWorkingSchema, formatPublicationError, workingSchemaHashes } from "./dag_publication_core.mjs";
 import { confirmPublicPublication } from "./publication_consent.mjs";
 export { CANONICAL_BASELINE_ID, CANONICAL_BASELINE_HASH, canonicalizeWorkingSchema, publishWorkingSchema, formatPublicationError } from "./dag_publication_core.mjs";
 
@@ -97,8 +97,7 @@ export function createPublicationController({
     if (!hash) return false;
     const start = performance.now();
     try {
-      if ((await currentCanonical()).contentHash === hash) return true;
-      return (await canonicalizeWorkingSchema(getWorkingSchema(), cryptoApi, { views: false })).contentHash === hash;
+      return (await workingSchemaHashes(getWorkingSchema(), cryptoApi)).includes(hash);
     } finally {
       performance.measure("echo:publication:compare", { start, end: performance.now() });
     }

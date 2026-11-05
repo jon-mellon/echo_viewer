@@ -581,9 +581,13 @@ function commitDiagnosticReview(kind, groupId, decision) {
   state.project[spec.field] = { ...(state.project[spec.field] || {}),
     [key]: decision };
   projectController.record(`Set ${spec.noun} status: ${groupById(groupId).label}`, before);
-  publicationController.workingCopyChanged();
-  void persistentViewer.commitDecision().catch(error => console.error(`Could not save ${spec.noun} status`, error));
   updateDagFilters({ allowRemovedGroups: true });
+  // Save after the screen updates, in a task of its own. Start the save first: while it is pending,
+  // Publish is unavailable without rebuilding the whole schema to compare it.
+  setTimeout(() => {
+    void persistentViewer.commitDecision().catch(error => console.error(`Could not save ${spec.noun} status`, error));
+    publicationController.workingCopyChanged();
+  }, 0);
   performance.measure("echo:review:commit", { start, end: performance.now() });
   void dagNetworkController.whenRendered().then(() => performance.measure("echo:review:rendered", { start, end: performance.now() }));
   // Keep keyboard focus on the moved row. On touch, focusing a select reopens its picker, and there is no keyboard focus to keep.

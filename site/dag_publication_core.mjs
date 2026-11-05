@@ -24,6 +24,19 @@ export async function canonicalizeWorkingSchema(schema, cryptoApi = globalThis.c
   return { files, contentHash: await canonicalFolderHash(files, cryptoApi) };
 }
 
+/** Both content hashes from one write: with the derived view files, and without them as older publications were made. */
+export async function workingSchemaHashes(schema, cryptoApi = globalThis.crypto) {
+  const files = await writeGroupingSchemaFolder(publicSchemaProjection(schema), cryptoApi);
+  const manifest = JSON.parse(new TextDecoder().decode(files.get("manifest.json")));
+  const legacy = new Map(files);
+  for (const key of ["variable_schema_file", "study_decisions_file"]) {
+    legacy.delete(manifest[key]);
+    delete manifest[key];
+  }
+  legacy.set("manifest.json", new TextEncoder().encode(stableJson(manifest)));
+  return [await canonicalFolderHash(files, cryptoApi), await canonicalFolderHash(legacy, cryptoApi)];
+}
+
 /** The browser and local agent use this exact publication path. */
 export async function publishWorkingSchema({
   schema,
