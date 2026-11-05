@@ -75,7 +75,8 @@ function validateSchema(schema) {
 }
 
 /** Mirror grouping_schema.write_folder with byte-stable browser files. */
-export async function writeGroupingSchemaFolder(schema, cryptoApi = globalThis.crypto) {
+// `views: false` omits the derived variable/decision files, matching publications made before they existed.
+export async function writeGroupingSchemaFolder(schema, cryptoApi = globalThis.crypto, { views = true } = {}) {
   validateSchema(schema);
   const encoder = new TextEncoder();
   const textFiles = new Map();
@@ -123,11 +124,12 @@ export async function writeGroupingSchemaFolder(schema, cryptoApi = globalThis.c
     provenance: schema.migration_provenance || {},
     extra,
     top_level_fields: Object.keys(schema).sort(),
-    variable_schema_file: "variable-schema.json",
-    study_decisions_file: "study-decisions.json",
+    ...(views ? { variable_schema_file: "variable-schema.json", study_decisions_file: "study-decisions.json" } : {}),
   };
-  textFiles.set("variable-schema.json", stableJson(variableSchema(schema)));
-  textFiles.set("study-decisions.json", stableJson(studyDecisionBundle(schema)));
+  if (views) {
+    textFiles.set("variable-schema.json", stableJson(variableSchema(schema)));
+    textFiles.set("study-decisions.json", stableJson(studyDecisionBundle(schema)));
+  }
   textFiles.set("manifest.json", stableJson(manifest));
   return new Map([...textFiles.entries()].map(([path, text]) => [path, encoder.encode(text)]));
 }

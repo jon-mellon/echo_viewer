@@ -91,6 +91,14 @@ export function createPublicationController({
     return canonicalizeWorkingSchema(getWorkingSchema(), cryptoApi);
   }
 
+  // A publication made before the derived view files existed hashes without them.
+  async function matchesPublished(published) {
+    const hash = published?.content_hash;
+    if (!hash) return false;
+    if ((await currentCanonical()).contentHash === hash) return true;
+    return (await canonicalizeWorkingSchema(getWorkingSchema(), cryptoApi, { views: false })).contentHash === hash;
+  }
+
   function stablePermalink(published) {
     return published?.publication_id
       ? publicationPermalink(published.publication_id, windowApi.location, getPermalinkState())
@@ -112,9 +120,9 @@ export function createPublicationController({
       return;
     }
     try {
-      const canonical = await currentCanonical();
+      const matches = await matchesPublished(published);
       if (revision !== statusRevision) return;
-      renderPublicationState(published, canonical.contentHash !== published.content_hash);
+      renderPublicationState(published, !matches);
     } catch (error) {
       if (revision === statusRevision) renderPublicationState(published, true);
     }
@@ -153,9 +161,8 @@ export function createPublicationController({
     busy = true;
     refreshPublishVisibility();
     try {
-      const canonical = await currentCanonical();
       const published = getPublicationState();
-      if (canonical.contentHash === published?.content_hash) {
+      if (await matchesPublished(published)) {
         renderPublicationState(published, false);
         reportSuccess("Already published: this working copy matches the public version.");
         return published;
@@ -259,8 +266,7 @@ export function createPublicationController({
     try {
       let hasLocalChanges = neverPublished;
       if (!neverPublished) {
-        const canonical = await currentCanonical();
-        hasLocalChanges = canonical.contentHash !== published.content_hash;
+        hasLocalChanges = !await matchesPublished(published);
         renderPublicationState(published, hasLocalChanges);
       }
       if (hasLocalChanges) {

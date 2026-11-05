@@ -8,7 +8,7 @@ const core = await readFile(new URL("../site/dag_publication_core.mjs", import.m
 const html = await readFile(new URL("../site/index.html", import.meta.url), "utf8");
 
 test("share warns when the schema is unpublished and offers to publish first", () => {
-  assert.match(source, /canonical\.contentHash !== published\.content_hash/);
+  assert.match(source, /hasLocalChanges = !await matchesPublished\(published\)/);
   assert.match(source, /confirmPublishBeforeShare\(neverPublished\)/);
   assert.match(source, /published = await publish\(\);/);
   assert.match(source, /if \(!await confirmPublishBeforeShare\(neverPublished\)\) return null;/);
