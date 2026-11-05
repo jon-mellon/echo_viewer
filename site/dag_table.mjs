@@ -474,11 +474,19 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
       select.value = entry.status.status;
       onSetStatus(spec.kind, entry.id, status);
     });
-    const warning = spec.kind === "exclusion" && entry.status.status === "explicitly_controlled"
-      ? el("span", { class: "review-warning", tabindex: "0", title: CONTROL_WARNING, "aria-label": CONTROL_WARNING, text: "⚠" }) : null;
+    // A tooltip needs a hover, so on a touch screen the warning is a button that shows its text in the cell.
+    const warned = spec.kind === "exclusion" && entry.status.status === "explicitly_controlled";
+    const warningText = warned ? el("span", { class: "small-note review-warning-text", text: CONTROL_WARNING }) : null;
+    if (warningText) warningText.hidden = true;
+    const warning = warned
+      ? el("button", { type: "button", class: "review-warning", title: CONTROL_WARNING, "aria-label": `Warning: ${CONTROL_WARNING}`, "aria-expanded": "false", text: "⚠" }) : null;
+    warning?.addEventListener("click", () => {
+      warningText.hidden = !warningText.hidden;
+      warning.setAttribute("aria-expanded", String(!warningText.hidden));
+    });
     const edit = entry.status.status === "removed_other" ? el("button", { type: "button", class: "btn btn--ghost btn--sm", text: "Edit reason" }) : null;
     edit?.addEventListener("click", () => onSetStatus(spec.kind, entry.id, "removed_other"));
-    return el("td", { class: "dag-table-status-cell" }, select, note, warning, edit);
+    return el("td", { class: "dag-table-status-cell" }, select, note, warning, warningText, edit);
   }
 
   /** Identify: one row per candidate with its paths, laid out like Explore's table. */
