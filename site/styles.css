@@ -4232,5 +4232,3 @@ div.explore-subsection-empty p, .custom-variables-empty p { margin: 0 0 var(--sp
 .explore-subsection-empty .btn, .custom-variables-empty .btn { width: auto; margin: 0; }
 
 /* Identify's panel filter: every variable, or only the confounders or colliders. */
-.identify-kind { display: flex; width: 100%; margin-bottom: var(--space-2); }
-.identify-kind > .btn { flex: 1 1 0; }

@@ -21,17 +21,6 @@ function witnessRoutes(stored) {
   if (Array.isArray(stored)) return stored.length > 1 ? [stored] : [];
   return Object.values(stored).filter(path => Array.isArray(path) && path.length > 1);
 }
-// The Identify panel follows the diagnostic family available in the graph toolbar.
-const IDENTIFY_KINDS = [
-  ["all", "All", "List every variable"],
-  ["confounders", "Confounders", "Only variables that could cause both the cause and the outcome"],
-  ["colliders", "Colliders", "Only variables that both the cause and the outcome could cause"],
-];
-const INSTRUMENT_KINDS = [
-  ["all", "All", "List every variable"],
-  ["exclusion", "Exclusion", "Only variables on paths that violate the exclusion restriction"],
-  ["exogeneity", "Exogeneity", "Only common causes of the instrument and outcome"],
-];
 const IDENTIFY_DEFAULTS = { confounderMaxPathLength: 1, excludeSparseEdges: false, minimumEdgePapers: 2 };
 const SVG_NS = "http://www.w3.org/2000/svg";
 /** The Lucide funnel ("filter") icon, built as DOM nodes. */
@@ -150,7 +139,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   let identifyPicking = null;
   let identifyListKey = null;
   // The Identify panel's list filter; not part of the saved view.
-  let identifyKind = "all";
 
   const exploring = () => state.task === "causes" || state.task === "consequences";
   const view = () => state.explore[state.task];
@@ -581,9 +569,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     return null;
   }
   const identifyReady = () => anchorConfigured("iv") && anchorConfigured("dv");
-  const instrumentReady = () => identifyReady() && Boolean(anchorId("instrument"))
-    && anchorId("instrument") !== anchorId("iv") && anchorId("instrument") !== anchorId("dv");
-  const identifyKinds = () => instrumentReady() ? INSTRUMENT_KINDS : IDENTIFY_KINDS;
 
   /** Variables unticked in Identify, kept only while the same cause and outcome are chosen. */
   const identifyExclusionKey = () => `${state.project?.iv_group_id || ""}\u0000${state.project?.dv_group_id || ""}`;
@@ -650,15 +635,14 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   }
 
   /**
-   * Every variable on offer, narrowed by the panel's own diagnostic filter when
-   * one is chosen. A candidate's routes and weakest link come from that
-   * filter, or with no filter from the diagnostic the map shows.
+   * Candidates, routes and paper counts follow the diagnostic selected in the
+   * graph toolbar, so the list and map describe the same view.
    */
   function identifyRows() {
     const view = pathView({ ...state, exploring: false });
-    const spec = IDENTIFY_VIEWS[identifyKind] || IDENTIFY_VIEWS[view];
+    const spec = IDENTIFY_VIEWS[view];
     const anchors = new Set(IDENTIFY_SIDES.map(anchorId).filter(Boolean));
-    const candidates = IDENTIFY_VIEWS[identifyKind] ? new Set(state[IDENTIFY_VIEWS[identifyKind].ids] || []) : null;
+    const candidates = spec ? new Set(state[spec.ids] || []) : null;
     const ids = groups().map(group => group.group_id)
       .filter(id => !anchors.has(id) && (!candidates || candidates.has(id)));
     const support = paperSupport();
@@ -684,29 +668,16 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       if (!listed.has(id) && !anchors.has(id) && groupFor(id)) rows.push({ groupId: id, between: [], papers: null, excluded: true });
     }
     rows.sort((a, b) => labelFor(a.groupId).localeCompare(labelFor(b.groupId)));
-    return { view, noun: IDENTIFY_VIEWS[identifyKind]?.noun || "variables", rows };
-  }
-
-  /** The panel's filter follows the available diagnostics for this study. */
-  function identifyKindControl() {
-    return h("div", { className: "identify-kind segmented", attrs: { role: "group", "aria-label": "Show variables" } },
-      identifyKinds().map(([kind, label, title]) => h("button", { type: "button", className: "btn btn--sm", textContent: label, title,
-        attrs: { "aria-pressed": String(identifyKind === kind) },
-        onclick: () => {
-          if (identifyKind === kind) return;
-          identifyKind = kind;
-          renderIdentifyResults();
-          els.results.querySelector(`.identify-kind [aria-pressed="true"]`)?.focus();
-        } })));
+    return { view, noun: spec?.noun || "variables", rows };
   }
 
   function renderIdentifyResults() {
     const { view, noun, rows } = identifyRows();
     const notice = text => { els.summary.textContent = text; els.summary.hidden = !text; };
-    notice(rows.length || identifyKind === "all" ? ""
+    notice(rows.length ? ""
       : `No ${noun} at this path length and paper count. Try a longer path or fewer papers in the filters.`);
     // Rebuild only when the rows change, so a filter being typed into keeps its focus.
-    const key = JSON.stringify([view, identifyKind, instrumentReady(), rows, state.selectedEvidenceGroupId, listFilter.query]);
+    const key = JSON.stringify([view, rows, state.selectedEvidenceGroupId, listFilter.query]);
     const filter = document.querySelector(".dag-ws-controls > .filter-dropdown, #exploreResults .filter-dropdown");
     if (key === identifyListKey && els.results.contains(filter)) return;
     identifyListKey = key;
@@ -717,7 +688,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
         empty: `None of your custom variables are ${noun} here.` },
       { key: "builtin", title: "Built-in variables", items: rows.filter(row => !isCustom(row.groupId)), empty: "None." },
     ];
-    replaceChildren(els.results, identifyKindControl(), ...sections.map(({ key, title, items, empty }, sectionIndex) => {
+    replaceChildren(els.results, ...sections.map(({ key, title, items, empty }, sectionIndex) => {
       const includedCount = items.filter(item => !item.excluded).length;
       const all = h("input", { type: "checkbox", className: "explore-include",
         checked: items.length > 0 && includedCount === items.length, disabled: !items.length, dataset: { section: key },
@@ -771,7 +742,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   function renderIdentify() {
     renderIdentifyFields();
     if (els.definition) els.definition.hidden = true;
-    if (!identifyKinds().some(([kind]) => kind === identifyKind)) identifyKind = "all";
     const picking = identifySide();
     const ready = identifyReady();
     els.resultsBlock.hidden = !ready || Boolean(picking);

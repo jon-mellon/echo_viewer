@@ -663,6 +663,28 @@ test("a published split appears after source selection and opens for review", as
   expect(groups.find(group => group.group_id === fixture.sourceId)?.label).toBe(fixture.sourceLabel);
 });
 
+test("the Identify variable list follows the diagnostic toolbar", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/?task=identify`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState.publishedSchemaHydrated);
+  await chooseAnchors(page, "category-sleep", "category-income-earnings");
+  await expect(page.locator("#exploreResults .identify-kind")).toHaveCount(0);
+  for (const [button, field] of [["toggleConfoundersOnly", "confounderGroupIds"], ["toggleCollidersOnly", "colliderGroupIds"]]) {
+    await page.locator(`#${button}`).click();
+    await expect(page.locator(`#${button}`)).toHaveAttribute("aria-pressed", "true");
+    const result = await page.evaluate(field => {
+      const state = window.__dagBuilderState;
+      const actual = [...document.querySelectorAll("#exploreResults .explore-row[data-group-id]")].map(row => row.dataset.groupId).sort();
+      const expected = state.project.groups.filter(group => state[field].has(group.group_id)
+        && group.variable_ids?.length && group.type !== "other" && group.group_id !== "category-other")
+        .map(group => group.group_id).sort();
+      return { actual, expected };
+    }, field);
+    expect(result.actual).toEqual(result.expected);
+  }
+});
+
 test("choosing a cause confirms the selection until its picker is reopened", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.goto(`http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/?task=identify`, { waitUntil: "domcontentloaded" });
