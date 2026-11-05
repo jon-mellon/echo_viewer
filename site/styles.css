@@ -4093,7 +4093,15 @@ h2 {
     overflow-y: auto;
     background: var(--surface);
   }
-  .custom-variables-view { padding: var(--space-3) var(--space-4) var(--space-8); }
+  .custom-variables-view {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-3) var(--space-4) var(--space-8);
+    overflow-wrap: anywhere;
+  }
+  /* Four buttons beside the title do not fit a phone's width: let them wrap under it. */
+  .custom-variables-heading { flex-wrap: wrap; }
+  #definitionWorkspace .custom-variables-heading h2 { flex: 1 0 100%; margin: 0; }
+  .custom-variables-grid, .custom-variables-grid tbody { display: block; }
   .custom-variables-grid thead { display: none; }
   .custom-variables-grid tr { display: grid; grid-template-columns: 1fr auto; border-bottom: 1px solid var(--border); }
   .custom-variables-grid td { border: 0; padding: var(--space-1) 0; }
