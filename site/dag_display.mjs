@@ -137,7 +137,7 @@ export function edgeVisualData(link, selectedEdgeId) {
       inherit: false,
       opacity: isSelected || isTarget ? 1 : PLAIN_EDGE_OPACITY,
     },
-    dashes: link.is_user_claim ? [2, 5] : false,
+    dashes: false,
     width: isSelected ? 3.6 : isTarget ? 2.6 : 1.0,
   };
 }

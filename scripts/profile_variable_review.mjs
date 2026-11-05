@@ -1,5 +1,5 @@
 // Real-data budgets for variable review and the schema page: setting a disposition,
-// opening a graph-claim preview, removing and restoring a variable, the publication
+// removing and restoring a variable, the publication
 // hash check that follows each decision, opening Edit variable schema, and
 // reusing a saved split. Local source is served on the staging origin by
 // Playwright; evidence requests still use the real snapshot.
@@ -27,7 +27,6 @@ if (!Number.isSafeInteger(runs) || runs < 1) throw new Error('PROFILE_RUNS must 
 // Wall time is from the user's action to the settled screen; the mark is the app's own span.
 const budgets = {
   disposition: { wallMs: mobile ? 600 : 300 },
-  claimPreview: { wallMs: mobile ? 800 : 400 },
   removal: { wallMs: mobile ? 800 : 400 },
   restore: { wallMs: mobile ? 1500 : 800 },
   publicationCompare: { markMs: mobile ? 1500 : 600 },
@@ -125,9 +124,8 @@ try {
 
         await measure('disposition: explicitly controlled', budgets.disposition,
           () => menu(0).selectOption('explicitly_controlled'), settled);
-        await measure('claim preview: affects outcome only via cause', budgets.claimPreview,
-          () => menu(1).selectOption('causes_y_only_via_x'), () => dialog.locator('.review-path, .small-note').first().waitFor());
-        await dialog.getByRole('button', { name: 'Cancel' }).click();
+        await measure('disposition: affects outcome only via cause', budgets.disposition,
+          () => menu(1).selectOption('causes_y_only_via_x'), settled);
         const removedId = await menu(2).getAttribute('data-group-id');
         await menu(2).selectOption('removed_other');
         await dialog.locator('textarea').fill('Outside the study population.');

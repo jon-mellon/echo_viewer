@@ -1,12 +1,14 @@
-# Variable review, graph claims, and schema editing redesign
+# Variable review and schema editing redesign
 
 Updated: 2026-11-05
+
+> **Revision.** The graph-claim machinery (previewing edge removals, asserting dotted direct effects, conflict flags, confirmation) was built and then dropped as too convoluted. Dispositions now only change how a variable is drawn, except **Removed for other reason**, which takes the variable out of the study graph. Sections 6 and the acceptance criteria below describe that simpler behavior.
 
 ## Purpose and status
 
 Combine the variable list and diagnostic-status controls into one review experience. Give schema editing a dedicated workspace, and make the consequences of each review decision visible on the graph.
 
-This document records the agreed interface, dispositions, and graph-claim behavior. Via-X claims may establish a direct arrow into X. Suggest edge removals when the required changes are unambiguous; otherwise let the user select the affected edges. The graph can contain cycles. Distinguish decisions about evidence from claims about whether a causal effect exists. Remaining interface details are listed separately.
+This document records the agreed interface and dispositions. A disposition records the user's judgment and fades the variable on the graph; only whole-variable removal changes the graph used for diagnostics.
 
 The broader redesign is a plan, not a description of functionality already implemented. Some supporting improvements already exist on the follow-up branch: clearer selection feedback, saved-split replacement previews, smaller subsection headings, synchronization with the top diagnostic selector, and lighter fills for controlled/design-addressed confounders. The lighter-fill legend entry has also been added locally.
 
@@ -40,7 +42,7 @@ The filter retains the relevant existing filtering capabilities. Any changes to 
 - Preserve keyboard focus when a disposition moves a row.
 - Keep lighter-shaded variables in the main list, with fully readable labels and controls.
 
-Use **Rejected candidates** for variables rejected by a disposition or whose recorded graph claim means they no longer qualify. A rejected candidate can remain in the schema and may still appear as an intermediate variable on the effective graph. Whole-variable removal is reserved for **Removed for other reason**. Retain each reviewed variable’s disposition and any supporting note in this section.
+Use **Rejected candidates** for variables removed with **Removed for other reason**, and for variables that no longer qualify as candidates under the current filters. A rejected candidate can remain in the schema and may still appear as an intermediate variable on the effective graph. Retain each reviewed variable’s disposition and any supporting note in this section.
 
 ## 2. Confounder dispositions
 
@@ -51,13 +53,13 @@ Use these user-facing labels:
 | Unaddressed | Normal fill; main list | No removal or rewiring from this disposition |
 | Explicitly controlled | Lighter fill; main list | No automatic graph change |
 | Accounted for by design | Lighter fill; main list | No automatic graph change |
-| Affects outcome only via cause | Preview the claim; move the review row to Rejected candidates after confirmation | Establish a direct arrow into X, apply confirmed edge removals, then recalculate |
+| Affects outcome only via cause | Lighter fill; main list | No automatic graph change |
 | Not in minimal adjustment set | Lighter fill; main list | No automatic graph change |
 | Removed for other reason | Remove the whole variable from the effective graph; move its row to Rejected candidates | Recalculate without the variable and its incident edges; require a note |
 
 Here X is the selected cause and Y is the selected outcome. The interface must make that relationship understandable; whether labels should substitute the selected variable names is not yet decided.
 
-Selecting **Unaddressed**, **Explicitly controlled**, **Accounted for by design**, or **Not in minimal adjustment set** restores a variable previously removed by its disposition, subject to the graph-claim restoration rules below.
+Selecting any other disposition restores a variable previously removed with **Removed for other reason**, and the diagnostics are recalculated. Independently pruned edges stay pruned.
 
 **Not in minimal adjustment set** is a user-recorded judgment in the proposed first version. The interface should not imply that the application has computed or validated a particular adjustment set unless that capability is explicitly implemented.
 
@@ -78,8 +80,8 @@ Use these user-facing labels:
 | --- | --- | --- |
 | Unaddressed | Normal fill; main list | Retain the baseline relationships |
 | Explicitly controlled for | Lighter fill, with a warning symbol | No automatic rewiring |
-| Instrument affects variable only via cause | Preview the claim; move the review row to Rejected candidates after confirmation | Establish the instrument’s direct arrow into X where needed; apply confirmed edge removals and recalculate |
-| Affects outcome only via cause | Preview the claim; move the review row to Rejected candidates after confirmation | Establish the variable’s direct arrow into X; apply confirmed edge removals and recalculate |
+| Instrument affects variable only via cause | Lighter fill; main list | No automatic graph change |
+| Affects outcome only via cause | Lighter fill; main list | No automatic graph change |
 | Removed for other reason | Remove the whole variable; move its row to Rejected candidates; require a note | Recalculate without the variable and its incident edges |
 
 Use **Removed for other reason**, not **Other**, consistently in both diagnostics. Whole-variable removal is distinct from separately pruning particular edges.
@@ -107,89 +109,29 @@ Exogeneity/common-cause-of-instrument decisions have not been redesigned in this
 - Include the lighter shade in the graph key.
 - The local entry currently reads **Explicitly controlled / accounted for by design**.
 - When **Not in minimal adjustment set** is implemented, expand the key to include that meaning as well. The exact concise wording remains an interface-copy decision.
-- Add a separate key entry for dotted user-claimed direct effects, including direct arrows into X established by a via-X disposition. Do not use the same visual convention for an indirect path summary without clearly distinguishing it.
+- The key has no entry for study-claimed effects; the graph draws only evidence relationships.
 
-## 6. Diagnostic calculations and graph claims
-
-### Calculation rules
+## 6. Diagnostic calculations
 
 Distinguish visual treatment from changes to the graph used to calculate diagnostics:
 
-- Controlled, design-addressed, and minimal-adjustment-set dispositions do not automatically change that graph.
-- **Removed for other reason** does change it.
-- Separately pruned edges also change it.
-- Merely recording a display disposition should not silently make other candidates disappear.
-
-The **via X** reasons express graph claims. Represent them by confirmed graph changes rather than simple node hiding.
+- Controlled, design-addressed, minimal-adjustment-set and both **via cause** dispositions never change that graph. They are recorded at once, with no preview or confirmation, and the variable stays on the map and in the main list, drawn in the lighter shade.
+- **Removed for other reason** takes the whole variable, and its links, out of the effective study graph. It asks for a private reason first. Its row moves to **Rejected candidates**, and choosing any other disposition restores it.
+- Separately pruned edges also change the graph.
 
 ### Baseline and study graphs
 
 Maintain a distinction between:
 
 1. The baseline schema and evidence relationships.
-2. The effective graph for the current study, incorporating confirmed substantive removals, separately pruned edges, and graph claims.
+2. The effective graph for the current study: the baseline minus variables removed for another reason and separately pruned edges.
 3. Visual styling applied to that study graph.
 
-Run confounder, collider, and exclusion-restriction calculations on the effective study graph. Preserve the baseline evidence so changes can be inspected and undone. Applying a study-specific claim should not silently overwrite a shared variable definition or the original evidence records.
+Run confounder, collider, and exclusion-restriction calculations on the effective study graph. Applying a study-specific removal does not overwrite a shared variable definition or the original evidence records. Traversal and path enumeration must terminate on cyclic graphs; the graph is not required to be a DAG.
 
-### Meaning of the via-X claims
+### Decisions saved before this revision
 
-| Reason | Path claim |
-| --- | --- |
-| Affects outcome only via cause | No directed path from this variable to Y bypasses X |
-| Instrument affects variable only via cause | No directed path from the instrument to this variable bypasses X |
-| Affects outcome only via cause | No directed path from this variable to Y bypasses X |
-
-In addition to rejecting bypassing paths, these dispositions authorize a direct arrow into X as a user claim: C → X for Affects outcome only via cause, instrument → X for Instrument affects variable only via cause, and variable → X for Affects outcome only via cause. Show a newly established effect as a dotted arrow, identified as a study-specific claim rather than new evidence. Reuse an existing direct effect rather than drawing a duplicate. This decision does not independently authorize inventing other direct effects, such as X → variable when only an indirect downstream path is known.
-
-### Concrete example
-
-Suppose the baseline graph is:
-
-```mermaid
-graph LR
-  C --> X
-  X --> Y
-  C --> Y
-```
-
-Choosing **C causes Y only via X** rejects the direct C → Y edge. Removing that edge leaves C → X → Y.
-
-If the graph also contains C → M → Y, the same claim rejects that bypassing path, but does not determine whether C → M or M → Y is wrong. The application must not silently choose which relationship to reject.
-
-If C previously reaches X only through an intermediate variable, this disposition can establish a dotted C → X arrow in the effective study graph. The preview must make that asserted direct effect explicit. Do not remove the existing intermediate path solely because the direct arrow has been added.
-
-### Preview and confirmation
-
-- Selecting a via-X reason opens a preview of the proposed study-graph changes.
-- List the exact relationships to be removed and any direct effects the user is asserting.
-- Show the direct arrow into X established by the disposition, and draw newly asserted direct effects with dotted lines.
-- Remove rejected direct effects from the effective study graph after confirmation.
-- Suggest the rejected edges when the change is unambiguous. When more than one edge change could satisfy the claim, require the user to select the affected edges rather than choosing arbitrarily.
-- Explain when the proposed changes do not satisfy the selected claim. Allow directed cycles; the graph is not required to be a DAG, and a cycle is not itself a conflict.
-- Flag only direct contradictions with earlier decisions about the same causal proposition in the same study scope. Do not impose a general confirmation block based on cycles or differing evidence assessments.
-- Cancel leaves the graph and recorded disposition unchanged.
-- Confirm records the decision and graph changes together as an undoable action, then recalculates diagnostics.
-- Preserve a visible review record when the decision means the variable no longer qualifies as a candidate.
-
-The preview/confirmation behavior and handling of ambiguous edge removals are agreed. Exact preview layout and interaction details can be designed during implementation.
-
-### Restoration and independent decisions
-
-Returning a substantively removed variable to another disposition should restore it to the effective graph and recalculate diagnostics. It should not restore edges the user pruned independently.
-
-Track the origin and meaning of graph changes so undoing one disposition does not erase an independent decision.
-
-### Evidence judgments, causal claims, and conflicts
-
-- Rejecting a finding or its supporting evidence is not equivalent to asserting that the causal effect does not exist.
-- A user can reject the available evidence for an edge and still assert that the edge exists. Preserve both decisions, and represent the asserted effect with the dotted-line convention where appropriate.
-- Record whether an operation rejects evidence, hides an effect from the current analysis, or explicitly claims that a direct effect does not exist. Do not infer the strongest claim from a generic exclusion action.
-- Use a high bar for a conflict: for example, an explicit claim that A directly causes B and an explicit claim that this same direct effect does not exist, in the same study scope.
-- Opposing directed effects, feedback, and cycles are permitted; they are not contradictions merely because they form a cycle.
-- Flag a direct contradiction for review without silently deleting or overwriting an earlier decision. A flag is not automatically a prohibition on confirmation.
-- Preserve provenance for both decisions so the user can inspect and revise them.
-- Diagnostic traversal and path enumeration must terminate on cyclic graphs. Do not implement this redesign using algorithms that assume a DAG.
+Earlier builds stored edge lists (`rejected_effects`, `asserted_effects`) with the via-cause dispositions. They still load and are ignored: the variable is simply faded. They are not published.
 
 ## 7. Notes, scope, persistence, and counts
 
@@ -204,7 +146,7 @@ Track the origin and meaning of graph changes so undoing one disposition does no
 - Confounder decisions remain scoped to the selected cause–outcome pair.
 - Reopening a pair restores its saved decisions.
 - Scope exclusion-restriction decisions to the instrument–cause–outcome combination.
-- Scope disposition-generated graph changes to the same cause–outcome pair or instrument–cause–outcome combination as the disposition. Restoring a disposition preserves independently rejected edges and decisions; study-specific claims do not change the global schema.
+- Scope disposition-generated graph changes (removals) to the same cause–outcome pair or instrument–cause–outcome combination as the disposition. Restoring a disposition preserves independently pruned edges; study-specific decisions do not change the global schema.
 
 ### Top-toolbar counts
 
@@ -219,7 +161,7 @@ Track the origin and meaning of graph changes so undoing one disposition does no
 - Save each completed schema create/edit operation, with undo.
 - **Back to analysis** is navigation, not an Apply-all action.
 - Saving edits is separate from the existing publication workflow.
-- Do not publish automatically when saving a disposition, confirming a graph claim, or completing a schema edit.
+- Do not publish automatically when saving a disposition or completing a schema edit.
 - When the user explicitly publishes, include the dispositions and scoped graph changes needed to reproduce the study. Exclude private supporting notes from public artifacts.
 
 ## 8. Edit variable schema workspace
@@ -270,19 +212,19 @@ These operations edit the schema. They remain distinct from assigning a diagnost
 
 ## 10. Remaining open details
 
-1. Design the presentation of a direct-contradiction flag and the interaction for inspecting or revising the conflicting decisions. Do not turn the flag into a blanket prohibition or treat cycles or evidence rejection as contradictions.
-2. Finalize concise key wording, selected-variable-name substitution in the via-X labels, and the graph-change preview layout.
+1. Whether the via-cause labels should name the selected variables, for example "Affects aesthetic evaluation only via academic achievement".
+2. Concise wording for the lighter-shade key entry, which currently reads **Accounted for**.
 
-The direct arrow into X, Rejected candidates section, whole-variable removal for Removed for other reason, decision scoping, initial schema-editing scope, cycle support, publication of reproducible study decisions, private notes, and notes-field availability are settled.
+Decision scoping, initial schema-editing scope, cycle support, publication of reproducible study decisions, private notes, and the notes-field rule are settled.
 
 ## 11. Suggested implementation sequence
 
-1. Finalize graph-claim semantics and the open decisions above.
+1. Finalize the open decisions above.
 2. Introduce scoped disposition records and migrations for existing confounder statuses, preserving recorded decisions and notes.
-3. Separate the baseline graph, effective study graph, and visual styling; implement provenance for reversible graph changes.
+3. Separate the baseline graph, effective study graph, and visual styling.
 4. Build the combined confounder list, notes, bottom section, restoration behavior, and lighter-fill key.
 5. Keep colliders as a plain list; build exclusion-restriction review using the finalized options and warning.
-6. Add graph-change previews, confirmation, cancellation, and undo.
+6. Add the private-reason dialog for removal, with cancellation and undo.
 7. Build the main-panel **Edit variable schema** workspace using the existing schema and saved-split operations.
 8. Verify persistence, navigation, graph/table consistency, publication boundaries, and keyboard/mobile behavior.
 
@@ -290,21 +232,19 @@ The direct arrow into X, Rejected candidates section, whole-variable removal for
 
 - One list replaces the variable tickboxes and separate confounder-status list.
 - The top diagnostic selector drives the list and graph consistently.
-- Every agreed disposition has the specified visual treatment and calculation behavior.
+- Every agreed disposition has the specified visual treatment and calculation behavior: all fade except Unaddressed, and only Removed for other reason changes the graph.
 - Lighter-shaded nodes retain readable text, visible paths, and stable hover/selection styling; the key explains their meaning.
 - Exclusion-restriction control warnings expose the exact agreed tooltip text.
 - A required note cannot be omitted for **Removed for other reason**.
 - No notes field is shown for other dispositions in the first version; private supporting notes are excluded from publication.
 - Moving a row preserves focus and gives it a visible, understandable destination.
-- Graph claims preview exact edge removals and any direct arrow into X established by the disposition. Newly asserted effects use dotted lines, do not overwrite evidence, and do not mutate the live graph before confirmation.
-- Cyclic graphs and opposing directed effects remain supported; path calculations terminate without rejecting cycles.
-- Rejecting evidence and asserting the corresponding causal effect can coexist. Only direct contradictions about the same proposition and scope receive conflict flags.
-- Cancelling a claim or split replacement preserves the existing study and schema.
+- Cyclic graphs remain supported; path calculations terminate without rejecting cycles.
+- Cancelling a split replacement preserves the existing study and schema.
 - Undo restores the relevant decision without undoing independently pruned relationships.
 - Restoring a disposition updates the graph and diagnostics correctly.
 - Candidate counts distinguish visual changes from substantive graph changes.
 - Confounder decisions and their graph changes persist per cause–outcome pair; exclusion-restriction decisions and their graph changes persist per instrument–cause–outcome combination.
 - Schema edits save independently of publishing and return the user to the prior analysis context.
-- Explicit publication includes dispositions and scoped graph changes sufficient to reproduce the study while preserving notes privacy.
+- Explicit publication includes dispositions sufficient to reproduce the study while preserving notes privacy.
 - Saved alternatives remain discoverable when viable after undoing the currently selected split.
 - Existing review records survive migration, including collider statuses that are not editable in the initial redesigned collider list.

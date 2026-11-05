@@ -90,8 +90,7 @@ export function buildPathHighlightModel({
     const link = visibleLinkById.get(logicalEdgeId);
     const relevantTargets = directionTargetsByPair.get(link ? pairKey(link.group_a, link.group_b) : "");
     const arrows = highlightedSegmentArrows(edge, link, relevantTargets);
-    laneSegments.push({ logicalEdgeId, from: edge.from, to: edge.to, role, color: palette.color, arrows,
-      ...(link?.is_user_claim ? { dashes: [2, 5] } : {}) });
+    laneSegments.push({ logicalEdgeId, from: edge.from, to: edge.to, role, color: palette.color, arrows });
     edgeUpdates.push({
       id: edge.id,
       color: { color: palette.color, highlight: palette.color, hover: palette.color,

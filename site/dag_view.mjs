@@ -50,7 +50,6 @@ const backwardDirections = new Set(["B_TO_A", "BIDIRECTIONAL"]);
  * Explore and the Papers column count it: findings for b → a do not support a → b.
  */
 function sparseFiltered(link, minimum, papersFor) {
-  if (link.is_user_claim) return link;
   const forward = forwardDirections.has(link.direction_type) && papersFor(link, true) >= minimum;
   const backward = backwardDirections.has(link.direction_type) && papersFor(link, false) >= minimum;
   if (forward && backward) return link;
