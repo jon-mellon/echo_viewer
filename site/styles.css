@@ -4492,6 +4492,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .picker-variable-info summary { list-style: none; padding: var(--space-2); }
 .picker-variable-info summary::-webkit-details-marker { display: none; }
 .picker-variable-info p { grid-column: 1 / -1; margin: 0; padding: var(--space-2); color: var(--text-muted); white-space: pre-line; }
+/* display: contents on <details> lets iOS Safari render the closed content, so hide it explicitly. */
+.picker-variable-info:not([open]) p { display: none; }
 .evidence-back-variables { display: none; }
 @media (max-width: 840px) {
   .evidence-from-variables .evidence-back-map { display: none; }
