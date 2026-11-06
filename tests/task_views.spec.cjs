@@ -64,9 +64,19 @@ test("the start page leads to causes and consequences views that behave like Ide
   await pick(page, "category-sleep").click();
   await expect(page.locator("#dagNetwork")).toBeVisible();
 
-  // The chosen variable stays in the Primary variable field; the old anchor bar is not shown.
+  // The chosen variable stays in the Variable field; the old anchor bar is not shown.
   await expect(page.locator("#focusInput")).toHaveValue("sleep");
   await expect(page.locator("#anchorBar")).toBeHidden();
+  await expect(page.locator("#focusInputLabel")).toHaveText("Variable");
+  await expect(page.locator("#focusSearchBlock")).toHaveClass(/is-selected/);
+  await expect(page.locator("#identifyBrowserIntro")).toHaveText("Variables on map");
+  await expect(page.locator("#exploreResults .explore-group")).toHaveCount(1);
+  await expect(page.locator("#exploreResults input[type=checkbox]")).toHaveCount(0);
+  await expect(page.locator("#variableReviewTools .list-filter")).toBeVisible();
+  await page.locator("#editVariableSchema").click();
+  await expect(page.locator("#customVariablesView")).toBeVisible();
+  await page.locator("#customVariablesClose").click();
+  await expect(page.locator("#focusInput")).toHaveValue("sleep");
   // The list stands on its own: no summary sentence, hint line or per-row extra action.
   await expect(page.locator("#exploreSummary")).toBeHidden();
   await expect(page.locator("#exploreHint")).toHaveCount(0);
@@ -78,6 +88,15 @@ test("the start page leads to causes and consequences views that behave like Ide
   // The graph draws exactly the links in the list.
   expect(await renderedEdges(page)).toBe(direct);
   await expect(page.locator("#exploreDirection button[data-direction=causes]")).toHaveAttribute("aria-pressed", "true");
+
+  // Saved exclusions from the old checkbox UI must not silently hide branches.
+  await page.evaluate(() => {
+    window.__dagBuilderState.explore.causes.excluded = [...document.querySelectorAll("#exploreResults .explore-row")]
+      .map(row => row.dataset.groupId);
+  });
+  await chooseDirection(page, "consequences");
+  await chooseDirection(page, "causes");
+  expect(await renderedEdges(page)).toBe(direct);
 
   // Clicking a row shows the evidence for its link, as clicking that link would.
   const row = page.locator('.explore-row[data-distance="1"]').first();
@@ -100,6 +119,11 @@ test("the start page leads to causes and consequences views that behave like Ide
   // Distance and minimum papers live in the list's funnel menu; the graph header has no Filters menu.
   await expect(page.locator(".dag-ws-controls > .filter-dropdown")).toBeHidden();
   await page.locator(".list-filter > summary").click();
+  await page.locator(".list-filter-search").fill("no matching variable here");
+  await expect(page.locator("#exploreResults .explore-row:visible")).toHaveCount(0);
+  await expect(page.locator("#exploreResults .list-filter-empty")).toBeVisible();
+  await page.locator(".list-filter-clear").click();
+  await expect(page.locator("#exploreResults .explore-row:visible")).toHaveCount(direct);
   await page.locator(".list-filter-distance").fill("2");
   await expect(page.locator('.explore-row[data-distance="2"]').first()).toBeVisible();
   await expect(page.locator('.explore-row[data-distance="2"] .explore-row-path').first()).toContainText("via ");
@@ -435,9 +459,9 @@ test("every view can show the same variables and links as a table, with the same
   await expect(page.locator("#dagNetwork")).toBeHidden();
   await expect(page.locator("#dagViewTable")).toHaveAttribute("aria-pressed", "true");
   await expect.poll(() => new URL(page.url()).searchParams.get("dag_view")).toBe("table");
-  // One row per variable, in Custom and Built-in sections, with the same links the graph drew.
+  // One list of variables, with the same links the graph drew.
   await expect(page.locator("#dagPathsTable caption")).toContainText("Causes of sleep");
-  await expect(page.locator("#dagPathsTable tbody tr.dag-table-section")).toHaveCount(2);
+  await expect(page.locator("#dagPathsTable tbody tr.dag-table-section")).toHaveCount(1);
   await expect(page.locator("#dagPathsTable tbody tr:not(.dag-table-section)")).toHaveCount(direct);
   // The filters stay where they were, and drive the table.
   await expect(page.locator(".list-filter > summary")).toBeVisible();
