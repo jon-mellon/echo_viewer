@@ -695,9 +695,17 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
             Object.entries(DIAGNOSTIC_STATUSES[view].statuses).map(([value, textContent]) => h("option", { value, textContent })),
             item.status === "other" ? h("option", { value: "other", textContent: "Other (previous decision)" }) : null) : null;
           if (select) select.value = item.status;
-          const warning = view === "exclusion" && item.status === "explicitly_controlled"
-            ? h("span", { className: "review-warning", tabIndex: 0, title: CONTROL_WARNING,
-              attrs: { role: "img", "aria-label": CONTROL_WARNING } }, "⚠") : null;
+          // A tooltip needs a hover, so on a touch screen the warning is a button that shows its text under the row.
+          const warned = view === "exclusion" && item.status === "explicitly_controlled";
+          const warningText = warned ? h("p", { className: "small-note review-row-note review-warning-text", hidden: true, textContent: CONTROL_WARNING }) : null;
+          const warning = warned
+            ? h("button", { type: "button", className: "review-warning", title: CONTROL_WARNING,
+              attrs: { "aria-label": `Warning: ${CONTROL_WARNING}`, "aria-expanded": "false" },
+              onclick: event => {
+                const open = warningText.hidden;
+                warningText.hidden = !open;
+                event.currentTarget.setAttribute("aria-expanded", String(open));
+              } }, "⚠") : null;
           // Accounted-for rows share the map's lighter shade, so the list and graph read the same way.
           return h("li", { className: `explore-row variable-review-row${LIGHT_STATUSES.has(item.status) ? " is-accounted" : ""}`, dataset: { groupId: item.groupId } },
             h("button", { type: "button", className: "explore-row-open",
@@ -709,7 +717,11 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
               h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: label.replace(/\//g, "/\u200b") }),
                 item.between.length ? h("span", { className: "explore-row-path", textContent: `via ${item.between.map(labelFor).join(", ")}` }) : null),
               h("span", { className: "explore-row-papers", textContent: item.papers === null ? "" : String(item.papers) })),
+            // On a touch screen the name is not a target (too close to the menu below it); this button opens the definition.
+            reviewable ? h("button", { type: "button", className: "review-info", title: `See the definition and concepts of ${label}`,
+              attrs: { "aria-label": `Definition of ${label}` }, onclick: () => onOpenIdentifyVariable(item.groupId) }, "ⓘ") : null,
             select ? h("div", { className: "variable-disposition-line" }, select, warning) : null,
+            warningText,
             item.noLongerCandidate && item.rejected && item.status !== "removed_other" ? h("p", { className: "small-note review-row-note", textContent: "Not a candidate with the current filters." }) : null,
             item.text && ["removed_other", "other"].includes(item.status) ? h("p", { className: "small-note review-row-note", textContent: `Private note: ${item.text}` }) : null,
             item.status === "removed_other" ? h("button", { type: "button", className: "btn btn--ghost btn--sm review-edit-note", textContent: "Edit reason",

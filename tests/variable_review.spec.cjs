@@ -90,7 +90,16 @@ test("exclusion decisions are scoped to the instrument; controlled violations wa
   await setup(page, { instrument: true });
   const menu = page.locator('.variable-disposition[data-group-id="c"]');
   await menu.selectOption("explicitly_controlled");
-  await expect(page.locator(".review-warning")).toHaveAttribute("title", "Controlling for exclusion restriction violations can induce post treatment bias.");
+  const warning = page.locator(".review-warning");
+  await expect(warning).toHaveAttribute("title", "Controlling for exclusion restriction violations can induce post treatment bias.");
+  // The text is also reachable without a hover: pressing the warning shows it under the row.
+  await expect(page.locator(".review-warning-text")).toBeHidden();
+  await warning.click();
+  await expect(page.locator(".review-warning-text")).toBeVisible();
+  await expect(page.locator(".review-warning-text")).toHaveText("Controlling for exclusion restriction violations can induce post treatment bias.");
+  await expect(warning).toHaveAttribute("aria-expanded", "true");
+  await warning.click();
+  await expect(page.locator(".review-warning-text")).toBeHidden();
   const keys = await page.evaluate(() => Object.keys(window.__dagBuilderState.project.exclusion_statuses));
   expect(keys).toEqual([JSON.stringify(["z", "x", "y", "c"])]);
   await menu.selectOption("instrument_only_via_x");
@@ -116,5 +125,35 @@ test("on a touch screen every field is at least 16px, so iOS does not zoom the p
     .map(el => ({ id: el.id || el.className, size: parseFloat(getComputedStyle(el).fontSize) }))
     .filter(item => item.size < 16));
   expect(small).toEqual([]);
+  await context.close();
+});
+
+test("on a phone the exclusion warning is tappable and its text is readable", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  await setup(page, { instrument: true });
+  await page.locator('.variable-disposition[data-group-id="c"]').selectOption("explicitly_controlled");
+  const warning = page.locator(".review-warning");
+  await expect(warning).toBeVisible();
+  const box = await warning.boundingBox();
+  expect(box.width).toBeGreaterThanOrEqual(28);
+  await warning.tap();
+  await expect(page.locator(".review-warning-text")).toBeVisible();
+  await context.close();
+});
+
+test("on a phone tapping a variable's name does not open its definition; the info button does", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  await setup(page);
+  const row = page.locator('.variable-review-row[data-group-id="c"]');
+  const name = await row.locator(".explore-row-label").boundingBox();
+  await page.touchscreen.tap(name.x + 8, name.y + 4);
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBeFalsy();
+  const info = row.locator(".review-info");
+  expect((await info.boundingBox()).width).toBeGreaterThanOrEqual(44);
+  await info.tap();
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBe("c");
   await context.close();
 });
