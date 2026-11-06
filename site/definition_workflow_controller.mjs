@@ -69,7 +69,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     browseState.error = "Loading the previous split…";
     // A direct add stays on the current view; the definition page opens only if it fails.
     draft.direct = addDirectly;
-    document.body.classList.toggle("adding-saved-split", addDirectly);
+    presenter.setAddingSaved(addDirectly);
     draft.step = "loading_saved";
     renderDraft();
     const start = performance.now();
@@ -110,9 +110,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       performance.measure("echo:saved-split:review", { start, end: performance.now() });
       if (addDirectly) await saveDefinition();
       else els.definitionSave.focus();
-      document.body.classList.remove("adding-saved-split");
+      presenter.setAddingSaved(false);
     } catch (error) {
-      document.body.classList.remove("adding-saved-split");
+      presenter.setAddingSaved(false);
       if (state.definitionDraft === draft) {
         draft.direct = false;
         draft.step = "sources";
