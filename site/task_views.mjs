@@ -353,14 +353,18 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     onFocusPicking();
   }
 
-  /** Hide list rows whose name does not match the search; the menu itself always stays. */
+  /** Filter the listed groups by their names or their constituent variables. */
   function applyListSearch() {
     const query = listFilter.query.trim().toLowerCase();
+    const listedIds = new Set([...els.results.querySelectorAll(".explore-row")].map(row => row.dataset.groupId));
+    const matchingIds = query ? new Set(searchGroups(groups().filter(group => listedIds.has(group.group_id)), query, Infinity)
+      .map(result => result.group.group_id)) : null;
     for (const group of els.results.querySelectorAll(".explore-group")) {
       let total = 0;
       let shown = 0;
       for (const row of group.querySelectorAll(".explore-row")) {
-        const match = !query || row.querySelector(".explore-row-label").textContent.toLowerCase().includes(query);
+        const match = !query || matchingIds.has(row.dataset.groupId)
+          || row.querySelector(".explore-row-label").textContent.toLowerCase().includes(query);
         row.hidden = !match;
         total += 1;
         if (match) shown += 1;
@@ -369,7 +373,9 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       const empty = group.querySelector(".list-filter-empty");
       if (empty) {
         empty.hidden = shown > 0;
-        empty.textContent = total ? "No variable in this section matches the search." : empty.dataset.empty;
+        empty.textContent = total ? (query && searchStatus() === "loading" ? "Loading variable search…"
+          : query && searchStatus() === "error" ? "Variable search unavailable; no names match."
+            : "No variable in this section matches the search.") : empty.dataset.empty;
       }
     }
     el("variableReviewTools")?.querySelector(".list-filter > summary")?.classList.toggle("is-active", Boolean(query));

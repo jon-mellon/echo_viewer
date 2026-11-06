@@ -18,6 +18,37 @@ const renderedEdges = page => page.evaluate(async () => {
   return api.renderedDagEdgeIds().filter(id => id !== "__study_design_iv_to_dv__").length;
 });
 
+test("exploration list search matches constituent variables", async ({ page }) => {
+  await open(page);
+  await chooseTask(page, "causes");
+  await pick(page, "category-sleep").click();
+  await page.locator(".list-filter > summary").click();
+  const search = page.locator(".list-filter-search");
+  // The first query starts the catalog load; the active filter is reapplied when it finishes.
+  await search.fill("unlikely search text");
+  await page.waitForFunction(() => window.__dagBuilderState.variableSearchStatus === "ready");
+  const member = await page.evaluate(async () => {
+    const { variableSearchCatalog } = await import("/variable_search_catalog.mjs");
+    const state = window.__dagBuilderState;
+    for (const row of document.querySelectorAll("#exploreResults .explore-row")) {
+      const group = state.project.groups.find(item => item.group_id === row.dataset.groupId);
+      for (const id of group?.variable_ids || []) {
+        const record = variableSearchCatalog.recordById.get(id);
+        const text = record?.[1] || record?.[2] || record?.[3];
+        if (text && !group.label.toLowerCase().includes(text.toLowerCase())) return { groupId: group.group_id, text };
+      }
+    }
+    return null;
+  });
+  expect(member).not.toBeNull();
+  await search.fill(member.text);
+  await expect(page.locator(`#exploreResults .explore-row[data-group-id="${member.groupId}"]`)).toBeVisible();
+  await search.fill("no matching variable here");
+  await expect(page.locator("#exploreResults .explore-row:visible")).toHaveCount(0);
+  await page.locator(".list-filter-clear").click();
+  await expect(page.locator("#exploreResults .explore-row:visible").first()).toBeVisible();
+});
+
 test("tabs start unconfigured views at setup and reopen configured views", async ({ page }) => {
   await open(page);
   await chooseTask(page, "causes");
