@@ -3137,7 +3137,9 @@ h2 {
   .task-identify #exploreResults .variable-review-row > :not(.explore-row-open, .variable-disposition-line, .review-info) { grid-column: 1 / -1; }
   .task-identify #exploreResults .variable-review-row:not(:has(.variable-disposition-line)) > .explore-row-open { grid-column: 1 / -1; }
 }
-.review-edit-note { width: auto; margin: var(--space-1) var(--space-2) 0; }
+.review-note-line { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.review-note-text { flex: 1 1 auto; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-edit-note { flex: none; padding: 0; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: var(--text-sm); text-decoration: underline; cursor: pointer; }
 /* The body scrolls; the footer with the outcome and the buttons stays in view. */
 .variable-review-dialog[open] { display: flex; flex-direction: column; width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: hidden; padding: 0; }
 .variable-review-dialog > h2 { margin: 0; padding: var(--space-4) var(--space-6) var(--space-2); }

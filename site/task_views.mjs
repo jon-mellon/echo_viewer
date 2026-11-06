@@ -680,9 +680,13 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
             select ? h("div", { className: "variable-disposition-line" }, select, warning) : null,
             warningText,
             item.noLongerCandidate && item.rejected && item.status !== "removed_other" ? h("p", { className: "small-note review-row-note", textContent: "Not a candidate with the current filters." }) : null,
-            item.text && ["removed_other", "other"].includes(item.status) ? h("p", { className: "small-note review-row-note", textContent: `Private note: ${item.text}` }) : null,
-            item.status === "removed_other" ? h("button", { type: "button", className: "btn btn--ghost btn--sm review-edit-note", textContent: "Edit reason",
-              onclick: () => onReviewVariable(view, item.groupId, "removed_other") }) : null);
+            // The private note and its edit link share one truncated line so a reason costs a single row.
+            (item.text && ["removed_other", "other"].includes(item.status)) || item.status === "removed_other"
+              ? h("div", { className: "review-row-note review-note-line" },
+                item.text && ["removed_other", "other"].includes(item.status)
+                  ? h("span", { className: "small-note review-note-text", title: item.text, textContent: `Private note: ${item.text}` }) : null,
+                item.status === "removed_other" ? h("button", { type: "button", className: "review-edit-note", textContent: "Edit reason",
+                  onclick: () => onReviewVariable(view, item.groupId, "removed_other") }) : null) : null);
         })),
         h("p", { className: "explore-subsection-empty list-filter-empty", dataset: { empty }, hidden: items.length > 0, textContent: empty }))));
     applyListSearch();
