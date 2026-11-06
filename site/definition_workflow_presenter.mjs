@@ -165,7 +165,13 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
     const name = String(draft.new_label || "").trim();
     els.definitionTitle.textContent = draft.step === "loading_saved" ? "Load saved variable" : draft.published_split ? `${draft.replaces_group_id ? "Replace with" : "Add"} “${truncate(name, 48)}”${draft.replaces_group_id ? "" : " to this schema"}` : draft.mode === "edit" ? `Edit “${truncate(name || "variable", 48)}”`
       : draft.role === "candidate" ? "Create a variable" : `Create a new ${draft.role.toUpperCase()}`;
-    els.definitionBlock.querySelector(".definition-stepper").hidden = Boolean(draft.published_split || draft.step === "loading_saved");
+    const stepper = els.definitionBlock.querySelector(".definition-stepper");
+    stepper.hidden = Boolean(draft.published_split || draft.step === "loading_saved");
+    const currentStep = draft.step === "partition" ? "sort" : draft.step;
+    stepper.querySelectorAll("li[data-step]").forEach(item => {
+      if (item.dataset.step === currentStep) item.setAttribute("aria-current", "step");
+      else item.removeAttribute("aria-current");
+    });
     // Editing keeps the variables it came from, so its middle step is skipped.
     els.definitionBlock.classList.toggle("definition-editing", draft.mode === "edit");
     els.definitionDescribeStep.hidden = draft.step !== "describe";
@@ -182,9 +188,11 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       els.definitionDescribeNext.textContent = "Next";
       els.definitionDescribeBack.hidden = draft.mode === "edit";
     } else if (draft.step === "sources") {
+      els.definitionSourceChangeNote.hidden = !draft.source_snapshot?.length;
       const query = normalized(els.definitionSourceSearch.value);
       const selected = new Set(draft.source_group_ids);
-      const groups = searchSourceGroups((state.project.groups || []).filter(group => group.variable_ids?.length), query, 60);
+      const sourceGroups = (state.project.groups || []).filter(group => group.variable_ids?.length);
+      const groups = searchSourceGroups(sourceGroups, query, sourceGroups.length);
       const searchNote = query && state.variableSearchStatus !== "ready"
         ? h("div", { className: "small-note", textContent: state.variableSearchStatus === "error"
           ? "Concept search could not be loaded; only variable names are searched."
@@ -195,6 +203,9 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       const noMatch = query && !groups.length ? h("div", { className: "definition-list-empty" },
         h("p", { textContent: "No matching variables." }),
         h("button", { type: "button", className: "btn btn--sm", dataset: { clearSearch: "definitionSourceSearch" }, textContent: "Clear search" })) : null;
+      // Rebuilding the list after a selection must not send keyboard focus back to the page.
+      const focusedSource = els.definitionSourceList.contains(document.activeElement)
+        ? /** @type {HTMLElement} */ (document.activeElement).dataset.sourceId : null;
       replaceChildren(els.definitionSourceList, [...(searchNote ? [searchNote] : []), ...(noMatch ? [noMatch] : []), ...[...chosen, ...groups].map(({ group, variableMatch }) =>
         h("label", { className: `definition-source-row${selected.has(group.group_id) ? " is-selected" : ""}` }, h("span", { className: "definition-source-copy" },
           h("span", { className: "definition-source-main" }, h("strong", { textContent: group.label || group.group_id }),
@@ -203,6 +214,8 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
         h("input", { type: "checkbox", dataset: { sourceId: group.group_id }, checked: selected.has(group.group_id) })))]);
       els.definitionSourceList.querySelectorAll("input[data-source-id]").forEach(input =>
         input.addEventListener("change", () => onSourceSelection(input.dataset.sourceId, input.checked)));
+      if (focusedSource) [...els.definitionSourceList.querySelectorAll("input[data-source-id]")]
+        .find(input => input.dataset.sourceId === focusedSource)?.focus({ preventScroll: true });
       const count = definitionSources().reduce((sum, group) =>
         sum + new Set(group.variable_ids.map(clusterRep)).size, 0);
       els.definitionContinue.disabled = !selected.size;
@@ -241,10 +254,13 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
   }
 
   function showDescribeError(message) {
-    els.definitionValidation.textContent = message;
-    els.definitionValidation.classList.add("is-error");
     const field = /name/i.test(message) && !/definition/i.test(message) ? els.definitionNewLabel
       : /called/.test(message) ? els.definitionNewLabel : els.definitionNewDescription;
+    const isName = field === els.definitionNewLabel;
+    const error = isName ? els.definitionNameValidation : els.definitionValidation;
+    error.textContent = message;
+    error.hidden = false;
+    error.classList.add("is-error");
     field.setAttribute("aria-invalid", "true");
     field.focus();
   }
@@ -257,6 +273,9 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
   function clearDescriptionValidation() {
     els.definitionNewLabel.removeAttribute("aria-invalid");
     els.definitionNewDescription.removeAttribute("aria-invalid");
+    els.definitionNameValidation.hidden = true;
+    els.definitionNameValidation.textContent = "";
+    els.definitionNameValidation.classList.remove("is-error");
     els.definitionValidation.classList.remove("is-error");
     els.definitionValidation.textContent = "At least 20 characters.";
   }

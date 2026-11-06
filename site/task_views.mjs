@@ -456,8 +456,8 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       replaceChildren(els.results);
       return;
     }
-    notice(!rows.length ? `Nothing ${causes ? "causes" : "is caused by"} ${labelFor(focus)} at this distance and paper count. Try a greater distance or fewer papers.`
-      : status === "failed" ? "Some paper details could not load, so links changed by your edits may be missing." : "");
+    notice(status === "failed" ? "Some paper details could not load, so links changed by your edits may be missing."
+      : !rows.length ? `No ${causes ? "causes" : "consequences"} of ${labelFor(focus)} were found at this distance and paper count. Try a greater distance or fewer papers.` : "");
     // Schema origin does not affect exploration; put every variable in causal order.
     const ordered = rows.slice().sort((a, b) => a.distance - b.distance);
     const hover = item => onRowHover(item ? { edgeId: item.edgeId, groupId: item.groupId, pathEdgeIds: item.pathEdgeIds } : null);

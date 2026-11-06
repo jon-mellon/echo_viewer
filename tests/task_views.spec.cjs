@@ -76,6 +76,8 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(page.locator("#taskLanding")).toBeVisible();
   await expect(page.locator("#taskLanding h1")).toHaveText("What would you like to do?");
   await expect(page.locator("#taskLanding .task-choice")).toHaveCount(2);
+  // The covered workspace must not remain available to keyboard or assistive technology.
+  await expect(page.locator(".dag-shell")).toBeHidden();
   await expect(page.locator("#taskLanding .task-choice").nth(0)).toContainText("Find threats to inference");
   await expect(page.locator("#taskLanding .task-choice").nth(1)).toContainText("Explore a variable");
   await expect(page.locator("#taskLanding .task-choice-example")).toHaveCount(2);
@@ -86,11 +88,19 @@ test("the start page leads to causes and consequences views that behave like Ide
   // Exploring opens the picker for its variable.
   await page.locator("#taskLanding .task-choice[data-task=explore]").click();
   await expect(page.locator("#taskLanding")).toBeHidden();
+  await expect(page.locator(".dag-shell")).toBeVisible();
   await expect(page.locator("#taskMenuValue")).toHaveText("Exploration");
   await expect(page.locator("#focusInput")).toHaveValue("");
   await expect(page.locator("#exploreView")).toBeVisible();
   await expect(page.locator("#focusInput")).toHaveAttribute("placeholder", "Search group or constituent variable");
   await expect(pick(page, "category-sleep")).toContainText("sleep");
+  await page.locator("#focusInput").fill("zzzzzzunmatched");
+  await expect(page.locator("#focusGroupPicker")).toContainText(/No match(es found yet|ing variables)/);
+  await page.locator('#focusGroupPicker button[data-clear-focus-search]').click();
+  await expect(page.locator("#focusInput")).toHaveValue("");
+  await page.locator("#focusInput").fill("sleep");
+  await page.waitForFunction(() => window.__dagBuilderState.variableSearchStatus === "ready");
+  await expect(pick(page, "category-age")).toHaveAttribute("aria-label", /matches .*sleep/i);
   await expect(page.locator("#exploreGraphHint")).toBeVisible();
   await pick(page, "category-sleep").click();
   await expect(page.locator("#dagNetwork")).toBeVisible();
@@ -467,11 +477,20 @@ test("a notice appears only when there is nothing to list, and goes away with re
   await pick(page, "category-sleep").click();
   await expect(page.locator(".explore-row").first()).toBeVisible();
   await expect(page.locator("#exploreSummary")).toBeHidden();
+  await page.evaluate(() => {
+    const original = window.vis.Network.prototype.fit;
+    window.vis.Network.prototype.fit = function (...args) {
+      const result = original.apply(this, args);
+      window.__emptyResultNetwork = this;
+      return result;
+    };
+  });
   await page.locator(".list-filter > summary").click();
   await page.locator(".list-filter-papers").fill("99999");
   await expect(page.locator(".explore-row")).toHaveCount(0);
   await expect(page.locator("#exploreSummary")).toBeVisible();
-  await expect(page.locator("#exploreSummary")).toContainText("Nothing causes sleep at this distance and paper count");
+  await expect(page.locator("#exploreSummary")).toContainText("No causes of sleep were found at this distance and paper count");
+  await expect.poll(() => page.evaluate(() => window.__emptyResultNetwork?.getScale() ?? Infinity)).toBeLessThanOrEqual(2.5);
   await page.locator(".list-filter-papers").fill("2");
   await expect(page.locator(".explore-row").first()).toBeVisible();
   await expect(page.locator("#exploreSummary")).toBeHidden();

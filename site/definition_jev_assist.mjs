@@ -466,7 +466,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     els.definitionAiApplyBottom.disabled = busy;
     els.definitionAiApplyBottom.textContent = els.definitionAiApply.textContent;
     els.definitionAiApplyNote.hidden = !fullDone || !manualChoices;
-    els.definitionAiApplyNote.textContent = `This replaces your ${manualChoices.toLocaleString()} existing choices: concepts suggested In become included and all others excluded. You can undo it in Choose manually.`;
+    els.definitionAiApplyNote.textContent = `This replaces your ${manualChoices.toLocaleString()} existing choices: concepts suggested In become included and all others excluded. Review the suggestions before continuing.`;
     els.definitionAiApplyNoteBottom.hidden = els.definitionAiApplyNote.hidden;
     els.definitionAiApplyNoteBottom.textContent = els.definitionAiApplyNote.textContent;
     els.definitionAiDiscard.hidden = !showPreview || busy;

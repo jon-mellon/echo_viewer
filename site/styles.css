@@ -2890,6 +2890,8 @@ h2 {
   background: var(--bg);
 }
 .task-view[hidden] { display: none; }
+/* The start screen covers the workspace visually; hide it from keyboard and screen-reader navigation too. */
+.dag-body.task-home .dag-shell { visibility: hidden; }
 
 /* The start page: two large choices, one column on a phone. */
 .task-landing-inner {
@@ -3026,6 +3028,7 @@ h2 {
 .list-filter-action { justify-self: start; }
 .list-filter-field { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   color: var(--text); font-size: var(--text-md); font-weight: var(--weight-normal); }
+.list-filter-papers { width: 7rem; }
 #exploreResults .explore-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--space-1); }
 .explore-view[hidden], .explore-results-block[hidden], .explore-summary[hidden] { display: none; }
 .explore-graph-hint {
@@ -3095,7 +3098,7 @@ h2 {
 .task-identify #exploreResults .variable-review-section .explore-group-header { grid-template-columns: minmax(0, 1fr); }
 .task-identify #exploreResults .variable-review-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 13.5rem); align-items: center; gap: 0 var(--space-1); }
 .task-identify #exploreResults .variable-review-row .explore-row-open { grid-template-columns: minmax(0, 1fr); min-width: 0; }
-.task-identify #exploreResults .variable-review-row .explore-row-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-identify #exploreResults .variable-review-row .explore-row-label { white-space: normal; overflow-wrap: anywhere; }
 .task-identify #exploreResults .variable-review-row:not(:has(.variable-disposition-line)) > .explore-row-open { grid-column: 1 / -1; }
 .task-identify #exploreResults .variable-review-row > .review-row-note,
 .task-identify #exploreResults .variable-review-row > .review-edit-note { grid-column: 1 / -1; }
@@ -4167,6 +4170,8 @@ h2 {
   font-weight: var(--weight-normal);
 }
 @media (max-width: 840px) {
+  /* The schema workspace covers these panels, so remove them from focus and accessibility navigation. */
+  .dag-body.custom-variables-open :is(.dag-left-panel, .dag-right-panel) { visibility: hidden; }
   /* On a phone the page covers the panels below the task bar. */
   .dag-body.custom-variables-open .definition-workspace {
     display: block;
