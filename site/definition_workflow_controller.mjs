@@ -68,7 +68,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     browseState.loading = true;
     browseState.error = "Loading the previous split…";
     draft.step = "loading_saved";
-    renderDraft();
+    if (!addDirectly) renderDraft();
     const start = performance.now();
     // Load the sources' variable details while the saved membership downloads; the review step needs both.
     for (const source of definitionSources()) {
@@ -103,7 +103,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       state.selectedVariableIds = new Set(draft.new_variable_ids);
       persistProjectLocally();
       invalidateVisibleCaches();
-      renderDraft();
+      if (!addDirectly) renderDraft();
       performance.measure("echo:saved-split:review", { start, end: performance.now() });
       if (addDirectly) await saveDefinition();
       else els.definitionSave.focus();
