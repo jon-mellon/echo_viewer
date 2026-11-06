@@ -2696,6 +2696,26 @@ h2 {
   border: 0;
 }
 
+/* Keyboard shortcut past the diagram: invisible until it takes focus. */
+.dag-table-skip:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.dag-table-skip:focus {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+}
+
 /* Explore: the selected variable is one clickable control with a chevron. */
 .focus-selector {
   display: grid;
