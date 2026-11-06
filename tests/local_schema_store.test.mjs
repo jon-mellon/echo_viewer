@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { openLocalDatabase } from "../site/local_schema_store.mjs";
+import { commitLocalSchema, openLocalDatabase } from "../site/local_schema_store.mjs";
 
 test("a timed-out database open can be retried and closes a late connection", async () => {
   const original = globalThis.indexedDB;
@@ -26,4 +26,17 @@ test("a timed-out database open can be retried and closes a late connection", as
   } finally {
     globalThis.indexedDB = original;
   }
+});
+
+test("a save whose transaction never reports back is aborted and rejected", async () => {
+  let aborted = false;
+  const tx = { objectStore: () => ({ get: () => ({}), put() {} }), abort() { aborted = true; } };
+  const db = { transaction: () => tx, close() {} };
+  const fake = { open() {
+    const request = {};
+    queueMicrotask(() => { request.result = db; request.onsuccess(); });
+    return request;
+  } };
+  await assert.rejects(commitLocalSchema({ id: "a", schema: {}, url: "u", timeoutMs: 5 }, fake), /did not respond/);
+  assert.equal(aborted, true);
 });
