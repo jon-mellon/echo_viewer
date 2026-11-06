@@ -45,7 +45,7 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(page.locator("#taskLanding")).toBeVisible();
   await expect(page.locator("#taskLanding h1")).toHaveText("What would you like to do?");
   await expect(page.locator("#taskLanding .task-choice")).toHaveCount(2);
-  await expect(page.locator("#taskLanding .task-choice").nth(0)).toContainText("Identify a causal estimate");
+  await expect(page.locator("#taskLanding .task-choice").nth(0)).toContainText("Threats to inference");
   await expect(page.locator("#taskLanding .task-choice").nth(1)).toContainText("Explore a variable");
   await expect(page.locator("#taskLanding .task-choice-example")).toHaveCount(2);
   await expect(page.locator("#taskReset")).toBeHidden();
@@ -148,10 +148,10 @@ test("the start page leads to causes and consequences views that behave like Ide
   expect(await page.evaluate(() => window.__dagBuilderState.explore.causes.focusId)).toBe(target);
 });
 
-test("the start page opens Identification from the keyboard, is skipped by task links, and a reload stays in the task", async ({ page }) => {
+test("the start page opens Threats to inference from the keyboard, is skipped by task links, and a reload stays in the task", async ({ page }) => {
   await open(page);
   await expect(page.locator("#taskLanding")).toBeVisible();
-  await expect(page.locator("#taskLanding .task-choice[data-task=identify]")).toContainText("Identify a causal estimate");
+  await expect(page.locator("#taskLanding .task-choice[data-task=identify]")).toContainText("Threats to inference");
   // Both choices can be reached and chosen without a mouse.
   await page.locator("#taskLanding .task-choice[data-task=identify]").focus();
   await page.keyboard.press("Tab");
@@ -159,7 +159,7 @@ test("the start page opens Identification from the keyboard, is skipped by task 
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Enter");
   await expect(page.locator("#taskLanding")).toBeHidden();
-  await expect(page.locator("#taskMenuValue")).toHaveText("Identification");
+  await expect(page.locator("#taskMenuValue")).toHaveText("Threats to inference");
   await expect(page.locator("#identifyFields")).toBeVisible();
   await expect(page.locator("#identify-iv-input")).toHaveValue("");
   expect(await page.evaluate(() => window.__dagBuilderState.task)).toBe("identify");
@@ -796,4 +796,45 @@ test("the table never prints stray text, and shows the choose-a-variable hint al
   for (const text of ["null", "undefined", "NaN", "[object"]) {
     expect(await page.locator("#dagTable").evaluate(node => node.textContent)).not.toContain(text);
   }
+});
+
+test.describe("mobile Identify picker dismissal", () => {
+  test.use({ hasTouch: true, isMobile: true });
+  for (const staleOutcome of [false, true]) test(`cancels an unconfigured outcome and reopens it (stale ID: ${staleOutcome})`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page, `http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/?task=identify`);
+    await page.waitForFunction(() => window.__dagBuilderState.publishedSchemaHydrated);
+    const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+      .filter(group => group.variable_ids?.length).slice(0, 2)
+      .map(group => ({ id: group.group_id, label: group.label })));
+    await chooseAnchor(page, "iv", anchors[0].id, { tap: true });
+    // A saved role can reference a group no longer present in this schema.
+    if (staleOutcome) {
+      await page.evaluate(() => { window.__dagBuilderState.project.dv_group_id = "missing-outcome"; });
+      await page.locator("#identify-dv-input").tap();
+    }
+    const picker = page.locator("#identifyGroupPicker");
+    await expect(picker).toBeVisible();
+    await expect(picker).toContainText("Choose outcome");
+    const before = await page.evaluate(() => ({ iv: window.__dagBuilderState.project.iv_group_id,
+      dv: window.__dagBuilderState.project.dv_group_id }));
+    await picker.getByRole("button", { name: "Cancel", exact: true }).tap();
+    await expect(picker).toBeHidden();
+    await expect(page.locator("#identify-dv-input")).toHaveValue("");
+    expect(await page.evaluate(() => ({ iv: window.__dagBuilderState.project.iv_group_id,
+      dv: window.__dagBuilderState.project.dv_group_id }))).toEqual(before);
+
+    // Focusing the empty field explicitly opens it again; Escape closes it even
+    // though the outcome still needs to be chosen. A later render stays closed.
+    await page.locator("#identify-dv-input").tap();
+    await expect(picker).toBeVisible();
+    await page.locator("#identify-dv-input").fill("sleep");
+    await page.locator("#identify-dv-input").press("Escape");
+    await expect(picker).toBeHidden();
+    await expect(page.locator("#identify-dv-input")).toHaveValue("");
+    await page.setViewportSize({ width: 400, height: 844 });
+    await expect(picker).toBeHidden();
+    await chooseAnchor(page, "dv", anchors[1].id, { tap: true });
+    await expect(page.locator("#identify-dv-input")).toHaveValue(anchors[1].label);
+  });
 });
