@@ -1982,7 +1982,9 @@ const customVariablesPresenter = createCustomVariablesPresenter({
   state, elements: els, truncate, normalized,
   customVariables: () => (state.project?.groups || []).filter(group => group.source === "user_split")
     .sort((a, b) => String(a.label || "").localeCompare(String(b.label || ""))),
-  schemaVariables: () => [...(state.project?.groups || [])].sort((a, b) => String(a.label || "").localeCompare(String(b.label || ""))),
+  schemaVariables: () => [...(state.project?.groups || [])].sort((a, b) =>
+    Number(b.source === "user_split") - Number(a.source === "user_split")
+      || String(a.label || "").localeCompare(String(b.label || ""))),
   getSchema: currentWorkingGroupingSchema,
   loadDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),
   conceptLabel: id => state.variableById.get(id)?.display_label || state.variableById.get(id)?.concept_label || id,

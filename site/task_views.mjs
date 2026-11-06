@@ -138,6 +138,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   const listFilter = { open: false, query: "" };
   // The Identify field being searched (iv, dv or instrument); not part of the saved view.
   let identifyPicking = null;
+  let identifyPickerDismissed = false;
   let identifyListKey = null;
   // The Identify panel's list filter; not part of the saved view.
 
@@ -253,6 +254,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     changing.causes = false;
     changing.consequences = false;
     identifyPicking = null;
+    identifyPickerDismissed = false;
     onTaskChange({ previous, task: null });
     render();
     onChange();
@@ -283,6 +285,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     }
     changing.causes = false;
     changing.consequences = false;
+    identifyPickerDismissed = false;
     onTaskChange({ previous, task });
     render();
     if (needsSetup()) onSetupNeeded();
@@ -565,6 +568,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   function identifySide() {
     if (!identifying() || state.definitionDraft) return null;
     if (identifyPicking) return identifyPicking;
+    if (identifyPickerDismissed) return null;
     if (!anchorConfigured("iv")) return "iv";
     if (!anchorConfigured("dv")) return "dv";
     return null;
@@ -591,6 +595,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
 
   function startIdentifyPicking(side) {
     if (identifyPicking === side) return;
+    identifyPickerDismissed = false;
     identifyPicking = side;
     const input = identifyInput(side);
     // Start from the full list, not a search for the current variable's name.
@@ -598,16 +603,23 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     onIdentifyPicking();
   }
   function cancelIdentifyPicking() {
-    if (!identifyPicking) return;
-    const side = identifyPicking;
+    // A definition hides the picker, but its explicit selection can still be
+    // active. Clear that selection too when focus leaves the fields.
+    const side = identifyPicking || identifySide();
+    if (!side) return;
     identifyPicking = null;
+    // Missing anchors normally open their picker automatically. Remember an
+    // explicit dismissal so a render does not immediately open it again.
+    identifyPickerDismissed = true;
     const id = anchorId(side);
     const input = identifyInput(side);
     if (input) input.value = id ? labelFor(id) : "";
+    input?.blur();
     onIdentifyPicking();
   }
   function chooseIdentify(side, groupId) {
     identifyPicking = null;
+    identifyPickerDismissed = false;
     identifyInput(side)?.blur();
     onChooseIdentify(side, groupId);
   }
@@ -680,9 +692,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     ];
     replaceChildren(els.results, ...sections.map(({ key, title, items, empty }) =>
       h("section", { className: "explore-group variable-review-section", dataset: { section: key } },
-        // Rejected rows have no paths, so no paper counts.
-        h("div", { className: "explore-group-header" }, h("h3", { textContent: title }),
-          key === "rejected" ? null : h("span", { className: "explore-papers-header", textContent: "Papers" })),
+        h("div", { className: "explore-group-header" }, h("h3", { textContent: title })),
         h("ol", { className: "explore-list" }, items.map(item => {
           const label = labelFor(item.groupId);
           const select = reviewable ? h("select", { className: "select-input variable-disposition", dataset: { groupId: item.groupId },
@@ -710,17 +720,15 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
           return h("li", { className: `explore-row variable-review-row${LIGHT_STATUSES.has(item.status) ? " is-accounted" : ""}`, dataset: { groupId: item.groupId } },
             h("button", { type: "button", className: "explore-row-open",
               attrs: { "aria-pressed": String(state.selectedEvidenceGroupId === item.groupId), "aria-label": label },
-              title: `See the definition and concepts of ${label}`,
+              title: `See the definition and concepts of ${label}${item.between.length ? ` (via ${item.between.map(labelFor).join(", ")})` : ""}`,
               onclick: () => onOpenIdentifyVariable(item.groupId),
               onmouseenter: () => onIdentifyRowHover(item.rejected ? null : item.groupId), onmouseleave: () => onIdentifyRowHover(null),
               onfocus: () => onIdentifyRowHover(item.rejected ? null : item.groupId), onblur: () => onIdentifyRowHover(null) },
-              h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: label.replace(/\//g, "/\u200b") }),
-                item.between.length ? h("span", { className: "explore-row-path", textContent: `via ${item.between.map(labelFor).join(", ")}` }) : null),
-              h("span", { className: "explore-row-papers", textContent: item.papers === null ? "" : String(item.papers) })),
-            select ? h("div", { className: "variable-disposition-line" }, select, warning) : null,
-            // On touch screens the rightmost info button opens the definition.
+              h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: label }))),
+            // On touch screens the info button opens the definition beside the status menu.
             reviewable ? h("button", { type: "button", className: "review-info", title: `See the definition and concepts of ${label}`,
               attrs: { "aria-label": `Definition of ${label}` }, onclick: () => onOpenIdentifyVariable(item.groupId) }, "ⓘ") : null,
+            select ? h("div", { className: "variable-disposition-line" }, select, warning) : null,
             warningText,
             item.noLongerCandidate && item.rejected && item.status !== "removed_other" ? h("p", { className: "small-note review-row-note", textContent: "Not a candidate with the current filters." }) : null,
             item.text && ["removed_other", "other"].includes(item.status) ? h("p", { className: "small-note review-row-note", textContent: `Private note: ${item.text}` }) : null,
@@ -808,7 +816,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       tab.setAttribute("aria-pressed", String(pressed));
     }
     const taskValue = el("taskMenuValue");
-    if (taskValue) taskValue.textContent = exploring() ? "Exploration" : "Identification";
+    if (taskValue) taskValue.textContent = exploring() ? "Exploration" : "Threats to inference";
     for (const button of els.direction.querySelectorAll("button[data-direction]")) {
       const pressed = button.dataset.direction === task;
       button.setAttribute("aria-pressed", String(pressed));
@@ -895,7 +903,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       input.addEventListener("focus", () => { if (identifying()) startIdentifyPicking(side); });
       input.addEventListener("input", () => { renderIdentifyFields(); onIdentifyPicking(); });
       input.addEventListener("keydown", event => {
-        if (event.key !== "Escape" || !identifyPicking) return;
+        if (event.key !== "Escape" || !identifySide()) return;
         event.preventDefault();
         cancelIdentifyPicking();
         input.blur();
