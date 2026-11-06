@@ -3,6 +3,7 @@ import * as groupListModel from "./dag_group_list.mjs";
 import * as searchModel from "./dag_search.mjs";
 import * as workflow from "./dag_workflow.mjs";
 import { h, replaceChildren } from "./dom_builder.mjs";
+import { attachListKeyboardNav, resultCountText } from "./list_keyboard_nav.mjs";
 import { createVariableButton, customVariableActions } from "./custom_variable_actions.mjs";
 
 export function dag2AnchorPickerIsActive(state, side, groupById) {
@@ -385,6 +386,20 @@ export function createDagSetupGroupController({
     elements.schemaChoice.hidden = state.phase !== "schema_choice";
   }
 
+  /** One persistent live region per picker (so a changed count is announced) and one set of arrow-key handlers. */
+  const pickerNav = new WeakMap();
+  function pickerA11y(container, input, nav) {
+    let entry = pickerNav.get(container);
+    if (!entry) {
+      entry = { input, inputs: new WeakSet(), status: h("p", { className: "sr-only picker-result-status", attrs: { role: "status", "aria-live": "polite" } }) };
+      entry.handler = attachListKeyboardNav(container, { getInput: () => entry.input, ...nav });
+      pickerNav.set(container, entry);
+    }
+    entry.input = input;
+    if (input && !entry.inputs.has(input)) { entry.inputs.add(input); input.addEventListener("keydown", entry.handler); }
+    return entry.status;
+  }
+
   function renderSetupPicker(side) {
     const container = side === "dv" ? elements.dvGroupPicker
       : side === "instrument" ? elements.instrumentGroupPicker : elements.ivGroupPicker;
@@ -440,7 +455,10 @@ export function createDagSetupGroupController({
         : query && state.variableSearchStatus === "error"
           ? "Existing groups · variable search unavailable"
           : "Existing groups";
-    replaceChildren(container, noneRow, h("div", { className: "setup-group-picker-title", textContent: title }),
+    const resultStatus = pickerA11y(container, input,
+      { rowSelector: "button[data-group-id], button[data-select-none]", itemSelector: ".setup-group-picker-row", detailSelector: "summary" });
+    resultStatus.textContent = `${resultCountText(groups.length, "group")}. Use the arrow keys to move through them.`;
+    replaceChildren(container, resultStatus, noneRow, h("div", { className: "setup-group-picker-title", textContent: title }),
       h("div", { className: "setup-group-picker-list" }, defineRow, ...rows));
     container.querySelectorAll("button[data-group-id]").forEach(button =>
       button.addEventListener("click", () => button.dataset.side === "instrument"
@@ -516,7 +534,11 @@ export function createDagSetupGroupController({
       h("ol", { className: "explore-list" }, items.map(row))) : null;
     const custom = groups.filter(({ group }) => group.source === "user_split");
     const builtIn = groups.filter(({ group }) => group.source !== "user_split");
-    replaceChildren(container,
+    const resultStatus = pickerA11y(container, input,
+      { rowSelector: "button.explore-row-open", itemSelector: ".picker-variable-row", detailSelector: "details.picker-variable-info > summary, .picker-saved-info" });
+    const matches = groups.length + previous.length;
+    resultStatus.textContent = status ? `${resultCountText(matches)}. ${status}` : `${resultCountText(matches)}. Use the arrow keys to move through them.`;
+    replaceChildren(container, resultStatus,
       pick ? h("div", { className: "identify-picker-head" },
         h("h2", { textContent: pick.title }),
         onCancel ? h("button", { className: "btn btn--ghost btn--sm", type: "button", textContent: "Cancel", onclick: onCancel }) : null) : null,

@@ -662,8 +662,9 @@
             </div>
           </div>
           <div class="dag-network-wrapper">
+            <button id="dagTableSkip" class="btn dag-table-skip" type="button">Skip the diagram and open the table of variables and links</button>
             <div id="dagNetwork" class="dag-network"></div>
-            <div id="dagTable" class="dag-table-view" hidden tabindex="-1" aria-label="Variables and links as tables"></div>
+            <div id="dagTable" class="dag-table-view" role="region" hidden tabindex="-1" aria-label="Variables and links as tables"></div>
             <p id="exploreGraphHint" class="explore-graph-hint" hidden></p>
             <div id="diagnosticOverlapKey" class="diagnostic-overlap-key" hidden></div>
             <!-- Graph view controls float over the graph's bottom-right corner (Lucide icons). -->
