@@ -40,6 +40,7 @@ test("one review list replaces tickboxes and the separate status panel; schema e
   await page.locator("#editVariableSchema").click();
   await expect(page.locator("#customVariablesTitle")).toHaveText("Edit variable schema");
   await expect(page.locator("#customVariablesTable")).toContainText("Candidate");
+  await page.locator(".custom-variables-export > summary").click();
   const [download] = await Promise.all([page.waitForEvent("download"), page.locator("#exportVariableSchema").click()]);
   const fs = require("node:fs");
   const schema = JSON.parse(fs.readFileSync(await download.path(), "utf8"));
