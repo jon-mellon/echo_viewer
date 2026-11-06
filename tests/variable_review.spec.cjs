@@ -69,17 +69,19 @@ test("'Affects outcome only via cause' fades the variable and leaves the graph a
   await expect(page.locator('.variable-review-row[data-group-id="c"]')).not.toHaveClass(/is-accounted/);
 });
 
-test("whole-variable removal requires a private reason and can be undone by choosing another disposition", async ({ page }) => {
+test("other decisions require a private reason and keep the variable in place", async ({ page }) => {
   await setup(page, { indirect: true });
   const menu = page.locator('.variable-disposition[data-group-id="c"]');
   const dialog = page.locator("#variableReviewDialog");
   await menu.selectOption("removed_other");
   await dialog.getByRole("button", { name: "Confirm decision" }).click();
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("textbox", { name: "Reason for removing this variable" }).fill("This variable is outside this study population.");
+  await dialog.getByRole("textbox", { name: "Reason for this decision" }).fill("This variable is outside this study population.");
   await dialog.getByRole("button", { name: "Confirm decision" }).click();
-  await expect(page.locator('[data-section="rejected"]')).toContainText("Private note:");
-  expect(await page.evaluate(() => window.__dagBuilderState.studyGraph.groups.some(group => group.group_id === "c"))).toBe(false);
+  await expect(page.locator('.variable-review-row[data-group-id="c"]')).toContainText("Private note:");
+  await expect(page.locator('.variable-review-row[data-group-id="c"]')).toHaveClass(/is-accounted/);
+  await expect(page.locator('[data-section="rejected"]')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__dagBuilderState.studyGraph.groups.some(group => group.group_id === "c"))).toBe(true);
   await menu.selectOption("unaddressed");
   expect(await page.evaluate(() => window.__dagBuilderState.studyGraph.groups.some(group => group.group_id === "c"))).toBe(true);
   await page.locator("#toggleCollidersOnly").click();
@@ -170,13 +172,42 @@ test("the schema page always shows the saved-variables section, ahead of the sch
   await page.locator("#editVariableSchema").click();
   await expect(page.locator("#customVariablesTable h2").first()).toContainText("Saved in other schemas");
   // Nothing saved here: the section says so, instead of vanishing.
-  await expect(page.locator(".custom-variables-previous")).toContainText(/Nothing saved in other schemas yet|Looking for saved variables/);
+  await expect(page.locator(".custom-variables-previous")).toContainText(/Nothing saved in other schemas yet|Some saved variables could not be loaded/, { timeout: 35000 });
+  await expect(page.locator(".custom-variables-previous")).not.toContainText("Looking for saved variables");
   await expect(page.locator("#customVariablesTable h2").nth(1)).toHaveText("In this schema");
   const order = await page.evaluate(() => {
     const first = document.querySelector("#customVariablesTable tbody tr");
     return Boolean(first);
   });
   expect(order).toBe(true);
+});
+
+
+test("variable details return to the originating mobile view", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await setup(page, { instrument: true });
+    await page.locator('.variable-review-row[data-group-id="c"] .review-info').tap();
+    const back = page.locator("#closeEvidencePane");
+    await expect(back).toHaveAccessibleName("Back to variables");
+    await back.tap();
+    await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
+    await expect(page.locator('.variable-disposition[data-group-id="c"]')).toBeVisible();
+  } finally { await context.close(); }
+});
+
+
+test("clearing the instrument on mobile keeps the variables panel open", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await setup(page, { instrument: true });
+    await page.locator('button[aria-label="Clear the instrument"]').tap();
+    await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
+    await expect(page.locator("#identify-instrument-input")).toHaveValue("");
+    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.project.instrument_group_id)).toBeNull();
+  } finally { await context.close(); }
 });
 
 test("on a phone the disposition menu is wide enough to read its choice", async ({ browser }) => {
