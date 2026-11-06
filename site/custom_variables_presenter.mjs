@@ -128,14 +128,14 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     const label = group.label || group.group_id;
     const custom = group.source === "user_split";
     const changeable = custom && canChange(group);
-    const lockedTitle = "Changed by a later edit; it can no longer be edited or deleted here.";
+    const lockedTitle = "Changed by a later edit; it can no longer be edited or removed here.";
     const sources = sourceLabels(group);
     if (confirmingId === group.group_id) {
       return h("tr", { className: "custom-variables-confirm" }, h("td", { colSpan: 3 },
         h("div", { className: "custom-variables-confirm-body" },
-          h("span", { textContent: `Delete “${label}”? Its ${group.variable_ids?.length || 0} concepts go back to ${sources.join(", ") || "where they came from"}. You can undo this.` }),
+          h("span", { textContent: `Remove “${label}” from this schema? Its ${group.variable_ids?.length || 0} concepts go back to ${sources.join(", ") || "where they came from"}. You can undo this.` }),
           h("button", { className: "btn btn--danger", type: "button", dataset: { action: "confirm-delete", groupId: group.group_id },
-            disabled: busy, textContent: deleting ? "Deleting…" : "Delete" }),
+            disabled: busy, textContent: deleting ? "Removing…" : "Remove" }),
           h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "cancel-delete", groupId: group.group_id },
             disabled: deleting, textContent: "Keep" }))));
     }
@@ -158,7 +158,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
         custom ? h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "edit", groupId: group.group_id },
           disabled: busy || !changeable, title: changeable ? `Edit ${label}` : lockedTitle, textContent: "Edit" }) : null,
         custom ? h("button", { className: "btn btn--ghost custom-variables-delete", type: "button", dataset: { action: "delete", groupId: group.group_id },
-          disabled: busy || !changeable, title: changeable ? `Delete ${label}` : lockedTitle, textContent: "Delete" }) : null));
+          disabled: busy || !changeable, title: changeable ? `Remove ${label} from schema` : lockedTitle, textContent: "Remove from schema" }) : null));
   }
 
   function detailsRow(group) {
@@ -195,9 +195,9 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     render();
     try {
       await onDelete(groupId);
-      status = `Deleted “${label}”. Undo brings it back.`;
+      status = `Removed “${label}” from this schema. Undo brings it back.`;
     } catch (error) {
-      status = `Could not delete “${label}”: ${error?.message || error}`;
+      status = `Could not remove “${label}”: ${error?.message || error}`;
     } finally {
       deleting = false;
       confirmingId = null;

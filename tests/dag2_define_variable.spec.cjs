@@ -794,7 +794,7 @@ test("add a saved variable to the schema without selecting an analysis role", as
   await page.locator(".definition-cancel:visible").first().click();
   expect(await page.evaluate(() => window.__dagBuilderState.project.dv_group_id)).toBe(selectedId);
   await openIdentifyField(page, "dv");
-  await page.getByRole("button", { name: "Add Alternative saved variable" }).click();
+  await page.getByRole("button", { name: "Choose Alternative saved variable" }).click();
   await expect(page.locator("#definitionBlock")).toBeHidden();
   const replaced = await page.evaluate(() => {
     const project = window.__dagBuilderState.project;
