@@ -3,6 +3,7 @@ import { computeDagRender, reuseDagGeometry } from "./dag_render_compute.mjs";
 import { routesToVisData } from "./dag_vis_routing.mjs";
 import { roundedBoxDistance } from "./dag_routing_geometry.mjs";
 import { attachDagInteractions } from "./dag_interactions.mjs";
+import { createStatusMenu } from "./dag_status_menu.mjs";
 import * as dagDisplay from "./dag_display.mjs";
 import { EDGE_HIGHLIGHT_COLOR, PLAIN_EDGE_COLOR, PLAIN_EDGE_OPACITY, mixHex } from "./dag_display.mjs";
 import * as workflow from "./dag_workflow.mjs";
@@ -963,6 +964,22 @@ function fitDag() {
 }
 
 let detachDagInteractions = null;
+let _statusMenu = null;
+let _statusMenuTarget = null;
+
+/** Right-click on a confounder (or exclusion violation) sets its status, as the list and table do. */
+function showStatusMenu(id, event) {
+  const view = pathView({ ...state, exploring: exploring() });
+  const statuses = tableStatuses(view);
+  if (!statuses || !event) return false;
+  const ids = view === "confounders" ? state.confounderGroupIds : state.exclusionViolationIds;
+  if (!ids?.has(id)) return false;
+  _statusMenu ||= createStatusMenu({ onChoose: value => _statusMenuTarget && onSetStatus(_statusMenuTarget.kind, _statusMenuTarget.id, value) });
+  _statusMenuTarget = { kind: statuses.kind, id };
+  _statusMenu.show({ title: `${groupById(id)?.label || id}: ${statuses.noun} status`, options: statuses.options,
+    current: statuses.byId[id]?.status, clientX: event.clientX, clientY: event.clientY });
+  return true;
+}
 
 function attachDagNetworkHandlers(network) {
   detachDagInteractions?.();
@@ -985,6 +1002,7 @@ function attachDagNetworkHandlers(network) {
       return (state.showConfoundersOnly || state.showCollidersOnly || state.showExclusionViolations || state.showExogeneity) && ids.has(id);
     },
     hasGroup: id => Boolean(groupById(id)),
+    onNodeContext: showStatusMenu,
     logicalEdgeId: id => _dagEdgeSegments.get(id) || id,
     focusGroup(id) {
       // In Explore a variable on the graph is a row in the list: open that row's link.

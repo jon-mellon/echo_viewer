@@ -165,6 +165,12 @@ export function attachDagInteractions(network, element, actions) {
         actions.zoomToPoint(event.pointer.canvas);
       }
     },
+    oncontext(event) {
+      const id = event.pointer?.DOM ? network.getNodeAt?.(event.pointer.DOM) : null;
+      if (!id || !actions.hasGroup(id)) return;
+      const source = event.event?.srcEvent || event.event;
+      if (actions.onNodeContext?.(id, source)) source?.preventDefault?.();
+    },
     selectEdge(event) {
       clearTappedCandidate();
       const id = actions.logicalEdgeId(event.edges[0]);
