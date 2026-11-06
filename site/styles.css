@@ -3178,7 +3178,7 @@ h2 {
   .variable-review-footer { padding: var(--space-3) var(--space-4) var(--space-4); }
 }
 .schema-variable-details ul { max-height: 45vh; overflow-y: auto; }
-.custom-variables-grid td.actions { white-space: normal; }
+.custom-variables-grid td.actions { width: 1%; white-space: nowrap; }
 .identify-field .search-input { width: 100%; margin-bottom: 0; padding-right: var(--control-md); }
 .identify-field .search-input::-webkit-search-cancel-button { display: none; }
 .identify-field.has-focus .search-input:not(:focus) { font-weight: var(--weight-normal); }
@@ -4070,6 +4070,8 @@ h2 {
   padding: var(--space-4) var(--space-8) var(--space-8);
 }
 .custom-variables-view[hidden] { display: none; }
+.custom-variables-back { justify-self: start; width: auto; margin: 0 0 calc(-1 * var(--space-1)); padding-left: 0; color: var(--text-muted); }
+.custom-variables-back:hover { color: var(--accent); }
 .custom-variables-heading {
   display: flex;
   align-items: center;
@@ -4077,6 +4079,10 @@ h2 {
   padding-bottom: var(--space-4);
   border-bottom: 1px solid var(--border);
 }
+.custom-variables-export { position: relative; flex: 0 0 auto; }
+.custom-variables-export > summary { list-style: none; }
+.custom-variables-view .custom-variables-export .nav-menu-panel { position: absolute; top: calc(100% + var(--space-1)); right: 0; left: auto; width: max-content; min-width: 12rem; z-index: 30; }
+.custom-variables-count { display: none; margin-top: var(--space-1); color: var(--text-muted); font-size: var(--text-sm); }
 #definitionWorkspace .custom-variables-heading h2 { margin: 0 auto 0 0; font-size: var(--text-xl); }
 .custom-variables-heading .btn, .custom-variables-confirm-body .btn { flex: 0 0 auto; width: auto; margin: 0; }
 .custom-variables-intro { margin: 0; max-width: 68ch; }
@@ -4132,9 +4138,14 @@ h2 {
     padding: var(--space-3) var(--space-4) var(--space-8);
     overflow-wrap: anywhere;
   }
-  /* Four buttons beside the title do not fit a phone's width: let them wrap under it. */
+  /* Title on its own line, then the one primary action with Export beside it. */
   .custom-variables-heading { flex-wrap: wrap; }
-  #definitionWorkspace .custom-variables-heading h2 { flex: 1 0 100%; margin: 0; }
+  #definitionWorkspace .custom-variables-heading h2 { flex: 1 0 100%; margin: 0; font-size: var(--text-lg); }
+  .custom-variables-heading > #customVariablesCreate { flex: 1 1 auto; }
+  /* Concepts are counted beside the name, where the number says what it counts. */
+  .custom-variables-count { display: block; }
+  .custom-variables-grid td.num { display: none; }
+  .custom-variables-grid .actions .btn { margin-left: 0; margin-right: var(--space-2); padding-left: 0; }
   .custom-variables-grid, .custom-variables-grid tbody { display: block; }
   .custom-variables-grid thead { display: none; }
   .custom-variables-grid tr { display: grid; grid-template-columns: 1fr auto; border-bottom: 1px solid var(--border); }

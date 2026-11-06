@@ -126,6 +126,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       // Whether a variable is custom, and what it was split from, is what this page is for.
       h("td", {}, h("strong", { textContent: label }),
         custom ? h("span", { className: "custom-variables-tag", textContent: "Custom" }) : null,
+        h("span", { className: "custom-variables-count", textContent: `${(group.variable_ids?.length || Number(group.member_count) || 0).toLocaleString("en-US")} concepts` }),
         custom && sources.length ? h("span", { className: "custom-variables-sources", textContent: `Split from ${sources.join(", ")}` }) : null,
         group.description ? h("span", { className: "custom-variables-definition", title: group.description,
           textContent: truncate(group.description, 140) }) : null),
