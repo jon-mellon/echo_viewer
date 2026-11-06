@@ -4458,6 +4458,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* Picker definitions stay available without selecting the variable. */
 .picker-variable-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: var(--space-1); }
 .picker-variable-info { display: contents; }
+/* An open <details> wraps its body in a ::details-content box; unless that is display: contents it becomes a stray auto grid column that squeezes the row's label. */
+.picker-variable-info::details-content { display: contents; }
 .picker-variable-info summary, .picker-saved-info { cursor: pointer; color: var(--text-muted); }
 .picker-variable-info summary { list-style: none; padding: var(--space-2); }
 .picker-variable-info summary::-webkit-details-marker { display: none; }
