@@ -48,6 +48,9 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     await loadDagData(permalink?.get("vlayout") || "");
     performance.measure("echo:startup:data", { start: dataStart, end: performance.now() });
     if (localRecord) {
+      // The incident-link query below needs the evidence engine. Start it now so
+      // it runs alongside the complete-schema download instead of after it.
+      void dagDataSource.ensureEvidenceConnection({ variableIds: [] }).catch(() => {});
       const publishedSchema = state.data.grouping_sets?.[0];
       const complete = await state.data.load_published_schema?.();
       const base = complete?.schema || publishedSchema;
