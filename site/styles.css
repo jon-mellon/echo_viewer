@@ -3156,7 +3156,21 @@ h2 {
 .identify-field .search-input { width: 100%; margin-bottom: 0; padding-right: var(--control-md); }
 .identify-field .search-input::-webkit-search-cancel-button { display: none; }
 .identify-field.has-focus .search-input:not(:focus) { font-weight: var(--weight-normal); }
-#identifyGroupPicker { position: absolute; top: calc(100% + var(--space-1)); left: 0; right: 0; z-index: 8; width: 100%; height: min(45vh, 340px); overflow-y: auto; margin: 0; padding: 0 var(--space-2) var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-sm); }
+/* An open chooser extends the input's outline, keeping the field label above
+   the menu in the hierarchy. :has also covers an automatically opened picker. */
+.identify-field:has(> #identifyGroupPicker:not([hidden])) .search-input {
+  border-color: var(--accent);
+  border-bottom-color: var(--border);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--surface);
+}
+.identify-field:has(> #identifyGroupPicker:not([hidden])) .search-input:focus-visible {
+  /* The joined control already has an accent outline; avoid a second box. */
+  outline: none;
+}
+#identifyGroupPicker { position: absolute; top: calc(100% - 1px); left: 0; right: 0; z-index: 8; width: 100%; height: min(45vh, 340px); overflow-y: auto; margin: 0; padding: 0 var(--space-2) var(--space-2); border: 1px solid var(--accent); border-top-color: var(--border); border-radius: 0 0 var(--radius-md) var(--radius-md); background: var(--surface); box-shadow: var(--shadow-sm); }
+#identifyGroupPicker .identify-picker-head { margin-bottom: var(--space-1); padding-bottom: var(--space-1); border-bottom: 0; }
+#identifyGroupPicker .identify-picker-head h2 { color: var(--text-muted); font-size: var(--text-md); font-weight: var(--weight-medium); }
 :is(.identify-browser-intro, .identify-picker-head) { margin-bottom: var(--space-3); padding-bottom: var(--space-2); border-bottom: 1px solid var(--border); }
 .identify-browser-intro h2, .identify-picker-head h2 { margin: 0; font-size: var(--text-lg); }
 .identify-picker-head { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); padding-top: var(--space-2); background: var(--surface); }
