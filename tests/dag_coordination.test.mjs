@@ -129,6 +129,9 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   });
   controller.renderDag();
   await controller.whenRendered();
+  assert.equal(visibilityChanges.at(-1), "hidden", "a new network stays hidden until its first fit");
+  await new Promise(resolve => setTimeout(resolve, 100));
+  assert.equal(visibilityChanges.at(-1), "", "the first fit reveals the network");
   const redraws = networks[0].redrawCalls || 0;
   controller.clearConfounderPathHover();
   controller.clearConfounderPathHover();
