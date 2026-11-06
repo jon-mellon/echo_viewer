@@ -603,7 +603,9 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     onIdentifyPicking();
   }
   function cancelIdentifyPicking() {
-    const side = identifySide();
+    // A definition hides the picker, but its explicit selection can still be
+    // active. Clear that selection too when focus leaves the fields.
+    const side = identifyPicking || identifySide();
     if (!side) return;
     identifyPicking = null;
     // Missing anchors normally open their picker automatically. Remember an
