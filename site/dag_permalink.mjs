@@ -109,7 +109,9 @@ export function applyPermalink(params, state) {
   const iv = resolveGroup(params.get("iv"));
   const dv = resolveGroup(params.get("dv"));
   const partialSetup = params.get("mode") === "setup" && (!iv || !dv);
-  if ((!iv || !dv || iv === dv) && !partialSetup) {
+  // Explore views are keyed by their focus variable, not a cause/outcome pair.
+  const exploring = Boolean(state.task !== "identify" && state.task && state.explore?.[state.task]?.focusId);
+  if ((!iv || !dv || iv === dv) && !partialSetup && !exploring) {
     throw new Error("Permalink Ind var or Dep var is absent from the referenced schema.");
   }
   state.project.iv_group_id = iv || "";

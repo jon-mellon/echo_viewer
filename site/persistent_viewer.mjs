@@ -36,7 +36,9 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     const groups = state.project.groups || [];
     const iv = groups.find(group => group.group_id === state.project.iv_group_id);
     const dv = groups.find(group => group.group_id === state.project.dv_group_id);
-    if (!localId && state.workflowMode !== "setup"
+    const exploring = ["causes", "consequences"].includes(state.task)
+      && Boolean(state.explore?.[state.task]?.focusId);
+    if (!localId && state.workflowMode !== "setup" && !exploring
       && (!iv?.variable_ids?.length || !dv?.variable_ids?.length)) return null;
     getViewport();
     return buildPermalink({

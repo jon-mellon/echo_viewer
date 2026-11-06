@@ -146,6 +146,13 @@ test("the task and each explore view round-trip, and pre-task links open identif
   assert.deepEqual(restored.explore.causes, { focusId: "outcome", depth: 3, minPapers: 4 });
   assert.deepEqual(restored.explore.consequences, { focusId: "cause", depth: 2, minPapers: 1 });
 
+  // A link made in Explore (no cause/outcome chosen) restores without error.
+  const noPair = { project: { ...structuredClone(project), iv_group_id: "g_iv", dv_group_id: "g_dv" },
+    seeds: { iv: new Set(), dv: new Set() }, explore: { causes: {}, consequences: {} } };
+  const exploreParams = new URLSearchParams({ p: "1", task: "causes", causes_of: "outcome", iv: "g_iv", dv: "g_dv", mode: "dag" });
+  assert.doesNotThrow(() => applyPermalink(exploreParams, noPair));
+  assert.equal(noPair.explore.causes.focusId, "outcome");
+
   const home = new URL(buildPermalink({ location: { href: "http://localhost:8767/" }, schemaUrl: "",
     dataVersion: "s", state: { ...state, task: null, explore: { causes: {}, consequences: {} } } })).searchParams;
   assert.equal(home.get("task"), "home");
