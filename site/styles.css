@@ -4144,7 +4144,9 @@ h2 {
 .custom-variables-grid tbody tr:not(.custom-variables-confirm):hover td { background: var(--surface-sunken); }
 .custom-variables-grid td strong { font-size: var(--text-base); font-weight: var(--weight-medium); }
 .custom-variables-grid td.num { padding-top: var(--space-4); }
-.custom-variables-grid .actions .btn { margin-left: var(--space-3); }
+/* Left-aligned so Inspect lines up from row to row. */
+.custom-variables-grid .actions { text-align: left; }
+.custom-variables-grid .actions .btn { margin-left: 0; margin-right: var(--space-3); }
 .custom-variables-tag {
   margin-left: var(--space-2);
   padding: 1px var(--space-2);
