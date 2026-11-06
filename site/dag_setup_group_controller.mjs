@@ -479,6 +479,8 @@ export function createDagSetupGroupController({
 
   /** The Custom and Built-in variable lists a search field opens, in the Explore row style. */
   function renderPickerList(container, { query, input, onChoose, onCreate, exclude = new Set(), pick = null, onCancel = null }) {
+    const expandedDefinitions = new Set([...container.querySelectorAll("details.picker-variable-info[open]")]
+      .map(detail => detail.dataset.groupId));
     loadPreviousSplits();
     const groups = searchFocusGroups(query).filter(({ group }) => !exclude.has(group.group_id));
     const previous = previousSplits(pick?.role || "candidate").filter(item => !groups.some(({ group }) => group.group_id === item.group_id)
@@ -488,13 +490,17 @@ export function createDagSetupGroupController({
       const label = group.label || group.group_id;
       const count = group.variable_ids?.length || Number(group.member_count) || 0;
       const custom = group.source === "user_split";
-      return h("li", { className: `explore-row${custom ? " has-actions" : ""}` },
+      return h("li", { className: "explore-row picker-variable-row" },
         h("button", { type: "button", className: "explore-row-open", dataset: { groupId: group.group_id },
           title: group.description || "", attrs: { "aria-label": pick ? `${pick.action}: ${label}, ${count} variables` : `${label}, ${count} variables` } },
         h("span", { className: "explore-row-text" },
           h("span", { className: "explore-row-label", textContent: label }),
           variableMatch ? h("span", { className: "explore-row-path", textContent: `matches ${truncate(variableMatch, 70)}` }) : null),
         h("span", { className: "explore-row-papers", textContent: String(count) })),
+        h("details", { className: "picker-variable-info", dataset: { groupId: group.group_id },
+          open: expandedDefinitions.has(group.group_id) },
+          h("summary", { title: `Definition of ${label}`, attrs: { "aria-label": `Definition of ${label}` } }, "ⓘ"),
+          h("p", { textContent: group.description || "No definition available." })),
         custom ? customVariableActions({ group, canChange: canChangeCustom,
           onEdit: id => startEditSplit?.(id), onDelete: deleteCustom }) : null);
     };
@@ -520,11 +526,14 @@ export function createDagSetupGroupController({
       section("Your variables", custom),
       previous.length ? h("section", { className: "picker-section" },
         h("h3", { className: "picker-label" }, "Saved in other schemas", h("span", { className: "picker-count", textContent: ` · ${previous.length}` })),
-        h("ol", { className: "explore-list" }, previous.map(item => h("li", { className: "explore-row" },
-          h("button", { type: "button", className: "explore-row-open saved-variable-row", title: "Review and add this variable to the current schema",
-            attrs: { "aria-label": `Review and add ${item.name}` }, onclick: () => reusePreviousSplit(pick?.role || "candidate", item) },
+        h("ol", { className: "explore-list" }, previous.map(item => h("li", { className: "explore-row picker-variable-row" },
+          h("button", { type: "button", className: "explore-row-open saved-variable-row", title: "Add this variable to the current schema",
+            attrs: { "aria-label": `Add ${item.name}` }, onclick: () => reusePreviousSplit(pick?.role || "candidate", item, { addDirectly: true }) },
             h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: item.name }),
-              h("span", { className: "explore-row-path", textContent: `From: ${(item.source_labels || []).join(", ")}` })), h("span", { className: "saved-variable-action", textContent: "Add" })))))) : null,
+              h("span", { className: "explore-row-path", textContent: `From: ${(item.source_labels || []).join(", ")}` })), h("span", { className: "saved-variable-action", textContent: "Add" })),
+          h("button", { type: "button", className: "btn btn--icon btn--ghost picker-saved-info",
+            title: `Review ${item.name}`, attrs: { "aria-label": `Review definition of ${item.name}` },
+            onclick: () => reusePreviousSplit(pick?.role || "candidate", item) }, "ⓘ"))))) : null,
       section(custom.length || previous.length ? "All other variables" : "Variables", builtIn),
       query && !groups.length ? h("div", { className: "explore-subsection-empty" }, clearButton()) : null);
     container.querySelectorAll("button[data-group-id]").forEach(button =>

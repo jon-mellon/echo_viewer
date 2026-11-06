@@ -792,15 +792,17 @@ test("add a saved variable to the schema without selecting an analysis role", as
   await chooseAnchor(page, "iv", "category-sleep");
   await chooseAnchor(page, "dv", selectedId);
   await openIdentifyField(page, "dv");
-  await page.getByRole("button", { name: "Review and add Alternative saved variable" }).click();
+  const builtInInfo = page.locator("#identifyGroupPicker .picker-variable-info").first();
+  await builtInInfo.locator("summary").click();
+  await expect(builtInInfo.locator("p")).toBeVisible();
+  expect(await page.evaluate(() => window.__dagBuilderState.project.dv_group_id)).toBe(selectedId);
+  await page.getByRole("button", { name: "Review definition of Alternative saved variable" }).click();
   await expect(page.locator("#definitionSave")).toHaveText("Replace and use as outcome");
   await expect(page.locator("#definitionConceptsIntro")).toContainText('This replaces “Saved test variable”');
   await page.locator(".definition-cancel:visible").first().click();
   expect(await page.evaluate(() => window.__dagBuilderState.project.dv_group_id)).toBe(selectedId);
   await openIdentifyField(page, "dv");
-  await page.getByRole("button", { name: "Review and add Alternative saved variable" }).click();
-  await expect(page.locator("#definitionSave")).toBeEnabled();
-  await page.locator("#definitionSave").click();
+  await page.getByRole("button", { name: "Add Alternative saved variable" }).click();
   await expect(page.locator("#definitionBlock")).toBeHidden();
   const replaced = await page.evaluate(() => {
     const project = window.__dagBuilderState.project;
@@ -1043,8 +1045,8 @@ test("previous local splits can be reused without changing the active schema fir
       index: parseInt(id.slice(1, 9), 16), display_label: id, concept_label: id,
       map_x: parseInt(id.slice(1, 9), 16), map_y: parseInt(id.slice(9, 17), 16) }));
   });
-  await expect(page.getByRole("button", { name: "Review and add Previous local construct" })).toBeVisible();
-  await page.getByRole("button", { name: "Review and add Previous local construct" }).click();
+  await expect(page.getByRole("button", { name: "Review definition of Previous local construct" })).toBeVisible();
+  await page.getByRole("button", { name: "Review definition of Previous local construct" }).click();
   await expect(page.locator("#definitionNewLabel")).toHaveValue("Previous local construct");
   expect(await page.evaluate(() => window.__dagBuilderState.project.groups.length)).toBe(fixture.before);
   expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.source_group_ids)).toEqual([fixture.sourceId]);

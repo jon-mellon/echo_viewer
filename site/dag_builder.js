@@ -1984,7 +1984,7 @@ function loadPreviousSplits(force = false) {
     customVariablesPresenter.render();
   });
 }
-function reusePreviousSplit(role, row) { definitionWorkflowController.reusePreviousSplit(role, row); }
+function reusePreviousSplit(role, row, options) { definitionWorkflowController.reusePreviousSplit(role, row, options); }
 
 const customVariablesPresenter = createCustomVariablesPresenter({
   state, elements: els, truncate, normalized,
