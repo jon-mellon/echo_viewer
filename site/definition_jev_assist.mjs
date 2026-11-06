@@ -38,6 +38,9 @@ async function sha256Base64Url(value) {
   return base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
 }
 
+const NEW_KEY_CHECK_RETRIES = 3;
+const NEW_KEY_CHECK_DELAY_MS = 1500;
+
 async function keySettingsUrl(key) {
   const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)));
   return `https://openrouter.ai/keys/${[...hash].map(byte => byte.toString(16).padStart(2, "0")).join("")}`;
@@ -580,8 +583,17 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       onConnectionChange(false);
       return;
     }
-    // Keep the issued key when the limit check fails so the user can retry it.
-    await checkKey().catch(() => {});
+    // OpenRouter can answer "User not found" for a few seconds after issuing a key,
+    // so retry before asking the user. The issued key is kept if every attempt
+    // fails, so they can recheck it themselves.
+    for (let attempt = 0; attempt <= NEW_KEY_CHECK_RETRIES; attempt += 1) {
+      if (attempt) await new Promise(resolve => setTimeout(resolve, NEW_KEY_CHECK_DELAY_MS));
+      if (!key) return;
+      try {
+        await checkKey();
+        return;
+      } catch { /* checkKey has already reported the failure. */ }
+    }
   }
 
   function showProgress(value) {
