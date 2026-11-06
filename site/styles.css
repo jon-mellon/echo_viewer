@@ -3813,6 +3813,27 @@ h2 {
   line-height: var(--leading-tight);
   overflow-wrap: anywhere;
 }
+.evidence-definitions {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.evidence-definition h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-strong);
+}
+.evidence-definition .provenance-count {
+  color: var(--text-muted);
+  font-weight: var(--weight-normal);
+}
+.evidence-definition .group-definition-text {
+  max-width: 75ch;
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.evidence-definition .group-definition-text.is-empty { color: var(--text-muted); font-style: italic; }
 .evidence-meta {
   margin: var(--space-1) 0 0;
   color: var(--text-muted);
