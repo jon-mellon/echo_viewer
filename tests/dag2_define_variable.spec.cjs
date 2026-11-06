@@ -765,15 +765,7 @@ test("add a saved variable to the schema without selecting an analysis role", as
   expect(await page.locator("#customVariablesTable h2").allTextContents()).toEqual(["Saved in other schemas · 2", "In this schema"]);
   await expect(saved).toContainText(before.source);
   await saved.getByRole("button", { name: "Add Saved test variable to schema" }).click();
-  await expect(page.locator("#definitionSavedLoading")).toBeVisible();
-  await expect(page.locator("#definitionDescribeStep")).toBeHidden();
-  await expect(page.locator("#definitionSourcesStep")).toBeHidden();
-  await expect(page.locator("#definitionJevPanel")).toBeHidden();
-  await expect(page.locator("#definitionConceptsTitle")).toHaveText("Review saved variable");
-  await expect(page.locator("#definitionJevPanel")).toBeHidden();
-  await expect(page.locator("#definitionResidualLabels input")).toHaveCount(0);
-  await expect(page.locator("#definitionSave")).toHaveText("Add to schema");
-  await page.locator("#definitionSave").click();
+  // Adding saves straight away, with no review screen.
   await expect(page.locator("#customVariablesView")).toBeVisible();
   await expect(page.locator("#customVariablesStatus")).toContainText("Saved test variable");
   const after = await page.evaluate(() => {

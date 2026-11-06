@@ -95,7 +95,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
           h("span", { textContent: `From: ${(item.source_labels || item.source_group_ids || []).join(", ")}` })),
         h("button", { type: "button", className: "btn btn--sm", textContent: "Add to schema",
           attrs: { "aria-label": `Add ${item.name} to schema` },
-          onclick: () => reusePreviousSplit("candidate", item) }))),
+          onclick: () => reusePreviousSplit("candidate", item, { addDirectly: true }) }))),
       loadingSplits ? h("p", { className: "small-note concept-loading", role: "status" },
         h("span", { className: "inline-spinner", ariaHidden: "true" }), "Looking for saved variables…")
         : splitsError() ? h("div", { role: "status" },
