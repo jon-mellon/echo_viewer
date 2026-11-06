@@ -142,7 +142,7 @@ export function createDagInspectorController({
           const knownLabel = conceptLabels.get(id)
             || state.variableById?.get(id)?.concept_label
             || state.variableById?.get(id)?.display_label;
-          const label = knownLabel || (loading ? "Loading…" : id);
+          const label = knownLabel || (loading ? "Loading…" : failedConceptPages.has(pageKey) ? "Name unavailable" : id);
           const canExclude = Boolean(knownLabel && (resolvedConceptIds.has(id)
             || state.variableById?.get(id)?.concept_label || state.variableById?.get(id)?.display_label));
           return h("li", {
@@ -162,7 +162,7 @@ export function createDagInspectorController({
           className: "btn btn--ghost", type: "button", dataset: { conceptPriorityRetry: "" },
           textContent: "Could not prioritize concepts. Retry",
         }) : null,
-        failedConceptPages.has(pageKey) ? h("button", {
+        failedConceptPages.has(pageKey) && missing.length ? h("button", {
           className: "btn btn--ghost", type: "button", dataset: { conceptRetry: "" },
           textContent: "Could not load concepts. Retry",
         }) : null,
