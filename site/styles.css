@@ -4346,3 +4346,12 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .evidence-from-variables .evidence-back-map { display: none; }
   .evidence-from-variables .evidence-back-variables { display: inline; }
 }
+
+.dag-status-menu { position: fixed; z-index: 60; min-width: 220px; padding: var(--space-1); display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); }
+.dag-status-menu[hidden] { display: none; }
+.dag-status-menu-title { padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-muted); }
+.dag-status-menu-item { text-align: left; padding: var(--space-2) var(--space-3); border: 0; border-radius: var(--radius-md); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.dag-status-menu-item:hover, .dag-status-menu-item:focus-visible { background: var(--surface-sunken); outline: none; }
+.dag-status-menu-item.is-current { font-weight: var(--weight-strong); }
+.dag-status-menu-item.is-current::before { content: "✓ "; }
