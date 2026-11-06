@@ -172,7 +172,8 @@ test("the schema page always shows the saved-variables section, ahead of the sch
   await page.locator("#editVariableSchema").click();
   await expect(page.locator("#customVariablesTable h2").first()).toContainText("Saved in other schemas");
   // Nothing saved here: the section says so, instead of vanishing.
-  await expect(page.locator(".custom-variables-previous")).toContainText(/Nothing saved in other schemas yet|Looking for saved variables/);
+  await expect(page.locator(".custom-variables-previous")).toContainText(/Nothing saved in other schemas yet|Some saved variables could not be loaded/, { timeout: 35000 });
+  await expect(page.locator(".custom-variables-previous")).not.toContainText("Looking for saved variables");
   await expect(page.locator("#customVariablesTable h2").nth(1)).toHaveText("In this schema");
   const order = await page.evaluate(() => {
     const first = document.querySelector("#customVariablesTable tbody tr");
