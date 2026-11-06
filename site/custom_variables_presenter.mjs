@@ -19,6 +19,21 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
   let status = "";
   let expandedId = null;
   let conceptLimit = 100;
+  let detailsLoading = false;
+  let detailsRequest = 0;
+
+  async function loadVisibleDetails(group) {
+    const request = ++detailsRequest;
+    detailsLoading = true;
+    render();
+    try {
+      await loadDetails((group?.variable_ids || []).slice(0, conceptLimit));
+    } catch (error) {
+      if (request === detailsRequest) status = `Some concept labels could not load: ${error.message || error}`;
+    } finally {
+      if (request === detailsRequest) { detailsLoading = false; render(); }
+    }
+  }
 
   function open() {
     els.openCustomVariables?.closest("details")?.removeAttribute("open");
@@ -147,9 +162,11 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     return h("tr", { className: "schema-variable-details" }, h("td", { colSpan: 3 },
       h("p", { textContent: group.description || "No definition recorded." }),
       h("p", { className: "small-note", textContent: `${ids.length} concepts` }),
-      h("ul", {}, ids.slice(0, conceptLimit).map(id => h("li", { textContent: conceptLabel(id) }))),
-      ids.length > conceptLimit ? h("button", { type: "button", className: "btn btn--sm", textContent: "Show more concepts",
-        onclick: () => { conceptLimit += 100; render(); void loadDetails(ids.slice(0, conceptLimit)).then(render).catch(() => {}); } }) : null));
+      detailsLoading ? h("span", { className: "concept-loading", role: "status" },
+        h("span", { className: "inline-spinner", ariaHidden: "true" }), "Loading concepts…")
+        : h("ul", {}, ids.slice(0, conceptLimit).map(id => h("li", { textContent: conceptLabel(id) }))),
+      !detailsLoading && ids.length > conceptLimit ? h("button", { type: "button", className: "btn btn--sm", textContent: "Show more concepts",
+        onclick: () => { conceptLimit += 100; void loadVisibleDetails(group); } }) : null));
   }
 
   async function act(action, groupId) {
@@ -158,10 +175,9 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     if (action === "inspect") {
       expandedId = expandedId === groupId ? null : groupId;
       conceptLimit = 100;
-      render();
       const group = schemaVariables().find(group => group.group_id === groupId);
-      if (expandedId) try { await loadDetails((group?.variable_ids || []).slice(0, conceptLimit)); render(); }
-      catch (error) { status = `Some concept labels could not load: ${error.message || error}`; render(); }
+      if (expandedId) void loadVisibleDetails(group);
+      else { detailsRequest++; detailsLoading = false; render(); }
       return;
     }
     if (action === "split") { onSplitSource(groupId); return; }
