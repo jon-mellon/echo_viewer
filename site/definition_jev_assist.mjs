@@ -455,9 +455,15 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     els.definitionAiApply.hidden = !fullDone;
     els.definitionAiApply.disabled = busy;
     els.definitionAiApply.textContent = manualChoices ? "Replace my choices with these suggestions" : "Use these suggestions";
+    els.definitionAiApplyBottom.hidden = !fullDone;
+    els.definitionAiApplyBottom.disabled = busy;
+    els.definitionAiApplyBottom.textContent = els.definitionAiApply.textContent;
     els.definitionAiApplyNote.hidden = !fullDone || !manualChoices;
     els.definitionAiApplyNote.textContent = `This replaces your ${manualChoices.toLocaleString()} existing choices: concepts suggested In become included and all others excluded. You can undo it in Choose manually.`;
+    els.definitionAiApplyNoteBottom.hidden = els.definitionAiApplyNote.hidden;
+    els.definitionAiApplyNoteBottom.textContent = els.definitionAiApplyNote.textContent;
     els.definitionAiDiscard.hidden = !showPreview || busy;
+    els.definitionAiDiscardBottom.hidden = !fullDone || busy;
 
     // Progress and errors sit with the step they belong to.
     const statusHost = !key ? (message ? els.definitionAiStepConnect.querySelector(".definition-ai-step-body") : null)
@@ -801,12 +807,15 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       reviewPage += 1;
       if (preview && previewDraft === getDraft()) renderReviewRows(previewDraft);
     });
-    els.definitionAiApply.addEventListener("click", () => {
+    const applySuggestions = () => {
       if (!preview || busy || previewMode !== "full" || previewDraft !== getDraft()) return;
       onApply(preview.filter(item => item.side === "new").map(item => item.id), testDescription);
       clearPreview();
-    });
+    };
+    els.definitionAiApply.addEventListener("click", applySuggestions);
+    els.definitionAiApplyBottom.addEventListener("click", applySuggestions);
     els.definitionAiDiscard.addEventListener("click", clearPreview);
+    els.definitionAiDiscardBottom.addEventListener("click", clearPreview);
     void finishConnection();
   }
 

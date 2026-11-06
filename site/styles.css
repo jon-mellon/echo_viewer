@@ -4243,6 +4243,7 @@ h2 {
 .definition-ai-step[data-state="error"] .definition-ai-step-num { border-color: var(--danger); background: var(--danger); }
 #definitionAiLimitText.is-error { color: var(--danger); }
 .definition-ai-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.definition-ai-actions--after-results { margin-top: var(--space-2); }
 .definition-ai-actions:empty { display: none; }
 .definition-ai-actions .btn { width: auto; margin: 0; }
 .definition-ai-actions .btn[hidden] { display: none; }
