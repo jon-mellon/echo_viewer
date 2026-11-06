@@ -67,6 +67,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.source_group_ids = [...row.source_group_ids];
     browseState.loading = true;
     browseState.error = "Loading the previous split…";
+    // A direct add stays on the current view; the definition page opens only if it fails.
+    draft.direct = addDirectly;
+    presenter.setAddingSaved(addDirectly);
     draft.step = "loading_saved";
     renderDraft();
     const start = performance.now();
@@ -107,8 +110,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       performance.measure("echo:saved-split:review", { start, end: performance.now() });
       if (addDirectly) await saveDefinition();
       else els.definitionSave.focus();
+      presenter.setAddingSaved(false);
     } catch (error) {
+      presenter.setAddingSaved(false);
       if (state.definitionDraft === draft) {
+        draft.direct = false;
         draft.step = "sources";
         browseState.error = `Could not use this split: ${error.message || error}`;
         browseState.loading = false;
@@ -117,6 +123,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     }
   }
   const renderDraft = () => {
+    if (state.definitionDraft?.direct) return;
     // Definition steps change the draft, not the project DAG.
     // The DAG is hidden until cancel/save, where a full render is performed.
     renderAll({ rebuild: false });
@@ -357,6 +364,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.new_description = clean(draft.new_description || "");
     const describeProblem = describeError(draft);
     if (describeProblem) {
+      draft.direct = false;
       draft.step = "describe";
       renderDraft();
       presenter.showDescribeError(describeProblem);
@@ -430,6 +438,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       state.project = previousProject;
       onCommitFailureRestored();
       invalidateVisibleCaches();
+      draft.direct = false;
       renderDraft();
       showSaveError(error);
     }

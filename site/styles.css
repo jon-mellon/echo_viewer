@@ -4363,3 +4363,6 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .dag-status-menu-item:hover, .dag-status-menu-item:focus-visible { background: var(--surface-sunken); outline: none; }
 .dag-status-menu-item.is-current { font-weight: var(--weight-strong); }
 .dag-status-menu-item.is-current::before { content: "✓ "; }
+
+/* A saved variable being added in place: no page change, so show that work is under way. */
+body.adding-saved-split, body.adding-saved-split * { cursor: progress; }
