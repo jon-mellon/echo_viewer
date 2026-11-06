@@ -4114,6 +4114,8 @@ h2 {
 .custom-variables-grid .num { text-align: right; font-variant-numeric: tabular-nums; }
 .custom-variables-grid .actions { text-align: right; white-space: nowrap; }
 .custom-variables-grid .actions .btn { width: auto; margin-left: var(--space-1); }
+.custom-variables-previous { margin-bottom: var(--space-6); }
+.custom-variables-none { margin: 0; }
 .custom-variables-tag { display: inline-block; margin-left: var(--space-2); padding: 0 var(--space-1); border: 1px solid var(--accent); border-radius: var(--radius-sm); color: var(--accent); font-size: var(--text-sm); vertical-align: 1px; }
 .custom-variables-sources { display: block; margin-top: var(--space-1); color: var(--text); font-size: var(--text-sm); }
 .custom-variables-definition { display: block; margin-top: var(--space-1); color: var(--text-muted); font-size: var(--text-sm); }
@@ -4342,4 +4344,7 @@ div.explore-subsection-empty p, .custom-variables-empty p { margin: 0 0 var(--sp
 @media (pointer: coarse) {
   :is(#identifyGroupPicker, #focusGroupPicker) .explore-row-open { min-height: var(--control-touch); }
   :is(#identifyGroupPicker, #focusGroupPicker) .picker-create { min-height: var(--control-touch); }
+}
+@media (pointer: coarse) {
+  .custom-variables-previous .btn, .custom-variables-grid .actions .btn { min-height: var(--control-touch); }
 }

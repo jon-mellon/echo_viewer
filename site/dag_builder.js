@@ -1991,6 +1991,7 @@ const customVariablesPresenter = createCustomVariablesPresenter({
   onEdit: groupId => startEditSplit(groupId),
   onDelete: deleteCustomVariable,
   previousSplits: savedSplitOptions, loadPreviousSplits, reusePreviousSplit,
+  splitsLoading: () => previousSplitsLoading || !previousSplitsLoaded,
   canExplore: () => taskViews.exploring(),
   onExplore: groupId => taskViews.chooseFocus(groupId),
 });
