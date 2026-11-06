@@ -301,7 +301,7 @@ test("mobile evidence tables reopen at their left edge", async ({ page }) => {
   expect(await panel.evaluate(node => node.scrollLeft)).toBe(0);
 });
 
-test("mobile definition waits for variable data before showing the concepts", async ({ page }) => {
+test("mobile definition allows naming while concepts load, then waits before review", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(viewer);
@@ -315,10 +315,14 @@ test("mobile definition waits for variable data before showing the concepts", as
   await startCreate(page, "iv");
   await page.locator('#definitionSourceList input[data-source-id]').first().check();
   await page.locator("#definitionContinue").click();
-  await expect(page.locator("#definitionContinue")).toHaveText("Loading concepts…");
-  await expect(page.locator("#definitionDescribeStep")).toBeHidden();
-  await page.evaluate(() => window.__releaseVariableLoad());
   await expect(page.locator("#definitionDescribeStep")).toBeVisible();
+  await page.locator("#definitionNewLabel").fill("Mobile test variable");
+  await page.locator("#definitionNewDescription").fill("A mobile test variable with a clear definition.");
+  await page.locator("#definitionDescribeNext").click();
+  await expect(page.locator("#definitionPartitionStep")).toBeHidden();
+  await expect(page.locator("#definitionLoadStatus")).toHaveText("Loading concepts…");
+  await page.evaluate(() => window.__releaseVariableLoad());
+  await expect(page.locator("#definitionPartitionStep")).toBeVisible({ timeout: 60_000 });
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variables.length)).toBeGreaterThan(0);
 });
 

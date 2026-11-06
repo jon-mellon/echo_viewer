@@ -15,6 +15,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   onCommitFailureRestored = () => {}, onInstrumentReady = () => {}, onFocusDefined = null, previousSplits = () => [],
   selectedGroupForRole = role => state.project?.[`${role}_group_id`] }) {
   let hydrationRevision = 0;
+  let pendingSourceHydration = null;
   const sourceHydrations = new Map();
   let browseRevision = 0;
   const browseState = { rows: [], loading: false, error: "" };
@@ -246,27 +247,33 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     draft.residual_labels = Object.fromEntries(sources.map(group =>
       [group.group_id, group.label || group.group_id]));
     draft.details_loading = true;
+    draft.details_error = "";
     state.selectedVariableIds.clear();
-    if (!saved) presenter.setContinueLoading();
+    if (!saved) {
+      draft.step = "describe";
+      invalidateVisibleCaches();
+      renderDraft();
+      els.definitionNewLabel.focus();
+    }
+    const loading = Promise.all(sources.map(source => sourceHydrations.get(source.group_id)
+      || hydrateVariableDetails(source.variable_ids, { skipNeighbors: true })));
+    pendingSourceHydration = loading;
     try {
-      await Promise.all(sources.map(source => sourceHydrations.get(source.group_id)
-        || hydrateVariableDetails(source.variable_ids, { skipNeighbors: true })));
+      await loading;
     } catch (error) {
       if (revision === hydrationRevision && state.definitionDraft === draft) {
         draft.details_loading = false;
         if (saved) throw error;
+        draft.details_error = error?.message || String(error);
         renderDefinition();
-        presenter.showLoadError(error);
       }
       return;
     }
     if (revision !== hydrationRevision || state.definitionDraft !== draft) return;
     draft.details_loading = false;
     if (saved) return;
-    draft.step = "describe";
     invalidateVisibleCaches();
     renderDraft();
-    els.definitionNewLabel.focus();
   }
 
   function definitionResidualIds(source) {
@@ -316,12 +323,17 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     return taken ? `Another variable is already called “${label}”.` : "";
   }
 
-  function goToStep(step) {
+  async function goToStep(step) {
     const draft = state.definitionDraft;
     if (!draft) return;
     if (draft.step === "describe" && step === "partition") {
       const error = describeError(draft);
       if (error) { presenter.showDescribeError(error); return; }
+      if (draft.details_loading && pendingSourceHydration) {
+        try { await pendingSourceHydration; } catch { /* Report the load failure below. */ }
+        if (state.definitionDraft !== draft || draft.step !== "describe") return;
+      }
+      if (draft.details_error) { presenter.showDescribeError(`Could not load concepts: ${draft.details_error}. Go back and try again.`); return; }
       draft.new_label = clean(draft.new_label);
       draft.new_description = clean(draft.new_description);
       // The AI sorts against the definition unless it was reworded for the AI.
