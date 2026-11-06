@@ -2005,8 +2005,6 @@ const customVariablesPresenter = createCustomVariablesPresenter({
   previousSplits: savedSplitOptions, loadPreviousSplits, reusePreviousSplit,
   splitsLoading: () => previousSplitsLoading || !previousSplitsLoaded,
   splitsError: () => previousSplitsError,
-  canExplore: () => taskViews.exploring(),
-  onExplore: groupId => taskViews.chooseFocus(groupId),
 });
 
 const projectController = createDagProjectController({
