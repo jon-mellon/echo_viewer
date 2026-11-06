@@ -1956,7 +1956,9 @@ function loadPreviousSplits(force = false) {
   if (previousSplitsLoading || (previousSplitsLoaded && !force)) return;
   previousSplitsLoading = true;
   previousSplitsError = false;
-  void Promise.allSettled([boundedSplitLookup(listOwnPublishedSplits()), boundedSplitLookup(listLocalSchemas())]).then(async ([published, local]) => {
+  // Wrapped so a synchronous throw from either lookup rejects instead of leaving the spinner up forever.
+  const bounded = lookup => boundedSplitLookup(new Promise(resolve => resolve(lookup())));
+  void Promise.allSettled([bounded(listOwnPublishedSplits), bounded(listLocalSchemas)]).then(async ([published, local]) => {
     const localRows = local.status === "fulfilled" ? local.value.flatMap(record =>
       (record.schema?.groups || []).filter(group => group.source === "user_split"
         && group.provenance?.operation === "split_categories" && Array.isArray(group.provenance.source_group_ids))
@@ -1979,9 +1981,11 @@ function loadPreviousSplits(force = false) {
   }).catch(() => { previousSplitsError = true; }).finally(() => {
     previousSplitsLoading = false;
     previousSplitsLoaded = true;
-    setupGroupController.renderFocusPicker();
-    setupGroupController.renderIdentifyPicker();
-    customVariablesPresenter.render();
+    // The custom-variables view shows the spinner, so it renders first and a failing picker cannot block it.
+    for (const render of [() => customVariablesPresenter.render(), () => setupGroupController.renderFocusPicker(),
+      () => setupGroupController.renderIdentifyPicker()]) {
+      try { render(); } catch (error) { console.error("Saved variable render failed", error); }
+    }
   });
 }
 function reusePreviousSplit(role, row, options) { definitionWorkflowController.reusePreviousSplit(role, row, options); }
