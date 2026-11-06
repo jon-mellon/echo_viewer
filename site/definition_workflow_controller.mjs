@@ -132,7 +132,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
 
   function startDefinition(role, { render = true } = {}) {
     if (state.interfaceMode !== "dag2" || !["iv", "dv", "instrument", "candidate"].includes(role)) return;
-    jevAssist.clearPreview();
+    jevAssist.clearPreview({ keepCheckpoint: true });
     browseRevision += 1;
     browseState.rows = [];
     browseState.error = "";
@@ -178,7 +178,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   async function startEditSplit(groupId = null) {
     const context = projectOps.editableSplitContext(state.project, groupId ? groupId : activeGroup());
     if (!context) return;
-    jevAssist.clearPreview();
+    jevAssist.clearPreview({ keepCheckpoint: true });
     const { splitId, newGroup, residuals } = context;
     const eligible = [...new Set([...newGroup.variable_ids, ...residuals.flatMap(group => group.variable_ids)]
       .map(clusterRep))];
@@ -219,7 +219,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
   function cancelDefinition() {
     browseRevision += 1;
     hydrationRevision += 1;
-    jevAssist.clearPreview();
+    jevAssist.clearPreview({ keepCheckpoint: true });
     state.definitionDraft = null;
     state.selectedVariableIds.clear();
     state.selectedVariableId = null;
@@ -244,17 +244,25 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     const sources = definitionSources();
     if (!draft || draft.details_loading || !sources.length) return;
     const revision = ++hydrationRevision;
+    // Returning through the source step should not discard work if its inputs did not change.
+    const sameSources = !saved && draft.source_snapshot?.length === sources.length
+      && sources.every(source => {
+        const snapshot = draft.source_snapshot.find(item => item.group_id === source.group_id);
+        return snapshot && JSON.stringify(snapshot.variable_ids) === JSON.stringify(source.variable_ids);
+      });
     draft.source_snapshot = sources.map(group => ({ group_id: group.group_id, label: group.label,
       variable_ids: [...group.variable_ids], updated_at: group.updated_at || null }));
     draft.eligible_variable_ids = [...new Set(sources.flatMap(group =>
       group.variable_ids.map(clusterRep)))];
-    draft.new_variable_ids = [];
-    draft.reviewed_variable_ids = [];
-    // What stays behind keeps its variable's name unless the user renames it.
-    draft.residual_labels = Object.fromEntries(sources.map(group =>
-      [group.group_id, group.label || group.group_id]));
+    if (!sameSources) {
+      draft.new_variable_ids = [];
+      draft.reviewed_variable_ids = [];
+      // What stays behind keeps its variable's name unless the user renames it.
+      draft.residual_labels = Object.fromEntries(sources.map(group =>
+        [group.group_id, group.label || group.group_id]));
+    }
     draft.details_loading = true;
-    state.selectedVariableIds.clear();
+    state.selectedVariableIds = new Set(draft.new_variable_ids);
     if (!saved) presenter.setContinueLoading();
     try {
       await Promise.all(sources.map(source => sourceHydrations.get(source.group_id)
@@ -348,8 +356,11 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     persistProjectLocally();
     invalidateVisibleCaches();
     renderDraft();
-    if (step === "sources") void refreshBrowse();
-    if (step === "describe") els.definitionNewLabel.focus();
+    if (step === "sources") {
+      void refreshBrowse();
+      els.definitionSourceSearch.focus();
+    } else if (step === "describe") els.definitionNewLabel.focus();
+    else if (step === "partition") els.definitionConceptsTitle.focus();
   }
 
   function renderDefinition() {

@@ -41,11 +41,14 @@ test("no field on any phone screen is small enough to make iOS zoom the page", a
   await check("removal reason");
   await page.locator("#variableReviewDialog").getByRole("button", { name: "Cancel" }).click();
   await page.locator("#editVariableSchema").tap();
+  await expect(page.locator("#definitionWorkspace")).toBeVisible();
+  await expect(page.locator(".dag-left-panel")).toBeHidden();
   await check("schema page");
   await page.locator("#customVariablesCreate").tap();
   await check("create a variable");
   await page.locator(".definition-cancel:visible").first().tap();
   await page.locator("#customVariablesClose").tap();
+  await expect(page.locator(".dag-left-panel")).toBeVisible();
 
   await page.goto(`${base}/?task=causes`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag && window.__dagBuilderState.publishedSchemaHydrated);
