@@ -4321,3 +4321,11 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 /* ?layout_debug=1: a phone's own report of its zoom and overflow. */
 .layout-debug { position: fixed; left: var(--space-2); bottom: var(--space-2); z-index: 30000; max-width: calc(100vw - 2 * var(--space-2)); margin: 0; padding: var(--space-1) var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--overlay); color: var(--text); font-family: monospace; font-size: var(--text-sm); line-height: var(--leading-tight); pointer-events: none; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Picker definitions stay available without selecting the variable. */
+.picker-variable-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: var(--space-1); }
+.picker-variable-info { display: contents; }
+.picker-variable-info summary, .picker-saved-info { cursor: pointer; color: var(--text-muted); }
+.picker-variable-info summary { list-style: none; padding: var(--space-2); }
+.picker-variable-info summary::-webkit-details-marker { display: none; }
+.picker-variable-info p { grid-column: 1 / -1; margin: 0; padding: var(--space-2); color: var(--text-muted); white-space: pre-line; }
