@@ -4112,6 +4112,53 @@ h2 {
 .custom-variables-confirm-body { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .custom-variables-confirm-body > span { flex: 1 1 320px; }
 .custom-variables-view .btn--danger, .custom-row-actions .btn--danger { border-color: var(--danger); background: var(--danger); color: var(--surface); }
+/* Polish: one rhythm for the heading, the status line, the saved list and the table. */
+.custom-variables-view h2 { margin: 0; font-size: var(--text-lg); font-weight: var(--weight-strong); }
+.custom-variables-view .custom-variables-heading h2 { font-size: var(--text-xl); }
+.custom-variables-view .small-note { margin: 0; }
+#customVariablesStatus:not([hidden]) {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.custom-variables-previous { display: grid; gap: var(--space-2); margin-bottom: var(--space-8); }
+.custom-variables-previous .setup-group-picker-row {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.custom-variables-previous .setup-group-picker-row:hover { background: var(--surface-sunken); }
+.custom-variables-previous .setup-group-picker-row strong { font-size: var(--text-base); font-weight: var(--weight-medium); }
+.custom-variables-previous .setup-group-picker-row span { display: block; margin-top: 2px; }
+.custom-variables-previous .setup-group-picker-row .btn--sm {
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+}
+.custom-variables-grid th { padding: var(--space-2) var(--space-3); }
+.custom-variables-grid td { padding: var(--space-4) var(--space-3); }
+.custom-variables-grid tbody tr:not(.custom-variables-confirm):hover td { background: var(--surface-sunken); }
+.custom-variables-grid td strong { font-size: var(--text-base); font-weight: var(--weight-medium); }
+.custom-variables-grid td.num { padding-top: var(--space-4); }
+.custom-variables-grid .actions .btn { margin-left: var(--space-3); }
+.custom-variables-tag {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--accent-subtle);
+  color: var(--text-muted);
+  font-weight: var(--weight-medium);
+  vertical-align: 1px;
+}
+.custom-variables-sources { color: var(--text-muted); }
+/* Removal reads as danger only when you reach for it. */
+.custom-variables-delete:not(:disabled) { color: var(--text-muted); }
+.custom-variables-delete:not(:disabled):hover { color: var(--danger); }
 /* Outlined like the segmented switches beside it, not like the borderless toolbar actions. */
 .explore-row-tag {
   margin-left: var(--space-2);
