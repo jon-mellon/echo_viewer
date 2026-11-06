@@ -2247,6 +2247,15 @@ const eventController = createDagEventController({
     const returnToVariables = document.body.classList.contains("evidence-from-variables");
     dismissEvidencePane();
     if (returnToVariables) shellController.showMobilePanel("controls");
+    // The map was display:none while evidence replaced it, so vis kept its stale canvas size
+    // and viewport; once it is visible again, resize the canvas and refit.
+    else requestAnimationFrame(() => {
+      const network = dagNetworkController.getNetwork();
+      if (!network) return;
+      network.setSize("100%", "100%");
+      network.redraw();
+      dagNetworkController.fit();
+    });
   },
   showExcludedLinks, showExcludedFindings,
 });
