@@ -2196,9 +2196,11 @@ const projectBootstrap = createProjectBootstrap({
   renderAll, dagNetworkController,
   buildDuplicateClusters, linkKey, pairKey, loadVariableSearchCatalog,
   onLocalSchemaLoaded: record => persistentViewer.setLoadedRecord(record),
-  onReady: () => {
+  waitForReadyBeforeShowing: () => new URL(location.href).searchParams.has("code")
+    && Boolean(sessionStorage.getItem("echo-openrouter-definition-draft-v1")),
+  onReady: async () => {
     persistentViewer.start();
-    void definitionWorkflowController.resumeAfterOAuth();
+    await definitionWorkflowController.resumeAfterOAuth();
     void publicationController.refreshPublicationState();
     // Compiled-DAG browsing and catalog search need no raw evidence engine.
     // Definitions, evidence details, and exports start it on explicit intent;
