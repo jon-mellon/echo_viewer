@@ -904,8 +904,11 @@ h2 {
 
 .definition-block {
   display: grid;
+  /* A bare grid track grows to its widest child and widens the whole page; this one never exceeds the panel. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
+.definition-block > * { min-width: 0; }
 
 .dag-body.definition-active #setupSection > .section-title,
 .dag-body.definition-active #workflowHint {
@@ -4324,6 +4327,8 @@ div.explore-subsection-empty p, .custom-variables-empty p { margin: 0 0 var(--sp
    Choosing a variable focuses a search field, so on touch screens every field is at least 16px.
    Component rules (a bare `font: inherit` on an id was enough) would otherwise win on specificity, so this one
    cannot lose; tests/mobile_no_zoom.spec.cjs scans every screen for a field that slips through. */
+/* iOS Safari enlarges text it judges too small for its block, which makes one screen read larger than the rest. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 @media (pointer: coarse) {
   :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
     font-size: var(--text-lg) !important; /* token-exempt: a field under 16px makes iOS zoom the page */
@@ -4348,3 +4353,6 @@ div.explore-subsection-empty p, .custom-variables-empty p { margin: 0 0 var(--sp
 @media (pointer: coarse) {
   .custom-variables-previous .btn, .custom-variables-grid .actions .btn { min-height: var(--control-touch); }
 }
+
+/* ?layout_debug=1: a phone's own report of its zoom and overflow. */
+.layout-debug { position: fixed; left: var(--space-2); bottom: var(--space-2); z-index: 30000; max-width: calc(100vw - 2 * var(--space-2)); margin: 0; padding: var(--space-1) var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--overlay); color: var(--text); font-family: monospace; font-size: var(--text-sm); line-height: var(--leading-tight); pointer-events: none; white-space: pre-wrap; overflow-wrap: anywhere; }

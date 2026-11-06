@@ -47,6 +47,7 @@ import { effectiveStudyGraph } from "/study_graph.mjs";
 import { createVariableReviewController } from "/variable_review_controller.mjs";
 import { h, replaceChildren, safeUrl, setSafeUrl } from "/dom_builder.mjs";
 import { hydrateSearchResult, variableSearchCatalog } from "/variable_search_catalog.mjs";
+import { installLayoutDebug } from "/layout_debug.mjs";
 
 
 const ROLE_LABELS = {
@@ -85,6 +86,7 @@ let schemaCommitQueued = false;
 const PROJECT_STORAGE_PREFIX = state.interfaceMode === "dag2" ? "dag2-project-v1" : "dag-builder-project-v2";
 
 window.__dagBuilderState = state;
+installLayoutDebug();
 
 const els = {};
 
