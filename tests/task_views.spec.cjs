@@ -2,7 +2,7 @@ const { test, expect } = require("./fixtures.cjs");
 const { chooseAnchor, chooseAnchors, startCreate } = require("./support/identify.cjs");
 const { chooseTask, chooseDirection, chooseFocus, openNav, closeNav, showPanel } = require("./support/navigation.cjs");
 
-const viewer = "http://127.0.0.1:8767/";
+const viewer = `http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/`;
 
 async function open(page, url = viewer) {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
@@ -45,7 +45,7 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(page.locator("#taskLanding")).toBeVisible();
   await expect(page.locator("#taskLanding h1")).toHaveText("What would you like to do?");
   await expect(page.locator("#taskLanding .task-choice")).toHaveCount(2);
-  await expect(page.locator("#taskLanding .task-choice").nth(0)).toContainText("Threats to inference");
+  await expect(page.locator("#taskLanding .task-choice").nth(0)).toContainText("Find threats to inference");
   await expect(page.locator("#taskLanding .task-choice").nth(1)).toContainText("Explore a variable");
   await expect(page.locator("#taskLanding .task-choice-example")).toHaveCount(2);
   await expect(page.locator("#taskReset")).toBeHidden();
@@ -111,7 +111,7 @@ test("the start page leads to causes and consequences views that behave like Ide
   // Evidence replaces the map, the list stays, and Back to map restores the graph.
   await expect(page.locator("#exploreView")).toBeVisible();
   await expect(page.locator("#dagNetwork")).toBeHidden();
-  await expect(page.locator("#closeEvidencePane")).toHaveText("Back to map");
+  await expect(page.locator("#closeEvidencePane")).toHaveText("Back to map", { useInnerText: true });
   await page.locator("#closeEvidencePane").click();
   await expect(page.locator("#dagNetwork")).toBeVisible();
   await expect(page.locator("#provenancePanel")).toBeHidden();
@@ -175,7 +175,7 @@ test("the start page leads to causes and consequences views that behave like Ide
 test("the start page opens Threats to inference from the keyboard, is skipped by task links, and a reload stays in the task", async ({ page }) => {
   await open(page);
   await expect(page.locator("#taskLanding")).toBeVisible();
-  await expect(page.locator("#taskLanding .task-choice[data-task=identify]")).toContainText("Threats to inference");
+  await expect(page.locator("#taskLanding .task-choice[data-task=identify]")).toContainText("Find threats to inference");
   // Both choices can be reached and chosen without a mouse.
   await page.locator("#taskLanding .task-choice[data-task=identify]").focus();
   await page.keyboard.press("Tab");
@@ -861,4 +861,21 @@ test.describe("mobile Identify picker dismissal", () => {
     await chooseAnchor(page, "dv", anchors[1].id, { tap: true });
     await expect(page.locator("#identify-dv-input")).toHaveValue(anchors[1].label);
   });
+});
+
+
+test("mobile save status wraps instead of truncating", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await open(page);
+    const status = page.locator("#localSaveStatus");
+    await status.evaluate(el => { el.textContent = "Previous view not saved — Could not save this view because the browser storage is unavailable."; });
+    await expect(status).toBeVisible();
+    const dimensions = await status.evaluate(el => ({ height: el.clientHeight, lineHeight: parseFloat(getComputedStyle(el).lineHeight),
+      width: el.clientWidth, scrollWidth: el.scrollWidth, whiteSpace: getComputedStyle(el).whiteSpace }));
+    expect(dimensions.whiteSpace).toBe("normal");
+    expect(dimensions.height).toBeGreaterThan(dimensions.lineHeight);
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
+  } finally { await context.close(); }
 });

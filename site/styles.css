@@ -1606,9 +1606,9 @@ h2 {
   max-width: min(320px, 90vw);
   padding: var(--space-1);
 }
-.filter-dropdown-panel > [hidden] { display: none; }
-.filter-dropdown-panel > .btn,
-.filter-dropdown-panel > .path-length-control {
+:is(.filter-dropdown-panel, .sparse-edge-group) > [hidden] { display: none; }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn,
+:is(.filter-dropdown-panel, .sparse-edge-group) > .path-length-control {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -1626,23 +1626,28 @@ h2 {
   white-space: normal;
   cursor: pointer;
 }
-.filter-dropdown-panel > .btn:hover,
-.filter-dropdown-panel > .path-length-control:hover { background: var(--hover-bg); }
-.filter-dropdown-panel > .btn[aria-pressed="true"],
-.filter-dropdown-panel > .btn.active { background: transparent; color: var(--text); }
-.filter-dropdown-panel > .btn[aria-pressed="true"]:hover { background: var(--hover-bg); }
-.filter-dropdown-panel > .btn:focus-visible { outline-offset: -2px; }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn:hover,
+:is(.filter-dropdown-panel, .sparse-edge-group) > .path-length-control:hover { background: var(--hover-bg); }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn[aria-pressed="true"],
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn.active { background: transparent; color: var(--text); }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn[aria-pressed="true"]:hover { background: var(--hover-bg); }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn:focus-visible { outline-offset: -2px; }
 /* Every row reserves the checkmark column so labels line up. */
-.filter-dropdown-panel > .btn::before,
-.filter-dropdown-panel > .path-length-control::before {
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn::before,
+:is(.filter-dropdown-panel, .sparse-edge-group) > .path-length-control::before {
   content: "✓";
   flex: none;
   width: var(--space-6);
   color: var(--accent);
   visibility: hidden;
 }
-.filter-dropdown-panel > .btn[aria-pressed="true"]::before { visibility: visible; }
-.filter-dropdown-panel > .path-length-control > span { flex: 1 1 auto; }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn[aria-pressed="true"]::before { visibility: visible; }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .path-length-control > span { flex: 1 1 auto; }
+/* Keep the threshold visually nested under the sparse-edge toggle. */
+.sparse-edge-group { border: 1px solid var(--border); border-radius: var(--radius-sm); }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .path-length-control.sparse-edge-threshold { padding-left: var(--space-4); }
+.sparse-edge-group > .path-length-control::before { width: var(--space-4); }
+
 .path-length-control {
   display: inline-flex;
   align-items: center;
@@ -3099,15 +3104,6 @@ h2 {
 .review-warning { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; padding: 0; border: 0; background: transparent; color: var(--warn-text); font: inherit; cursor: pointer; }
 .review-warning-text { display: block; color: var(--warn-text); }
 .review-info { display: none; }
-/* Touch keeps the name, definition button and status on the same row. */
-@media (pointer: coarse) {
-  .task-identify #exploreResults .variable-review-row:has(.variable-disposition-line) { grid-template-columns: minmax(0, 1fr) var(--control-touch) minmax(0, 1fr); }
-  .task-identify #exploreResults .variable-review-row .explore-row-open { pointer-events: none; }
-  .task-identify #exploreResults .variable-review-row .review-info {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: var(--control-touch); height: var(--control-touch); padding: 0; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: var(--text-lg); cursor: pointer;
-  }
-}
 .review-warning-text[hidden] { display: none; }
 .review-warning:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .review-row-note { margin: var(--space-1) var(--space-2) 0; }
@@ -3125,7 +3121,7 @@ h2 {
   .task-identify #exploreResults .variable-review-row > .explore-row-open {
     grid-column: 1; grid-row: 1; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-1); min-width: 0; pointer-events: none;
   }
-  .task-identify #exploreResults .variable-review-row .explore-row-label { font-size: var(--text-lg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-identify #exploreResults .variable-review-row .explore-row-label { font-size: var(--text-lg); overflow: visible; white-space: normal; overflow-wrap: anywhere; }
   .task-identify #exploreResults .variable-review-row .variable-disposition-line {
     grid-column: 2; grid-row: 1; min-width: 0; padding: 0;
   }
@@ -3178,6 +3174,10 @@ h2 {
 @media (max-width: 840px) {
   .dag-body { --app-top: 52px; }
   .task-bar { gap: var(--space-2); padding: 0 var(--space-2); }
+  .schema-menu-title, .schema-menu-panel .menu-item > span,
+  .edit-history-entry > span, .previous-session-title {
+    overflow: visible; white-space: normal; overflow-wrap: anywhere;
+  }
   .nav-menu-panel,
   .task-menu .nav-menu-panel { position: fixed; top: calc(var(--app-top) + 4px); left: 8px; right: 8px; width: auto; }
   .dag-body.definition-active .task-bar-menus { display: none; }
@@ -3186,7 +3186,12 @@ h2 {
      each menu expands in place as an accordion. */
   .nav-toggle { display: inline-flex; flex: none; }
   .nav-toggle[aria-expanded="true"] { background: var(--hover-bg); color: var(--accent); }
-  .task-bar-status { flex: 1 1 auto; }
+  .task-bar-status:not(:empty) {
+    position: absolute; top: 100%; left: 0; right: 0;
+    max-height: 30dvh; overflow: auto; padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border); background: var(--surface);
+    white-space: normal; overflow-wrap: anywhere;
+  }
   .task-bar-overflow {
     position: fixed;
     top: calc(var(--app-top) + 4px);
@@ -4329,3 +4334,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .picker-variable-info summary { list-style: none; padding: var(--space-2); }
 .picker-variable-info summary::-webkit-details-marker { display: none; }
 .picker-variable-info p { grid-column: 1 / -1; margin: 0; padding: var(--space-2); color: var(--text-muted); white-space: pre-line; }
+.evidence-back-variables { display: none; }
+@media (max-width: 840px) {
+  .evidence-from-variables .evidence-back-map { display: none; }
+  .evidence-from-variables .evidence-back-variables { display: inline; }
+}

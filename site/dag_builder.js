@@ -1,3 +1,4 @@
+import { boundedSplitLookup } from "./split_lookup_timeout.mjs";
 import { listOwnPublishedSplits, loadPublishedSplitMembership } from "/published_split_browser.mjs";
 import { previousSplitsForRole } from "/previous_split_candidates.mjs";
 "use strict";
@@ -641,7 +642,7 @@ function assignGroupAsInstrument(groupId) {
   renderAll({ rebuild: false });
   updateDagFilters();
   renderUndoRedo();
-  shellController.showMobilePanel("dag");
+  if (groupId) shellController.showMobilePanel("dag");
 }
 
 
@@ -1291,7 +1292,7 @@ const taskViews = createTaskViews({
     const bothExplore = [previous, task].every(name => name === "causes" || name === "consequences");
     if (bothExplore) renderExploreFocus(); else renderAll({ reuseLinks: true });
   },
-  openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
+  openEvidence: edgeId => { inspectDagEdge(edgeId); markEvidenceOrigin(); shellController.showMobilePanel("dag"); },
   onRowHover: row => dagNetworkController.hoverExploreRow(row),
   onChooseIdentify: (side, groupId) => chooseIdentifyVariable(side, groupId),
   onIdentifyPicking: () => { setupGroupController.renderIdentifyPicker(); taskViews.render(); },
@@ -1302,6 +1303,7 @@ const taskViews = createTaskViews({
   onEditVariableSchema: () => customVariablesPresenter.open(),
   // A row opens the variable's definition and concepts in the evidence pane, as clicking its node does.
   onOpenIdentifyVariable: groupId => {
+    markEvidenceOrigin();
     if (state.fullscreenPanel) setFullscreenPanel(null);
     state.selectedEdgeId = null;
     state.comparisonVariableIds = [];
@@ -1793,7 +1795,12 @@ function dismissEvidenceForTask() {
   }
 }
 
+function markEvidenceOrigin() {
+  document.body.classList.toggle("evidence-from-variables", document.body.dataset.mobilePanel === "controls");
+}
+
 function dismissEvidencePane() {
+  document.body.classList.remove("evidence-from-variables");
   els.provenancePanel.scrollLeft = 0;
   els.closeEvidencePane.closest(".dag-ws-footer").scrollLeft = 0;
   state.selectedEdgeId = null;
@@ -1944,10 +1951,12 @@ function savedSplitOptions(role) {
 }
 let previousSplitsLoading = false;
 let previousSplitsLoaded = false;
+let previousSplitsError = false;
 function loadPreviousSplits(force = false) {
   if (previousSplitsLoading || (previousSplitsLoaded && !force)) return;
   previousSplitsLoading = true;
-  void Promise.allSettled([listOwnPublishedSplits(), listLocalSchemas()]).then(async ([published, local]) => {
+  previousSplitsError = false;
+  void Promise.allSettled([boundedSplitLookup(listOwnPublishedSplits()), boundedSplitLookup(listLocalSchemas())]).then(async ([published, local]) => {
     const localRows = local.status === "fulfilled" ? local.value.flatMap(record =>
       (record.schema?.groups || []).filter(group => group.source === "user_split"
         && group.provenance?.operation === "split_categories" && Array.isArray(group.provenance.source_group_ids))
@@ -1964,13 +1973,16 @@ function loadPreviousSplits(force = false) {
           local_variable_ids: group.variable_ids, published_at: record.updatedAt || "", is_local: true }))) : [];
     const publishedRows = await Promise.allSettled((published.status === "fulfilled" ? published.value : [])
       .filter(row => row.source_group_by_variable).map(async row => ({ ...row,
-        local_variable_ids: await loadPublishedSplitMembership(row) })));
+        local_variable_ids: await boundedSplitLookup(loadPublishedSplitMembership(row)) })));
     previousSplitRows = [...localRows, ...publishedRows.flatMap(result => result.status === "fulfilled" ? [result.value] : [])];
+    previousSplitsError = [published, local, ...publishedRows].some(result => result.status === "rejected");
+  }).catch(() => { previousSplitsError = true; }).finally(() => {
+    previousSplitsLoading = false;
     previousSplitsLoaded = true;
     setupGroupController.renderFocusPicker();
     setupGroupController.renderIdentifyPicker();
     customVariablesPresenter.render();
-  }).finally(() => { previousSplitsLoading = false; });
+  });
 }
 function reusePreviousSplit(role, row, options) { definitionWorkflowController.reusePreviousSplit(role, row, options); }
 
@@ -1992,6 +2004,7 @@ const customVariablesPresenter = createCustomVariablesPresenter({
   onDelete: deleteCustomVariable,
   previousSplits: savedSplitOptions, loadPreviousSplits, reusePreviousSplit,
   splitsLoading: () => previousSplitsLoading || !previousSplitsLoaded,
+  splitsError: () => previousSplitsError,
   canExplore: () => taskViews.exploring(),
   onExplore: groupId => taskViews.chooseFocus(groupId),
 });
@@ -2047,6 +2060,7 @@ const dagNetworkController = createDagNetworkController({
   onSetStatus: (kind, groupId, status, text) => setDiagnosticStatus(kind, groupId, status, text),
   onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
   selectEdge: () => {
+    document.body.classList.remove("evidence-from-variables");
     if (state.fullscreenPanel) setFullscreenPanel(null);
     state.selectedEvidenceGroupId = null;
     // The interaction clears vis's segment selection and redraws the network.
@@ -2054,6 +2068,7 @@ const dagNetworkController = createDagNetworkController({
     persistentViewer.viewerChanged();
   },
   selectGroup: id => {
+    document.body.classList.remove("evidence-from-variables");
     if (state.fullscreenPanel) setFullscreenPanel(null);
     state.selectedEdgeId = null;
     state.comparisonVariableIds = [];
@@ -2230,7 +2245,11 @@ const eventController = createDagEventController({
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,
   exportTex, installDagHandlers, initPanelResizers, takeSnapshot,
   addToUndoHistory, clusterRep, addVariableToGroup, clean,
-  startEditSplit, startDefinition, dismissEvidencePane,
+  startEditSplit, startDefinition, dismissEvidencePane: () => {
+    const returnToVariables = document.body.classList.contains("evidence-from-variables");
+    dismissEvidencePane();
+    if (returnToVariables) shellController.showMobilePanel("controls");
+  },
   showExcludedLinks, showExcludedFindings,
 });
 

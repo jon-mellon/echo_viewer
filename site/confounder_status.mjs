@@ -4,7 +4,7 @@ export const CONFOUNDER_STATUSES = {
   accounted_for_by_design: "Accounted for by design",
   causes_y_only_via_x: "Affects outcome only via cause",
   not_in_minimal_adjustment_set: "Not in minimal adjustment set",
-  removed_other: "Removed for other reason",
+  removed_other: "Other reason",
 };
 
 export const EXCLUSION_STATUSES = {
@@ -12,12 +12,12 @@ export const EXCLUSION_STATUSES = {
   explicitly_controlled: "Explicitly controlled for",
   instrument_only_via_x: "Instrument affects variable only via cause",
   variable_only_via_x: "Affects outcome only via cause",
-  removed_other: "Removed for other reason",
+  removed_other: "Other reason",
 };
 export const CONTROL_WARNING = "Controlling for exclusion restriction violations can induce post treatment bias.";
 // These dispositions keep the variable on the map and draw it faded.
 export const LIGHT_STATUSES = new Set(["explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set",
-  "causes_y_only_via_x", "instrument_only_via_x", "variable_only_via_x"]);
+  "causes_y_only_via_x", "instrument_only_via_x", "variable_only_via_x", "removed_other", "other"]);
 
 // A collider biases the estimate only when the analysis conditions on it, so its
 // status records whether it was left out of the model and sample, or was not.
@@ -88,7 +88,7 @@ export function diagnosticReviewRows(project, groupIds, kind = "confounders") {
   const candidates = new Set(groupIds || []);
   const retained = scopedDecisions(project, kind).filter(row => row.status !== "unaddressed").map(row => row.groupId);
   return diagnosticStatusRows(project, new Set([...candidates, ...retained]), kind).map(row => ({ ...row,
-    rejected: row.status === "removed_other" || !candidates.has(row.groupId),
+    rejected: !candidates.has(row.groupId),
     noLongerCandidate: !candidates.has(row.groupId) }));
 }
 
