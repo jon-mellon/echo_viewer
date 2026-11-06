@@ -51,9 +51,10 @@ function mapIcon() {
   }
   return svg;
 }
-function backToMapLabel() {
+function backLabel(text, className) {
   const label = document.createElement("span");
-  label.textContent = "Back to map";
+  label.className = className;
+  label.textContent = text;
   return label;
 }
 const clampDepth = value => Math.max(1, Math.min(MAX_NEIGHBORHOOD_DEPTH, Math.trunc(Number(value)) || 1));
@@ -803,9 +804,11 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     const closeEvidence = el("closeEvidencePane");
     if (closeEvidence) {
       // Lucide "map" icon, inline like the other toolbar icons.
-      if (task) closeEvidence.replaceChildren(mapIcon(), backToMapLabel());
+      if (task) closeEvidence.replaceChildren(mapIcon(), backLabel("Back to map", "evidence-back-map"),
+        backLabel("Back to variables", "evidence-back-variables"));
       else closeEvidence.textContent = "Close";
-      closeEvidence.setAttribute("aria-label", task ? "Back to the map" : "Close evidence or description");
+      if (task) closeEvidence.removeAttribute("aria-label");
+      else closeEvidence.setAttribute("aria-label", "Close evidence or description");
     }
     for (const [name, className] of Object.entries(TASK_CLASSES)) document.body.classList.toggle(className, task === name);
     document.body.classList.toggle("task-home", !task);

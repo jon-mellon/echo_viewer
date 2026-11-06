@@ -178,3 +178,18 @@ test("the schema page always shows the saved-variables section, ahead of the sch
   });
   expect(order).toBe(true);
 });
+
+
+test("variable details return to the originating mobile view", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await setup(page, { instrument: true });
+    await page.locator('.variable-review-row[data-group-id="c"] .review-info').tap();
+    const back = page.locator("#closeEvidencePane");
+    await expect(back).toHaveAccessibleName("Back to variables");
+    await back.tap();
+    await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
+    await expect(page.locator('.variable-disposition[data-group-id="c"]')).toBeVisible();
+  } finally { await context.close(); }
+});

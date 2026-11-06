@@ -225,7 +225,7 @@ test("evidence replaces the map, the fields and list stay, and Back to map resto
   await expect(pane).toBeVisible();
   await expect(page.locator("#dagNetwork")).toBeHidden();
   await expect(page.locator("#identifyFields")).toBeVisible();
-  await expect(page.locator("#closeEvidencePane")).toHaveText("Back to map");
+  await expect(page.locator("#closeEvidencePane")).toHaveText("Back to map", { useInnerText: true });
   await page.locator("#closeEvidencePane").click();
   await expect(page.locator("#dagNetwork")).toBeVisible();
   expect((await page.locator(".dag-network-wrapper").boundingBox()).height).toBeGreaterThan(600);

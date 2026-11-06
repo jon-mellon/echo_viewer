@@ -33,7 +33,7 @@ export function createToolbarPresenter({ state, elements, groupById }) {
           keyItem("diagnostic-key-cause", "Potential common cause")]
         : state.showExclusionViolations
           ? [...anchorItems, keyItem("diagnostic-key-instrument", "Instrument"),
-            keyItem("diagnostic-key-violation", "Potential violation"),
+            keyItem("diagnostic-key-violation", "Exclusion violation"),
             keyItem("diagnostic-key-addressed", "Accounted for")]
           : [...anchorItems, keyItem("diagnostic-key-fill", state.showConfoundersOnly ? "Confounder" : "Collider"),
             ...(state.showConfoundersOnly ? [keyItem("diagnostic-key-addressed", "Accounted for")] : []),

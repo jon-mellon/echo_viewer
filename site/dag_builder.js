@@ -1291,7 +1291,7 @@ const taskViews = createTaskViews({
     const bothExplore = [previous, task].every(name => name === "causes" || name === "consequences");
     if (bothExplore) renderExploreFocus(); else renderAll({ reuseLinks: true });
   },
-  openEvidence: edgeId => { inspectDagEdge(edgeId); shellController.showMobilePanel("dag"); },
+  openEvidence: edgeId => { inspectDagEdge(edgeId); markEvidenceOrigin(); shellController.showMobilePanel("dag"); },
   onRowHover: row => dagNetworkController.hoverExploreRow(row),
   onChooseIdentify: (side, groupId) => chooseIdentifyVariable(side, groupId),
   onIdentifyPicking: () => { setupGroupController.renderIdentifyPicker(); taskViews.render(); },
@@ -1302,6 +1302,7 @@ const taskViews = createTaskViews({
   onEditVariableSchema: () => customVariablesPresenter.open(),
   // A row opens the variable's definition and concepts in the evidence pane, as clicking its node does.
   onOpenIdentifyVariable: groupId => {
+    markEvidenceOrigin();
     if (state.fullscreenPanel) setFullscreenPanel(null);
     state.selectedEdgeId = null;
     state.comparisonVariableIds = [];
@@ -1797,7 +1798,12 @@ function dismissEvidenceForTask() {
   }
 }
 
+function markEvidenceOrigin() {
+  document.body.classList.toggle("evidence-from-variables", document.body.dataset.mobilePanel === "controls");
+}
+
 function dismissEvidencePane() {
+  document.body.classList.remove("evidence-from-variables");
   els.provenancePanel.scrollLeft = 0;
   els.closeEvidencePane.closest(".dag-ws-footer").scrollLeft = 0;
   state.selectedEdgeId = null;
@@ -2051,6 +2057,7 @@ const dagNetworkController = createDagNetworkController({
   onSetStatus: (kind, groupId, status, text) => setDiagnosticStatus(kind, groupId, status, text),
   onViewportChange: continuous => persistentViewer.viewerChanged(continuous),
   selectEdge: () => {
+    document.body.classList.remove("evidence-from-variables");
     if (state.fullscreenPanel) setFullscreenPanel(null);
     state.selectedEvidenceGroupId = null;
     // The interaction clears vis's segment selection and redraws the network.
@@ -2058,6 +2065,7 @@ const dagNetworkController = createDagNetworkController({
     persistentViewer.viewerChanged();
   },
   selectGroup: id => {
+    document.body.classList.remove("evidence-from-variables");
     if (state.fullscreenPanel) setFullscreenPanel(null);
     state.selectedEdgeId = null;
     state.comparisonVariableIds = [];
@@ -2234,7 +2242,11 @@ const eventController = createDagEventController({
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,
   exportTex, installDagHandlers, initPanelResizers, takeSnapshot,
   addToUndoHistory, clusterRep, addVariableToGroup, clean,
-  startEditSplit, startDefinition, dismissEvidencePane,
+  startEditSplit, startDefinition, dismissEvidencePane: () => {
+    const returnToVariables = document.body.classList.contains("evidence-from-variables");
+    dismissEvidencePane();
+    if (returnToVariables) shellController.showMobilePanel("controls");
+  },
   showExcludedLinks, showExcludedFindings,
 });
 

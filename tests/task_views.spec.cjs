@@ -92,7 +92,7 @@ test("the start page leads to causes and consequences views that behave like Ide
   // Evidence replaces the map, the list stays, and Back to map restores the graph.
   await expect(page.locator("#exploreView")).toBeVisible();
   await expect(page.locator("#dagNetwork")).toBeHidden();
-  await expect(page.locator("#closeEvidencePane")).toHaveText("Back to map");
+  await expect(page.locator("#closeEvidencePane")).toHaveText("Back to map", { useInnerText: true });
   await page.locator("#closeEvidencePane").click();
   await expect(page.locator("#dagNetwork")).toBeVisible();
   await expect(page.locator("#provenancePanel")).toBeHidden();
