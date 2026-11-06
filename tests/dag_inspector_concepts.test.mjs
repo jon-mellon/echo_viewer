@@ -280,9 +280,35 @@ test("concept exclude control passes the selected concept to the group update pa
       excludeConcept: (...args) => exclusions.push(args),
     }).renderGroupDefinition();
     const button = elements.edgeInspector.querySelector("[data-exclude-concept-id]");
-    assert.equal(button.textContent, "×");
+    assert.equal(button.textContent, "Exclude");
+    assert.match(elements.edgeInspector.textContent, /Exclude removes a concept from this variable/);
     button.click();
     assert.deepEqual(exclusions, [["g1", "v1", "Concept one"]]);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("excluded concepts are listed with a Restore control until restored", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName) };
+  try {
+    const decision = (type, variable_id) => ({ type, payload: { group_id: "g1", variable_id, label: `Concept ${variable_id}` } });
+    const state = {
+      project: { groups: [{ group_id: "g1", label: "Variable", description: "Definition", variable_ids: ["v1"] }],
+        decisions: [decision("concept_excluded", "v2"), decision("concept_excluded", "v3"), decision("concept_restored", "v3")] },
+      selectedEvidenceGroupId: "g1", variableById: new Map([["v1", { concept_label: "Concept one" }]]),
+    };
+    const elements = { edgeInspector: new Element("div"), closeEvidencePane: new Element("button"),
+      provenancePanel: new Element("div") };
+    const restores = [];
+    createDagInspectorController({ state, elements,
+      restoreConcept: (...args) => restores.push(args),
+    }).renderGroupDefinition();
+    const buttons = elements.edgeInspector.querySelectorAll("[data-restore-concept-id]");
+    assert.deepEqual(buttons.map(button => button.dataset.restoreConceptId), ["v2"]);
+    buttons[0].click();
+    assert.deepEqual(restores, [["g1", "v2", "Concept v2"]]);
   } finally {
     globalThis.document = previousDocument;
   }
