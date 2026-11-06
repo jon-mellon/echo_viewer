@@ -1,6 +1,7 @@
 import * as inspector from "./dag_inspector.mjs";
 import * as projectOps from "./dag_project.mjs";
 import { h, replaceChildren, safeUrl } from "./dom_builder.mjs";
+import { excludeButton, excludedConcepts, exclusionNote, restoreList } from "./concept_exclusion_ui.mjs";
 
 export const STUDY_DESIGN_EDGE_ID = "__study_design_iv_to_dv__";
 export const STUDY_INSTRUMENT_EDGE_ID = "__study_design_instrument_to_iv__";
@@ -13,6 +14,7 @@ export function createDagInspectorController({
   loadConceptLabels = async () => [],
   loadVisibleLinkEndpoints = async () => [],
   excludeConcept = () => {},
+  restoreConcept = () => {},
 }) {
   const selectedEdge = () => state.studyGraph?.links?.find(link => link.edge_id === state.selectedEdgeId)
     || state.project?.links?.find(link => state.selectedEdgeId === STUDY_DESIGN_EDGE_ID
@@ -132,6 +134,10 @@ export function createDagInspectorController({
       h("section", { className: "provenance-direction group-concepts" },
         h("h3", {}, "Underlying concepts ",
           h("span", { className: "provenance-count", textContent: count ? `(${count} concept${count === 1 ? "" : "s"})` : "" })),
+        ids.length ? exclusionNote() : null,
+        restoreList({ items: excludedConcepts(state.project, group), groupLabel: group.label || group.group_id,
+          disabled: state.publishedSchemaHydrating || state.publishedSchemaLoadFailed,
+          onRestore: (id, label) => restoreConcept(group.group_id, id, label) }),
         priority?.matchedCount ? h("div", { className: "small-note",
           textContent: "Concepts used by visible DAG links first" }) : null,
         pageIds.length ? h("ol", {
@@ -148,12 +154,9 @@ export function createDagInspectorController({
           return h("li", {
             className: priority?.matchedCount === start + index && index > 0
               ? "group-concept-boundary" : "",
-          }, h("span", { textContent: label }), canExclude ? h("button", {
-            className: "group-concept-exclude", type: "button", dataset: { excludeConceptId: id },
-            attrs: { "aria-label": `Exclude ${label} from ${group.label || group.group_id}` },
-            title: `Exclude ${label}`,
+          }, h("span", { textContent: label }), canExclude ? excludeButton({
+            label, groupLabel: group.label || group.group_id, dataset: { excludeConceptId: id },
             disabled: state.publishedSchemaHydrating || state.publishedSchemaLoadFailed,
-            textContent: "×",
           }) : null);
         })) : h("div", { className: "small-note", role: "status", textContent: priorityPending
           ? "Finding concepts used in this view…"
