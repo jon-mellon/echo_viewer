@@ -2986,8 +2986,8 @@ h2 {
 .explore-row-open:hover, .explore-row.is-hovered .explore-row-open { background: var(--accent-subtle); }
 .explore-row-open[aria-pressed="true"] { background: var(--accent-subtle); box-shadow: inset 3px 0 0 var(--accent); }
 .explore-row-open[aria-pressed="true"] .explore-row-label { font-weight: var(--weight-medium); }
-/* A tick box before each row (and each section heading) keeps the variable on the map. */
-#exploreResults .explore-group-header { grid-template-columns: auto minmax(0, 1fr) auto 4ch; }
+#exploreResults .explore-neighborhood .explore-group-header { grid-template-columns: minmax(0, 1fr) 4ch; }
+#exploreResults .explore-neighborhood .explore-row { grid-template-columns: minmax(0, 1fr); }
 #exploreResults .explore-group[hidden],
 #exploreResults .explore-row[hidden],
 #exploreResults .list-filter-empty[hidden] { display: none; }
@@ -3022,53 +3022,6 @@ h2 {
 .list-filter-field { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   color: var(--text); font-size: var(--text-md); font-weight: var(--weight-normal); }
 #exploreResults .explore-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: var(--space-1); }
-/* Two clear states: a filled accent box with a tick is on the map; an empty box is off it
-   (and its row is dimmed and struck through). A dash means only some of a section is on the map. */
-.explore-include {
-  appearance: none;
-  position: relative;
-  display: grid;
-  place-content: center;
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  border: 1.5px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  cursor: pointer;
-}
-.explore-include:hover:not(:disabled) { border-color: var(--accent); }
-.explore-include:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-.explore-include:checked,
-.explore-include:indeterminate { border-color: var(--accent); background: var(--accent); }
-.explore-include:checked::before {
-  content: "";
-  width: 4px;
-  height: 8px;
-  margin-top: -2px;
-  border: solid var(--surface);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
-}
-.explore-include:indeterminate::before {
-  content: "";
-  width: 8px;
-  height: 2px;
-  margin: 0;
-  border: 0;
-  background: var(--surface);
-  transform: none;
-}
-/* Nothing to toggle: clearly inert, never mistaken for an unticked variable. */
-.explore-include:disabled { cursor: not-allowed; opacity: 0.4; background: var(--hover-bg); }
-.explore-row.is-excluded .explore-row-open { opacity: 0.6; }
-.explore-row.is-excluded .explore-row-label,
-.explore-row.is-excluded .explore-row-papers { color: var(--text-muted); text-decoration: line-through; }
-/* A variable left off the map is not "selected", even while its evidence is still open. */
-.explore-row.is-excluded .explore-row-open[aria-pressed="true"],
-.explore-row.is-excluded .explore-row-open:hover { background: none; box-shadow: none; }
-.explore-row.is-excluded .explore-row-open[aria-pressed="true"] .explore-row-label { font-weight: inherit; }
-
 .explore-view[hidden], .explore-results-block[hidden], .explore-summary[hidden] { display: none; }
 .explore-graph-hint {
   position: absolute;
@@ -3125,8 +3078,8 @@ h2 {
 .identify-field { position: relative; }
 .identify-field-label { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-1); color: var(--text); font-weight: var(--weight-strong); }
 .identify-selection-status { color: var(--accent); font-size: var(--text-sm); font-weight: var(--weight-medium); }
-.identify-field.is-selected .search-input { background: var(--accent-subtle); border-color: var(--accent); cursor: pointer; }
-.identify-field.is-selected .search-input:not(:focus) { font-weight: var(--weight-medium); }
+:is(.identify-field, #focusSearchBlock).is-selected .search-input { background: var(--accent-subtle); border-color: var(--accent); cursor: pointer; }
+:is(.identify-field, #focusSearchBlock).is-selected .search-input:not(:focus) { font-weight: var(--weight-medium); }
 .variable-review-tools { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-3); }
 .variable-review-tools > .btn { width: auto; margin: 0; }
 /* The way into the schema workspace: a bordered button with an icon, not a text link. */
@@ -3869,12 +3822,9 @@ h2 {
      rows                                                              text-base normal */
 .explore-picker-section { margin-top: var(--space-4); }
 .explore-picker-section .explore-group-header { grid-template-columns: minmax(0, 1fr) auto; }
-/* Create a variable lives in the Custom variables heading. */
-.explore-group-tools { display: flex; align-items: center; gap: var(--space-1); }
 .custom-create { display: inline-flex; align-items: center; gap: var(--space-1); width: auto; margin: 0; }
 /* Custom variable rows end with edit (pencil) and delete (trash) icons. */
 .explore-row.has-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-1); }
-#exploreResults .explore-row.has-actions { grid-template-columns: auto minmax(0, 1fr) auto; }
 .custom-row-actions { display: flex; align-items: center; gap: 2px; }
 .custom-row-actions .btn--icon { display: grid; place-items: center; border-color: transparent; background: transparent; color: var(--text-muted); }
 .custom-row-actions .btn--icon:hover:not(:disabled) { background: var(--hover-bg); color: var(--text); }

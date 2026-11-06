@@ -151,8 +151,7 @@ export function dagTableModel({ view, groups, links, pathsByGroup = new Map(), e
     const ids = link.direction_type === "B_TO_A" ? [link.group_b, link.group_a] : [link.group_a, link.group_b];
     return { id: link.edge_id, chains: [chain(ids, [link.edge_id])], papers: linkPapers(link) };
   });
-  // Explore: one row per variable, nearest first, custom variables before built-in
-  // ones. Each row has exactly one link, the step from the variable to its
+  // Explore: one row per variable, nearest first. Each row has exactly one link, the step from the variable to its
   // neighbour toward the chosen variable (or from it, for consequences); every
   // neighbour on the way is closer, so it has its own row above.
   let explore = null;
@@ -164,14 +163,11 @@ export function dagTableModel({ view, groups, links, pathsByGroup = new Map(), e
       return { id: row.groupId, label: label(row.groupId), edgeId: row.edgeId, targetId: target, targetLabel: label(target),
         papers: row.papers, concepts: group?.variable_ids?.length || Number(group?.member_count) || 0 };
     };
-    const isCustom = row => byId.get(row.groupId)?.source === "user_split";
     explore = {
       causes, focusId: exploreFocusId, focusLabel: exploreFocusId ? label(exploreFocusId) : "",
       focusDescription: String(byId.get(exploreFocusId)?.description || "").trim(),
-      sections: [
-        { title: "Custom variables", rows: exploreRows.filter(isCustom).map(item) },
-        { title: "Built-in variables", rows: exploreRows.filter(row => !isCustom(row)).map(item) },
-      ],
+      sections: [{ title: causes ? "Causes" : "Consequences", rows: exploreRows.slice()
+        .sort((a, b) => a.distance - b.distance).map(item) }],
     };
   }
   // Identify's diagnostics: the same shape as Explore's table, one row per candidate with

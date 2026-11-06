@@ -1311,10 +1311,6 @@ const taskViews = createTaskViews({
     persistentViewer.viewerChanged();
     shellController.showMobilePanel("dag");
   },
-  canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
-  onEditCustom: groupId => startEditSplit(groupId),
-  onDeleteCustom: deleteCustomVariable,
-  onCreateCustom: () => startDefinition("candidate"),
 
   placeEvidencePane: () => shellController.placeEvidencePane(),
   onChange: () => persistentViewer.viewerChanged(), prepareReset: () => persistentViewer.prepareReset(), whenReady: () => persistentViewer.whenReady(),

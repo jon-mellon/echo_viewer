@@ -1,6 +1,5 @@
 import { h, replaceChildren } from "./dom_builder.mjs";
 import { causalNeighborhood, MAX_NEIGHBORHOOD_DEPTH } from "./causal_neighborhood.mjs";
-import { createVariableButton, customVariableActions } from "./custom_variable_actions.mjs";
 import { pathView } from "./dag_table.mjs";
 import { DIAGNOSTIC_STATUSES, CONTROL_WARNING, LIGHT_STATUSES, diagnosticReviewRows } from "./confounder_status.mjs";
 
@@ -109,7 +108,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   isDisplayGroup = () => true, onExploreChange = () => {}, onTaskChange = () => {},
   onFocusPicking = () => {}, onPickerInput = () => {}, onSetupNeeded = () => {}, openEvidence = () => {},
   onRowHover = () => {}, onChooseIdentify = () => {}, onIdentifyPicking = () => {}, onIdentifyRowHover = () => {},
-  onReviewVariable = () => {}, onEditVariableSchema = () => {}, onIdentifyExcludedChange = () => {}, onOpenIdentifyVariable = () => {}, canChangeCustom = () => true, onEditCustom = () => {}, onDeleteCustom = async () => {}, onCreateCustom = () => {},
+  onReviewVariable = () => {}, onEditVariableSchema = () => {}, onIdentifyExcludedChange = () => {}, onOpenIdentifyVariable = () => {},
   placeEvidencePane = () => {}, prepareReset = () => {}, whenReady = () => Promise.resolve(), openWindow = (url) => window.open(url, "_blank", "noopener"),
   navigate = (url) => window.location.assign(url) }) {
   const el = id => document.getElementById(id);
@@ -148,8 +147,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   const groupFor = id => groups().find(group => group.group_id === id);
   const labelFor = id => groupFor(id)?.label || id;
   const focusId = () => (groupFor(view().focusId) ? view().focusId : null);
-  // Variables the user unticked: listed, but left off the map and not followed further.
-  const excludedIds = () => new Set(view().excluded || []);
   const anchorConfigured = side => {
     const group = groupFor(state.project?.[`${side}_group_id`]);
     return Boolean(group?.variable_ids?.length
@@ -182,18 +179,15 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     if (support.status === "loading") return { status: "loading", ...empty };
     const { depth, minPapers } = settings();
     const links = state.project?.links || [];
-    const excluded = excludedIds();
     const key = [state.task, focus, depth, minPapers, links, links.length, groups(), support.status, support.cacheKey,
-      support.cacheKey?.size, [...excluded].sort().join("\u0000")];
+      support.cacheKey?.size];
     if (hoodCache.key && key.every((part, index) => part === hoodCache.key[index])) return hoodCache.value;
     const hidden = new Set(groups().filter(group => !isDisplayGroup(group)).map(group => group.group_id));
     const rows = causalNeighborhood({ links, focusId: focus, direction: state.task, depth, minPapers,
-      papersFor: support.papersFor && cachedCounter(support), isNode: id => !hidden.has(id),
-      isPassable: id => !excluded.has(id) })
-      .map(row => ({ ...row, excluded: excluded.has(row.groupId) }));
-    const included = rows.filter(row => !row.excluded);
-    const value = { status: support.status, rows, included,
-      graph: neighborhoodGraph({ rows: included, focusId: focus, links, direction: state.task }) };
+      papersFor: support.papersFor && cachedCounter(support), isNode: id => !hidden.has(id) });
+    // Legacy checkbox exclusions are ignored: distance and paper filters define this map.
+    const value = { status: support.status, rows, included: rows,
+      graph: neighborhoodGraph({ rows, focusId: focus, links, direction: state.task }) };
     hoodCache = { key, value };
     return value;
   }
@@ -359,20 +353,6 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     onFocusPicking();
   }
 
-  /** Include (true) or exclude (false) variables from the map, keeping keyboard focus on the box used. */
-  function setIncluded(groupIds, include, focusSelector = null) {
-    const excluded = excludedIds();
-    for (const id of groupIds) {
-      if (include) excluded.delete(id);
-      else excluded.add(id);
-    }
-    if (excluded.size) view().excluded = [...excluded];
-    else delete view().excluded;
-    onExploreChange();
-    onChange();
-    if (focusSelector) els.results.querySelector(focusSelector)?.focus();
-  }
-
   /** Hide list rows whose name does not match the search; the menu itself always stays. */
   function applyListSearch() {
     const query = listFilter.query.trim().toLowerCase();
@@ -385,18 +365,18 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
         total += 1;
         if (match) shown += 1;
       }
-      // Both sections always show; an empty one says why.
+      // Keep the section heading visible when the search has no matches.
       const empty = group.querySelector(".list-filter-empty");
       if (empty) {
         empty.hidden = shown > 0;
         empty.textContent = total ? "No variable in this section matches the search." : empty.dataset.empty;
       }
     }
-    els.results.querySelector(".list-filter > summary")?.classList.toggle("is-active", Boolean(query));
+    el("variableReviewTools")?.querySelector(".list-filter > summary")?.classList.toggle("is-active", Boolean(query));
   }
 
   /**
-   * The funnel menu beside the first list heading: the one place Explore's filters live
+   * The funnel menu beside Edit variable schema: the one place Explore's filters live
    * (name search, distance, minimum papers per link, and any excluded links or findings).
    */
   function listFilterControl() {
@@ -419,7 +399,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
         if (requested > 1) state.minimumEdgePapers = requested;
         onExploreChange();
         onChange();
-        els.results.querySelector(".list-filter-papers")?.focus();
+        el("variableReviewTools")?.querySelector(".list-filter-papers")?.focus();
       },
       onchange: event => { event.target.value = String(settings().minPapers); } });
     const distance = h("input", { type: "number", className: "path-length-input list-filter-distance", min: 1,
@@ -432,22 +412,23 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
         state.confounderMaxPathLength = clampDepth(requested);
         onExploreChange();
         onChange();
-        els.results.querySelector(".list-filter-distance")?.focus();
+        el("variableReviewTools")?.querySelector(".list-filter-distance")?.focus();
       },
       onchange: event => { event.target.value = String(settings().depth); } });
     // Excluded links and findings open from the graph's Filters menu elsewhere; in Explore they open from here.
     const excludedActions = ["showExcludedLinks", "showExcludedFindings"].map(el)
-      .filter(button => button && !button.hidden)
+      .filter(Boolean)
       .map(button => h("button", { type: "button", className: "btn btn--sm list-filter-action",
-        textContent: button.textContent, onclick: () => button.click() }));
+        textContent: button.textContent, hidden: button.hidden, dataset: { sourceId: button.id }, onclick: () => button.click() }));
     return h("details", { className: "list-filter", open: listFilter.open,
       ontoggle: event => {
+        if (!event.target.isConnected) return;
         // A rebuilt list re-creates the menu already open, which also fires toggle; only a real opening moves focus.
         const opened = event.target.open && !listFilter.open;
         listFilter.open = event.target.open;
         if (opened) event.target.querySelector(".list-filter-search")?.focus();
       } },
-    h("summary", { className: "btn btn--icon", title: "Filter the list and map by name, distance or number of papers",
+    h("summary", { className: "btn btn--icon", title: "Search the list, or filter the map by distance and number of papers",
       attrs: { "aria-label": "Filters" } }, filterIcon()),
     h("div", { className: "list-filter-panel menu-panel", attrs: { role: "group", "aria-label": "Filters" } },
       h("div", { className: "list-filter-search-wrap" }, search, clear),
@@ -470,68 +451,36 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     }
     notice(!rows.length ? `Nothing ${causes ? "causes" : "is caused by"} ${labelFor(focus)} at this distance and paper count. Try a greater distance or fewer papers.`
       : status === "failed" ? "Some paper details could not load, so links changed by your edits may be missing." : "");
-    // Two sections, custom variables then built-in ones; within each, nearer first.
-    // Rows further than one step say which variables they go through.
-    const isCustom = id => groupFor(id)?.source === "user_split";
-    const ordered = rows.map((row, index) => ({ row, index }))
-      .sort((a, b) => a.row.distance - b.row.distance || a.index - b.index).map(({ row }) => row);
-    const sections = [
-      { key: "custom", title: "Custom variables", items: ordered.filter(row => isCustom(row.groupId)),
-        empty: "None of your custom variables are linked here." },
-      { key: "builtin", title: "Built-in variables", items: ordered.filter(row => !isCustom(row.groupId)), empty: "None." },
-    ];
-    // Rows hover their link on the graph; leaving the list clears it.
+    // Schema origin does not affect exploration; put every variable in causal order.
+    const ordered = rows.slice().sort((a, b) => a.distance - b.distance);
     const hover = item => onRowHover(item ? { edgeId: item.edgeId, groupId: item.groupId, pathEdgeIds: item.pathEdgeIds } : null);
-    replaceChildren(els.results, sections.map(({ key, title, items, empty }, sectionIndex) => {
-      const includedCount = items.filter(item => !item.excluded).length;
-      const all = h("input", { type: "checkbox", className: "explore-include",
-        checked: items.length > 0 && includedCount === items.length, disabled: !items.length, dataset: { section: key },
-        title: includedCount === items.length ? "Exclude all of these from the map" : "Include all of these in the map",
-        attrs: { "aria-label": `Include all ${title.toLowerCase()} in the map` },
-        onchange: event => setIncluded(items.map(item => item.groupId), event.target.checked,
-          `.explore-include[data-section="${key}"]`) });
-      all.indeterminate = includedCount > 0 && includedCount < items.length;
-      return h("section", { className: "explore-group", dataset: { section: key } },
-        h("div", { className: "explore-group-header" },
-          all,
-          h("h2", { textContent: title }),
-          // One filter, beside the first heading, narrows both sections; Create sits with it.
-          sectionIndex === 0 ? h("span", { className: "explore-group-tools" }, createVariableButton(onCreateCustom), listFilterControl())
-            : h("span"),
-          h("span", { className: "explore-papers-header", textContent: "Papers",
-            title: "Distinct papers supporting the link; for a variable further away, its weakest link" })),
-        h("ol", { className: "explore-list" }, items.map(item => {
-          const distance = item.distance;
-          const between = item.path.slice(1, -1).map(labelFor);
-          const toward = causes ? item.path[1] : item.path[item.path.length - 2];
-          const count = distance === 1 ? item.papers : item.weakestPapers;
-          const group = groupFor(item.groupId);
-          return h("li", { className: `explore-row${item.excluded ? " is-excluded" : ""}${key === "custom" ? " has-actions" : ""}`,
-            dataset: { groupId: item.groupId, distance: String(distance), edgeId: item.edgeId } },
-          h("input", { type: "checkbox", className: "explore-include", checked: !item.excluded,
-            dataset: { groupId: item.groupId },
-            title: item.excluded ? "Show on the map" : "Leave off the map",
-            attrs: { "aria-label": `Include ${labelFor(item.groupId)} in the map` },
-            onchange: event => setIncluded([item.groupId], event.target.checked,
-              `.explore-include[data-group-id="${CSS.escape(item.groupId)}"]`) }),
+    replaceChildren(els.results, h("section", { className: "explore-group explore-neighborhood" },
+      h("div", { className: "explore-group-header" },
+        h("h3", { textContent: causes ? "Causes" : "Consequences" }),
+        h("span", { className: "explore-papers-header", textContent: "Papers",
+          title: "Distinct papers supporting the link; for a variable further away, its weakest link" })),
+      h("ol", { className: "explore-list" }, ordered.map(item => {
+        const distance = item.distance;
+        const between = item.path.slice(1, -1).map(labelFor);
+        const toward = causes ? item.path[1] : item.path[item.path.length - 2];
+        const count = distance === 1 ? item.papers : item.weakestPapers;
+        return h("li", { className: "explore-row",
+          dataset: { groupId: item.groupId, distance: String(distance), edgeId: item.edgeId } },
           h("button", { type: "button", className: "explore-row-open",
             attrs: { "aria-pressed": String(state.selectedEdgeId === item.edgeId),
               "aria-label": `${labelFor(item.groupId)}, ${plural(count, "paper")}${distance === 1 ? "" : " on the weakest link"}` },
             title: `See the evidence that ${causes ? `${labelFor(item.groupId)} causes ${labelFor(toward)}`
               : `${labelFor(toward)} causes ${labelFor(item.groupId)}`}`,
             onclick: () => openEvidence(item.edgeId),
-            onmouseenter: () => hover(item.excluded ? null : item), onmouseleave: () => hover(null),
-            onfocus: () => hover(item.excluded ? null : item), onblur: () => hover(null) },
-          h("span", { className: "explore-row-text" },
-            h("span", { className: "explore-row-label", textContent: labelFor(item.groupId) }),
-            between.length ? h("span", { className: "explore-row-path", textContent: `via ${between.join(" → ")}` }) : null),
-          h("span", { className: "explore-row-papers", textContent: String(count) })),
-          key === "custom" && group ? customVariableActions({ group, canChange: canChangeCustom,
-            onEdit: onEditCustom, onDelete: onDeleteCustom }) : null);
-        })),
-        h("p", { className: "explore-subsection-empty list-filter-empty", dataset: { empty },
-          hidden: items.length > 0, textContent: empty }));
-    }));
+            onmouseenter: () => hover(item), onmouseleave: () => hover(null),
+            onfocus: () => hover(item), onblur: () => hover(null) },
+            h("span", { className: "explore-row-text" },
+              h("span", { className: "explore-row-label", textContent: labelFor(item.groupId) }),
+              between.length ? h("span", { className: "explore-row-path", textContent: `via ${between.join(" → ")}` }) : null),
+            h("span", { className: "explore-row-papers", textContent: String(count) })));
+      })),
+      h("p", { className: "explore-subsection-empty list-filter-empty", dataset: { empty: "" }, hidden: true })));
+
     applyListSearch();
   }
 
@@ -754,11 +703,24 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   }
 
   function renderExplore() {
+    identifyListKey = null; // Explore replaces the shared list.
     const causes = state.task === "causes";
     syncFocusClear();
     // While searching for another variable, the matches take the list's place.
     const { groupId, picking } = focus();
     els.resultsBlock.hidden = !groupId || picking;
+    const toolbar = el("variableReviewTools");
+    if (toolbar) {
+      if (!toolbar.querySelector(".list-filter")) toolbar.append(listFilterControl());
+      const { depth, minPapers } = settings();
+      toolbar.querySelector(".list-filter-distance").value = String(depth);
+      toolbar.querySelector(".list-filter-papers").value = String(minPapers);
+      for (const button of toolbar.querySelectorAll(".list-filter-action")) {
+        const source = el(button.dataset.sourceId);
+        button.hidden = source.hidden;
+        button.textContent = source.textContent;
+      }
+    }
     if (groupId && !picking) renderResults(groupId);
     els.graphHint.hidden = Boolean(groupId);
     els.graphHint.textContent = `Choose a variable to see its ${causes ? "causes" : "consequences"} as a graph.`;
@@ -828,9 +790,12 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     if (els.landing) els.landing.hidden = Boolean(task);
     els.explore.hidden = !task;
     const browserIntro = el("identifyBrowserIntro");
-    if (browserIntro) browserIntro.hidden = !identifying();
+    if (browserIntro) browserIntro.hidden = !task;
     const reviewTools = el("variableReviewTools");
-    if (reviewTools) reviewTools.hidden = !identifying();
+    if (reviewTools) {
+      reviewTools.hidden = !task;
+      if (!exploring()) reviewTools.querySelector(".list-filter")?.remove();
+    }
     const identifyFields = el("identifyFields");
     if (identifyFields) identifyFields.hidden = !identifying();
     if (!identifying()) identifyPicking = null;

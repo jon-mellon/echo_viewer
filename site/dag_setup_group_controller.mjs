@@ -462,7 +462,8 @@ export function createDagSetupGroupController({
     const chosen = Boolean(focus.active && focus.groupId);
     elements.focusSearchBlock.hidden = !focus.active;
     elements.focusSearchBlock.classList.toggle("has-focus", chosen);
-    if (elements.focusInputLabel) elements.focusInputLabel.textContent = "Primary variable";
+    elements.focusSearchBlock.classList.toggle("is-selected", chosen && !picking);
+    if (elements.focusInputLabel) elements.focusInputLabel.textContent = "Variable";
     elements.focusInput.placeholder = chosen && picking ? `Search to replace ${focus.label}`
       : "Search group or constituent variable";
     if (chosen && !picking && document.activeElement !== elements.focusInput) elements.focusInput.value = focus.label;
