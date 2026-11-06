@@ -31,7 +31,9 @@ const budgets = {
   restore: { wallMs: mobile ? 1500 : 800 },
   publicationCompare: { markMs: mobile ? 1500 : 600 },
   schemaPage: { wallMs: mobile ? 1200 : 500 },
-  savedSplit: { wallMs: mobile ? 8000 : 4000 },
+  // Adding a saved split now validates, hashes and writes the whole schema in the same click (it used to stop at
+  // the review screen), so its single commit task is allowed to run longer than a plain interaction.
+  savedSplit: { wallMs: mobile ? 8000 : 4000, longestTaskMs: mobile ? 1500 : 500 },
   longestTaskMs: mobile ? 400 : 200,
 };
 const report = { url: url.href, mobile, cpuThrottle: mobile ? 4 : 1, source: remote ? 'remote deployment' : root, budgets, runs: [] };
@@ -115,7 +117,7 @@ try {
           result.timings.push(timing);
           console.log(JSON.stringify({ run: run + 1, ...timing }));
           if (process.env.PROFILE_DISABLE_BUDGETS === '1') return timing;
-          const over = (budget.wallMs && timing.ms > budget.wallMs) || timing.longestTaskMs > budgets.longestTaskMs;
+          const over = (budget.wallMs && timing.ms > budget.wallMs) || timing.longestTaskMs > (budget.longestTaskMs ?? budgets.longestTaskMs);
           if (over) throw new Error(`Performance budget exceeded: ${name} (${timing.ms} ms, longest task ${timing.longestTaskMs} ms)`);
           return timing;
         }
