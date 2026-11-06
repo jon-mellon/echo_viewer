@@ -50,9 +50,9 @@ function visOptionSignature(params = {}) {
   ]);
 }
 
-// vis-network's fit() defaults to maxZoomLevel: 1, leaving small DAGs surrounded
-// by empty canvas even when there is room to display them larger.
-export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: Number.MAX_VALUE };
+// Allow small DAGs to grow beyond vis-network's default scale of 1, but avoid
+// enlarging a lone node until it fills the entire viewport when filters remove links.
+export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: 2.5 };
 
 // Fitting a large DAG into the viewport can shrink labels to a few pixels, which is
 // unreadable (vis-network stops drawing text entirely below ~3px). Never fit tighter
@@ -297,9 +297,18 @@ async function renderDagTable(groups, links) {
   await built;
 }
 
+/** The canvas is a picture to assistive technology; say what it holds and where the same facts are navigable. */
+function describeDagImage(groupCount, linkCount) {
+  const noun = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+  els.dagNetwork.setAttribute("role", "img");
+  els.dagNetwork.setAttribute("aria-label",
+    `Diagram of ${noun(groupCount, "variable")} and ${noun(linkCount, "link")}. The Table view lists the same variables, links, definitions and evidence.`);
+}
+
 function showDagDisplay() {
   const table = tableShown();
   els.dagTable.hidden = !table;
+  els.dagTableSkip.hidden = table;
   els.dagNetwork.hidden = table;
   for (const [button, active] of [[els.dagViewGraph, !table], [els.dagViewTable, table]]) {
     button.classList.toggle("active", active);
@@ -307,14 +316,15 @@ function showDagDisplay() {
   }
 }
 
-async function setDagDisplay(mode) {
+async function setDagDisplay(mode, { focusTable = false } = {}) {
   const next = mode === "table" ? "table" : "graph";
-  if (state.dagDisplay === next) return;
+  if (state.dagDisplay === next) { if (focusTable && next === "table") els.dagTable.focus(); return; }
   state.dagDisplay = next;
   showDagDisplay();
   onViewportChange(false);
   await renderDag();
   if (next === "graph") _visNetwork?.redraw();
+  else if (focusTable) els.dagTable.focus();
 }
 
 function refreshEdgeSelection({ redraw = true } = {}) {
@@ -642,6 +652,7 @@ async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } =
 
   const links = state.visibleLinks.filter((link) => !link.is_target_relation
     && nextGroupIds.has(link.group_a) && nextGroupIds.has(link.group_b));
+  describeDagImage(groups.length, links.length);
   if (els.dagTable.hidden === tableShown()) showDagDisplay();
   if (tableShown()) {
     // No layout: the graph is rebuilt from the same groups and links when it is shown again.

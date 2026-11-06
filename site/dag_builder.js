@@ -133,7 +133,7 @@ function initElements() {
     "schemaChoice", "loadSchema", "skipSchema",
     "definitionBlock", "definitionTitle", "definitionCancel", "definitionDescribeStep", "definitionDescribeNext", "definitionResumeList",
     "definitionAiWork", "definitionSourcesStep", "definitionDescribeBack",
-    "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionSourceLoadStatus", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults", "definitionBrowseJump",
+    "definitionSourceSearch", "definitionSourceList", "definitionContinue", "definitionSourceLoadStatus", "definitionSourceChangeNote", "definitionBrowsePanel", "definitionBrowseStatus", "definitionBrowseResults", "definitionBrowseJump", "definitionConceptsTitle",
     "definitionPartitionStep", "definitionLoadStatus", "definitionJevPanel", "definitionIncludedPanel",
     "definitionConceptsIntro", "definitionCountIncluded", "definitionCountExcluded", "definitionCountUnreviewed",
     "definitionSourcesSummary",
@@ -149,7 +149,7 @@ function initElements() {
     "definitionSelectedVariables",
     "definitionBack", "definitionSelectedTitle", "definitionSaveStatus",
     "definitionNewLabel", "definitionNewDescription", "definitionResidualLabels",
-    "definitionValidation", "definitionSave",
+    "definitionValidation", "definitionNameValidation", "definitionSave",
     "openCustomVariables", "customVariablesView", "customVariablesTitle", "customVariablesCreate", "customVariablesClose",
     "customVariablesFilter", "customVariablesStatus", "customVariablesTable",
     "workflowHint", "dagStatusBadge",
@@ -181,7 +181,7 @@ function initElements() {
     // Right: DAG workspace
     "focusSearchBlock", "focusInput", "focusInputLabel", "focusGroupPicker", "focusPickerCancel",
     "dagWorkspaceSection", "dagNetwork", "dagViewTitle", "diagnosticOverlapKey", "confounderConfig", "confounderDisclosure", "confounderSummary", "confounderStatusList",
-    "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag", "dagTable", "dagViewGraph", "dagViewTable",
+    "dagSvgZoomIn", "dagSvgZoomOut", "dagSvgFit", "fullscreenDag", "dagTable", "dagTableSkip", "dagViewGraph", "dagViewTable",
     "edgeInspector", "provenancePanel", "closeEvidencePane",
     // Export
     "exportProject", "exportWorkingMap", "projectImport",

@@ -194,6 +194,7 @@ function installHandlers() {
     dagNetwork.fit();
   });
   els.fullscreenDag.addEventListener("click", () => toggleFullscreenPanel("dag"));
+  els.dagTableSkip.addEventListener("click", () => dagNetwork.setDagDisplay("table", { focusTable: true }));
   for (const [button, mode] of [[els.dagViewGraph, "graph"], [els.dagViewTable, "table"]]) {
     button.addEventListener("click", () => dagNetwork.setDagDisplay(mode));
   }

@@ -20,6 +20,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await startCreate(page, "iv");
   // Creating starts by choosing the sources; the name and definition come next.
   await expect(page.locator("#definitionSourcesStep")).toBeVisible();
+  await expect(page.locator('.definition-stepper [data-step="sources"]')).toHaveAttribute("aria-current", "step");
   await expect(page.locator("#definitionDescribeStep")).toBeHidden();
   await expect(page.locator("body")).not.toHaveClass(/defining-variable/);
   // Initial setup uses the full viewport until both anchors are selected.
@@ -28,7 +29,14 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
 
   const usable = page.locator("#definitionSourceList input[data-source-id]");
   await expect(usable.nth(1)).toBeVisible();
-  await usable.nth(0).check();
+  // The complete source list remains available without requiring a search.
+  const eligibleSources = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(group => group.variable_ids?.length).length);
+  await expect(usable).toHaveCount(eligibleSources);
+  const firstSourceId = await usable.nth(0).getAttribute("data-source-id");
+  const firstSource = page.locator(`#definitionSourceList input[data-source-id="${firstSourceId}"]`);
+  await firstSource.press("Space");
+  await expect(firstSource).toBeChecked();
+  await expect(firstSource).toBeFocused();
   await usable.nth(1).check();
   const sourceIds = await usable.evaluateAll(inputs => inputs.filter(input => input.checked).map(input => input.dataset.sourceId));
   const originals = await page.evaluate(sourceIds => sourceIds.map(id => {
@@ -37,7 +45,13 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   }), sourceIds);
   await page.locator("#definitionContinue").click();
   await expect(page.locator("#definitionDescribeStep")).toBeVisible();
+  await expect(page.locator('.definition-stepper [data-step="describe"]')).toHaveAttribute("aria-current", "step");
+  await page.locator("#definitionDescribeNext").click();
+  await expect(page.locator("#definitionNameValidation")).toHaveText("Name the new variable.");
+  await expect(page.locator("#definitionNewLabel")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.locator("#definitionValidation")).toHaveText("At least 20 characters.");
   await page.locator("#definitionNewLabel").fill("Browser test construct");
+  await expect(page.locator("#definitionNameValidation")).toBeHidden();
   await page.locator("#definitionNewDescription").fill("too short");
   await page.locator("#definitionDescribeNext").click();
   await expect(page.locator("#definitionValidation")).toHaveText("Write a definition of at least 20 characters.");
@@ -48,6 +62,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await page.locator("#definitionDescribeNext").click();
   await expect(page.locator("body"), browserErrors.errors.join("\n")).toHaveClass(/defining-variable/);
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
+  await expect(page.locator("#definitionConceptsTitle")).toBeFocused();
   await expect(page.locator("#definitionJevPanel")).toBeVisible();
   await expect(page.locator("#definitionIncludedPanel")).toBeVisible();
   await expect(page.locator("#definitionSave")).toBeDisabled();
@@ -63,6 +78,17 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await expect(page.locator("#definitionSelectedVariables .definition-included-row")).toHaveCount(1);
   await expect(page.locator("#definitionSelectedTitle")).toHaveText("Included concepts (1)");
   await expect(page.locator("#definitionSave")).toBeEnabled();
+
+  // Revisiting unchanged sources must preserve selections and residual names.
+  await page.locator("#definitionResidualLabels input").first().fill("Kept after going back");
+  await page.locator("#definitionBack").click();
+  await page.locator("#definitionDescribeBack").click();
+  await expect(page.locator("#definitionSourceSearch")).toBeFocused();
+  await expect(page.locator("#definitionSourceChangeNote")).toBeVisible();
+  await page.locator("#definitionContinue").click();
+  await page.locator("#definitionDescribeNext").click();
+  await expect(page.locator("#definitionSelectedTitle")).toHaveText("Included concepts (1)");
+  await expect(page.locator("#definitionResidualLabels input").first()).toHaveValue("Kept after going back");
 
   // Leftovers keep their source's name unless renamed.
   const residualInputs = page.locator("#definitionResidualLabels input[data-residual-id]");
