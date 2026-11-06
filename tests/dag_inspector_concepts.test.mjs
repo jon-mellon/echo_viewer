@@ -170,6 +170,16 @@ test("a finding's exclude control waits for both concept labels", () => {
       .find(button => button.textContent === "Confirm exclusion").click();
     assert.equal(state.project.finding_decisions.r1.reason_code, "concept_miscategorized");
     assert.equal(state.project.finding_decisions.r1.reason_text, undefined);
+    controller.renderEdge();
+    controller.renderProvenance();
+    assert.match(elements.edgeInspector.textContent, /1 rejected/);
+    assert.match(elements.provenancePanel.findAll("section")[0].textContent, /1 record · 1 rejected/);
+    assert.doesNotMatch(elements.provenancePanel.findAll("section")[1].textContent, /rejected/);
+    elements.provenancePanel.findAll("button").find(button => button.textContent === "Restore").click();
+    controller.renderEdge();
+    controller.renderProvenance();
+    assert.doesNotMatch(elements.edgeInspector.textContent, /rejected/);
+    assert.doesNotMatch(elements.provenancePanel.textContent, /rejected/);
   } finally {
     globalThis.document = previousDocument;
   }
