@@ -7,11 +7,11 @@ test("DAG viewport keeps part of the graph visible", () => {
   const viewport = { width: 200, height: 120 };
   assert.deepEqual(
     constrainViewPosition({ x: 1000, y: -1000 }, 2, bounds, viewport),
-    { x: 134, y: -64 },
+    { x: 125, y: -65 },
   );
   assert.deepEqual(
     constrainViewPosition({ x: -1000, y: 1000 }, 2, bounds, viewport),
-    { x: -134, y: 64 },
+    { x: -125, y: 65 },
   );
 });
 

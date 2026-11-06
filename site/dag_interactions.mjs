@@ -6,16 +6,20 @@ export function constrainViewPosition(position, scale, contentBounds, viewport, 
   const height = Math.max(0, Number(viewport?.height) || 0);
   const visibleX = Math.min(Math.max(0, minimumVisible), width / 2) / scale;
   const visibleY = Math.min(Math.max(0, minimumVisible), height / 2) / scale;
+  // No more than three quarters of the viewport may be empty: keep at least a
+  // quarter of it covered by graph, or all of the graph when it is smaller.
+  const coverX = Math.min(width / 4, (contentBounds.right - contentBounds.left) * scale) / scale;
+  const coverY = Math.min(height / 4, (contentBounds.bottom - contentBounds.top) * scale) / scale;
   const halfWidth = width / (2 * scale);
   const halfHeight = height / (2 * scale);
   const constrained = {
     x: Math.max(
-      contentBounds.left - halfWidth + visibleX,
-      Math.min(contentBounds.right + halfWidth - visibleX, position.x),
+      contentBounds.left - halfWidth + coverX,
+      Math.min(contentBounds.right + halfWidth - coverX, position.x),
     ),
     y: Math.max(
-      contentBounds.top - halfHeight + visibleY,
-      Math.min(contentBounds.bottom + halfHeight - visibleY, position.y),
+      contentBounds.top - halfHeight + coverY,
+      Math.min(contentBounds.bottom + halfHeight - coverY, position.y),
     ),
   };
   let nearest = null;
@@ -164,6 +168,12 @@ export function attachDagInteractions(network, element, actions) {
       if (!event.nodes?.length && !event.edges?.length && event.pointer?.canvas) {
         actions.zoomToPoint(event.pointer.canvas);
       }
+    },
+    oncontext(event) {
+      const id = event.pointer?.DOM ? network.getNodeAt?.(event.pointer.DOM) : null;
+      if (!id || !actions.hasGroup(id)) return;
+      const source = event.event?.srcEvent || event.event;
+      if (actions.onNodeContext?.(id, source)) source?.preventDefault?.();
     },
     selectEdge(event) {
       clearTappedCandidate();

@@ -87,7 +87,7 @@ test("no phone screen widens the page, even in a much wider font, and iOS text i
   const check = async screen => { const extra = await over(); if (extra > 0) problems.push(`${screen}: ${extra}px wider than the screen`); };
   await page.locator("#identify-iv-input").tap();
   await check("variable picker");
-  await page.getByRole("button", { name: "Review and add Innovation" }).tap();
+  await page.getByRole("button", { name: "Review definition of Innovation" }).tap();
   await expect(page.locator("#definitionConceptsTitle")).toHaveText("Review saved variable");
   await check("review saved variable");
   await expect(page.locator(".layout-debug")).toContainText("zoom");
