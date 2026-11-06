@@ -47,46 +47,87 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     const dataStart = performance.now();
     await loadDagData(permalink?.get("vlayout") || "");
     performance.measure("echo:startup:data", { start: dataStart, end: performance.now() });
+    let applyDraftEdges = null;
     if (localRecord) {
       // The incident-link query below needs the evidence engine. Start it now so
-      // it runs alongside the complete-schema download instead of after it.
+      // it runs in the background while the first graph paints.
       void dagDataSource.ensureEvidenceConnection({ variableIds: [] }).catch(() => {});
       const publishedSchema = state.data.grouping_sets?.[0];
-      const complete = await state.data.load_published_schema?.();
-      const base = complete?.schema || publishedSchema;
+      const loadComplete = state.data.load_published_schema;
       const local = localRecord.schema;
-      const owners = schema => new Map((schema.groups || []).flatMap(group =>
-        (group.variable_ids || []).map(id => [id, group.group_id])));
-      const before = owners(base), after = owners(local);
-      const changed = [...new Set([...before.keys(), ...after.keys()])]
-        .filter(id => before.get(id) !== after.get(id));
-      const findingIds = [...new Set([...Object.keys(base.finding_decisions || {}),
-        ...Object.keys(local.finding_decisions || {})])].filter(id =>
-        (base.finding_decisions?.[id]?.display_status === "excluded")
-          !== (local.finding_decisions?.[id]?.display_status === "excluded"));
-      const incidentRawLinks = [...new Map((await Promise.all([
-        changed.length ? dagDataSource.loadIncidentRawLinks(changed) : [],
-        findingIds.length ? dagDataSource.loadRawLinksByIds(findingIds) : [],
-      ])).flat().map(link => [link.raw_causal_link_id, link])).values()];
-      const incremented = incrementCompiledDag({
-        compiledDag: state.data.compiled_dag, oldSchema: base, newSchema: local,
-        incidentRawLinks,
-        project: { groups: local.groups, iv_group_id: permalink.get("iv"),
-          dv_group_id: permalink.get("dv"), link_decisions: local.link_decisions || {},
-          finding_decisions: local.finding_decisions || {} },
-      });
-      const compiled = { ...incremented, edges: (incremented.edges || []).map(edge => {
-        const decision = normalizeLinkDecision(local.link_decisions?.[edge.edge_id]) || null;
-        return { ...edge, display_status: decision?.display_status || "active_by_default",
-          user_decision: decision };
-      }) };
+      const publishedDag = state.data.compiled_dag;
+      // Paint with the published edges and the draft's groups first. The draft's
+      // edge changes need the complete schema and evidence queries (seconds), so
+      // they are applied after the first render.
+      const nodeById = new Map((publishedDag?.nodes || []).map(node => [node.group_id, node]));
+      const compiled = { ...publishedDag, nodes: (local.groups || []).map(group => ({
+        ...(nodeById.get(group.group_id) || {}), group_id: group.group_id, label: group.label || "",
+        member_count: (group.variable_ids || []).length })) };
       state.data = { ...state.data, grouping_sets: [local],
         default_grouping_set_id: local.grouping_set_id,
         compiled_dag: compiled, load_published_schema: null };
       state.compiledDag = compiled;
       state.compiledDagValid = true;
+      state.compiledDagUpdating = true;
       onLocalSchemaLoaded(localRecord);
+      applyDraftEdges = async () => {
+        const revision = state.compiledDagRevision || 0;
+        const draftStart = performance.now();
+        try {
+          const complete = await loadComplete?.();
+          performance.measure("echo:draft:published-schema", { start: draftStart, end: performance.now() });
+          const base = complete?.schema || publishedSchema;
+          const compute = performance.now();
+          const owners = schema => new Map((schema.groups || []).flatMap(group =>
+            (group.variable_ids || []).map(id => [id, group.group_id])));
+          const before = owners(base), after = owners(local);
+          const changed = [...new Set([...before.keys(), ...after.keys()])]
+            .filter(id => before.get(id) !== after.get(id));
+          const findingIds = [...new Set([...Object.keys(base.finding_decisions || {}),
+            ...Object.keys(local.finding_decisions || {})])].filter(id =>
+            (base.finding_decisions?.[id]?.display_status === "excluded")
+              !== (local.finding_decisions?.[id]?.display_status === "excluded"));
+          performance.measure("echo:draft:diff", { start: compute, end: performance.now() });
+          const queryStart = performance.now();
+          const incidentRawLinks = [...new Map((await Promise.all([
+            changed.length ? dagDataSource.loadIncidentRawLinks(changed) : [],
+            findingIds.length ? dagDataSource.loadRawLinksByIds(findingIds) : [],
+          ])).flat().map(link => [link.raw_causal_link_id, link])).values()];
+          performance.measure("echo:draft:links", { start: queryStart, end: performance.now() });
+          if ((state.compiledDagRevision || 0) !== revision) {
+            // An edit landed first; its incremental update assumed the draft's edges.
+            state.compiledDagValid = false;
+            return;
+          }
+          const incrementStart = performance.now();
+          const incremented = incrementCompiledDag({
+            compiledDag: publishedDag, oldSchema: base, newSchema: local, incidentRawLinks,
+            project: { groups: local.groups, iv_group_id: permalink.get("iv"),
+              dv_group_id: permalink.get("dv"), link_decisions: local.link_decisions || {},
+              finding_decisions: local.finding_decisions || {} },
+          });
+          const edges = (incremented.edges || []).map(edge => {
+            const decision = normalizeLinkDecision(local.link_decisions?.[edge.edge_id]) || null;
+            return { ...edge, display_status: decision?.display_status || "active_by_default",
+              user_decision: decision };
+          });
+          const next = { ...incremented, edges };
+          performance.measure("echo:draft:increment", { start: incrementStart, end: performance.now() });
+          state.data = { ...state.data, compiled_dag: next };
+          state.compiledDag = next;
+          state.compiledDagUpdating = false;
+          renderAll();
+        } catch (error) {
+          console.warn("Could not apply the draft's edge changes; a full local recomputation is required.", error);
+          state.compiledDagValid = false;
+        } finally {
+          state.compiledDagUpdating = false;
+          if (state.compiledDagUpdatePromise === draftPromise) state.compiledDagUpdatePromise = null;
+          performance.measure("echo:draft:total", { start: draftStart, end: performance.now() });
+        }
+      };
     }
+    let draftPromise = null;
     if (state.data.load_published_schema) {
       state.publishedSchemaHydrating = true;
       state.publishedSchemaHydrated = false;
@@ -144,6 +185,11 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     renderAll();
     await dagNetworkController.whenRendered?.();
     performance.measure("echo:startup:graph", { start: renderStart, end: performance.now() });
+    // Started before the frame wait: requestAnimationFrame stalls in hidden tabs.
+    if (applyDraftEdges) {
+      draftPromise = applyDraftEdges();
+      state.compiledDagUpdatePromise = draftPromise;
+    }
     if (state.permalinkDagViewport) {
       dagNetworkController.getNetwork()?.moveTo({ ...state.permalinkDagViewport, animation: false });
     }
