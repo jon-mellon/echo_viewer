@@ -567,13 +567,15 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       if (typeof body.key !== "string" || !body.key) throw new Error("OpenRouter did not return a key.");
       key = body.key;
       settingsUrl = await keySettingsUrl(key);
-      await checkKey();
     } catch (error) {
       key = null;
       message = `Could not connect OpenRouter: ${error.message}`;
       render();
       onConnectionChange(false);
+      return;
     }
+    // Keep the issued key when the limit check fails so the user can retry it.
+    await checkKey().catch(() => {});
   }
 
   function showProgress(value) {

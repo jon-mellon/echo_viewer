@@ -183,16 +183,32 @@ test("OpenRouter returns to the variable picker with the current anchors", async
     callback.searchParams.set("state", auth.searchParams.get("state"));
     await route.fulfill({ status: 302, headers: { location: callback.href } });
   });
+  let keyChecks = 0;
   await page.route("https://openrouter.ai/api/**", async route => {
     const headers = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "authorization, content-type" };
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers });
     const url = route.request().url();
+    if (url.endsWith("/v1/key")) {
+      expect(route.request().headers().authorization).toBe("Bearer sk-or-test");
+      if (++keyChecks === 1) return route.fulfill({ status: 401, headers, contentType: "application/json",
+        body: JSON.stringify({ error: { message: "User not found." } }) });
+    }
     const body = url.endsWith("/auth/keys") ? { key: "sk-or-test" }
       : url.endsWith("/v1/key") ? { data: { limit: 5, limit_reset: null, limit_remaining: 5 } }
         : { data: { pricing: { prompt: "0.000000042", completion: "0", request: "0" } } };
     await route.fulfill({ headers, contentType: "application/json", body: JSON.stringify(body) });
   });
-  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.addInitScript(() => {
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+    if (!new URL(location.href).searchParams.has("code")) return;
+    document.addEventListener("DOMContentLoaded", () => {
+      new MutationObserver(() => {
+        if (!document.body.classList.contains("viewer-loading")) {
+          window.__oauthDefinitionVisibleAtReveal = !document.querySelector("#definitionBlock").hidden;
+        }
+      }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    });
+  });
   await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20 && window.__dagBuilderState?.publishedSchemaHydrated);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
@@ -205,6 +221,12 @@ test("OpenRouter returns to the variable picker with the current anchors", async
   // The saved draft comes back on the concepts step, where the connection was made.
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
   await expect(page.locator("#definitionTitle")).toHaveText("Create a variable");
+  expect(await page.evaluate(() => window.__oauthDefinitionVisibleAtReveal)).toBe(true);
+  await expect(page.locator("#definitionAiLimitText")).toContainText("User not found");
+  await expect(page.locator("#definitionAiConnect")).toBeHidden();
+  await page.locator("#definitionAiRecheck").click();
+  await expect(page.locator("#definitionAiLimitSummary")).toContainText("$5 cap");
+  expect(keyChecks).toBe(2);
   expect(await page.evaluate(() => [window.__dagBuilderState.definitionDraft.role, window.__dagBuilderState.project.iv_group_id, window.__dagBuilderState.project.dv_group_id])).toEqual(["candidate", ...anchors]);
 });
 
