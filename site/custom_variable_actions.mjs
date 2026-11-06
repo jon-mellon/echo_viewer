@@ -61,8 +61,8 @@ export function customVariableActions({ group, canChange = () => true, onEdit = 
 }
 
 /** The "Create" button in the side panel's Custom variables heading. */
-export function createVariableButton(onCreate) {
-  return h("button", { type: "button", className: "btn btn--sm btn--ghost custom-create",
+export function createVariableButton(onCreate, { label = "Create", className = "btn btn--sm btn--ghost" } = {}) {
+  return h("button", { type: "button", className: `${className} custom-create`,
     title: "Create a variable from concepts in existing variables", onclick: () => onCreate() },
-  icon("plus"), h("span", { textContent: "Create" }));
+  icon("plus"), h("span", { textContent: label }));
 }

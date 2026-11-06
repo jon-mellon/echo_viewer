@@ -1,6 +1,6 @@
 module.exports = {
   testDir: "./tests",
-  testMatch: ["variable_review.spec.cjs", "browser_v2_workflows.spec.cjs", "dag2_define_variable.spec.cjs",
+  testMatch: ["variable_review.spec.cjs", "mobile_no_zoom.spec.cjs", "browser_v2_workflows.spec.cjs", "dag2_define_variable.spec.cjs",
     "interaction_workflows.spec.cjs", "static_data_source.spec.cjs",
     "local_schema_persistence.spec.cjs", "evidence_panel.spec.cjs", "task_views.spec.cjs", "schema_source.spec.cjs"],
   workers: 1,
