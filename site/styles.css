@@ -2974,7 +2974,7 @@ h2 {
 .explore-row-label {    overflow-wrap: anywhere; }
 .explore-row-path { color: var(--text-muted); font-size: var(--text-sm); line-height:  var(--leading-body); }
 .saved-variable-row { grid-template-columns: minmax(0, 1fr) auto; }
-.saved-variable-action { color: var(--accent); font-size: var(--text-sm); white-space: nowrap; }
+.saved-variable-action { color: var(--text-muted); font-size: var(--text-sm); white-space: nowrap; }
 .explore-row-papers {
   color: var(--text-muted);
   font-size: var(--text-sm);
@@ -4315,4 +4315,17 @@ div.explore-subsection-empty p, .custom-variables-empty p { margin: 0 0 var(--sp
   :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
     font-size: var(--text-lg);
   }
+}
+
+/* Variable pickers: rows first, quiet labels, one secondary action. */
+.picker-section { margin-top: var(--space-3); }
+.picker-label { margin: 0 0 var(--space-1); padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--text-sm); font-weight: var(--weight-medium); line-height: var(--leading-tight); }
+.picker-count { font-weight: var(--weight-normal); }
+.picker-create { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-2); width: 100%; margin: 0 0 var(--space-1); border-color: transparent; background: transparent; color: var(--accent); font-weight: var(--weight-medium); }
+.picker-create:hover { background: var(--accent-subtle); }
+#identifyGroupPicker { height: min(65vh, 520px); }
+@media (max-width: 840px) { #identifyGroupPicker { height: min(78dvh, 640px); } }
+@media (pointer: coarse) {
+  :is(#identifyGroupPicker, #focusGroupPicker) .explore-row-open { min-height: var(--control-touch); }
+  :is(#identifyGroupPicker, #focusGroupPicker) .picker-create { min-height: var(--control-touch); }
 }
