@@ -11,7 +11,7 @@ import { publicSchemaProjection } from "./public_schema_projection.mjs";
  */
 export function createCustomVariablesPresenter({ state, elements: els, truncate, normalized,
   customVariables, sourceLabels, canChange, onCreate, onEdit, onDelete,
-  canExplore = () => false, onExplore = () => {}, previousSplits = () => [],
+  previousSplits = () => [],
   loadPreviousSplits = () => {}, reusePreviousSplit = () => {}, splitsLoading = () => false, splitsError = () => false, schemaVariables = customVariables,
   onSplitSource = () => {}, getSchema = () => ({}), loadDetails = async () => {}, conceptLabel = id => id }) {
   let confirmingId = null;
@@ -151,8 +151,6 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       h("td", { className: "actions" },
         h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "inspect", groupId: group.group_id },
           textContent: "Inspect", attrs: { "aria-expanded": String(expandedId === group.group_id) } }),
-        canExplore() ? h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "explore", groupId: group.group_id },
-          textContent: "Explore", title: `Show the causes or consequences of ${label}` }) : null,
         !custom ? h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "split", groupId: group.group_id }, disabled: busy,
           textContent: "Create split" }) : null,
         custom ? h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "edit", groupId: group.group_id },
@@ -188,7 +186,6 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     if (action === "delete") { confirmingId = groupId; render(); return; }
     if (action === "cancel-delete") { confirmingId = null; render(); return; }
     if (action === "edit") { confirmingId = null; onEdit(groupId); return; }
-    if (action === "explore") { close(); onExplore(groupId); return; }
     if (action !== "confirm-delete" || deleting) return;
     const label = customVariables().find(group => group.group_id === groupId)?.label || groupId;
     deleting = true;
