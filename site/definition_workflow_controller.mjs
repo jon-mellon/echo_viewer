@@ -46,7 +46,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     browseState.loading = false;
     renderDefinition();
   }
-  async function choosePublishedSplit(row) {
+  async function choosePublishedSplit(row, { save = false } = {}) {
     if (!row || browseState.loading || state.definitionDraft?.step !== "sources") return;
     const draft = state.definitionDraft;
     const base = row.replaces_group_id ? selectedGroupForRole(draft.role) === row.replaces_group_id
@@ -102,6 +102,8 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       draft.step = "partition";
       state.selectedVariableIds = new Set(draft.new_variable_ids);
       persistProjectLocally();
+      // Adding from the schema page skips the review screen.
+      if (save) { await saveDefinition(); return; }
       invalidateVisibleCaches();
       renderDraft();
       performance.measure("echo:saved-split:review", { start, end: performance.now() });
@@ -153,7 +155,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
     if (state.definitionDraft) setSourceSelection(sourceId, true);
   }
 
-  function reusePreviousSplit(role, row) {
+  function reusePreviousSplit(role, row, options) {
     startDefinition(role, { render: false });
     if (!state.definitionDraft) return;
     const available = new Set((state.project?.groups || []).filter(group => group.variable_ids?.length).map(group => group.group_id));
@@ -164,7 +166,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       return;
     }
     state.definitionDraft.source_group_ids = [...row.source_group_ids];
-    void choosePublishedSplit(row);
+    void choosePublishedSplit(row, options);
   }
 
   async function startEditSplit(groupId = null) {
