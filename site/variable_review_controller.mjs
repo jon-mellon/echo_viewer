@@ -3,8 +3,7 @@ import { CONTROL_WARNING, diagnosticKey, DIAGNOSTIC_STATUSES } from "./confounde
 
 /**
  * One review editor shared by the list and table. Every disposition saves at once and only changes how the
- * variable is drawn, except "Removed for other reason", which takes the variable out of this study's graph and
- * asks for a private reason first. Nothing is saved until that is confirmed.
+ * variable is drawn, except "Other reason", which asks for a private reason first. Nothing is saved until that is confirmed.
  */
 export function createVariableReviewController({ state, onCommit, onCancel = () => {} }) {
   const title = h("h2", { id: "variableReviewTitle" });
@@ -38,13 +37,13 @@ export function createVariableReviewController({ state, onCommit, onCancel = () 
       return;
     }
     const note = h("textarea", { id: "variableReviewNote", className: "search-input", rows: 4, value: existing.text || "", required: true,
-      attrs: { "aria-label": "Reason for removing this variable" } });
+      attrs: { "aria-label": "Reason for this decision" } });
     pending = { kind, groupId, status, scopeKey: diagnosticKey(state.project, kind, groupId), note };
     title.textContent = `${spec.statuses[status]}: ${label(groupId)}`;
     error.hidden = true;
     confirm.disabled = false;
     replaceChildren(content,
-      h("p", { textContent: "This removes the whole variable and its links from this study's graph. The reusable variable schema is unchanged. Diagnostics will be recalculated." }),
+      h("p", { textContent: "This decision keeps the variable and its links on the map and shades it lighter." }),
       h("label", { className: "review-note-label", htmlFor: "variableReviewNote", textContent: "Reason (required; kept private)" }), note);
     dialog.showModal();
     note.focus();
@@ -55,7 +54,7 @@ export function createVariableReviewController({ state, onCommit, onCancel = () 
     try {
       const { kind, groupId, status, note, scopeKey } = pending;
       if (diagnosticKey(state.project, kind, groupId) !== scopeKey) throw new Error("The study changed. Reopen this decision.");
-      if (!note.value.trim()) { note.setAttribute("aria-invalid", "true"); note.focus(); throw new Error("Explain why this variable is removed."); }
+      if (!note.value.trim()) { note.setAttribute("aria-invalid", "true"); note.focus(); throw new Error("Explain the reason for this decision."); }
       dialog.close(); pending = null;
       onCommit(kind, groupId, { status, text: note.value.trim() });
     } catch (problem) { showProblem(problem); }

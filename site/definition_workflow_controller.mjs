@@ -1,3 +1,4 @@
+import { boundedSplitLookup } from "./split_lookup_timeout.mjs";
 import * as projectOps from "./dag_project.mjs";
 import { createDefinitionWorkflowPresenter } from "./definition_workflow_presenter.mjs";
 import { createDefinitionJevAssist } from "./definition_jev_assist.mjs";
@@ -28,9 +29,10 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       const ids = state.definitionDraft.source_group_ids;
       const rows = [...previousSplits(state.definitionDraft.role)];
       if (!rows.length) {
-        const published = await listOwnPublishedSplits();
+        const published = await boundedSplitLookup(listOwnPublishedSplits());
         const loaded = await Promise.allSettled(published.filter(row => row.source_group_by_variable)
-          .map(async row => ({ ...row, local_variable_ids: await loadPublishedSplitMembership(row) })));
+          .map(async row => ({ ...row, local_variable_ids: await boundedSplitLookup(loadPublishedSplitMembership(row)) })));
+        if (loaded.some(result => result.status === "rejected")) browseState.error = "Some saved variables could not be loaded. Try again.";
         rows.push(...previousSplitsForRole(loaded.flatMap(result => result.status === "fulfilled" ? [result.value] : []), state.project, state.definitionDraft.role,
           selectedGroupForRole(state.definitionDraft.role)));
       }
@@ -76,7 +78,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       void loading.catch(() => sourceHydrations.delete(source.group_id));
     }
     try {
-      const ids = row.local_variable_ids || await loadPublishedSplitMembership(row);
+      const ids = row.local_variable_ids || await boundedSplitLookup(loadPublishedSplitMembership(row));
       performance.measure("echo:saved-split:membership", { start, end: performance.now() });
       if (state.definitionDraft !== draft) return;
       const sources = definitionSources();
