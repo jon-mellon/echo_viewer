@@ -63,9 +63,6 @@ let _dagFontSize = 14;
 // A new network paints at vis-network's default scale until the first fit, so a
 // node reads as an enormous blob on reload. Keep the canvas hidden until then.
 let _dagAwaitingInitialFit = false;
-function revealDagNetwork() {
-  if (!_dagAwaitingInitialFit) els.dagNetwork.style.visibility = "";
-}
 
 export function fitDagNetwork(network) {
   if (!network) return;
@@ -114,6 +111,9 @@ export function createDagNetworkController({
   // The causes and consequences views draw a neighborhood of one variable, not
   // a study design, so there are no IV, DV or instrument anchors to pin or style.
   const exploring = () => state.task === "causes" || state.task === "consequences";
+  const revealDagNetwork = () => {
+    if (!_dagAwaitingInitialFit) els.dagNetwork.style.visibility = "";
+  };
   const studyAnchors = () => exploring() ? { ivId: null, dvId: null, instrumentId: null }
     : { ivId: state.project?.iv_group_id, dvId: state.project?.dv_group_id, instrumentId: state.project?.instrument_group_id };
   const exploreFocusId = () => exploring() ? state.explore?.[state.task]?.focusId || null : null;
