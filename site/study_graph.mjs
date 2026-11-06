@@ -1,4 +1,4 @@
-import { diagnosticKey, scopedDecisions } from "./confounder_status.mjs";
+import { scopedDecisions } from "./confounder_status.mjs";
 
 export const effectKey = ({ sourceId, targetId }) => JSON.stringify([sourceId, targetId]);
 
@@ -17,16 +17,7 @@ export function activeStudyDecisions(project, omitKey = null) {
     .filter(row => row.key !== omitKey).map(row => ({ ...row, kind })));
 }
 
-/**
- * Baseline groups and evidence links stay immutable. A variable removed for another reason leaves this study's
- * graph; every other disposition only changes how its node is drawn.
- */
-export function effectiveStudyGraph(project, { omitKey = null } = {}) {
-  const decisions = activeStudyDecisions(project, omitKey);
-  const anchors = new Set([project.iv_group_id, project.dv_group_id, project.instrument_group_id]);
-  const removed = new Set(decisions.filter(row => row.status === "removed_other" && !anchors.has(row.groupId)).map(row => row.groupId));
-  const groups = (project.groups || []).filter(group => !removed.has(group.group_id));
-  const ids = new Set(groups.map(group => group.group_id));
-  const links = (project.links || []).filter(link => ids.has(link.group_a) && ids.has(link.group_b));
-  return { groups, links, removed };
+/** Review decisions affect presentation, while the study graph retains the baseline evidence. */
+export function effectiveStudyGraph(project) {
+  return { groups: project.groups || [], links: project.links || [], removed: new Set() };
 }

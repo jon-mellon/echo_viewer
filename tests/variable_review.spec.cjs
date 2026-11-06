@@ -69,17 +69,19 @@ test("'Affects outcome only via cause' fades the variable and leaves the graph a
   await expect(page.locator('.variable-review-row[data-group-id="c"]')).not.toHaveClass(/is-accounted/);
 });
 
-test("whole-variable removal requires a private reason and can be undone by choosing another disposition", async ({ page }) => {
+test("other decisions require a private reason and keep the variable in place", async ({ page }) => {
   await setup(page, { indirect: true });
   const menu = page.locator('.variable-disposition[data-group-id="c"]');
   const dialog = page.locator("#variableReviewDialog");
   await menu.selectOption("removed_other");
   await dialog.getByRole("button", { name: "Confirm decision" }).click();
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("textbox", { name: "Reason for removing this variable" }).fill("This variable is outside this study population.");
+  await dialog.getByRole("textbox", { name: "Reason for this decision" }).fill("This variable is outside this study population.");
   await dialog.getByRole("button", { name: "Confirm decision" }).click();
-  await expect(page.locator('[data-section="rejected"]')).toContainText("Private note:");
-  expect(await page.evaluate(() => window.__dagBuilderState.studyGraph.groups.some(group => group.group_id === "c"))).toBe(false);
+  await expect(page.locator('.variable-review-row[data-group-id="c"]')).toContainText("Private note:");
+  await expect(page.locator('.variable-review-row[data-group-id="c"]')).toHaveClass(/is-accounted/);
+  await expect(page.locator('[data-section="rejected"]')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__dagBuilderState.studyGraph.groups.some(group => group.group_id === "c"))).toBe(true);
   await menu.selectOption("unaddressed");
   expect(await page.evaluate(() => window.__dagBuilderState.studyGraph.groups.some(group => group.group_id === "c"))).toBe(true);
   await page.locator("#toggleCollidersOnly").click();

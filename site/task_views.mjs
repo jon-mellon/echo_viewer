@@ -683,13 +683,11 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     if (filter && toolbar && filter.parentElement !== toolbar) toolbar.append(filter);
     if (key === identifyListKey) return;
     identifyListKey = key;
-    const active = rows.filter(row => !row.rejected), rejected = rows.filter(row => row.rejected);
-    els.summary.textContent = !active.length ? `No ${noun} at this path length and paper count. Reviewed decisions remain below.` : "";
-    els.summary.hidden = Boolean(active.length);
+    els.summary.textContent = !rows.length ? `No ${noun} at this path length and paper count. Reviewed decisions remain below.` : "";
+    els.summary.hidden = Boolean(rows.length);
     const sections = [
       // Where a variable came from is a schema question; review treats every variable alike.
-      { key: "candidates", title: noun.charAt(0).toUpperCase() + noun.slice(1), items: active, empty: "None." },
-      ...(rejected.length ? [{ key: "rejected", title: `Rejected candidates (${rejected.length})`, items: rejected, empty: "" }] : []),
+      { key: "candidates", title: noun.charAt(0).toUpperCase() + noun.slice(1), items: rows, empty: "None." },
     ];
     replaceChildren(els.results, ...sections.map(({ key, title, items, empty }) =>
       h("section", { className: "explore-group variable-review-section", dataset: { section: key } },
@@ -731,7 +729,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
               attrs: { "aria-label": `Definition of ${label}` }, onclick: () => onOpenIdentifyVariable(item.groupId) }, "ⓘ") : null,
             select ? h("div", { className: "variable-disposition-line" }, select, warning) : null,
             warningText,
-            item.noLongerCandidate && item.rejected && item.status !== "removed_other" ? h("p", { className: "small-note review-row-note", textContent: "Not a candidate with the current filters." }) : null,
+            item.noLongerCandidate ? h("p", { className: "small-note review-row-note", textContent: "Not a candidate with the current filters." }) : null,
             item.text && ["removed_other", "other"].includes(item.status) ? h("p", { className: "small-note review-row-note", textContent: `Private note: ${item.text}` }) : null,
             item.status === "removed_other" ? h("button", { type: "button", className: "btn btn--ghost btn--sm review-edit-note", textContent: "Edit reason",
               onclick: () => onReviewVariable(view, item.groupId, "removed_other") }) : null);
