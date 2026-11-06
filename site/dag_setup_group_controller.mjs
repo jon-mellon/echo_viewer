@@ -162,7 +162,7 @@ export function createDagSetupGroupController({
         const knownLabel = conceptLabels.get(id)
           || state.variableById?.get(id)?.concept_label
           || state.variableById?.get(id)?.display_label;
-        const label = knownLabel || (loading ? "Loading…" : id);
+        const label = knownLabel || (loading ? "Loading…" : failedConceptPages.has(pageKey) ? "Name unavailable" : id);
         const canExclude = Boolean(knownLabel && (resolvedConceptIds.has(id)
           || state.variableById?.get(id)?.concept_label || state.variableById?.get(id)?.display_label));
         const button = canExclude ? h("button", {
@@ -184,7 +184,7 @@ export function createDagSetupGroupController({
         className: "btn btn--ghost", type: "button", textContent: "Could not prioritize concepts. Retry",
         onclick: () => { failedConceptViews.delete(viewKey); renderVariableConcepts(group); },
       }) : null,
-      failedConceptPages.has(pageKey) ? h("button", {
+      failedConceptPages.has(pageKey) && missing.length ? h("button", {
         className: "btn btn--ghost", type: "button", textContent: "Could not load concepts. Retry",
         onclick: () => { failedConceptPages.delete(pageKey); renderVariableConcepts(group); },
       }) : null,
