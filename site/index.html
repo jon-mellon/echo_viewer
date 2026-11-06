@@ -38,9 +38,9 @@
         <!-- What the user is doing: the view switcher, beside the brand. -->
         <details id="taskMenu" class="nav-menu menu task-menu">
           <!-- One control: the muted "Task" label, the current task, and a chevron. -->
-          <summary id="taskMenuToggle" class="task-selector" title="Choose what to do"><span class="task-selector-label">Task</span><span id="taskMenuValue" class="task-selector-value">Identification</span><svg class="lucide task-selector-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <summary id="taskMenuToggle" class="task-selector" title="Choose what to do"><span class="task-selector-label">Task</span><span id="taskMenuValue" class="task-selector-value">Threats to inference</span><svg class="lucide task-selector-chevron" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
           <div class="nav-menu-panel menu-panel menu-panel--list task-menu-panel" role="group" aria-label="Choose what to do">
-            <button class="menu-item task-tab" type="button" data-task="identify" aria-pressed="false">Identification</button>
+            <button class="menu-item task-tab" type="button" data-task="identify" aria-pressed="false">Threats to inference</button>
             <button class="menu-item task-tab" type="button" data-task="explore" aria-pressed="false">Exploration</button>
           </div>
         </details>
@@ -137,12 +137,12 @@
     <section id="taskLanding" class="task-view task-landing" aria-labelledby="taskLandingTitle" hidden>
       <div class="task-landing-inner">
         <h1 id="taskLandingTitle">What would you like to do?</h1>
-        <p class="task-landing-lead">ECHO shows what the research literature says about cause and effect. Choose how you want to start; you can switch at any time from the Task menu.</p>
+        <p class="task-landing-lead">ECHO shows what the research literature says about cause and effect. Assess threats to a causal inference or explore the causes and consequences of one variable. You can switch at any time from the Task menu.</p>
         <div class="task-choices">
           <button class="task-choice" type="button" data-task="identify">
-            <strong>Identify a causal estimate</strong>
-            <span class="task-choice-text">Pick a cause and an outcome, then see what the literature says could bias the link: confounders to account for, colliders to avoid, and problems with an instrument.</span>
-            <span class="task-choice-example">For example: does education raise income, and what else would I need to account for?</span>
+            <strong>Threats to inference</strong>
+            <span class="task-choice-text">Pick a cause and an outcome to explore threats to drawing a causal conclusion: confounders to account for, colliders to avoid, and potential problems with an instrument.</span>
+            <span class="task-choice-example">For example: could the link between education and income reflect other causes or selection bias?</span>
           </button>
           <button class="task-choice" type="button" data-task="explore">
             <strong>Explore a variable</strong>

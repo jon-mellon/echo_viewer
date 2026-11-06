@@ -45,7 +45,7 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(page.locator("#taskLanding")).toBeVisible();
   await expect(page.locator("#taskLanding h1")).toHaveText("What would you like to do?");
   await expect(page.locator("#taskLanding .task-choice")).toHaveCount(2);
-  await expect(page.locator("#taskLanding .task-choice").nth(0)).toContainText("Identify a causal estimate");
+  await expect(page.locator("#taskLanding .task-choice").nth(0)).toContainText("Threats to inference");
   await expect(page.locator("#taskLanding .task-choice").nth(1)).toContainText("Explore a variable");
   await expect(page.locator("#taskLanding .task-choice-example")).toHaveCount(2);
   await expect(page.locator("#taskReset")).toBeHidden();
@@ -148,10 +148,10 @@ test("the start page leads to causes and consequences views that behave like Ide
   expect(await page.evaluate(() => window.__dagBuilderState.explore.causes.focusId)).toBe(target);
 });
 
-test("the start page opens Identification from the keyboard, is skipped by task links, and a reload stays in the task", async ({ page }) => {
+test("the start page opens Threats to inference from the keyboard, is skipped by task links, and a reload stays in the task", async ({ page }) => {
   await open(page);
   await expect(page.locator("#taskLanding")).toBeVisible();
-  await expect(page.locator("#taskLanding .task-choice[data-task=identify]")).toContainText("Identify a causal estimate");
+  await expect(page.locator("#taskLanding .task-choice[data-task=identify]")).toContainText("Threats to inference");
   // Both choices can be reached and chosen without a mouse.
   await page.locator("#taskLanding .task-choice[data-task=identify]").focus();
   await page.keyboard.press("Tab");
@@ -159,7 +159,7 @@ test("the start page opens Identification from the keyboard, is skipped by task 
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Enter");
   await expect(page.locator("#taskLanding")).toBeHidden();
-  await expect(page.locator("#taskMenuValue")).toHaveText("Identification");
+  await expect(page.locator("#taskMenuValue")).toHaveText("Threats to inference");
   await expect(page.locator("#identifyFields")).toBeVisible();
   await expect(page.locator("#identify-iv-input")).toHaveValue("");
   expect(await page.evaluate(() => window.__dagBuilderState.task)).toBe("identify");

@@ -690,9 +690,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     ];
     replaceChildren(els.results, ...sections.map(({ key, title, items, empty }) =>
       h("section", { className: "explore-group variable-review-section", dataset: { section: key } },
-        // Rejected rows have no paths, so no paper counts.
-        h("div", { className: "explore-group-header" }, h("h3", { textContent: title }),
-          key === "rejected" ? null : h("span", { className: "explore-papers-header", textContent: "Papers" })),
+        h("div", { className: "explore-group-header" }, h("h3", { textContent: title })),
         h("ol", { className: "explore-list" }, items.map(item => {
           const label = labelFor(item.groupId);
           const select = reviewable ? h("select", { className: "select-input variable-disposition", dataset: { groupId: item.groupId },
@@ -720,14 +718,12 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
           return h("li", { className: `explore-row variable-review-row${LIGHT_STATUSES.has(item.status) ? " is-accounted" : ""}`, dataset: { groupId: item.groupId } },
             h("button", { type: "button", className: "explore-row-open",
               attrs: { "aria-pressed": String(state.selectedEvidenceGroupId === item.groupId), "aria-label": label },
-              title: `See the definition and concepts of ${label}`,
+              title: `See the definition and concepts of ${label}${item.between.length ? ` (via ${item.between.map(labelFor).join(", ")})` : ""}`,
               onclick: () => onOpenIdentifyVariable(item.groupId),
               onmouseenter: () => onIdentifyRowHover(item.rejected ? null : item.groupId), onmouseleave: () => onIdentifyRowHover(null),
               onfocus: () => onIdentifyRowHover(item.rejected ? null : item.groupId), onblur: () => onIdentifyRowHover(null) },
-              h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: label.replace(/\//g, "/\u200b") }),
-                item.between.length ? h("span", { className: "explore-row-path", textContent: `via ${item.between.map(labelFor).join(", ")}` }) : null),
-              h("span", { className: "explore-row-papers", textContent: item.papers === null ? "" : String(item.papers) })),
-            // On a touch screen the name is not a target (too close to the menu below it); this button opens the definition.
+              h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: label }))),
+            // On touch screens the info button opens the definition beside the status menu.
             reviewable ? h("button", { type: "button", className: "review-info", title: `See the definition and concepts of ${label}`,
               attrs: { "aria-label": `Definition of ${label}` }, onclick: () => onOpenIdentifyVariable(item.groupId) }, "ⓘ") : null,
             select ? h("div", { className: "variable-disposition-line" }, select, warning) : null,
@@ -818,7 +814,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       tab.setAttribute("aria-pressed", String(pressed));
     }
     const taskValue = el("taskMenuValue");
-    if (taskValue) taskValue.textContent = exploring() ? "Exploration" : "Identification";
+    if (taskValue) taskValue.textContent = exploring() ? "Exploration" : "Threats to inference";
     for (const button of els.direction.querySelectorAll("button[data-direction]")) {
       const pressed = button.dataset.direction === task;
       button.setAttribute("aria-pressed", String(pressed));
