@@ -64,7 +64,7 @@ test("publication permalink is independent of the storage URL", () => {
   assert.match(source, /dataVersion: state\.data\?\.snapshot\?\.snapshot_id/);
   assert.match(source, /url\.searchParams\.delete\("schema_url"\)/);
   assert.match(source, /url\.searchParams\.set\("schema", publicationId\)/);
-  assert.match(source, /const hasView = Boolean\(anchor\("iv"\)/);
+  assert.match(source, /const hasView = exploreFocus \|\| Boolean\(anchor\("iv"\)/);
 });
 
 test("public permalinks keep the app path when it is served below the domain root", async () => {
@@ -77,6 +77,12 @@ test("public permalinks keep the app path when it is served below the domain roo
   assert.equal(withView.origin + withView.pathname, "https://www.jonathanmellon.com/echo_viewer_staging/");
   assert.equal(withView.searchParams.get("schema"), "pub-1");
   assert.equal(withView.searchParams.get("iv"), "iv");
+  // An explore view has no cause/outcome pair but must still be shared.
+  const exploreState = { ...state, task: "causes", project: { groups: [], iv_group_id: "g_iv", dv_group_id: "g_dv" },
+    explore: { causes: { focusId: "g1", depth: 1, minPapers: 2 }, consequences: {} } };
+  const explored = new URL(publicationPermalink("pub-1", staging, exploreState));
+  assert.equal(explored.searchParams.get("causes_of"), "g1");
+  assert.equal(explored.searchParams.get("schema"), "pub-1");
   const schemaOnly = new URL(publicationPermalink("pub-1", staging, null));
   assert.equal(schemaOnly.href, "https://www.jonathanmellon.com/echo_viewer_staging/?schema=pub-1");
   // Production and callers without a location are unchanged.

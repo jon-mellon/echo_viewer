@@ -39,7 +39,10 @@ export function publicationPermalink(publicationId, location = globalThis.locati
   const base = new URL(location?.origin ? location.pathname || "/" : "/", origin);
   const groups = state?.project?.groups || [];
   const anchor = side => groups.find(group => group.group_id === state?.project?.[`${side}_group_id`]);
-  const hasView = Boolean(anchor("iv")?.variable_ids?.length && anchor("dv")?.variable_ids?.length
+  // Explore tasks have no cause/outcome pair; a focused variable is their view.
+  const exploreFocus = ["causes", "consequences"].includes(state?.task)
+    && Boolean(state.explore?.[state.task]?.focusId);
+  const hasView = exploreFocus || Boolean(anchor("iv")?.variable_ids?.length && anchor("dv")?.variable_ids?.length
     && state.project.iv_group_id !== state.project.dv_group_id);
   const url = hasView
     ? new URL(buildPermalink({
