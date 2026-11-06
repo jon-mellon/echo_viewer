@@ -374,8 +374,8 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       const empty = group.querySelector(".list-filter-empty");
       if (empty) {
         empty.hidden = shown > 0;
-        empty.textContent = total ? (query && searchStatus() === "loading" ? "Loading variable search…"
-          : query && searchStatus() === "error" ? "Variable search unavailable; no names match."
+        empty.textContent = total ? (query && searchStatus() === "loading" ? "Loading concept search…"
+          : query && searchStatus() === "error" ? "Concept search unavailable; no variable names match."
             : "No variable in this section matches the search.") : empty.dataset.empty;
       }
     }
@@ -589,7 +589,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       const label = id ? labelFor(id) : "";
       const active = picking === side;
       if (!active && document.activeElement !== input) input.value = label;
-      input.placeholder = active && id ? `Search to replace ${label}` : side === "instrument" ? "Optional" : "Search group or constituent variable";
+      input.placeholder = active && id ? `Search to replace ${label}` : side === "instrument" ? "Optional" : "Search variable or underlying concept";
       input.closest(".identify-field")?.classList.toggle("has-focus", Boolean(id));
       input.closest(".identify-field")?.classList.toggle("is-picking", active);
       const accepted = Boolean(id && !active);

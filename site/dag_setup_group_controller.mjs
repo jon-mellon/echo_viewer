@@ -331,7 +331,7 @@ export function createDagSetupGroupController({
           : state.definitionDraft.step === "partition" ? "Construct" : "Review";
         elements.dagStatusBadge.className = "badge";
         elements.workflowHint.textContent = state.definitionDraft.step === "sources"
-          ? "Choose the existing categories whose canonical variables should be available."
+          ? "Choose the existing categories whose underlying concepts should be available."
           : "Use the Variables tab to tap points or draw around them. Return to Setup to search, review, and save.";
         elements.ivSearchBlock.hidden = true;
         elements.dvSearchBlock.hidden = true;
@@ -404,7 +404,7 @@ export function createDagSetupGroupController({
       label.textContent = isNew ? "Search raw variables" : "Search existing groups";
       toggle.textContent = isNew ? "Back to existing groups" : "Define new group";
     }
-    input.placeholder = isNew ? (side === "dv" ? "Income, prejudice, labor-market outcome" : "Education, religiosity, parental status") : "Search group or constituent variable";
+    input.placeholder = isNew ? (side === "dv" ? "Income, prejudice, labor-market outcome" : "Education, religiosity, parental status") : "Search variable or underlying concept";
     if (isNew) { container.hidden = true; container.replaceChildren(); return; }
     const searchProject = dagProjectView ? dagProjectView() : state.project;
     const query = normalized(input.value);
@@ -420,25 +420,25 @@ export function createDagSetupGroupController({
         dataset: { selectNone: "true" }, textContent: "Use None" })) : null;
     const rows = groups.map(({ group, variableMatch }) => h("div", { className: "setup-group-picker-row" },
       h("div", {}, h("strong", { textContent: group.label || group.group_id }),
-        h("span", { textContent: `${group.variable_ids?.length || 0} vars` }),
-        variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched variable: ${truncate(variableMatch, 86)}` }) : null,
+        h("span", { textContent: `${group.variable_ids?.length || 0} concepts` }),
+        variableMatch ? h("span", { className: "setup-group-variable-match", textContent: `Matched concept: ${truncate(variableMatch, 86)}` }) : null,
         group.description ? h("details", { className: "setup-group-definition" },
           h("summary", { textContent: "Definition" }),
           h("p", { textContent: group.description })) : null),
       h("button", { className: "btn btn--sm", type: "button", dataset: { side, groupId: group.group_id },
         textContent: side === "instrument" ? "Use as instrument" : `Use as ${side.toUpperCase()}` })));
     const emptyTitle = query && state.variableSearchStatus === "loading"
-      ? "Loading variable search…"
+      ? "Loading concept search…"
       : query && state.publishedSchemaHydrating
         ? "Loading group memberships…"
         : query && state.variableSearchStatus === "error"
-          ? "Variable search unavailable"
+          ? "Concept search unavailable"
           : "No matching existing groups";
     const title = !groups.length ? emptyTitle
       : query && state.variableSearchStatus === "loading"
-        ? "Existing groups · variable search loading…"
+        ? "Existing groups · concept search loading…"
         : query && state.variableSearchStatus === "error"
-          ? "Existing groups · variable search unavailable"
+          ? "Existing groups · concept search unavailable"
           : "Existing groups";
     replaceChildren(container, noneRow, h("div", { className: "setup-group-picker-title", textContent: title }),
       h("div", { className: "setup-group-picker-list" }, defineRow, ...rows));
@@ -465,7 +465,7 @@ export function createDagSetupGroupController({
     elements.focusSearchBlock.classList.toggle("is-selected", chosen && !picking);
     if (elements.focusInputLabel) elements.focusInputLabel.textContent = "Variable";
     elements.focusInput.placeholder = chosen && picking ? `Search to replace ${focus.label}`
-      : "Search group or constituent variable";
+      : "Search variable or underlying concept";
     if (chosen && !picking && document.activeElement !== elements.focusInput) elements.focusInput.value = focus.label;
     if (!picking) { container.hidden = true; container.replaceChildren(); elements.focusPickerCancel.hidden = true; return; }
     const newPicker = container.hidden;
@@ -492,11 +492,12 @@ export function createDagSetupGroupController({
       const custom = group.source === "user_split";
       return h("li", { className: "explore-row picker-variable-row" },
         h("button", { type: "button", className: "explore-row-open", dataset: { groupId: group.group_id },
-          title: group.description || "", attrs: { "aria-label": pick ? `${pick.action}: ${label}, ${count} variables` : `${label}, ${count} variables` } },
+          title: group.description || "", attrs: { "aria-label": pick ? `${pick.action}: ${label}, ${count} underlying concepts` : `${label}, ${count} underlying concepts` } },
         h("span", { className: "explore-row-text" },
           h("span", { className: "explore-row-label", textContent: label }),
           variableMatch ? h("span", { className: "explore-row-path", textContent: `matches ${truncate(variableMatch, 70)}` }) : null),
-        h("span", { className: "explore-row-papers", textContent: String(count) })),
+        h("span", { className: "explore-row-papers", textContent: String(count),
+          title: `${count} underlying ${count === 1 ? "concept" : "concepts"} in this variable` })),
         h("details", { className: "picker-variable-info", dataset: { groupId: group.group_id },
           open: expandedDefinitions.has(group.group_id) },
           h("summary", { title: `Definition of ${label}`, attrs: { "aria-label": `Definition of ${label}` } }, "ⓘ"),
@@ -506,9 +507,9 @@ export function createDagSetupGroupController({
     };
     // Under "Primary variable": Custom variables, then Built-in variables. The
     // search box above filters both.
-    const status = query && state.variableSearchStatus === "loading" ? "Variable search is loading; matching names only for now."
+    const status = query && state.variableSearchStatus === "loading" ? "Concept search is loading; matching variable names only for now."
       : query && state.publishedSchemaHydrating ? "Loading group memberships…"
-        : query && state.variableSearchStatus === "error" ? "Variable search is unavailable; matching names only." : "";
+        : query && state.variableSearchStatus === "error" ? "Concept search is unavailable; matching variable names only." : "";
     const clearButton = () => h("button", { className: "btn btn--sm", type: "button", dataset: { clearFocusSearch: "true" }, textContent: "Clear search" });
     // A quiet label over each list: the variables are what is being chosen, so they outrank their headings.
     const section = (title, items) => items.length ? h("section", { className: "picker-section" },
@@ -521,6 +522,8 @@ export function createDagSetupGroupController({
         h("h2", { textContent: pick.title }),
         onCancel ? h("button", { className: "btn btn--ghost btn--sm", type: "button", textContent: "Cancel", onclick: onCancel }) : null) : null,
       status ? h("p", { className: "explore-subsection-empty", role: "status", textContent: status }) : null,
+      h("p", { className: "picker-help",
+        textContent: "Each variable groups related underlying concepts. The number beside it counts those concepts. Concepts in a variable are related, not interchangeable; open ⓘ for its definition." }),
       // The one secondary action, above the lists instead of inside an empty section's heading.
       createVariableButton(onCreate, { label: "Create a new variable", className: "btn picker-create" }),
       section("Your variables", custom),
