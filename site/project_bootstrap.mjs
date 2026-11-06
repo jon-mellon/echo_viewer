@@ -59,8 +59,13 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       // Paint with the published edges and the draft's groups first. The draft's
       // edge changes need the complete schema and evidence queries (seconds), so
       // they are applied after the first render.
+      const withDecisions = edges => edges.map(edge => {
+        const decision = normalizeLinkDecision(local.link_decisions?.[edge.edge_id]) || null;
+        return { ...edge, display_status: decision?.display_status || "active_by_default",
+          user_decision: decision };
+      });
       const nodeById = new Map((publishedDag?.nodes || []).map(node => [node.group_id, node]));
-      const compiled = { ...publishedDag, nodes: (local.groups || []).map(group => ({
+      const compiled = { ...publishedDag, edges: withDecisions(publishedDag?.edges || []), nodes: (local.groups || []).map(group => ({
         ...(nodeById.get(group.group_id) || {}), group_id: group.group_id, label: group.label || "",
         member_count: (group.variable_ids || []).length })) };
       state.data = { ...state.data, grouping_sets: [local],
@@ -106,11 +111,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
               dv_group_id: permalink.get("dv"), link_decisions: local.link_decisions || {},
               finding_decisions: local.finding_decisions || {} },
           });
-          const edges = (incremented.edges || []).map(edge => {
-            const decision = normalizeLinkDecision(local.link_decisions?.[edge.edge_id]) || null;
-            return { ...edge, display_status: decision?.display_status || "active_by_default",
-              user_decision: decision };
-          });
+          const edges = withDecisions(incremented.edges || []);
           const next = { ...incremented, edges };
           performance.measure("echo:draft:increment", { start: incrementStart, end: performance.now() });
           state.data = { ...state.data, compiled_dag: next };
