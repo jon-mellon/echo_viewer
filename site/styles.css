@@ -1535,27 +1535,68 @@ h2 {
   border-top: 1px dashed var(--border);
 }
 
-.group-concept-exclude {
+.group-concept-note { margin: var(--space-1) 0 var(--space-3); max-width: 60ch; }
+.group-concepts .small-note + ol,
+.group-concept-excluded + .small-note { margin-top: var(--space-2); }
+
+.group-concepts li,
+.group-concept-excluded li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.group-concept-exclude,
+.group-concept-restore {
+  flex: none;
+  min-height: var(--control-sm);
   margin-left: var(--space-1);
-  padding: 0 var(--space-1);
-  border: 0;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--danger);
-  font-size: var(--text-lg);
-  line-height: 1;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
 .group-concept-exclude:hover,
 .group-concept-exclude:focus-visible {
-  color: var(--danger);
+  border-color: var(--danger);
   background: var(--danger-subtle);
-  border-radius: var(--radius-sm);
+  color: var(--danger);
 }
 
-.group-concept-exclude:disabled {
+.group-concept-restore:hover,
+.group-concept-restore:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.group-concept-exclude:disabled,
+.group-concept-restore:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.group-concept-excluded {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.group-concept-excluded summary { cursor: pointer; font-size: var(--text-sm); color: var(--text-muted); }
+.group-concept-excluded ul { margin: var(--space-2) 0 0; padding: 0; list-style: none; }
+.group-concept-excluded li { padding: var(--space-1) 0; color: var(--text-muted); }
+.group-concept-excluded li span { text-decoration: line-through; text-decoration-color: var(--border); }
+
+@media (pointer: coarse) {
+  .group-concept-exclude,
+  .group-concept-restore { min-height: var(--control-touch); min-width: var(--control-touch); }
 }
 
 .group-concept-pagination,
@@ -3778,6 +3819,27 @@ h2 {
   line-height: var(--leading-tight);
   overflow-wrap: anywhere;
 }
+.evidence-definitions {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.evidence-definition h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-strong);
+}
+.evidence-definition .provenance-count {
+  color: var(--text-muted);
+  font-weight: var(--weight-normal);
+}
+.evidence-definition .group-definition-text {
+  max-width: 75ch;
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.evidence-definition .group-definition-text.is-empty { color: var(--text-muted); font-style: italic; }
 .evidence-meta {
   margin: var(--space-1) 0 0;
   color: var(--text-muted);
@@ -4424,6 +4486,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* Picker definitions stay available without selecting the variable. */
 .picker-variable-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: var(--space-1); }
 .picker-variable-info { display: contents; }
+/* An open <details> wraps its body in a ::details-content box; unless that is display: contents it becomes a stray auto grid column that squeezes the row's label. */
+.picker-variable-info::details-content { display: contents; }
 .picker-variable-info summary, .picker-saved-info { cursor: pointer; color: var(--text-muted); }
 .picker-variable-info summary { list-style: none; padding: var(--space-2); }
 .picker-variable-info summary::-webkit-details-marker { display: none; }

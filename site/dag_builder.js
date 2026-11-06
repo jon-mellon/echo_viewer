@@ -1704,11 +1704,10 @@ function excludeGroupConcept(groupId, variableId, label) {
   const group = groupById(groupId);
   if (!group?.variable_ids.includes(variableId)) return;
   if (state.publishedSchemaHydrating || state.publishedSchemaLoadFailed) return;
-  if (!window.confirm(`Exclude “${label}” from “${group.label || groupId}”? This removes the concept from the schema and updates the DAG.`)) return;
   const before = takeSnapshot();
   const next = projectOps.removeMembers(state.project, groupId, [variableId], nowIso());
   if (applyProjectOperation(next) === false) return;
-  addDecision("concept_excluded", { group_id: groupId, variable_id: variableId });
+  addDecision("concept_excluded", { group_id: groupId, variable_id: variableId, label });
   addToUndoHistory(`Excluded concept from "${group.label || groupId}"`, before);
   // The incremental evidence update will rebuild the graph when its incident
   // links arrive. Update the visible selection now instead of rebuilding twice.
@@ -1718,6 +1717,23 @@ function excludeGroupConcept(groupId, variableId, label) {
     void persistentViewer.commitDecision().then(() =>
       publicationController.workingCopyChanged()).catch(error =>
       console.error("Could not save concept exclusion", error));
+  }
+}
+
+function restoreGroupConcept(groupId, variableId, label) {
+  const group = groupById(groupId);
+  if (!group || group.variable_ids.includes(variableId)) return;
+  if (state.publishedSchemaHydrating || state.publishedSchemaLoadFailed) return;
+  const before = takeSnapshot();
+  if (applyProjectOperation(projectOps.addMembers(state.project, groupId, [variableId], nowIso())) === false) return;
+  addDecision("concept_restored", { group_id: groupId, variable_id: variableId, label });
+  addToUndoHistory(`Restored concept to "${group.label || groupId}"`, before);
+  if (state.compiledDagUpdating) renderAll({ rebuild: false, refreshView: true });
+  else renderAll();
+  if (state.activeGroupId && !persistentViewer.editorOpen) {
+    void persistentViewer.commitDecision().then(() =>
+      publicationController.workingCopyChanged()).catch(error =>
+      console.error("Could not save concept restoration", error));
   }
 }
 
@@ -1956,7 +1972,9 @@ function loadPreviousSplits(force = false) {
   if (previousSplitsLoading || (previousSplitsLoaded && !force)) return;
   previousSplitsLoading = true;
   previousSplitsError = false;
-  void Promise.allSettled([boundedSplitLookup(listOwnPublishedSplits()), boundedSplitLookup(listLocalSchemas())]).then(async ([published, local]) => {
+  // Wrapped so a synchronous throw from either lookup rejects instead of leaving the spinner up forever.
+  const bounded = lookup => boundedSplitLookup(new Promise(resolve => resolve(lookup())));
+  void Promise.allSettled([bounded(listOwnPublishedSplits), bounded(listLocalSchemas)]).then(async ([published, local]) => {
     const localRows = local.status === "fulfilled" ? local.value.flatMap(record =>
       (record.schema?.groups || []).filter(group => group.source === "user_split"
         && group.provenance?.operation === "split_categories" && Array.isArray(group.provenance.source_group_ids))
@@ -1979,9 +1997,11 @@ function loadPreviousSplits(force = false) {
   }).catch(() => { previousSplitsError = true; }).finally(() => {
     previousSplitsLoading = false;
     previousSplitsLoaded = true;
-    setupGroupController.renderFocusPicker();
-    setupGroupController.renderIdentifyPicker();
-    customVariablesPresenter.render();
+    // The custom-variables view shows the spinner, so it renders first and a failing picker cannot block it.
+    for (const render of [() => customVariablesPresenter.render(), () => setupGroupController.renderFocusPicker(),
+      () => setupGroupController.renderIdentifyPicker()]) {
+      try { render(); } catch (error) { console.error("Saved variable render failed", error); }
+    }
   });
 }
 function reusePreviousSplit(role, row, options) { definitionWorkflowController.reusePreviousSplit(role, row, options); }
@@ -2019,6 +2039,7 @@ const inspectorController = createDagInspectorController({
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
   excludeConcept: excludeGroupConcept,
+  restoreConcept: restoreGroupConcept,
 });
 
 const groupEditorController = createDagGroupEditorController({
@@ -2049,6 +2070,7 @@ const setupGroupController = createDagSetupGroupController({
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
   excludeConcept: excludeGroupConcept,
+  restoreConcept: restoreGroupConcept,
 });
 
 const dagNetworkController = createDagNetworkController({
