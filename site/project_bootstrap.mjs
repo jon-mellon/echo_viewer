@@ -12,12 +12,13 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
   normalizeProjectDuplicateAssignments, publicationController, renderAll,
   dagNetworkController, buildDuplicateClusters,
   linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {},
-  onLocalSchemaLoaded = () => {} }) {
+  onLocalSchemaLoaded = () => {}, waitForReadyBeforeShowing = () => false }) {
   const presenter = createProjectBootstrapPresenter({});
   const setStartupStage = message => presenter.setStartupStage(message);
   const finishStartupLoading = () => presenter.finishStartupLoading();
 
   async function init() {
+    const waitForReady = waitForReadyBeforeShowing();
     dagDataSource.onStatus = setStartupStage;
     presenter.configureInterface(state.interfaceMode);
     initElements();
@@ -144,7 +145,12 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       dagNetworkController.getNetwork()?.moveTo({ ...state.permalinkDagViewport, animation: false });
     }
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    finishStartupLoading();
+    if (!waitForReady) finishStartupLoading();
+    else setStartupStage("Restoring your variable…");
+    const ready = async () => {
+      try { await onReady(); }
+      finally { if (waitForReady) finishStartupLoading(); }
+    };
     // The first evidence panel otherwise pays for query-engine startup (WASM
     // instantiation and snapshot validation, over a second). Start it once the
     // schema work is done, in idle time, unless the snapshot has evidence bundles
@@ -201,7 +207,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         void catalogIfSettingUp();
         publicationController.setSchemaReady?.(true);
         void publicationController.refreshPublicationState?.();
-        onReady();
+        await ready();
         preload();
       }).catch(error => {
         if ((state.compiledDagRevision || 0) !== revision) return;
@@ -209,11 +215,12 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         state.publishedSchemaLoadFailed = true;
         publicationController.setSchemaLoadFailed?.();
         console.error("Could not finish loading the published schema.", error);
+        if (waitForReady) finishStartupLoading();
         preload();
       });
     } else {
       void catalogIfSettingUp();
-      onReady();
+      await ready();
       preload();
     }
   }

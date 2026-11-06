@@ -904,8 +904,11 @@ h2 {
 
 .definition-block {
   display: grid;
+  /* A bare grid track grows to its widest child and widens the whole page; this one never exceeds the panel. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
+.definition-block > * { min-width: 0; }
 
 .dag-body.definition-active #setupSection > .section-title,
 .dag-body.definition-active #workflowHint {
@@ -3159,6 +3162,28 @@ h2 {
 @media (min-width: 841px) and (pointer: fine) {
   .task-identify #exploreResults .variable-review-row .variable-disposition-line .select-input { padding-block: 2px; min-height: 0; height: auto; }
 }
+/* Touch rows keep the menu between the name and a full-size info target.
+   Match the label to the 16px field size that prevents Safari focus zoom. */
+@media (pointer: coarse) {
+  .task-identify #exploreResults .variable-review-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--control-touch);
+    align-items: center; column-gap: var(--space-1); padding-bottom: 0;
+  }
+  .task-identify #exploreResults .variable-review-row > .explore-row-open {
+    grid-column: 1; grid-row: 1; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-1); min-width: 0; pointer-events: none;
+  }
+  .task-identify #exploreResults .variable-review-row .explore-row-label { font-size: var(--text-lg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-identify #exploreResults .variable-review-row .variable-disposition-line {
+    grid-column: 2; grid-row: 1; min-width: 0; padding: 0;
+  }
+  .task-identify #exploreResults .variable-review-row .review-info {
+    display: inline-flex; align-items: center; justify-content: center; grid-column: 3; grid-row: 1;
+    width: var(--control-touch); height: var(--control-touch); margin: 0; padding: 0; border: 0;
+    background: transparent; color: var(--accent); font: inherit; font-size: var(--text-lg); cursor: pointer;
+  }
+  .task-identify #exploreResults .variable-review-row > :not(.explore-row-open, .variable-disposition-line, .review-info) { grid-column: 1 / -1; }
+  .task-identify #exploreResults .variable-review-row:not(:has(.variable-disposition-line)) > .explore-row-open { grid-column: 1 / -1; }
+}
 .review-edit-note { width: auto; margin: var(--space-1) var(--space-2) 0; }
 /* The body scrolls; the footer with the outcome and the buttons stays in view. */
 .variable-review-dialog[open] { display: flex; flex-direction: column; width: min(680px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: hidden; padding: 0; }
@@ -4317,6 +4342,8 @@ div.explore-subsection-empty p, .custom-variables-empty p { margin: 0 0 var(--sp
    Choosing a variable focuses a search field, so on touch screens every field is at least 16px.
    Component rules (a bare `font: inherit` on an id was enough) would otherwise win on specificity, so this one
    cannot lose; tests/mobile_no_zoom.spec.cjs scans every screen for a field that slips through. */
+/* iOS Safari enlarges text it judges too small for its block, which makes one screen read larger than the rest. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 @media (pointer: coarse) {
   :is(input, textarea, select):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
     font-size: var(--text-lg) !important; /* token-exempt: a field under 16px makes iOS zoom the page */
@@ -4341,3 +4368,6 @@ div.explore-subsection-empty p, .custom-variables-empty p { margin: 0 0 var(--sp
 @media (pointer: coarse) {
   .custom-variables-previous .btn, .custom-variables-grid .actions .btn { min-height: var(--control-touch); }
 }
+
+/* ?layout_debug=1: a phone's own report of its zoom and overflow. */
+.layout-debug { position: fixed; left: var(--space-2); bottom: var(--space-2); z-index: 30000; max-width: calc(100vw - 2 * var(--space-2)); margin: 0; padding: var(--space-1) var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--overlay); color: var(--text); font-family: monospace; font-size: var(--text-sm); line-height: var(--leading-tight); pointer-events: none; white-space: pre-wrap; overflow-wrap: anywhere; }

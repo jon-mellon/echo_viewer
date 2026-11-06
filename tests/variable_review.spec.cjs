@@ -153,7 +153,13 @@ test("on a phone tapping a variable's name does not open its definition; the inf
   await page.waitForTimeout(400);
   expect(await page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBeFalsy();
   const info = row.locator(".review-info");
-  expect((await info.boundingBox()).width).toBeGreaterThanOrEqual(44);
+  const infoBox = await info.boundingBox();
+  const menuBox = await row.locator("select").boundingBox();
+  expect(infoBox.width).toBeGreaterThanOrEqual(44);
+  expect(infoBox.x).toBeGreaterThanOrEqual(menuBox.x + menuBox.width);
+  expect(Math.abs(infoBox.y + infoBox.height / 2 - menuBox.y - menuBox.height / 2)).toBeLessThan(1);
+  const sizes = await row.evaluate(el => ["select", ".explore-row-label"].map(selector => getComputedStyle(el.querySelector(selector)).fontSize));
+  expect(sizes[0]).toBe(sizes[1]);
   await info.tap();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBe("c");
   await context.close();
