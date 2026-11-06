@@ -77,7 +77,7 @@ test("controlled and design-addressed confounders have a lighter fill in every i
   const node = status => display.visNodeData(group, null, {}, { ...view, confounderStatus: status });
   const normal = node("unaddressed").color.background;
   const lighter = display.mixHex(display.OKABE_ITO.vermillion, "#ffffff", 0.8);
-  for (const status of ["explicitly_controlled", "accounted_for_by_design"]) {
+  for (const status of ["explicitly_controlled", "accounted_for_by_design", "removed_other", "other"]) {
     const styled = node(status);
     assert.equal(styled.color.background, lighter);
     assert.equal(styled.color.highlight.background, lighter);
@@ -85,7 +85,6 @@ test("controlled and design-addressed confounders have a lighter fill in every i
     assert.notEqual(styled.color.background, normal);
     assert.equal(styled.font.color, node("unaddressed").font.color);
   }
-  assert.equal(node("other").color.background, normal);
   const colliderView = { ...view, showConfoundersOnly: false, showCollidersOnly: true, colliderGroupIds: new Set(["c"]) };
   assert.equal(display.visNodeData(group, null, {}, { ...colliderView, confounderStatus: "explicitly_controlled" }).color.background,
     display.visNodeData(group, null, {}, colliderView).color.background);
