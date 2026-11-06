@@ -12,7 +12,7 @@ import { publicSchemaProjection } from "./public_schema_projection.mjs";
 export function createCustomVariablesPresenter({ state, elements: els, truncate, normalized,
   customVariables, sourceLabels, canChange, onCreate, onEdit, onDelete,
   canExplore = () => false, onExplore = () => {}, previousSplits = () => [],
-  loadPreviousSplits = () => {}, reusePreviousSplit = () => {}, schemaVariables = customVariables,
+  loadPreviousSplits = () => {}, reusePreviousSplit = () => {}, splitsLoading = () => false, schemaVariables = customVariables,
   onSplitSource = () => {}, getSchema = () => ({}), loadDetails = async () => {}, conceptLabel = id => id }) {
   let confirmingId = null;
   let deleting = false;
@@ -55,55 +55,53 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     const query = normalized(els.customVariablesFilter.value);
     const previous = previousSplits().filter(item => !all.some(group => group.group_id === item.group_id)
       && (!query || normalized([item.name, item.description, ...(item.source_labels || [])].join(" ")).includes(query)));
+    // Your own variables lead; the built-in ones follow. Each group stays alphabetical.
     const rows = all.filter(group => !query || normalized([group.label, group.description,
-      ...sourceLabels(group)].join(" ")).includes(query));
+      ...sourceLabels(group)].join(" ")).includes(query))
+      .sort((a, b) => Number(b.source === "user_split") - Number(a.source === "user_split"));
     const highlight = state.customVariablesHighlight;
     if (highlight && all.some(group => group.group_id === highlight) && !status) {
       status = `Added “${all.find(group => group.group_id === highlight).label}” to this schema.`;
     }
     els.customVariablesTitle.textContent = "Edit variable schema";
-    els.customVariablesFilter.hidden = !all.length && !previous.length;
+    els.customVariablesFilter.hidden = !all.length;
     els.customVariablesStatus.textContent = status;
     els.customVariablesStatus.hidden = !status;
-    if (!all.length && !previous.length) {
-      replaceChildren(els.customVariablesTable, h("div", { className: "custom-variables-empty" },
-        h("p", { textContent: "You have not made any custom variables yet." }),
-        h("p", { className: "small-note", textContent: "Make one when an existing variable mixes things you want to study separately — for example, to take school grades out of academic achievement." })));
-      return;
-    }
-    if (!rows.length && !previous.length) {
-      replaceChildren(els.customVariablesTable, h("div", { className: "custom-variables-empty" },
-        h("p", { textContent: "No custom variables match this filter." }),
-        h("button", { className: "btn btn--sm", type: "button", dataset: { action: "clear-filter" }, textContent: "Clear filter" })));
-      els.customVariablesTable.querySelector("button[data-action=clear-filter]")?.addEventListener("click", () => {
-        els.customVariablesFilter.value = "";
-        render();
-        els.customVariablesFilter.focus();
-      });
-      return;
-    }
     const busy = state.publishedSchemaHydrating || state.publishedSchemaLoadFailed || deleting;
     // Saved variables from elsewhere come first: they are what you add; the schema list below is what you have.
     const sections = [];
-    if (previous.length) {
-      sections.push(h("section", { className: "custom-variables-previous" },
-        h("h2", { textContent: "Saved elsewhere" }),
-        h("p", { className: "small-note", textContent: "Add a saved variable to this schema by splitting its source groups." }),
-        ...previous.map(item => h("div", { className: "setup-group-picker-row" },
-          h("div", {}, h("strong", { textContent: item.name }),
-            h("span", { textContent: `From: ${(item.source_labels || item.source_group_ids || []).join(", ")}` })),
-          h("button", { type: "button", className: "btn btn--sm", textContent: "Add to schema",
-            attrs: { "aria-label": `Add ${item.name} to schema` },
-            onclick: () => reusePreviousSplit("candidate", item) })))));
-    }
-    sections.push(h("h2", { textContent: "In this schema" }), h("table", { className: "custom-variables-grid" },
-      h("thead", {}, h("tr", {},
-        h("th", { scope: "col", textContent: "Name" }),
-        h("th", { scope: "col", className: "num", textContent: "Concepts" }),
-        h("th", { scope: "col", className: "actions" }, h("span", { className: "sr-only", textContent: "Actions" })))),
-      h("tbody", {}, rows.flatMap(group => [row(group, { busy, highlight }), group.group_id === expandedId ? detailsRow(group) : null]))));
+    // Always shown, so it is clear whether there is anything to reuse and whether the search has finished.
+    const loadingSplits = splitsLoading();
+    sections.push(h("section", { className: "custom-variables-previous" },
+      h("h2", {}, "Saved in other schemas", previous.length ? h("span", { className: "picker-count", textContent: ` · ${previous.length}` }) : null),
+      previous.length ? h("p", { className: "small-note", textContent: "Add one to this schema by splitting its source groups." }) : null,
+      ...previous.map(item => h("div", { className: "setup-group-picker-row" },
+        h("div", {}, h("strong", { textContent: item.name }),
+          h("span", { textContent: `From: ${(item.source_labels || item.source_group_ids || []).join(", ")}` })),
+        h("button", { type: "button", className: "btn btn--sm", textContent: "Add to schema",
+          attrs: { "aria-label": `Add ${item.name} to schema` },
+          onclick: () => reusePreviousSplit("candidate", item) }))),
+      previous.length ? null : h("p", { className: "small-note custom-variables-none", role: "status",
+        textContent: loadingSplits ? "Looking for saved variables…"
+          : query ? "No saved variable matches this filter."
+            : "Nothing saved in other schemas yet. Variables you create elsewhere will appear here, ready to add." })));
+    sections.push(h("h2", { textContent: "In this schema" }), rows.length
+      ? h("table", { className: "custom-variables-grid" },
+        h("thead", {}, h("tr", {},
+          h("th", { scope: "col", textContent: "Name" }),
+          h("th", { scope: "col", className: "num", textContent: "Concepts" }),
+          h("th", { scope: "col", className: "actions" }, h("span", { className: "sr-only", textContent: "Actions" })))),
+        h("tbody", {}, rows.flatMap(group => [row(group, { busy, highlight }), group.group_id === expandedId ? detailsRow(group) : null])))
+      : h("div", { className: "custom-variables-empty" },
+        h("p", { textContent: "No variable in this schema matches this filter." }),
+        h("button", { className: "btn btn--sm", type: "button", dataset: { action: "clear-filter" }, textContent: "Clear filter" })));
     replaceChildren(els.customVariablesTable, ...sections);
-    els.customVariablesTable.querySelectorAll("button[data-action]").forEach(button =>
+    els.customVariablesTable.querySelector("button[data-action=clear-filter]")?.addEventListener("click", () => {
+      els.customVariablesFilter.value = "";
+      render();
+      els.customVariablesFilter.focus();
+    });
+    els.customVariablesTable.querySelectorAll("button[data-action]:not([data-action=clear-filter])").forEach(button =>
       button.addEventListener("click", () => act(button.dataset.action, button.dataset.groupId)));
   }
 

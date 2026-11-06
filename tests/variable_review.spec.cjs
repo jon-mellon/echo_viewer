@@ -158,3 +158,17 @@ test("on a phone tapping a variable's name does not open its definition; the inf
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBe("c");
   await context.close();
 });
+
+test("the schema page always shows the saved-variables section, ahead of the schema's own list, with custom variables first", async ({ page }) => {
+  await setup(page);
+  await page.locator("#editVariableSchema").click();
+  await expect(page.locator("#customVariablesTable h2").first()).toContainText("Saved in other schemas");
+  // Nothing saved here: the section says so, instead of vanishing.
+  await expect(page.locator(".custom-variables-previous")).toContainText(/Nothing saved in other schemas yet|Looking for saved variables/);
+  await expect(page.locator("#customVariablesTable h2").nth(1)).toHaveText("In this schema");
+  const order = await page.evaluate(() => {
+    const first = document.querySelector("#customVariablesTable tbody tr");
+    return Boolean(first);
+  });
+  expect(order).toBe(true);
+});

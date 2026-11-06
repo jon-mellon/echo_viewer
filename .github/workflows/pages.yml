@@ -31,6 +31,12 @@ jobs:
         run: npm ci
       - name: Run unit and architecture checks
         run: npm test
+      # The browser download is the slowest and least predictable step; keep it between runs.
+      - name: Restore Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install profiling browser
         run: npx playwright install --with-deps chromium
       # Published schema files are immutable; keep them between runs instead of

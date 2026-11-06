@@ -35,6 +35,12 @@ jobs:
       - name: Build Echo
         run: npm run build:site
 
+      # The browser download is the slowest and least predictable step; keep it between runs.
+      - name: Restore Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install profiling browser
         run: npx playwright install --with-deps chromium
 
