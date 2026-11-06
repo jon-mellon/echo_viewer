@@ -489,7 +489,20 @@ function initPanelResizers() {
 }
 
 function installDagHandlers() {
-  // vis.js handles all DAG interaction (zoom, pan, click) natively
+  // vis.js handles all DAG interaction (zoom, pan, click) natively.
+  // Evidence, the schema editor and the table all hide the map with display:none. vis keeps its stale
+  // canvas size and viewport across that, so whenever the map regains a size, resize the canvas and refit.
+  let hadSize = Boolean(els.dagNetwork.clientWidth);
+  new ResizeObserver(() => {
+    const hasSize = Boolean(els.dagNetwork.clientWidth && els.dagNetwork.clientHeight);
+    const revealed = hasSize && !hadSize;
+    hadSize = hasSize;
+    const network = dagNetworkController.getNetwork();
+    if (!revealed || !network) return;
+    network.setSize("100%", "100%");
+    network.redraw();
+    dagNetworkController.fit();
+  }).observe(els.dagNetwork);
 }
 
 // ─── Render orchestration ──────────────────────────────────────────────────────
@@ -2247,15 +2260,6 @@ const eventController = createDagEventController({
     const returnToVariables = document.body.classList.contains("evidence-from-variables");
     dismissEvidencePane();
     if (returnToVariables) shellController.showMobilePanel("controls");
-    // The map was display:none while evidence replaced it, so vis kept its stale canvas size
-    // and viewport; once it is visible again, resize the canvas and refit.
-    else requestAnimationFrame(() => {
-      const network = dagNetworkController.getNetwork();
-      if (!network) return;
-      network.setSize("100%", "100%");
-      network.redraw();
-      dagNetworkController.fit();
-    });
   },
   showExcludedLinks, showExcludedFindings,
 });
