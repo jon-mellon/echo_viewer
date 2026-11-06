@@ -479,6 +479,8 @@ export function createDagSetupGroupController({
 
   /** The Custom and Built-in variable lists a search field opens, in the Explore row style. */
   function renderPickerList(container, { query, input, onChoose, onCreate, exclude = new Set(), pick = null, onCancel = null }) {
+    const expandedDefinitions = new Set([...container.querySelectorAll("details.picker-variable-info[open]")]
+      .map(detail => detail.dataset.groupId));
     loadPreviousSplits();
     const groups = searchFocusGroups(query).filter(({ group }) => !exclude.has(group.group_id));
     const previous = previousSplits(pick?.role || "candidate").filter(item => !groups.some(({ group }) => group.group_id === item.group_id)
@@ -495,7 +497,8 @@ export function createDagSetupGroupController({
           h("span", { className: "explore-row-label", textContent: label }),
           variableMatch ? h("span", { className: "explore-row-path", textContent: `matches ${truncate(variableMatch, 70)}` }) : null),
         h("span", { className: "explore-row-papers", textContent: String(count) })),
-        h("details", { className: "picker-variable-info" },
+        h("details", { className: "picker-variable-info", dataset: { groupId: group.group_id },
+          open: expandedDefinitions.has(group.group_id) },
           h("summary", { title: `Definition of ${label}`, attrs: { "aria-label": `Definition of ${label}` } }, "ⓘ"),
           h("p", { textContent: group.description || "No definition available." })),
         custom ? customVariableActions({ group, canChange: canChangeCustom,
