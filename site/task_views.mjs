@@ -138,6 +138,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   const listFilter = { open: false, query: "" };
   // The Identify field being searched (iv, dv or instrument); not part of the saved view.
   let identifyPicking = null;
+  let identifyPickerDismissed = false;
   let identifyListKey = null;
   // The Identify panel's list filter; not part of the saved view.
 
@@ -253,6 +254,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     changing.causes = false;
     changing.consequences = false;
     identifyPicking = null;
+    identifyPickerDismissed = false;
     onTaskChange({ previous, task: null });
     render();
     onChange();
@@ -283,6 +285,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     }
     changing.causes = false;
     changing.consequences = false;
+    identifyPickerDismissed = false;
     onTaskChange({ previous, task });
     render();
     if (needsSetup()) onSetupNeeded();
@@ -565,6 +568,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
   function identifySide() {
     if (!identifying() || state.definitionDraft) return null;
     if (identifyPicking) return identifyPicking;
+    if (identifyPickerDismissed) return null;
     if (!anchorConfigured("iv")) return "iv";
     if (!anchorConfigured("dv")) return "dv";
     return null;
@@ -591,6 +595,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
 
   function startIdentifyPicking(side) {
     if (identifyPicking === side) return;
+    identifyPickerDismissed = false;
     identifyPicking = side;
     const input = identifyInput(side);
     // Start from the full list, not a search for the current variable's name.
@@ -598,16 +603,21 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     onIdentifyPicking();
   }
   function cancelIdentifyPicking() {
-    if (!identifyPicking) return;
-    const side = identifyPicking;
+    const side = identifySide();
+    if (!side) return;
     identifyPicking = null;
+    // Missing anchors normally open their picker automatically. Remember an
+    // explicit dismissal so a render does not immediately open it again.
+    identifyPickerDismissed = true;
     const id = anchorId(side);
     const input = identifyInput(side);
     if (input) input.value = id ? labelFor(id) : "";
+    input?.blur();
     onIdentifyPicking();
   }
   function chooseIdentify(side, groupId) {
     identifyPicking = null;
+    identifyPickerDismissed = false;
     identifyInput(side)?.blur();
     onChooseIdentify(side, groupId);
   }
@@ -895,7 +905,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       input.addEventListener("focus", () => { if (identifying()) startIdentifyPicking(side); });
       input.addEventListener("input", () => { renderIdentifyFields(); onIdentifyPicking(); });
       input.addEventListener("keydown", event => {
-        if (event.key !== "Escape" || !identifyPicking) return;
+        if (event.key !== "Escape" || !identifySide()) return;
         event.preventDefault();
         cancelIdentifyPicking();
         input.blur();

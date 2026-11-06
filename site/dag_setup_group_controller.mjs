@@ -477,7 +477,7 @@ export function createDagSetupGroupController({
   }
 
   /** The Custom and Built-in variable lists a search field opens, in the Explore row style. */
-  function renderPickerList(container, { query, input, onChoose, onCreate, exclude = new Set(), pick = null, onCancel = null, replacing = false }) {
+  function renderPickerList(container, { query, input, onChoose, onCreate, exclude = new Set(), pick = null, onCancel = null }) {
     loadPreviousSplits();
     const groups = searchFocusGroups(query).filter(({ group }) => !exclude.has(group.group_id));
     const previous = previousSplits(pick?.role || "candidate").filter(item => !groups.some(({ group }) => group.group_id === item.group_id)
@@ -514,7 +514,7 @@ export function createDagSetupGroupController({
     replaceChildren(container,
       pick ? h("div", { className: "identify-picker-head" },
         h("h2", { textContent: pick.title }),
-        replacing ? h("button", { className: "btn btn--ghost btn--sm", type: "button", textContent: "Cancel", onclick: onCancel }) : null) : null,
+        onCancel ? h("button", { className: "btn btn--ghost btn--sm", type: "button", textContent: "Cancel", onclick: onCancel }) : null) : null,
       status ? h("p", { className: "explore-subsection-empty", role: "status", textContent: status }) : null,
       section("In this schema", custom, pick ? null : query ? "No custom variable matches." : "You have not made any custom variables yet.",
         createVariableButton(onCreate)),
@@ -552,7 +552,7 @@ export function createDagSetupGroupController({
     const role = { iv: "cause", dv: "outcome", instrument: "instrument" }[side];
     renderPickerList(container, { query: normalized(input?.value || ""), input, exclude,
       pick: { title: `Choose ${role}`, action: `Use as ${role}`, role: side },
-      replacing: Boolean(state.project?.[`${side}_group_id`]), onCancel: onCancelIdentify,
+      onCancel: onCancelIdentify,
       onChoose: groupId => onChooseIdentify(side, groupId), onCreate: () => startDefinition?.(side) });
     container.dataset.pickerSide = side;
     if (newPicker) container.scrollTop = 0;
