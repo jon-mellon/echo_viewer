@@ -50,9 +50,9 @@ function visOptionSignature(params = {}) {
   ]);
 }
 
-// vis-network's fit() defaults to maxZoomLevel: 1, leaving small DAGs surrounded
-// by empty canvas even when there is room to display them larger.
-export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: Number.MAX_VALUE };
+// Allow small DAGs to grow beyond vis-network's default scale of 1, but avoid
+// enlarging a lone node until it fills the entire viewport when filters remove links.
+export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: 2.5 };
 
 // Fitting a large DAG into the viewport can shrink labels to a few pixels, which is
 // unreadable (vis-network stops drawing text entirely below ~3px). Never fit tighter

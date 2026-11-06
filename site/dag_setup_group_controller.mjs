@@ -492,7 +492,7 @@ export function createDagSetupGroupController({
       const custom = group.source === "user_split";
       return h("li", { className: "explore-row picker-variable-row" },
         h("button", { type: "button", className: "explore-row-open", dataset: { groupId: group.group_id },
-          title: group.description || "", attrs: { "aria-label": pick ? `${pick.action}: ${label}, ${count} variables` : `${label}, ${count} variables` } },
+          title: group.description || "", attrs: { "aria-label": `${pick ? `${pick.action}: ` : ""}${label}, ${count} variables${variableMatch ? `, matches ${variableMatch}` : ""}` } },
         h("span", { className: "explore-row-text" },
           h("span", { className: "explore-row-label", textContent: label }),
           variableMatch ? h("span", { className: "explore-row-path", textContent: `matches ${truncate(variableMatch, 70)}` }) : null),
@@ -535,7 +535,9 @@ export function createDagSetupGroupController({
             title: `Review ${item.name}`, attrs: { "aria-label": `Review definition of ${item.name}` },
             onclick: () => reusePreviousSplit(pick?.role || "candidate", item) }, "ⓘ"))))) : null,
       section(custom.length || previous.length ? "All other variables" : "Variables", builtIn),
-      query && !groups.length ? h("div", { className: "explore-subsection-empty" }, clearButton()) : null);
+      query && !groups.length && !previous.length ? h("div", { className: "explore-subsection-empty" },
+        h("p", { role: "status", textContent: state.variableSearchStatus === "loading" || state.publishedSchemaHydrating
+          ? "No matches found yet." : state.variableSearchStatus === "error" ? "No matching variable names." : "No matching variables." }), clearButton()) : null);
     container.querySelectorAll("button[data-group-id]").forEach(button =>
       button.addEventListener("click", () => onChoose(button.dataset.groupId)));
     container.querySelector("button[data-clear-focus-search]")?.addEventListener("click", () => {
