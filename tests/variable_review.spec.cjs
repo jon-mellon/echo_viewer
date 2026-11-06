@@ -178,3 +178,14 @@ test("the schema page always shows the saved-variables section, ahead of the sch
   });
   expect(order).toBe(true);
 });
+
+test("on a phone the disposition menu is wide enough to read its choice", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  await setup(page);
+  const menu = page.locator('.variable-disposition[data-group-id="c"]');
+  await menu.selectOption("not_in_minimal_adjustment_set");
+  // Two touch-layout rules once fought over the row's columns and left the menu 44px wide, showing one letter.
+  expect((await menu.boundingBox()).width).toBeGreaterThanOrEqual(120);
+  await context.close();
+});
