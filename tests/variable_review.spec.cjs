@@ -141,3 +141,19 @@ test("on a phone the exclusion warning is tappable and its text is readable", as
   await expect(page.locator(".review-warning-text")).toBeVisible();
   await context.close();
 });
+
+test("on a phone tapping a variable's name does not open its definition; the info button does", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  await setup(page);
+  const row = page.locator('.variable-review-row[data-group-id="c"]');
+  const name = await row.locator(".explore-row-label").boundingBox();
+  await page.touchscreen.tap(name.x + 8, name.y + 4);
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBeFalsy();
+  const info = row.locator(".review-info");
+  expect((await info.boundingBox()).width).toBeGreaterThanOrEqual(44);
+  await info.tap();
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBe("c");
+  await context.close();
+});

@@ -83,14 +83,10 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       return;
     }
     const busy = state.publishedSchemaHydrating || state.publishedSchemaLoadFailed || deleting;
-    replaceChildren(els.customVariablesTable, h("h2", { textContent: "In this schema" }), h("table", { className: "custom-variables-grid" },
-      h("thead", {}, h("tr", {},
-        h("th", { scope: "col", textContent: "Name" }),
-        h("th", { scope: "col", className: "num", textContent: "Concepts" }),
-        h("th", { scope: "col", className: "actions" }, h("span", { className: "sr-only", textContent: "Actions" })))),
-      h("tbody", {}, rows.flatMap(group => [row(group, { busy, highlight }), group.group_id === expandedId ? detailsRow(group) : null]))));
+    // Saved variables from elsewhere come first: they are what you add; the schema list below is what you have.
+    const sections = [];
     if (previous.length) {
-      els.customVariablesTable.append(h("section", { className: "custom-variables-previous" },
+      sections.push(h("section", { className: "custom-variables-previous" },
         h("h2", { textContent: "Saved elsewhere" }),
         h("p", { className: "small-note", textContent: "Add a saved variable to this schema by splitting its source groups." }),
         ...previous.map(item => h("div", { className: "setup-group-picker-row" },
@@ -100,6 +96,13 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
             attrs: { "aria-label": `Add ${item.name} to schema` },
             onclick: () => reusePreviousSplit("candidate", item) })))));
     }
+    sections.push(h("h2", { textContent: "In this schema" }), h("table", { className: "custom-variables-grid" },
+      h("thead", {}, h("tr", {},
+        h("th", { scope: "col", textContent: "Name" }),
+        h("th", { scope: "col", className: "num", textContent: "Concepts" }),
+        h("th", { scope: "col", className: "actions" }, h("span", { className: "sr-only", textContent: "Actions" })))),
+      h("tbody", {}, rows.flatMap(group => [row(group, { busy, highlight }), group.group_id === expandedId ? detailsRow(group) : null]))));
+    replaceChildren(els.customVariablesTable, ...sections);
     els.customVariablesTable.querySelectorAll("button[data-action]").forEach(button =>
       button.addEventListener("click", () => act(button.dataset.action, button.dataset.groupId)));
   }

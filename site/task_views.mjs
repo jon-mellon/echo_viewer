@@ -717,6 +717,9 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
               h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: label.replace(/\//g, "/\u200b") }),
                 item.between.length ? h("span", { className: "explore-row-path", textContent: `via ${item.between.map(labelFor).join(", ")}` }) : null),
               h("span", { className: "explore-row-papers", textContent: item.papers === null ? "" : String(item.papers) })),
+            // On a touch screen the name is not a target (too close to the menu below it); this button opens the definition.
+            reviewable ? h("button", { type: "button", className: "review-info", title: `See the definition and concepts of ${label}`,
+              attrs: { "aria-label": `Definition of ${label}` }, onclick: () => onOpenIdentifyVariable(item.groupId) }, "ⓘ") : null,
             select ? h("div", { className: "variable-disposition-line" }, select, warning) : null,
             warningText,
             item.noLongerCandidate && item.rejected && item.status !== "removed_other" ? h("p", { className: "small-note review-row-note", textContent: "Not a candidate with the current filters." }) : null,

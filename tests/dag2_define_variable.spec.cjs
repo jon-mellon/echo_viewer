@@ -739,6 +739,8 @@ test("add a saved variable to the schema without selecting an analysis role", as
   await expect(page.locator("#customVariablesView")).toBeVisible();
   const saved = page.locator(".custom-variables-previous");
   await expect(saved).toContainText("Saved test variable");
+  // Saved variables lead the page; the schema's own list follows.
+  expect(await page.locator("#customVariablesTable h2").allTextContents()).toEqual(["Saved elsewhere", "In this schema"]);
   await expect(saved).toContainText(before.source);
   await saved.getByRole("button", { name: "Add Saved test variable to schema" }).click();
   await expect(page.locator("#definitionSavedLoading")).toBeVisible();
