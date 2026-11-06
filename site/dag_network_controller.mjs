@@ -60,6 +60,13 @@ export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: Number.MAX_VALU
 const MIN_READABLE_FONT_PX = 9;
 let _dagFontSize = 14;
 
+// A new network paints at vis-network's default scale until the first fit, so a
+// node reads as an enormous blob on reload. Keep the canvas hidden until then.
+let _dagAwaitingInitialFit = false;
+function revealDagNetwork() {
+  if (!_dagAwaitingInitialFit) els.dagNetwork.style.visibility = "";
+}
+
 export function fitDagNetwork(network) {
   if (!network) return;
   network.fit(DAG_FIT_OPTIONS);
@@ -778,7 +785,13 @@ async function applyDagRender(groups, layout, routes) {
     _visOptionSignature = visOptionSignature(layout.params);
     patchBoxBorderDistance(_visNetwork);
     attachDagNetworkHandlers(_visNetwork);
-    setTimeout(() => fitDagNetwork(_visNetwork), 80);
+    _dagAwaitingInitialFit = true;
+    els.dagNetwork.style.visibility = "hidden";
+    setTimeout(() => {
+      fitDagNetwork(_visNetwork);
+      _dagAwaitingInitialFit = false;
+      els.dagNetwork.style.visibility = "";
+    }, 80);
   } else {
     // Update the existing network in place. Destroying/recreating the network
     // synchronously here is unsafe when renderDag() is called from inside a visApi.js
@@ -857,7 +870,7 @@ async function applyDagRender(groups, layout, routes) {
       setTimeout(() => fitDagNetwork(_visNetwork), 120);
     }
   }
-  els.dagNetwork.style.visibility = "";
+  revealDagNetwork();
 }
 
 function applyReusedDagRender(groups, layout, routes) {
@@ -912,7 +925,7 @@ function applyReusedDagRender(groups, layout, routes) {
   }
   if (changedNodes.length) _visNodes.update(changedNodes);
   _renderedSelectedEdgeId = state.selectedEdgeId;
-  els.dagNetwork.style.visibility = "";
+  revealDagNetwork();
   // DataSet additions/removals/updates schedule their own coalesced paint.
 }
 
