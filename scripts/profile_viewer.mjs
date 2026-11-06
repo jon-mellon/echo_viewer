@@ -22,7 +22,8 @@ const results = { started, url, browser: browserName, profileScenario: permalink
   device: mobile ? "mobile" : "desktop", scenarios: [], errors: [] };
 const scenarioBudgets = {
   "open variable definition": 750,
-  "describe definition": 750,
+  // Review may still wait for the source metadata that loads during naming.
+  "describe definition": 2500,
   "select definition source": 2500,
   "select definition variable": 1000,
   "incident links (40 variables)": 1000,
@@ -292,18 +293,18 @@ try {
     await page.locator("#definitionSourceList input[data-source-id]").first().check();
     await page.locator("#definitionContinue").click();
     await page.locator("#definitionNewLabel").waitFor({ state: "visible" });
-    const loaded = await page.evaluate(groupId => {
-      const state = window.__dagBuilderState;
-      const ids = state.project.groups.find(group => group.group_id === groupId)?.variable_ids || [];
-      return { total: ids.length, missing: ids.filter(id => !state.variableById.has(id)).length };
-    }, sourceGroupId);
-    if (!loaded.total || loaded.missing) throw new Error(`Definition metadata missing for ${loaded.missing}/${loaded.total} variables`);
   });
   await measure("describe definition", async () => {
     await page.locator("#definitionNewLabel").fill("Profile variable");
     await page.locator("#definitionNewDescription").fill("A variable made while profiling the viewer.");
     await page.locator("#definitionDescribeNext").click();
     await page.locator("#definitionPartitionStep").waitFor({ state: "visible" });
+    const loaded = await page.evaluate(groupId => {
+      const state = window.__dagBuilderState;
+      const ids = state.project.groups.find(group => group.group_id === groupId)?.variable_ids || [];
+      return { total: ids.length, missing: ids.filter(id => !state.variableById.has(id)).length };
+    }, sourceGroupId);
+    if (!loaded.total || loaded.missing) throw new Error(`Definition metadata missing for ${loaded.missing}/${loaded.total} variables`);
   });
   await measure("select definition variable", async () => {
     const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
