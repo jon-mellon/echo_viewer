@@ -222,10 +222,9 @@ test("OpenRouter returns to the variable picker with the current anchors", async
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
   await expect(page.locator("#definitionTitle")).toHaveText("Create a variable");
   expect(await page.evaluate(() => window.__oauthDefinitionVisibleAtReveal)).toBe(true);
-  await expect(page.locator("#definitionAiLimitText")).toContainText("User not found");
-  await expect(page.locator("#definitionAiConnect")).toBeHidden();
-  await page.locator("#definitionAiRecheck").click();
+  // The first check fails with "User not found" as OpenRouter finishes issuing the key; the retry succeeds.
   await expect(page.locator("#definitionAiLimitSummary")).toContainText("$5 cap");
+  await expect(page.locator("#definitionAiConnect")).toBeHidden();
   expect(keyChecks).toBe(2);
   expect(await page.evaluate(() => [window.__dagBuilderState.definitionDraft.role, window.__dagBuilderState.project.iv_group_id, window.__dagBuilderState.project.dv_group_id])).toEqual(["candidate", ...anchors]);
 });

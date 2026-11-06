@@ -38,6 +38,10 @@ async function sha256Base64Url(value) {
   return base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
 }
 
+// A new key has taken up to a couple of minutes to be recognised by OpenRouter.
+const NEW_KEY_CHECK_RETRIES = 40;
+const NEW_KEY_CHECK_DELAY_MS = 3000;
+
 async function keySettingsUrl(key) {
   const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key)));
   return `https://openrouter.ai/keys/${[...hash].map(byte => byte.toString(16).padStart(2, "0")).join("")}`;
@@ -69,6 +73,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   let message = "";
   // "idle" before a key exists, then "checking", "ok", "invalid" (the key breaks a rule) or "error" (the check itself failed).
   let keyCheck = "idle";
+  let newKeyWaiting = false;
   const LOW_SCORE = 0.65;
   let runRevision = 0;
   let checkpoint = null;
@@ -414,7 +419,9 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       ? `$${keyInfo.limit} cap · $${Number(keyInfo.limit_remaining).toFixed(2)} left` : "";
     els.definitionAiLimitText.textContent = !key
       ? "The key needs a maximum spend of $5 or less that never resets. This is checked after you connect."
-      : keyCheck === "checking" ? "Checking the key's spending limit…"
+      : keyCheck === "checking" ? (newKeyWaiting
+        ? "OpenRouter hasn't recognised the new key yet. This can take a minute or two, so we'll keep checking."
+        : "Checking the key's spending limit…")
         : keyCheck === "invalid" || keyCheck === "error" ? message
           : "The key needs a maximum spend of $5 or less that never resets.";
     els.definitionAiLimitText.classList.toggle("is-error", limitState === "error");
@@ -580,8 +587,27 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       onConnectionChange(false);
       return;
     }
-    // Keep the issued key when the limit check fails so the user can retry it.
-    await checkKey().catch(() => {});
+    // OpenRouter can answer "User not found" for a few seconds after issuing a key,
+    // so retry before asking the user. The issued key is kept if every attempt
+    // fails, so they can recheck it themselves.
+    try {
+      for (let attempt = 0; attempt <= NEW_KEY_CHECK_RETRIES; attempt += 1) {
+        if (attempt) {
+          newKeyWaiting = true;
+          keyCheck = "checking";
+          render();
+          await new Promise(resolve => setTimeout(resolve, NEW_KEY_CHECK_DELAY_MS));
+        }
+        if (!key) return;
+        try {
+          await checkKey();
+          return;
+        } catch { /* checkKey has already reported the failure. */ }
+      }
+    } finally {
+      newKeyWaiting = false;
+    }
+    render();
   }
 
   function showProgress(value) {
@@ -786,6 +812,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       });
     });
     els.definitionAiDisconnect.addEventListener("click", () => {
+      newKeyWaiting = false;
       key = null; keyInfo = null; pricing = null; keyCheck = "idle";
       onConnectionChange(false);
       message = "";
