@@ -641,7 +641,7 @@ function assignGroupAsInstrument(groupId) {
   renderAll({ rebuild: false });
   updateDagFilters();
   renderUndoRedo();
-  shellController.showMobilePanel("dag");
+  if (groupId) shellController.showMobilePanel("dag");
 }
 
 

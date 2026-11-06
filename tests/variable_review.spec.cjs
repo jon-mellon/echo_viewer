@@ -195,3 +195,16 @@ test("variable details return to the originating mobile view", async ({ browser 
     await expect(page.locator('.variable-disposition[data-group-id="c"]')).toBeVisible();
   } finally { await context.close(); }
 });
+
+
+test("clearing the instrument on mobile keeps the variables panel open", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await setup(page, { instrument: true });
+    await page.locator('button[aria-label="Clear the instrument"]').tap();
+    await expect(page.locator("body")).toHaveAttribute("data-mobile-panel", "controls");
+    await expect(page.locator("#identify-instrument-input")).toHaveValue("");
+    await expect.poll(() => page.evaluate(() => window.__dagBuilderState.project.instrument_group_id)).toBeNull();
+  } finally { await context.close(); }
+});

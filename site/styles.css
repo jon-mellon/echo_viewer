@@ -1606,9 +1606,9 @@ h2 {
   max-width: min(320px, 90vw);
   padding: var(--space-1);
 }
-.filter-dropdown-panel > [hidden] { display: none; }
-.filter-dropdown-panel > .btn,
-.filter-dropdown-panel > .path-length-control {
+:is(.filter-dropdown-panel, .sparse-edge-group) > [hidden] { display: none; }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn,
+:is(.filter-dropdown-panel, .sparse-edge-group) > .path-length-control {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -1626,23 +1626,28 @@ h2 {
   white-space: normal;
   cursor: pointer;
 }
-.filter-dropdown-panel > .btn:hover,
-.filter-dropdown-panel > .path-length-control:hover { background: var(--hover-bg); }
-.filter-dropdown-panel > .btn[aria-pressed="true"],
-.filter-dropdown-panel > .btn.active { background: transparent; color: var(--text); }
-.filter-dropdown-panel > .btn[aria-pressed="true"]:hover { background: var(--hover-bg); }
-.filter-dropdown-panel > .btn:focus-visible { outline-offset: -2px; }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn:hover,
+:is(.filter-dropdown-panel, .sparse-edge-group) > .path-length-control:hover { background: var(--hover-bg); }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn[aria-pressed="true"],
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn.active { background: transparent; color: var(--text); }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn[aria-pressed="true"]:hover { background: var(--hover-bg); }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn:focus-visible { outline-offset: -2px; }
 /* Every row reserves the checkmark column so labels line up. */
-.filter-dropdown-panel > .btn::before,
-.filter-dropdown-panel > .path-length-control::before {
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn::before,
+:is(.filter-dropdown-panel, .sparse-edge-group) > .path-length-control::before {
   content: "✓";
   flex: none;
   width: var(--space-6);
   color: var(--accent);
   visibility: hidden;
 }
-.filter-dropdown-panel > .btn[aria-pressed="true"]::before { visibility: visible; }
-.filter-dropdown-panel > .path-length-control > span { flex: 1 1 auto; }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .btn[aria-pressed="true"]::before { visibility: visible; }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .path-length-control > span { flex: 1 1 auto; }
+/* Keep the threshold visually nested under the sparse-edge toggle. */
+.sparse-edge-group { border: 1px solid var(--border); border-radius: var(--radius-sm); }
+:is(.filter-dropdown-panel, .sparse-edge-group) > .path-length-control.sparse-edge-threshold { padding-left: var(--space-4); }
+.sparse-edge-group > .path-length-control::before { width: var(--space-4); }
+
 .path-length-control {
   display: inline-flex;
   align-items: center;
