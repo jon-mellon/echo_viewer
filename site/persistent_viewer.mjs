@@ -6,7 +6,7 @@ import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contrac
 const RESET_HANDOFF_KEY = "echo-pending-reset-session";
 
 export function createPersistentViewer({ state, getSchema, getViewport = () => {},
-  status = () => {}, onDiscard = () => {} }) {
+  status = () => {}, onDiscard = () => {}, onSessionSaved = () => {} }) {
   let localRecord = null;
   let committedSchema = null;
   let editorBaseline = null;
@@ -219,6 +219,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     const sequence = urlSequence();
     if (url !== window.location.href) replaceUrl(url);
     return mirrorSessionUrl(sessionId, url, sequence, sessionTitle())
+      .then(() => onSessionSaved())
       .catch(error => status(`Previous view not saved — ${error.message}`));
   }
 
