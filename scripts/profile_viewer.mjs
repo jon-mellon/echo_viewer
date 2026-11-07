@@ -192,7 +192,12 @@ try {
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   page = await context.newPage();
   page.on("pageerror", error => results.errors.push(error.message));
-  page.on("console", message => { if (message.type() === "error") results.errors.push(message.text()); });
+  page.on("console", message => {
+    if (message.type() !== "error") return;
+    // The data host answers the probe for a snapshot's unpublished viewer assets with a 404; the viewer handles it.
+    if (/status of 404/.test(message.text()) && /\/viewer-assets\/manifest\.json$/.test(message.location().url || "")) return;
+    results.errors.push(message.text());
+  });
   await page.addInitScript(() => {
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
     const supportedTypes = PerformanceObserver.supportedEntryTypes || [];

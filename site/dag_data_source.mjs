@@ -5,11 +5,12 @@ import { browserV2ManifestLayout, browserV2ShardPath,
   validateBrowserV2EvidenceBinding } from "./dag_manifest.mjs";
 import { loadGroupingSchema } from "./grouping_schema_loader.mjs";
 import { loadPublishedSchema } from "./published_schema_loader.mjs?v=publication-v2";
-import { variableSearchCatalog, SNAPSHOT_SEARCH_CATALOGS } from "./variable_search_catalog.mjs";
+import { variableSearchCatalog, searchCatalogs } from "./variable_search_catalog.mjs";
 import { evidencePanelCatalog } from "./evidence_panel_catalog.mjs";
 import { variableMapCatalog } from "./variable_map_catalog.mjs";
 import { variableNeighborCatalog } from "./variable_neighbor_catalog.mjs";
 import { variableIncidentCatalog } from "./variable_incident_catalog.mjs";
+import { fetchViewerAssets, bindViewerAssets, missingViewerAssets } from "./viewer_assets.mjs";
 
 // Reading many small remote Parquet shards incurs a separate metadata/range
 // round trip for each shard. The canonical snapshot is cheaper for wide groups.
@@ -55,6 +56,37 @@ export class ParquetManifestDagDataSource {
     this.manifestUrl = manifestUrl;
     this.onStatus = onStatus;
     this.browserRelationScopes = new Map();
+  }
+
+  /**
+   * Bind the precomputed files published beside this snapshot (see viewer_assets.mjs) into the catalogs. Once per
+   * snapshot, before any catalog is consulted: without them a lookup quietly falls back to starting the query engine.
+   */
+  bindViewerAssets() {
+    const snapshot = evidenceSnapshotIdFromManifestUrl(this.manifestUrl);
+    this.viewerAssetBindings ||= new Map();
+    if (!this.viewerAssetBindings.has(snapshot)) {
+      const catalogs = { searchCatalogs, variableMaps: variableMapCatalog, variableNeighbors: variableNeighborCatalog,
+        variableIncidents: variableIncidentCatalog, evidencePanels: evidencePanelCatalog };
+      const start = performance.now();
+      this.viewerAssetBindings.set(snapshot, (async () => {
+        const found = await fetchViewerAssets(this.manifestUrl, snapshot);
+        const bound = found ? bindViewerAssets(snapshot, found, catalogs) : [];
+        const missing = missingViewerAssets(snapshot, catalogs);
+        if (missing.length) {
+          // Not an error the user can act on, but never silent: this is the slow path.
+          console.warn(`Echo has no precomputed ${missing.join(" or ")} for evidence snapshot ${snapshot}; `
+            + "evidence will be loaded by querying the snapshot, which is very slow on a phone.");
+          performance.mark("echo:viewer-assets:missing", { detail: { snapshot, missing } });
+        }
+        performance.measure("echo:viewer-assets:bind", { start, end: performance.now() });
+        return { source: found ? "data-host" : "committed", bound, missing };
+      })().catch(error => {
+        console.warn("Could not bind viewer assets.", error);
+        return { source: "none", bound: [], missing: ["viewer assets"] };
+      }));
+    }
+    return this.viewerAssetBindings.get(snapshot);
   }
 
   async initialize() {
@@ -170,6 +202,7 @@ export class ParquetManifestDagDataSource {
 
   async loadVariableMetadata(variableIds, layoutSource = "", { mapOnly = false } = {}) {
     const start = performance.now();
+    await this.bindViewerAssets();
     if (mapOnly && variableIds?.length) {
       try {
         const payload = await variableMapCatalog.load(evidenceSnapshotIdFromManifestUrl(this.manifestUrl), variableIds, layoutSource);
@@ -210,8 +243,9 @@ export class ParquetManifestDagDataSource {
   async loadVariableProvenance(variableIds) {
     if (!variableIds?.length) return [];
     await this.initialize();
+    await this.bindViewerAssets();
     const snapshotId = evidenceSnapshotIdFromManifestUrl(this.manifestUrl);
-    if (SNAPSHOT_SEARCH_CATALOGS[snapshotId]) {
+    if (searchCatalogs.has(snapshotId)) {
       try {
         await variableSearchCatalog.loadSnapshot(snapshotId);
       } catch {
@@ -232,6 +266,7 @@ export class ParquetManifestDagDataSource {
   async prewarmVariableMap(layoutSource = "") {
     this.prewarmMapFiles = true;
     try {
+      await this.bindViewerAssets();
       const snapshot = evidenceSnapshotIdFromManifestUrl(this.manifestUrl);
       const ready = Boolean(await variableMapCatalog.prepare(snapshot, layoutSource));
       if (ready) void variableNeighborCatalog.prepare(snapshot).catch(() => {});
@@ -243,6 +278,7 @@ export class ParquetManifestDagDataSource {
   async loadIncidentRawLinks(variableIds) {
     if (variableIds?.length) {
       try {
+        await this.bindViewerAssets();
         const rows = await variableIncidentCatalog.load(evidenceSnapshotIdFromManifestUrl(this.manifestUrl), variableIds);
         if (rows) return rows;
       } catch (error) { console.warn("Incident bundle unavailable; using snapshot retrieval.", error); }
@@ -263,8 +299,9 @@ export class ParquetManifestDagDataSource {
     if (!rawLinkIds?.length) return [];
     // Evidence rows need endpoint labels. Begin the shared catalog download
     // alongside the query engine instead of waiting for the findings query.
+    await this.bindViewerAssets();
     const snapshotId = evidenceSnapshotIdFromManifestUrl(this.manifestUrl);
-    if (SNAPSHOT_SEARCH_CATALOGS[snapshotId]) {
+    if (searchCatalogs.has(snapshotId)) {
       void variableSearchCatalog.loadSnapshot(snapshotId).catch(() => {});
     }
     this.prewarmRawLinks = true;
@@ -295,6 +332,7 @@ export class ParquetManifestDagDataSource {
 
   async loadPanelEvidence(rawLinkIds) {
     try {
+      await this.bindViewerAssets();
       return await evidencePanelCatalog.load(evidenceSnapshotIdFromManifestUrl(this.manifestUrl), rawLinkIds);
     } catch (error) {
       console.warn("Evidence bundle unavailable; using snapshot retrieval.", error);
@@ -360,6 +398,7 @@ export class ParquetManifestDagDataSource {
     const start = performance.now();
     if (variableIds?.length) {
       try {
+        await this.bindViewerAssets();
         const rows = await variableNeighborCatalog.load(evidenceSnapshotIdFromManifestUrl(this.manifestUrl), variableIds);
         if (rows) {
           performance.measure("echo:evidence:neighbors", { start, end: performance.now() });

@@ -213,7 +213,9 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
       if (typeof globalThis.requestIdleCallback === "function") globalThis.requestIdleCallback(start, { timeout: 5000 });
       else setTimeout(start, 1000);
     });
-    const preload = () => void prewarmEvidenceEngine();
+    // Look for the snapshot's published viewer assets alongside, not before, the engine's idle-time start: waiting for that
+    // request first pushed the engine's multi-hundred-millisecond start into whatever the user did next.
+    const preload = () => { void dagDataSource.bindViewerAssets?.(); void prewarmEvidenceEngine(); };
     // A fresh project carries placeholder anchor IDs, so check for real groups.
     const anchored = side => (state.project.groups || []).some(group => group.group_id === state.project[`${side}_group_id`]);
     const catalogIfSettingUp = () => (!anchored("iv") || !anchored("dv")

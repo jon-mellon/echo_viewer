@@ -791,6 +791,7 @@ async function startVariableSearchCatalogLoad() {
   state.variableSearchStatus = "loading";
   state.variableSearchError = null;
   try {
+    await dagDataSource.bindViewerAssets?.();
     await variableSearchCatalog.loadSnapshot(state.data.snapshot.snapshot_id, {
       loadRecords: () => dagDataSource.loadVariableSearchRecords(),
     });

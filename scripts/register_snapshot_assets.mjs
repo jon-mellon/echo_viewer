@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// LEGACY / OFFLINE USE. The data pipeline now builds, verifies and publishes these assets with every snapshot
+// (harvest_abstracts: analysis/10k/echo_viewer_bundle/viewer_assets.py), and the viewer finds them beside the snapshot, so
+// nothing needs committing here. This script remains for working offline or on a snapshot the pipeline did not build;
+// the bundles it commits are a fallback the viewer uses only when nothing is published.
 // Generate and register the static assets a published evidence snapshot needs
 // for fast evidence loading: its variable search catalog (concept labels for every
 // endpoint) and its variable map bundles (one per variable group, so a group's
