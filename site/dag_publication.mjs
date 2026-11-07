@@ -144,9 +144,12 @@ export function createPublicationController({
   }
 
   // The save machine moved (saving, saved, failed, editor opened or closed): re-derive what the controls allow.
+  // The visibility is cheap; the hash comparison is not, and a save starts and ends within one user action, so
+  // it runs once the interaction has settled, as it does after an edit.
   function canPublishChanged() {
     refreshPublishVisibility();
-    void refreshPublicationState();
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => void refreshPublicationState(), 150);
   }
 
   function showShareCopied() {
