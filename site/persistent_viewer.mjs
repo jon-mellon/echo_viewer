@@ -6,7 +6,7 @@ import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contrac
 const RESET_HANDOFF_KEY = "echo-pending-reset-session";
 
 export function createPersistentViewer({ state, getSchema, getViewport = () => {},
-  status = () => {}, onDiscard = () => {}, onSessionSaved = () => {} }) {
+  status = () => {}, onDiscard = () => {}, onSessionSaved = () => {}, saveSchema = commitLocalSchema }) {
   let localRecord = null;
   let committedSchema = null;
   let editorBaseline = null;
@@ -45,6 +45,18 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
       location: window.location, schemaUrl: "", dataVersion: state.data.snapshot?.snapshot_id || "",
       state, publishedSchemaId: baseId(), localSchemaId: localId,
     });
+  }
+
+  // The user can change tasks or selections while IndexedDB is writing.
+  // Keep the completed schema ID, but serialize the current view rather than
+  // restoring the stale URL captured when the write started.
+  function showSavedUrl(savedUrl, id) {
+    const latest = currentUrl(id) || savedUrl;
+    replaceUrl(latest);
+    if (latest !== savedUrl) {
+      void mirrorSessionUrl(sessionId, latest, urlSequence(), sessionTitle())
+        .catch(error => status(`Previous view not saved — ${error.message}`));
+    }
   }
 
   function setLoadedRecord(record) { localRecord = record; }
@@ -124,7 +136,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     if (!url) throw new Error("Cannot construct a recovery URL for this draft.");
     if (urlTimer !== null) { clearTimeout(urlTimer); urlTimer = null; }
     status("Saving locally…");
-    const pending = commitLocalSchema({
+    const pending = saveSchema({
       id, expectedRevision: localRecord?.revision || 0, schema, url,
       sequence: urlSequence(), basePublicationId: baseId(), basePublicationHash: baseHash(),
       sessionId, sessionTitle: sessionTitle(),
@@ -132,7 +144,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
       localRecord = record;
       committedSchema = structuredClone(schema);
       unsavedSchema = false;
-      replaceUrl(url);
+      showSavedUrl(url, id);
       status("Saved locally");
       return true;
     }).catch(error => {
@@ -180,14 +192,14 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     const url = currentUrl(id);
     if (!url) throw new Error("Cannot construct a URL for this draft.");
     status("Saving independent copy…");
-    const record = await commitLocalSchema({ id, expectedRevision: 0, schema, url,
+    const record = await saveSchema({ id, expectedRevision: 0, schema, url,
       basePublicationId: baseId(), basePublicationHash: baseHash(),
       sessionId, sessionTitle: sessionTitle() });
     localRecord = record;
     committedSchema = structuredClone(schema);
     editorBaseline = null;
     unsavedSchema = false;
-    replaceUrl(url);
+    showSavedUrl(url, id);
     status("Saved independent local copy");
     return record;
   }

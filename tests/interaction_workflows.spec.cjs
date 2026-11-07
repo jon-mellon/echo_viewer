@@ -672,3 +672,31 @@ test("reload warns before discarding an unfinished variable definition", async (
   await reloadPromise;
   await expect(selectedSource).toBeChecked();
 });
+
+test("a save finishing after navigation keeps the newer view in the address", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const result = await page.evaluate(async () => {
+    const { createPersistentViewer } = await import("/persistent_viewer.mjs");
+    const live = window.__dagBuilderState;
+    const schema = { schema_version: "groupings-v3", grouping_set_id: "test", membership_unit: "canonical_variable",
+      groups: [{ group_id: "a", label: "A", variable_ids: ["v1"] }] };
+    const state = { project: { groups: schema.groups, iv_group_id: "", dv_group_id: "" },
+      data: live.data, task: "causes", explore: { causes: { focusId: "a", depth: 1, minPapers: 2 },
+        consequences: { focusId: "a", depth: 1, minPapers: 2 } }, workflowMode: "setup", definitionDraft: null };
+    let release;
+    const controller = createPersistentViewer({ state, getSchema: () => structuredClone(schema),
+      saveSchema: ({ id }) => new Promise(resolve => { release = () => resolve({ id, revision: 1 }); }) });
+    controller.start();
+    schema.groups[0].label = "Edited";
+    const saving = controller.commitDecision();
+    state.task = "consequences";
+    controller.viewerChanged();
+    release();
+    await saving;
+    await new Promise(resolve => setTimeout(resolve, 20));
+    return { task: new URL(location.href).searchParams.get("task"), local: new URL(location.href).searchParams.has("local_schema") };
+  });
+  expect(result).toEqual({ task: "consequences", local: true });
+});
