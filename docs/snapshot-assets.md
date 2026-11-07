@@ -71,6 +71,6 @@ pipeline's README).
 offline or for a snapshot the pipeline did not build; the pipeline's Python port of the generators was checked to produce
 decoded payloads identical to these on the current snapshot.
 
-For the current default snapshot (`8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849`) the search catalog and
-variable maps are committed. Neighbor, incident and evidence-panel bundles are not; those features use the engine until
-the snapshot's assets are published.
+The current default snapshot (`8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849`) has no committed
+bundles: its assets are published to the data host by the pipeline and `npm run check:snapshot-assets` gates the deploy.
+The earlier committed bundles are recoverable from git history and regenerable with `scripts/register_snapshot_assets.mjs`.
