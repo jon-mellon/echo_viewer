@@ -5,6 +5,17 @@ import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contrac
 
 const RESET_HANDOFF_KEY = "echo-pending-reset-session";
 
+/**
+ * Whether leaving the page now would lose work that exists only in memory: a
+ * definition being written, schema-editor changes, or a schema whose save failed.
+ */
+export function hasUnsavedWork({ definitionDraft, editorDirty = false, unsavedSchema = false }) {
+  const draft = definitionDraft;
+  const draftStarted = Boolean(draft && (draft.source_group_ids?.length || draft.new_label
+    || draft.new_description || draft.replaces_group_id || draft.new_variable_ids?.length));
+  return draftStarted || Boolean(editorDirty) || Boolean(unsavedSchema);
+}
+
 export function createPersistentViewer({ state, getSchema, getViewport = () => {},
   status = () => {}, onDiscard = () => {}, onSessionSaved = () => {}, saveSchema = commitLocalSchema }) {
   let localRecord = null;
@@ -260,6 +271,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     get sessionId() { return sessionId; },
     get localRecord() { return localRecord; },
     get editorOpen() { return Boolean(editorBaseline); },
+    get hasUnsavedSchema() { return unsavedSchema; },
     get editorDirty() { return Boolean(editorBaseline && !same(getSchema(), editorBaseline.schema)); },
     get canPublish() { return ready && !editorBaseline && !commitPending && !unsavedSchema
       && Boolean(committedSchema && same(getSchema(), committedSchema)); },
