@@ -1944,6 +1944,8 @@ const definitionWorkflowController = createDefinitionWorkflowController({
   commitSchema: async () => {
     await persistentViewer.commitDecision();
     previousSplitsLoaded = false;
+    // Nothing else reloads while the schema page stays open, which would leave its spinner up forever.
+    if (state.customVariablesOpen) loadPreviousSplits(true);
     publicationController.workingCopyChanged();
   },
   onCommitFailureRestored: () => persistentViewer.clearSaveFailure(),
@@ -2008,7 +2010,7 @@ function loadPreviousSplits(force = false) {
 function reusePreviousSplit(role, row, options) { definitionWorkflowController.reusePreviousSplit(role, row, options); }
 
 const customVariablesPresenter = createCustomVariablesPresenter({
-  state, elements: els, truncate, normalized,
+  state, elements: els, normalized,
   customVariables: () => (state.project?.groups || []).filter(group => group.source === "user_split")
     .sort((a, b) => String(a.label || "").localeCompare(String(b.label || ""))),
   schemaVariables: () => [...(state.project?.groups || [])].sort((a, b) =>

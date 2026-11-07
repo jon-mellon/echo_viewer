@@ -9,7 +9,7 @@ import { publicSchemaProjection } from "./public_schema_projection.mjs";
  * editing hands over to the create-a-variable steps, and the page comes back
  * when they are saved or cancelled.
  */
-export function createCustomVariablesPresenter({ state, elements: els, truncate, normalized,
+export function createCustomVariablesPresenter({ state, elements: els, normalized,
   customVariables, sourceLabels, canChange, onCreate, onEdit, onDelete,
   previousSplits = () => [],
   loadPreviousSplits = () => {}, reusePreviousSplit = () => {}, splitsLoading = () => false, splitsError = () => false, schemaVariables = customVariables,
@@ -153,9 +153,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       h("td", {}, h("strong", { textContent: label }),
         custom ? h("span", { className: "custom-variables-tag", textContent: "Custom" }) : null,
         h("span", { className: "custom-variables-count", textContent: `${(group.variable_ids?.length || Number(group.member_count) || 0).toLocaleString("en-US")} concepts` }),
-        custom && sources.length ? h("span", { className: "custom-variables-sources", textContent: `Split from ${sources.join(", ")}` }) : null,
-        group.description ? h("span", { className: "custom-variables-definition", title: group.description,
-          textContent: truncate(group.description, 140) }) : null),
+        custom && sources.length ? h("span", { className: "custom-variables-sources", textContent: `Split from ${sources.join(", ")}` }) : null),
       h("td", { className: "num", textContent: String(group.variable_ids?.length || Number(group.member_count) || 0) }),
       h("td", { className: "actions" },
         h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "inspect", groupId: group.group_id },

@@ -18,6 +18,21 @@ const renderedEdges = page => page.evaluate(async () => {
   return api.renderedDagEdgeIds().filter(id => id !== "__study_design_iv_to_dv__").length;
 });
 
+test("mobile exploration picker uses the available panel height", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page);
+  await chooseTask(page, "causes");
+  const picker = page.locator("#focusGroupPicker");
+  await expect(picker.locator("button[data-group-id]").first()).toBeVisible();
+  const dimensions = await picker.evaluate(el => ({ height: el.clientHeight, scrollHeight: el.scrollHeight }));
+  expect(dimensions.height).toBeGreaterThan(340);
+  expect(dimensions.height).toBe(dimensions.scrollHeight);
+  const panel = page.locator(".dag-left-panel");
+  await panel.evaluate(el => { el.scrollTop = el.scrollHeight; });
+  await expect.poll(() => panel.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await page.waitForLoadState("networkidle");
+});
+
 test("exploration list search matches constituent variables", async ({ page }) => {
   await open(page);
   await chooseTask(page, "causes");
