@@ -91,6 +91,22 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
   await expect(page.locator("#definitionSelectedTitle")).toHaveText("Included concepts (1)");
   await expect(page.locator("#definitionResidualLabels input").first()).toHaveValue("Kept after going back");
 
+  // Changing the sources starts a fresh classification, rather than carrying
+  // assignments from the previous source set into the new one.
+  await page.locator("#definitionBack").click();
+  await page.locator("#definitionDescribeBack").click();
+  await page.locator(`#definitionSourceList input[data-source-id="${sourceIds[1]}"]`).uncheck();
+  await page.locator("#definitionContinue").click();
+  await page.locator("#definitionDescribeNext").click();
+  await expect(page.locator("#definitionSelectedTitle")).toHaveText("Included concepts (0)");
+  expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.reviewed_variable_ids)).toEqual([]);
+  await page.locator("#definitionBack").click();
+  await page.locator("#definitionDescribeBack").click();
+  await page.locator(`#definitionSourceList input[data-source-id="${sourceIds[1]}"]`).check();
+  await page.locator("#definitionContinue").click();
+  await page.locator("#definitionDescribeNext").click();
+  await includeConcepts(page, [canonicalId]);
+
   // Leftovers keep their source's name unless renamed.
   const residualInputs = page.locator("#definitionResidualLabels input[data-residual-id]");
   await expect(residualInputs).toHaveCount(2);
@@ -554,6 +570,11 @@ test("Jev test and full split resume saved batches after failure and reload", as
     expect(requestedBatches.slice(7).flat()).not.toContainEqual(requestedBatches[5][0]);
     // The description is tucked away while suggestions exist; discarding them brings it back for editing.
     await page.locator("#definitionAiDiscard").click();
+    await expect(page.locator("#definitionAiPreview")).toBeHidden();
+    await expect.poll(() => page.evaluate(async () => {
+      const { listJevRuns } = await import("/definition_jev_checkpoint.mjs");
+      return (await listJevRuns()).length;
+    })).toBe(0);
     await expect(page.locator("#definitionAiPreview")).toBeHidden();
     await page.locator("#definitionAiDescription").fill("School measures only");
     await expect(page.locator("#definitionAiRun")).toContainText("Classify a sample of");

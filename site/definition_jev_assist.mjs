@@ -83,6 +83,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   let restorePromise = null;
   // Serialize edits so a quick sequence of review choices is saved in order.
   let pendingReviewSaves = Promise.resolve();
+  const pendingDeletions = new Map();
 
   function eligibleSignature(draft) {
     return (draft?.eligible_variable_ids || []).join("\u0000");
@@ -96,8 +97,14 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     checkpointDescription = null;
     checkpointSignature = null;
     restorePromise = null;
-    if (oldId && !keepCheckpoint) void pendingReviewSaves.then(() => deleteJevRun(oldId)).catch(error =>
-      console.warn("Could not remove Jev checkpoint.", error));
+    if (oldId && !keepCheckpoint) {
+      const deletion = pendingReviewSaves.then(() => deleteJevRun(oldId)).catch(error => {
+        console.warn("Could not remove Jev checkpoint.", error);
+        throw error;
+      }).finally(() => pendingDeletions.delete(oldId));
+      pendingDeletions.set(oldId, deletion);
+      void deletion.catch(() => {});
+    }
     preview = null;
     previewDraft = null;
     previewMode = null;
@@ -221,6 +228,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     restorePromise = (async () => {
       await pendingReviewSaves;
       const id = await jevRunId(checkpointSource(draft, description));
+      await pendingDeletions.get(id);
       const saved = await loadJevRun(id);
       if (revision !== runRevision || draft !== getDraft()
         || description !== String(draft.ai_description || "").trim()
