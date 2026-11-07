@@ -7,13 +7,14 @@ const RESET_HANDOFF_KEY = "echo-pending-reset-session";
 
 /**
  * Whether leaving the page now would lose work that exists only in memory: a
- * definition being written, schema-editor changes, or a schema whose save failed.
+ * definition being written or schema-editor changes. Writes that are running or
+ * failed are reported separately by `saving`.
  */
-export function hasUnsavedWork({ definitionDraft, editorDirty = false, unsavedSchema = false }) {
+export function hasUnsavedWork({ definitionDraft, editorDirty = false }) {
   const draft = definitionDraft;
   const draftStarted = Boolean(draft && (draft.source_group_ids?.length || draft.new_label
     || draft.new_description || draft.replaces_group_id || draft.new_variable_ids?.length));
-  return draftStarted || Boolean(editorDirty) || Boolean(unsavedSchema);
+  return draftStarted || Boolean(editorDirty);
 }
 
 export function createPersistentViewer({ state, getSchema, getViewport = () => {},

@@ -7,8 +7,7 @@ test("an untouched definition draft does not block leaving", () => {
   assert.equal(hasUnsavedWork({ definitionDraft: null }), false);
 });
 
-test("a started definition, a dirty schema editor and a failed schema save each block leaving", () => {
+test("a started definition or a dirty schema editor blocks leaving", () => {
   assert.equal(hasUnsavedWork({ definitionDraft: { new_label: "Trust" } }), true);
   assert.equal(hasUnsavedWork({ definitionDraft: null, editorDirty: true }), true);
-  assert.equal(hasUnsavedWork({ definitionDraft: null, unsavedSchema: true }), true);
 });

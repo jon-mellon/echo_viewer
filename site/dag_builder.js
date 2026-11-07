@@ -2368,9 +2368,8 @@ const eventController = createDagEventController({
   showExcludedLinks, showExcludedFindings,
 });
 
-// Definitions, schema-editor changes and failed schema saves are kept in memory
-// until saved. Protect them from an accidental reload or closed tab; OAuth has
-// its own draft handoff.
+// Definitions and schema-editor changes are kept in memory until saved. Protect
+// them from an accidental reload or closed tab; OAuth has its own draft handoff.
 window.addEventListener("beforeunload", event => {
   // A schema write that is still running (or has failed) would be lost with the page.
   if (persistentViewer.saving) { event.preventDefault(); event.returnValue = ""; return; }
