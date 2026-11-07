@@ -574,3 +574,32 @@ for (const width of [390, 1440]) test(`Identify waits for membership loading bef
   await expect(input).toHaveValue("sleep");
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.project.iv_group_id)).toBe("category-sleep");
 });
+
+for (const width of [390, 1440]) test(`unfinished evidence reason survives leaving the panel at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  const openEvidence = () => page.evaluate(async () => {
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    api.inspectDagEdge("category-academic-achievement__category-macroeconomic-context");
+  });
+  await openEvidence();
+  await page.getByRole("button", { name: /^Exclude finding / }).first().click();
+  const reason = page.getByRole("combobox", { name: "Finding exclusion reason" });
+  const detail = page.getByRole("textbox", { name: "Other exclusion reason" });
+  await reason.selectOption("other");
+  await detail.fill("A reason still being written");
+  await page.locator("#closeEvidencePane").click();
+  await openEvidence();
+  await expect(reason).toHaveValue("other");
+  await expect(detail).toHaveValue("A reason still being written");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: /^Exclude finding / }).first().click();
+  await expect(reason).toHaveValue("not_relevant_to_target_population");
+  await reason.selectOption("other");
+  await expect(detail).toHaveValue("");
+});

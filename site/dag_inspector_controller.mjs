@@ -21,6 +21,11 @@ export function createDagInspectorController({
     || state.project?.links?.find(link => state.selectedEdgeId === STUDY_DESIGN_EDGE_ID
       ? link.is_target_relation : link.edge_id === state.selectedEdgeId) || null;
   let pendingFindingId = null;
+  let pendingFindingReason = { code: "not_relevant_to_target_population", text: "" };
+  const clearPendingFinding = () => {
+    pendingFindingId = null;
+    pendingFindingReason = { code: "not_relevant_to_target_population", text: "" };
+  };
   const conceptLabels = new Map();
   const resolvedConceptIds = new Set();
   const pendingConceptPages = new Map();
@@ -344,7 +349,8 @@ export function createDagInspectorController({
           rebuildLinkDecision();
           persistFindingDecision();
         } else {
-          pendingFindingId = pendingFindingId === id ? null : id;
+          if (pendingFindingId === id) clearPendingFinding();
+          else { clearPendingFinding(); pendingFindingId = id; }
           renderProvenance({ findingId: id, control: pendingFindingId ? "reason" : "action" });
         }
       });
@@ -365,9 +371,15 @@ export function createDagInspectorController({
       const detailError = h("p", { id: "finding-reason-error", className: "small-note is-error", role: "alert", hidden: true,
         textContent: "Enter a reason for excluding this finding." });
       const clearDetailError = () => { detailError.hidden = true; detail.removeAttribute("aria-invalid"); };
-      detail.hidden = true;
-      reason.addEventListener("change", () => { detail.hidden = reason.value !== "other"; clearDetailError(); });
-      detail.addEventListener("input", clearDetailError);
+      reason.value = pendingFindingReason.code;
+      detail.value = pendingFindingReason.text;
+      detail.hidden = reason.value !== "other";
+      reason.addEventListener("change", () => {
+        pendingFindingReason.code = reason.value;
+        detail.hidden = reason.value !== "other";
+        clearDetailError();
+      });
+      detail.addEventListener("input", () => { pendingFindingReason.text = detail.value; clearDetailError(); });
       const confirm = h("button", { className: "btn btn--primary btn--sm", type: "button", textContent: "Confirm exclusion" });
       confirm.addEventListener("click", () => {
         const reasonText = detail.value.trim();
@@ -381,14 +393,14 @@ export function createDagInspectorController({
         const findingDecision = { display_status: "excluded", reason_code: reason.value,
           ...(reason.value === "other" ? { reason_text: reasonText } : {}), timestamp: nowIso() };
         if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, findingDecision)) === false) return;
-        pendingFindingId = null;
+        clearPendingFinding();
         addDecision("finding_excluded", { raw_causal_link_id: id });
         addToUndoHistory("Excluded finding", before, "finding-decision");
         rebuildLinkDecision();
         persistFindingDecision();
       });
       const cancel = h("button", { className: "btn btn--ghost btn--sm", type: "button", textContent: "Cancel" });
-      cancel.addEventListener("click", () => { pendingFindingId = null; renderProvenance({ findingId: id, control: "action" }); });
+      cancel.addEventListener("click", () => { clearPendingFinding(); renderProvenance({ findingId: id, control: "action" }); });
       return [row, h("tr", { className: "finding-reason-tr" }, h("td", { colSpan: 7, className: "finding-reason-row" },
         h("div", { className: "exclude-reason-row" },
           h("span", { className: "exclude-reason-label", textContent: "Why exclude this finding?" }),
@@ -407,7 +419,7 @@ export function createDagInspectorController({
       provenancePages.set(section.direction, page.page);
       const goTo = (next, control) => {
         provenancePages.set(section.direction, next);
-        pendingFindingId = null;
+        clearPendingFinding();
         renderProvenance({ direction: section.direction, control });
       };
       const directionLabel = `${section.sourceLabel} to ${section.targetLabel}`;
