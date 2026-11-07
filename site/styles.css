@@ -4196,7 +4196,6 @@ h2 {
 .custom-variables-none { margin: 0; }
 .custom-variables-tag { display: inline-block; margin-left: var(--space-2); padding: 0 var(--space-1); border: 1px solid var(--accent); border-radius: var(--radius-sm); color: var(--accent); font-size: var(--text-sm); vertical-align: 1px; }
 .custom-variables-sources { display: block; margin-top: var(--space-1); color: var(--text); font-size: var(--text-sm); }
-.custom-variables-definition { display: block; margin-top: var(--space-1); color: var(--text-muted); font-size: var(--text-sm); }
 .custom-variables-grid tr.is-highlighted td { background: var(--accent-subtle); }
 .custom-variables-delete:not(:disabled) { color: var(--danger); }
 .custom-variables-confirm td { background: var(--danger-subtle); }
