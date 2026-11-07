@@ -50,6 +50,14 @@ test("one review list replaces tickboxes and the separate status panel; schema e
   await expect(menu).toHaveValue("not_in_minimal_adjustment_set");
 });
 
+test("an empty instrument diagnostic describes the filtered result without inventing reviews", async ({ page }) => {
+  await setup(page, { instrument: true });
+  await page.locator("#toggleExogeneity").dispatchEvent("click");
+  await expect(page.locator("#exploreSummary")).toHaveText(
+    "No common causes of the instrument and outcome were found with the current path length and paper count.");
+  await expect(page.locator("#exploreResults .variable-review-row")).toHaveCount(0);
+});
+
 test("'Affects outcome only via cause' fades the variable and leaves the graph alone", async ({ page }) => {
   await setup(page);
   const baseline = await page.evaluate(() => JSON.stringify(window.__dagBuilderState.project.links));
@@ -180,6 +188,14 @@ test("the schema page always shows the saved-variables section, ahead of the sch
     return Boolean(first);
   });
   expect(order).toBe(true);
+  const inspect = page.locator('#customVariablesTable button[data-action="inspect"]').first();
+  await expect(inspect).toHaveAccessibleName(/^Inspect .+/);
+  await inspect.focus();
+  await inspect.press("Enter");
+  await expect(inspect).toHaveAttribute("aria-expanded", "true");
+  await expect(inspect).toBeFocused();
+  await expect(page.locator(".schema-variable-details .concept-loading")).toHaveCount(0);
+  await expect(inspect).toBeFocused();
 });
 
 

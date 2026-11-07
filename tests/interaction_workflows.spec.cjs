@@ -12,6 +12,14 @@ async function ready(page) {
     && !window.__dagBuilderState?.publishedSchemaHydrating);
 }
 
+async function selectedCatalogUrl(page) {
+  return page.evaluate(async () => {
+    const { searchCatalogs } = await import('/variable_search_catalog.mjs');
+    const url = searchCatalogs.url(new URL(location.href).searchParams.get('data_version'));
+    return url ? new URL(url, location.href).href : "";
+  });
+}
+
 async function completeSetup(page) {
   const anchors = await page.evaluate(() => {
     const state = window.__dagBuilderState;
@@ -132,7 +140,7 @@ test("variable search catalog preloads once and serves anchor search", async ({ 
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const catalogRequests = [];
   page.on("request", request => {
-    catalogRequests.push(request.url());
+    if (/\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
   });
   await page.goto(viewer);
   await ready(page);
@@ -140,11 +148,7 @@ test("variable search catalog preloads once and serves anchor search", async ({ 
   expect(["loading", "ready"]).toContain(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus));
   await page.locator("#identify-iv-input").focus();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("ready");
-  const catalogUrl = await page.evaluate(async () => {
-    const { searchCatalogs } = await import('/variable_search_catalog.mjs');
-    const url = searchCatalogs.url(new URL(location.href).searchParams.get('data_version'));
-    return url && typeof DecompressionStream === "function" ? new URL(url, location.href).href : "";
-  });
+  const catalogUrl = await selectedCatalogUrl(page);
   expect(catalogRequests.filter(url => url === catalogUrl)).toHaveLength(catalogUrl ? 1 : 0);
   await page.locator("#identify-iv-input").fill("education");
   await expect(page.locator("#identifyGroupPicker button[data-group-id]").first()).toBeVisible();
@@ -156,7 +160,7 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
   const catalogRequests = [];
   page.on("request", request => {
     if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
-    catalogRequests.push(request.url());
+    if (/\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
   });
   // This checks the precomputed search-catalog path available for this snapshot.
   await page.goto(`${viewer}&schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
@@ -175,42 +179,38 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
   await expect(page.locator("#provenancePanel tbody tr").first()).toBeVisible();
   await expect(page.locator("#provenancePanel .concept-loading")).toHaveCount(0);
   expect(parquetRequests.some(url => url.endsWith("/variable_layouts.parquet"))).toBe(false);
-  const catalogUrl = await page.evaluate(async () => {
-    const { searchCatalogs } = await import('/variable_search_catalog.mjs');
-    return new URL(searchCatalogs.url(new URL(location.href).searchParams.get('data_version')), location.href).href;
-  });
+  const catalogUrl = await selectedCatalogUrl(page);
+  expect(catalogUrl).toBeTruthy();
   expect(catalogRequests.filter(url => url === catalogUrl)).toHaveLength(1);
 });
 
 test("evidence keeps available fields visible while concept labels load", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(viewer);
+  await page.goto(`${viewer}&schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
   await ready(page);
   await completeSetup(page);
   const edgeId = await page.evaluate(async () => {
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
     await whenDagRendered();
-    // Supply findings and hold back their labels, independent of whether the
-    // snapshot's precomputed bundle normally includes both together.
-    dagDataSource.loadPanelEvidence = async ids => ({
-      links: ids.map(id => ({ raw_causal_link_id: id, paper_id: "test-paper",
-        source_variable_id: "test-source", target_variable_id: "test-target" })),
-      variables: [],
-    });
-    dagDataSource.loadVariableProvenance = () => new Promise(resolve => {
-      window.__releaseConceptLabels = () => resolve([
-        { variable_id: "test-source", concept_label: "Source" },
-        { variable_id: "test-target", concept_label: "Target" },
-      ]);
+    // Seed evidence but not its endpoint labels: newer precomputed panels may
+    // otherwise deliver both together and never enter the loading state.
+    dagDataSource.loadVariableProvenance = ids => new Promise(resolve => {
+      window.__releaseConceptLabels = () => resolve(ids.map(variable_id => ({ variable_id, concept_label: `Concept ${variable_id}` })));
     });
     const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__"
       && window.__dagBuilderState.project.links.some(link => link.edge_id === value
         && (link.a_to_b_raw_link_ids?.length || link.b_to_a_raw_link_ids?.length)));
     if (id) {
-      const link = window.__dagBuilderState.project.links.find(item => item.edge_id === id);
-      for (const rawId of [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]) {
-        window.__dagBuilderState.rawLinksById.delete(rawId);
+      const state = window.__dagBuilderState;
+      const link = state.project.links.find(item => item.edge_id === id);
+      const source = state.project.groups.find(group => group.group_id === link.group_a).variable_ids[0];
+      const target = state.project.groups.find(group => group.group_id === link.group_b).variable_ids[0];
+      state.variableById.delete(source);
+      state.variableById.delete(target);
+      for (const [rawIds, from, to] of [[link.a_to_b_raw_link_ids || [], source, target], [link.b_to_a_raw_link_ids || [], target, source]]) {
+        for (const rawId of rawIds) state.rawLinksById.set(rawId, { raw_causal_link_id: rawId,
+          paper_id: "10.1234/test", paper_title: "Example paper", source_variable_id: from, target_variable_id: to });
       }
       inspectDagEdge(id);
     }
@@ -507,6 +507,7 @@ test("instrument diagnostics use the same mobile view switch", async ({ browser 
     await expect(page.locator("#toggleConfoundersOnly")).toBeHidden();
     await expect(page.locator("#toggleCollidersOnly")).toBeHidden();
     await expect(page.locator("#toggleExclusionViolations")).toBeVisible();
+    await expect(page.locator("#toggleExclusionViolations")).toHaveAccessibleName(/Exclusion restriction violations \(\d+\)/);
     await expect(page.locator("#toggleExogeneity")).toBeVisible();
     await openNav(page, { tap: true });
     await page.locator("#toggleExogeneity").tap();
