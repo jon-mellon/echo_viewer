@@ -40,7 +40,8 @@ export function createDagSetupGroupController({
   // Identify's Cause, Outcome and Instrument fields share the Explore picker list.
   identifyPicking = () => null, onChooseIdentify = () => {}, onCancelIdentify = () => {},
   canChangeCustom = () => true, deleteCustom = async () => {},
-  previousSplits = () => [], loadPreviousSplits = () => {}, reusePreviousSplit = () => {}, browsePreviousForSource = () => {},
+  previousSplits = () => [], loadPreviousSplits = () => {}, splitsLoading = () => false, splitsError = () => false,
+  reusePreviousSplit = () => {}, browsePreviousForSource = () => {},
 }) {
   const variablePageSize = 10;
   let variablePage = 0;
@@ -510,9 +511,11 @@ export function createDagSetupGroupController({
     const row = ({ group, variableMatch }) => {
       const label = group.label || group.group_id;
       const count = group.variable_ids?.length || Number(group.member_count) || 0;
+      const unavailable = pick?.requiresMembership && (state.publishedSchemaHydrating || state.publishedSchemaLoadFailed);
       const custom = group.source === "user_split";
       return h("li", { className: "explore-row picker-variable-row" },
         h("button", { type: "button", className: "explore-row-open", dataset: { groupId: group.group_id },
+          disabled: unavailable,
           title: group.description || "", attrs: { "aria-label": `${pick ? `${pick.action}: ` : ""}${label}, ${count} underlying concepts${variableMatch ? `, matches ${variableMatch}` : ""}` } },
         h("span", { className: "explore-row-text" },
           h("span", { className: "explore-row-label", textContent: label }),
@@ -528,7 +531,9 @@ export function createDagSetupGroupController({
     };
     // Under "Primary variable": Custom variables, then Built-in variables. The
     // search box above filters both.
-    const status = query && state.variableSearchStatus === "loading" ? "Concept search is loading; matching variable names only for now."
+    const status = pick?.requiresMembership && state.publishedSchemaLoadFailed ? "Variable data could not be loaded. Reload to try again."
+      : pick?.requiresMembership && state.publishedSchemaHydrating ? "Loading variable data before selection…"
+      : query && state.variableSearchStatus === "loading" ? "Concept search is loading; matching variable names only for now."
       : query && state.publishedSchemaHydrating ? "Loading group memberships…"
         : query && state.variableSearchStatus === "error" ? "Concept search is unavailable; matching variable names only." : "";
     const clearButton = () => h("button", { className: "btn btn--sm", type: "button", dataset: { clearFocusSearch: "true" }, textContent: "Clear search" });
@@ -541,7 +546,11 @@ export function createDagSetupGroupController({
     const resultStatus = pickerA11y(container, input,
       { rowSelector: "button.explore-row-open", itemSelector: ".picker-variable-row", detailSelector: "details.picker-variable-info > summary, .picker-saved-info" });
     const matches = groups.length + previous.length;
-    resultStatus.textContent = status ? `${resultCountText(matches)}. ${status}` : `${resultCountText(matches)}. Use the arrow keys to move through them.`;
+    const savedStatus = splitsLoading() ? "Saved variables are still loading."
+      : splitsError() ? "Some saved variables could not be searched." : "";
+    resultStatus.textContent = savedStatus
+      ? `${matches} currently matching variables. ${savedStatus}${status ? ` ${status}` : ""}`
+      : status ? `${resultCountText(matches)}. ${status}` : `${resultCountText(matches)}. Use the arrow keys to move through them.`;
     replaceChildren(container, resultStatus,
       pick ? h("div", { className: "identify-picker-head" },
         h("h2", { textContent: pick.title }),
@@ -551,6 +560,10 @@ export function createDagSetupGroupController({
         textContent: "Each variable groups related underlying concepts. The number beside it counts those concepts. Concepts in a variable are related, not interchangeable; open ⓘ for its definition." }),
       // The one secondary action, above the lists instead of inside an empty section's heading.
       createVariableButton(onCreate, { label: "Create a new variable", className: "btn picker-create" }),
+      savedStatus ? h("div", { className: "small-note", role: "status" },
+        h("span", { textContent: savedStatus }), splitsError() && !splitsLoading()
+          ? h("button", { type: "button", className: "btn btn--sm", textContent: "Retry saved variables",
+            onclick: () => { loadPreviousSplits(true); renderFocusPicker(); renderIdentifyPicker(); } }) : null) : null,
       section("Your variables", custom),
       previous.length ? h("section", { className: "picker-section" },
         h("h3", { className: "picker-label" }, "Saved in other schemas", h("span", { className: "picker-count", textContent: ` · ${previous.length}` })),
@@ -565,7 +578,7 @@ export function createDagSetupGroupController({
       section(custom.length || previous.length ? "All other variables" : "Variables", builtIn),
       query && !groups.length && !previous.length ? h("div", { className: "explore-subsection-empty" },
         h("p", { role: "status", textContent: state.variableSearchStatus === "loading" || state.publishedSchemaHydrating
-          ? "No matches found yet." : state.variableSearchStatus === "error" ? "No matching variable names." : "No matching variables." }), clearButton()) : null);
+          ? "No matches found yet." : state.variableSearchStatus === "error" || savedStatus ? "No matching variable names." : "No matching variables." }), clearButton()) : null);
     container.querySelectorAll("button[data-group-id]").forEach(button =>
       button.addEventListener("click", () => onChoose(button.dataset.groupId)));
     container.querySelector("button[data-clear-focus-search]")?.addEventListener("click", () => {
@@ -589,7 +602,7 @@ export function createDagSetupGroupController({
       .map(other => state.project?.[`${other}_group_id`]).filter(Boolean));
     const role = { iv: "cause", dv: "outcome", instrument: "instrument" }[side];
     renderPickerList(container, { query: normalized(input?.value || ""), input, exclude,
-      pick: { title: `Choose ${role}`, action: `Use as ${role}`, role: side },
+      pick: { title: `Choose ${role}`, action: `Use as ${role}`, role: side, requiresMembership: true },
       onCancel: onCancelIdentify,
       onChoose: groupId => onChooseIdentify(side, groupId), onCreate: () => startDefinition?.(side) });
     container.dataset.pickerSide = side;

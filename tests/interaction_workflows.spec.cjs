@@ -549,3 +549,336 @@ test("bibliography, Markdown, and LaTeX export controls produce downloads", asyn
     expect(await download.failure()).toBeNull();
   }
 });
+
+for (const width of [390, 1440]) test(`Identify waits for membership loading before accepting a variable at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  // Reproduce the interval between the compiled graph appearing and the full
+  // published memberships arriving, without relying on network timing.
+  await page.evaluate(() => { window.__dagBuilderState.publishedSchemaHydrating = true; });
+  const input = page.locator("#identify-iv-input");
+  await input.click();
+  await input.fill("sleep");
+  const picker = page.locator("#identifyGroupPicker");
+  const choice = picker.locator('button[data-group-id="category-sleep"]');
+  await expect(choice).toBeDisabled();
+  await expect(picker).toContainText("Loading variable data before selection");
+  await page.evaluate(() => { window.__dagBuilderState.publishedSchemaHydrating = false; });
+  // Hydration normally rerenders the controls; an input event does the same here.
+  await input.fill("slee");
+  await input.fill("sleep");
+  await expect(choice).toBeEnabled();
+  await choice.click();
+  await expect(input).toHaveValue("sleep");
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.project.iv_group_id)).toBe("category-sleep");
+});
+
+for (const width of [390, 1440]) test(`unfinished evidence reason survives leaving the panel at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  const openEvidence = () => page.evaluate(async () => {
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    api.inspectDagEdge("category-academic-achievement__category-macroeconomic-context");
+  });
+  await openEvidence();
+  await page.getByRole("button", { name: /^Exclude finding / }).first().click();
+  const reason = page.getByRole("combobox", { name: "Finding exclusion reason" });
+  const detail = page.getByRole("textbox", { name: "Other exclusion reason" });
+  await reason.selectOption("other");
+  await detail.fill("A reason still being written");
+  await page.locator("#closeEvidencePane").click();
+  await openEvidence();
+  await expect(reason).toHaveValue("other");
+  await expect(detail).toHaveValue("A reason still being written");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: /^Exclude finding / }).first().click();
+  await expect(reason).toHaveValue("not_relevant_to_target_population");
+  await reason.selectOption("other");
+  await expect(detail).toHaveValue("");
+});
+
+for (const width of [390, 1440]) test(`a partially selected Identify view survives reload at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  await page.locator("#identify-iv-input").fill("sleep");
+  await page.locator('#identifyGroupPicker button[data-group-id="category-sleep"]').click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("iv")).toBe("category-sleep");
+  await expect.poll(() => new URL(page.url()).searchParams.get("mode")).toBe("setup");
+  await page.reload();
+  await ready(page);
+  await expect(page.locator("#identify-iv-input")).toHaveValue("sleep");
+  await expect(page.locator('#identifyGroupPicker[data-picker-side="dv"]')).toBeVisible();
+});
+
+for (const width of [390, 1440]) test(`schema workspace survives reload at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  if (width < 840) await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').click();
+  await page.locator("#editVariableSchema").click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("workspace")).toBe("schema");
+  await page.reload();
+  await ready(page);
+  await expect(page.locator("#customVariablesView")).toBeVisible();
+  await page.locator("#customVariablesClose").click();
+  await expect.poll(() => new URL(page.url()).searchParams.has("workspace")).toBe(false);
+});
+
+test("mobile reload returns to the open evidence pane", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  const edge = "category-academic-achievement__category-macroeconomic-context";
+  await page.evaluate(async id => {
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    api.inspectDagEdge(id);
+  }, edge);
+  await expect.poll(() => new URL(page.url()).searchParams.get("selected_edge")).toBe(edge);
+  await page.reload();
+  await ready(page);
+  await expect(page.locator("#closeEvidencePane")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Exclude finding / }).first()).toBeVisible();
+});
+
+test("reload warns before discarding an unfinished variable definition", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  await startCreate(page, "iv");
+  await page.locator("#definitionSourceList input[data-source-id]").first().check();
+  const selectedSource = page.locator("#definitionSourceList input[data-source-id]").first();
+  const dialogPromise = page.waitForEvent("dialog");
+  const reloadPromise = page.reload({ timeout: 3000 }).catch(() => {});
+  const dialog = await dialogPromise;
+  expect(dialog.type()).toBe("beforeunload");
+  await dialog.dismiss();
+  await reloadPromise;
+  await expect(selectedSource).toBeChecked();
+});
+
+test("a save finishing after navigation keeps the newer view in the address", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const result = await page.evaluate(async () => {
+    const { createPersistentViewer } = await import("/persistent_viewer.mjs");
+    const live = window.__dagBuilderState;
+    const schema = { schema_version: "groupings-v3", grouping_set_id: "test", membership_unit: "canonical_variable",
+      groups: [{ group_id: "a", label: "A", variable_ids: ["v1"] }] };
+    const state = { project: { groups: schema.groups, iv_group_id: "", dv_group_id: "" },
+      data: live.data, task: "causes", explore: { causes: { focusId: "a", depth: 1, minPapers: 2 },
+        consequences: { focusId: "a", depth: 1, minPapers: 2 } }, workflowMode: "setup", definitionDraft: null };
+    let release;
+    const controller = createPersistentViewer({ state, getSchema: () => structuredClone(schema),
+      saveSchema: ({ id }) => new Promise(resolve => { release = () => resolve({ id, revision: 1 }); }) });
+    controller.start();
+    schema.groups[0].label = "Edited";
+    const saving = controller.commitDecision();
+    state.task = "consequences";
+    controller.viewerChanged();
+    release();
+    await saving;
+    await new Promise(resolve => setTimeout(resolve, 20));
+    return { task: new URL(location.href).searchParams.get("task"), local: new URL(location.href).searchParams.has("local_schema") };
+  });
+  expect(result).toEqual({ task: "consequences", local: true });
+});
+
+test("an old source loading failure cannot replace the new draft's in-flight load", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const sourceId = await page.evaluate(async () => {
+    const state = window.__dagBuilderState;
+    const group = state.project.groups.find(g => g.variable_ids?.some(id => !state.variableById.has(id)));
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    window.__sourceLoads = [];
+    dagDataSource.loadVariableMetadata = () => new Promise((resolve, reject) => window.__sourceLoads.push({ resolve, reject }));
+    return group.group_id;
+  });
+  await startCreate(page, "iv");
+  const source = page.locator(`#definitionSourceList input[data-source-id="${sourceId}"]`);
+  await source.check();
+  await expect.poll(() => page.evaluate(() => window.__sourceLoads.length)).toBe(1);
+  await page.locator(".definition-cancel:visible").first().click();
+  await startCreate(page, "iv");
+  await source.check();
+  await expect.poll(() => page.evaluate(() => window.__sourceLoads.length)).toBe(2);
+  await page.evaluate(() => window.__sourceLoads[0].reject(new Error("old load failed")));
+  await page.locator("#definitionContinue").click();
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => window.__sourceLoads.length)).toBe(2);
+  await page.evaluate(() => window.__sourceLoads[1].resolve([]));
+});
+
+for (const mode of ["publish", "share"]) test(`a ${mode} finishing after another edit remains unpublished`, async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const result = await page.evaluate(async mode => {
+    const { createPublicationController } = await import("/dag_publication.mjs");
+    const { workingSchemaHashes } = await import("/dag_publication_core.mjs");
+    let schema = { schema_version: "groupings-v3", grouping_set_id: "test", membership_unit: "canonical_variable",
+      groups: [{ group_id: "a", label: "Before", variable_ids: ["v1"] }] };
+    const originalHash = (await workingSchemaHashes(schema, crypto))[0];
+    let publication = null, release, started;
+    const publishing = new Promise(resolve => { started = resolve; });
+    const elements = { publish: document.createElement("button"), status: document.createElement("div"),
+      badge: document.createElement("span"), menuButton: document.createElement("button"), confirmation: null };
+    const controller = createPublicationController({ elements, getWorkingSchema: () => structuredClone(schema),
+      getPublicationState: () => publication, setPublicationState: value => { publication = value; },
+      getPermalinkState: () => window.__dagBuilderState, saveWorkingState: () => {},
+      windowApi: { location, confirm: () => true },
+      publishSchema: () => { started(); return new Promise(resolve => { release = () => resolve({
+        publicationId: "11111111-1111-4111-8111-111111111111", contentHash: originalHash, reused: false, fileCount: 1 }); }); } });
+    controller.initialize();
+    const pending = mode === "share" ? controller.publicPermalink() : controller.publish();
+    await publishing;
+    schema.groups[0].label = "Edited during upload";
+    controller.workingCopyChanged();
+    await new Promise(resolve => setTimeout(resolve, 400));
+    release();
+    const value = await pending;
+    await new Promise(resolve => setTimeout(resolve, 400));
+    return { badge: elements.badge.textContent, publishHidden: elements.publish.hidden, shared: mode === "share" && Boolean(value) };
+  }, mode);
+  expect(result).toEqual({ badge: "Unpublished changes", publishHidden: false, shared: false });
+});
+
+test("publication stops if the schema changes while its graph is being prepared", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const result = await page.evaluate(async () => {
+    const { createPublicationController } = await import("/dag_publication.mjs");
+    let schema = { schema_version: "groupings-v3", grouping_set_id: "test", membership_unit: "canonical_variable",
+      groups: [{ group_id: "a", label: "Before", variable_ids: ["v1"] }] };
+    let release, started, published = false;
+    const preparing = new Promise(resolve => { started = resolve; });
+    const elements = { publish: document.createElement("button"), status: document.createElement("div"),
+      badge: document.createElement("span"), menuButton: document.createElement("button"), confirmation: null };
+    const controller = createPublicationController({ elements, getWorkingSchema: () => structuredClone(schema),
+      getPublicationState: () => null, setPublicationState: () => {}, getPermalinkState: () => window.__dagBuilderState,
+      saveWorkingState: () => {}, windowApi: { location, confirm: () => true },
+      getCompileInput: () => { started(); return new Promise(resolve => { release = () => resolve({}); }); },
+      publishSchema: async () => { published = true; throw new Error("unexpected publication"); } });
+    controller.initialize();
+    const pending = controller.publish();
+    await preparing;
+    schema.groups[0].label = "Changed during preparation";
+    controller.workingCopyChanged();
+    release();
+    await pending;
+    return { published, status: elements.status.textContent };
+  });
+  expect(result.published).toBe(false);
+  expect(result.status).toMatch(/changed.*prepar/i);
+});
+
+for (const width of [390, 1440]) test(`failed evidence loading is reported at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    window.__loadPanelEvidence = dagDataSource.loadPanelEvidence.bind(dagDataSource);
+    dagDataSource.loadPanelEvidence = async () => { throw new Error("simulated evidence failure"); };
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    api.inspectDagEdge("category-academic-achievement__category-macroeconomic-context");
+  });
+  await expect(page.getByText("Evidence could not be loaded. Try again.")).toBeVisible();
+  await expect(page.locator("#provenancePanel")).not.toContainText("No evidence records for this direction.");
+  await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    dagDataSource.loadPanelEvidence = window.__loadPanelEvidence;
+  });
+  await page.getByRole("button", { name: "Retry evidence loading" }).click();
+  await expect(page.getByRole("button", { name: /^Exclude finding / }).first()).toBeVisible();
+});
+
+for (const width of [390, 1440]) test(`the picker reports when saved variables could not be searched at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => {
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+    localStorage.setItem("echo-owner-token", `00000000-0000-4000-8000-000000000001.${"a".repeat(64)}`);
+  });
+  await page.route("**/v1/owners/publications", route => route.fulfill({ status: 500,
+    headers: { "access-control-allow-origin": "*" }, body: "unavailable" }));
+  await page.goto(viewer);
+  await ready(page);
+  await page.locator("#identify-iv-input").fill("unmatched saved name");
+  const warning = page.getByText("Some saved variables could not be searched.", { exact: true });
+  await expect(warning).toBeVisible();
+  await page.unroute("**/v1/owners/publications");
+  await page.route("**/v1/owners/publications", route => route.fulfill({ status: 200,
+    headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: "[]" }));
+  await page.getByRole("button", { name: "Retry saved variables" }).click();
+  await expect(warning).toBeHidden();
+});
+
+for (const viewport of [{ width: 320, height: 568 }, { width: 568, height: 320 }]) {
+  test(`mobile collider rows open their definitions at ${viewport.width}x${viewport.height}`, async ({ browser }) => {
+    const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
+    const page = await context.newPage();
+    try {
+      await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+      await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+      await ready(page);
+      const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+        .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+      await chooseAnchors(page, anchors[0], anchors[1], { tap: true });
+      await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').tap();
+      await openNav(page, { tap: true });
+      await page.locator("#toggleCollidersOnly").tap();
+      await closeNav(page, { tap: true });
+      const row = page.locator(".variable-review-row").first();
+      const groupId = await row.getAttribute("data-group-id");
+      await row.locator(".explore-row-open").tap({ timeout: 3000 });
+      await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBe(groupId);
+      await expect(page.locator("#edgeInspector")).toBeVisible();
+    } finally { await context.close(); }
+  });
+}
+
+test("collider paths highlight on mouse movement and keyboard focus", async ({ page }) => {
+  const source = await readFile("site/dag_builder.js", "utf8");
+  await page.route("**/dag_builder.js*", route => route.fulfill({ contentType: "text/javascript",
+    body: `${source}\nwindow.__testPathLanes = () => dagNetworkController.getPathLaneSegments();` }));
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  await page.locator("#toggleCollidersOnly").click();
+  const row = page.locator(".variable-review-row .explore-row-open").first();
+  await row.dispatchEvent("mouseenter");
+  expect(await page.evaluate(() => window.__testPathLanes().length)).toBe(0);
+  await row.hover();
+  await expect.poll(() => page.evaluate(() => window.__testPathLanes().length)).toBeGreaterThan(0);
+  await page.mouse.move(0, 0);
+  await expect.poll(() => page.evaluate(() => window.__testPathLanes().length)).toBe(0);
+  await row.focus();
+  await expect.poll(() => page.evaluate(() => window.__testPathLanes().length)).toBeGreaterThan(0);
+});

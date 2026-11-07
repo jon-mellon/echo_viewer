@@ -955,18 +955,31 @@ function chooseIdentifyVariable(side, groupId) {
     state.selectedEvidenceGroupId = null;
     addToUndoHistory(`Remove "${label || side}" as ${side === "iv" ? "cause" : "outcome"}`, before, "anchors");
     renderAll({ reuseLinks: true });
-    setupGroupController.renderIdentifyPicker();
     return;
   }
   if (groupId === state.project?.[`${side}_group_id`] && groupById(groupId)?.variable_ids?.length) {
-    renderAll({ rebuild: false });
+    // Nothing in the project or graph changed; just dismiss the picker and
+    // restore the field label instead of rebuilding every control.
+    setupGroupController.renderIdentifyPicker();
+    taskViews.render();
     return;
   }
   // Replacing a role, rather than stepping through setup, goes straight to the map.
   state.changingAnchorSide = side;
   assignGroupAsAnchor(side, groupId);
   state.changingAnchorSide = null;
-  setupGroupController.renderIdentifyPicker();
+  // A single selected anchor is still an incomplete setup and must be
+  // represented in the URL so a reload can return to the next field.
+  const ivReady = Boolean(groupById(state.project.iv_group_id)?.variable_ids?.length);
+  const dvReady = Boolean(groupById(state.project.dv_group_id)?.variable_ids?.length);
+  if (!ivReady || !dvReady) {
+    state.workflowMode = "setup";
+    state.phase = ivReady ? "select_dv" : "select_iv";
+  }
+  persistentViewer.viewerChanged();
+  // Successful assignments already rendered the picker in renderAll(). Only
+  // redraw here if the assignment was rejected and no full render occurred.
+  if (state.project?.[`${side}_group_id`] !== groupId) setupGroupController.renderIdentifyPicker();
 }
 function seedLabel(side) { return groupEditorController.seedLabel(side); }
 // Event handlers retain group references through edits. Apply pure results while
@@ -1716,6 +1729,7 @@ function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 // ─── Edge inspector + provenance ──────────────────────────────────────────────
 
 let pendingEdgeEvidencePromise = null;
+let failedEvidenceEdgeId = null;
 
 function renderSelectedEdgePanels() {
   if (!state.selectedEdgeId && !state.selectedEvidenceGroupId && !els.edgeInspector.hidden
@@ -1788,6 +1802,7 @@ function renderSelectedEdge() {
   const missingVariables = loadedVariableIds().filter(id => !state.variableById.has(id));
   if ((missing.length || missingVariables.length) && !pendingEdgeEvidencePromise) {
     const loadingEdgeId = state.selectedEdgeId;
+    failedEvidenceEdgeId = null;
     state.pendingEdgeEvidence = true;
     const loadSources = async () => {
       if (!missing.length) return [];
@@ -1808,6 +1823,7 @@ function renderSelectedEdge() {
         for (const variable of variables) state.variableById.set(variable.variable_id, variable);
       }
     }).catch(error => {
+      failedEvidenceEdgeId = loadingEdgeId;
       console.warn("Could not lazily load aggregate-edge evidence.", error);
     }).finally(() => {
       if (pendingEdgeEvidencePromise !== load) return;
@@ -2040,6 +2056,7 @@ const customVariablesPresenter = createCustomVariablesPresenter({
     Number(b.source === "user_split") - Number(a.source === "user_split")
       || String(a.label || "").localeCompare(String(b.label || ""))),
   getSchema: currentWorkingGroupingSchema,
+  onVisibilityChange: () => persistentViewer.viewerChanged(),
   loadDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),
   conceptLabel: id => state.variableById.get(id)?.display_label || state.variableById.get(id)?.concept_label || id,
   onSplitSource: id => definitionWorkflowController.browsePreviousForSource("candidate", id),
@@ -2062,6 +2079,8 @@ const inspectorController = createDagInspectorController({
   state, elements: els, truncate, nowIso, takeSnapshot,
   applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision, renderAll,
   persistFindingDecision,
+  evidenceLoadFailed: () => failedEvidenceEdgeId === state.selectedEdgeId,
+  retryEvidence: () => { failedEvidenceEdgeId = null; renderSelectedEdge(); },
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
   excludeConcept: excludeGroupConcept,
@@ -2091,6 +2110,7 @@ const setupGroupController = createDagSetupGroupController({
   onCancelIdentify: () => taskViews.cancelIdentify(),
   canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
   previousSplits: savedSplitOptions, loadPreviousSplits, reusePreviousSplit,
+  splitsLoading: () => previousSplitsLoading || !previousSplitsLoaded, splitsError: () => previousSplitsError,
   browsePreviousForSource: (role, id) => definitionWorkflowController.browsePreviousForSource(role, id),
   deleteCustom: deleteCustomVariable,
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
@@ -2261,6 +2281,11 @@ const projectBootstrap = createProjectBootstrap({
     && Boolean(sessionStorage.getItem("echo-openrouter-definition-draft-v1")),
   onReady: async () => {
     persistentViewer.start();
+    if (state.customVariablesOpen) customVariablesPresenter.open();
+    else if (state.selectedEdgeId && !els.closeEvidencePane.hidden) {
+      markEvidenceOrigin();
+      shellController.showMobilePanel("dag");
+    }
     await definitionWorkflowController.resumeAfterOAuth();
     void publicationController.refreshPublicationState();
     // Compiled-DAG browsing and catalog search need no raw evidence engine.
@@ -2306,6 +2331,17 @@ const eventController = createDagEventController({
     });
   },
   showExcludedLinks, showExcludedFindings,
+});
+
+// A variable definition is kept in memory until it is saved. Protect work in
+// progress from an accidental reload; OAuth has its own draft handoff.
+window.addEventListener("beforeunload", event => {
+  const draft = state.definitionDraft;
+  if (!draft || sessionStorage.getItem("echo-openrouter-definition-draft-v1")) return;
+  if (!draft.source_group_ids?.length && !draft.new_label && !draft.new_description
+      && !draft.replaces_group_id && !draft.new_variable_ids?.length) return;
+  event.preventDefault();
+  event.returnValue = "";
 });
 
 // ─── Boot ──────────────────────────────────────────────────────────────────────

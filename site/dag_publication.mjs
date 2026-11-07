@@ -44,6 +44,7 @@ export function createPublicationController({
   getCompiledDag = () => null,
   getCompileInput = () => null,
   canPublish = () => true,
+  publishSchema = publishWorkingSchema,
   // Temporary notification for completed operations, which do not belong in the menu.
   notify = () => {},
   cryptoApi = globalThis.crypto,
@@ -166,18 +167,26 @@ export function createPublicationController({
     refreshPublishVisibility();
     try {
       const published = getPublicationState();
-      if (await matchesPublished(published)) {
+      const comparisonRevision = statusRevision;
+      if (await matchesPublished(published) && comparisonRevision === statusRevision) {
         renderPublicationState(published, false);
         reportSuccess("Already published: this working copy matches the public version.");
         return published;
       }
       if (!await confirmPublicPublication(elements.confirmation, windowApi)) return null;
       showStatus(elements.status, "Canonicalizing current working schema…");
-      const result = await publishWorkingSchema({
-        schema: getWorkingSchema(),
+      const schema = structuredClone(getWorkingSchema());
+      const preparationRevision = statusRevision;
+      const compiledDag = getCompiledDag();
+      const compileInput = await getCompileInput();
+      if (preparationRevision !== statusRevision || JSON.stringify(schema) !== JSON.stringify(getWorkingSchema())) {
+        throw new Error("The working copy changed while preparing publication. Please try again.");
+      }
+      const result = await publishSchema({
+        schema,
         previousPublication: getPublicationState(),
-        compiledDag: getCompiledDag(),
-        compileInput: await getCompileInput(),
+        compiledDag,
+        compileInput,
         cryptoApi,
         onProgress: (current, total, path) => showStatus(elements.status, `Uploading ${current}/${total}: ${path}`),
       });
@@ -190,7 +199,10 @@ export function createPublicationController({
       };
       setPublicationState(publication);
       saveWorkingState();
-      renderPublicationState(publication, false);
+      // The user may have edited the working copy while the upload ran.
+      // Stay conservative until a fresh comparison of the current copy finishes.
+      renderPublicationState(publication, true);
+      await refreshPublicationState();
       reportSuccess(result.reused
         ? `Already published as ${result.publicationId}. No files were uploaded.`
         : `Published ${result.fileCount} files as ${result.publicationId}.`);
@@ -277,6 +289,13 @@ export function createPublicationController({
         if (!await confirmPublishBeforeShare(neverPublished)) return null;
         published = await publish();
         if (!published?.publication_id) return null;
+      }
+      // An edit can finish while a publication or hash comparison is in flight.
+      // Never present the older publication as a link to the current working copy.
+      const revision = statusRevision;
+      if (!await matchesPublished(published) || revision !== statusRevision) {
+        showStatus(elements.status, "The working copy changed while sharing. Publish the latest changes and try again.", true);
+        return null;
       }
       return { permalink: stablePermalink(published), hasLocalChanges: false };
     } catch (error) {

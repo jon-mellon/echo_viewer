@@ -42,7 +42,7 @@ test("publication explicitly confirms public immutable access", () => {
 
 test("publication requests authentication only after immutable-public confirmation", () => {
   const publish = source.slice(source.indexOf("async function publish()"), source.indexOf("async function share()"));
-  assert.ok(publish.indexOf("confirmPublicPublication(elements.confirmation, windowApi)") < publish.indexOf("publishWorkingSchema({"));
+  assert.ok(publish.indexOf("confirmPublicPublication(elements.confirmation, windowApi)") < publish.indexOf("publishSchema({"));
   assert.match(core, /ensureOwner\(cloudflare\)/);
 });
 
