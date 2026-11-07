@@ -117,6 +117,25 @@ test("retained finding reviews and every confounder status keep local open reaso
   assert.equal(session.schema.finding_reviews.r1, undefined);
 });
 
+test("confounder and exclusion statuses reject values the UI does not offer", async () => {
+  const session = await fixture();
+  await session.setAnchors({ ivId: "iv", dvId: "dv" });
+  await assert.rejects(session.setConfounderStatus({ groupId: "source", status: "explicitly_controled" }), /Unknown confounder status/);
+  await assert.rejects(session.setExclusionStatus({ groupId: "source", status: "explicitly_controlled" }), /instrument/);
+  await session.setConfounderStatus({ groupId: "source", status: "causes_y_only_via_x" });
+  assert.equal(Object.values(session.schema.confounder_statuses)[0].status, "causes_y_only_via_x");
+});
+
+test("exclusion statuses are keyed by instrument, IV, DV and group", async () => {
+  const session = await fixture();
+  session.schema.groups.push({ group_id: "inst", label: "Instrument", variable_ids: [] });
+  await session.setAnchors({ ivId: "iv", dvId: "dv", instrumentId: "inst" });
+  await assert.rejects(session.setExclusionStatus({ groupId: "source", status: "bogus" }), /Unknown exclusion status/);
+  await session.setExclusionStatus({ groupId: "source", status: "variable_only_via_x", text: "Mediated." });
+  assert.deepEqual(session.schema.exclusion_statuses[JSON.stringify(["inst", "iv", "dv", "source"])],
+    { status: "variable_only_via_x", text: "Mediated." });
+});
+
 test("publication permalink selects the reviewed X-Y graph", () => {
   const state = { project: { ...baseSchema, iv_group_id: "iv", dv_group_id: "dv" },
     data: { snapshot: { snapshot_id: "fixture" } }, workflowMode: "dag",

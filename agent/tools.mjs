@@ -1,5 +1,6 @@
 import { EchoAgentSession } from "./session.mjs";
 import { clonePublication } from "./local_data.mjs";
+import { CONFOUNDER_STATUSES, EXCLUSION_STATUSES } from "../site/confounder_status.mjs";
 
 const obj = (properties, required = []) => ({ type: "object", properties, required, additionalProperties: false });
 const str = { type: "string" }, bool = { type: "boolean" }, num = { type: "number" };
@@ -88,8 +89,12 @@ export function createEchoTools({ getSession, setSession }) {
     define("echo_set_finding_decision", "Exclude a finding with a reason, or retain it with a private open review reason.",
       obj({ rawLinkId: str, excluded: bool, reasonCode: str, reasonText: str }, ["rawLinkId", "excluded"]),
       a => session().setFindingDecision(a)),
-    define("echo_set_confounder_status", "Set Echo's status for a potential confounder and a private open reason under the selected IV and DV.",
-      obj({ groupId: str, status: str, text: str }, ["groupId", "status"]), a => session().setConfounderStatus(a)),
+    define("echo_set_confounder_status", `Set Echo's status for a potential confounder and a private open reason under the selected IV and DV. Statuses: ${Object.entries(CONFOUNDER_STATUSES).map(([id, label]) => `${id} (${label})`).join("; ")}.`,
+      obj({ groupId: str, status: { type: "string", enum: [...Object.keys(CONFOUNDER_STATUSES), "other"] }, text: str }, ["groupId", "status"]),
+      a => session().setConfounderStatus(a)),
+    define("echo_set_exclusion_status", `Set Echo's status for an exclusion restriction violation under the selected instrument, IV and DV (anchors must include an instrument). Statuses: ${Object.entries(EXCLUSION_STATUSES).map(([id, label]) => `${id} (${label})`).join("; ")}.`,
+      obj({ groupId: str, status: { type: "string", enum: Object.keys(EXCLUSION_STATUSES) }, text: str }, ["groupId", "status"]),
+      a => session().setExclusionStatus(a)),
     define("echo_graph", "Compile the working DAG and calculate Echo's confounder, collider, and exclusion diagnostics.",
       obj({ showConfoundersOnly: bool, showCollidersOnly: bool, showExclusionViolations: bool,
         showExogeneity: bool, maxPathLength: num, excludeBottlenecked: bool,
