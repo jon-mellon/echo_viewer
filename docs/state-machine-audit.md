@@ -7,8 +7,8 @@ happened when unusual event orders were tried against them.
 How this was checked: the code was read for each machine, a randomised sequence test drove `persistent_viewer.mjs` with
 a controllable store (400 sequences of 24 events: edit, begin/finish/discard editor, commit, copy, URL sync, settle ok,
 settle out of order, fail, other-tab write), a round-trip test compared `buildPermalink` and `applyPermalink` over 1,152
-view combinations, and `tests/state_machines.spec.cjs` replays the browser scenarios below. Everything marked **verified**
-was reproduced in Chromium.
+view combinations, and `tests/state_machines.spec.cjs` replays the browser scenarios below and now guards each fix. Everything marked
+**verified** was reproduced in Chromium before it was fixed.
 
 ## 1. The machines
 
@@ -29,44 +29,36 @@ was reproduced in Chromium.
 The app never calls `pushState` and has no `popstate` handler. Only `replaceState` is used, so in-app navigation adds no
 history entries. The browser Back button leaves the app, and a view is rebuilt from its URL on every load.
 
-## 2. Contradictory or invalid states found
+## 2. Contradictory or invalid states found, and how each was fixed
 
-### Confirmed
+**A. Publishing stayed disabled after a failed save was retried successfully.** (verified)
+Retry save succeeded but nothing told the Publish control, so it kept saying "unsaved" until an unrelated render. The
+save machine now reports every move (saving, saved, failed, editor opened or closed) through `onSaveStateChange`, which
+refreshes the publication controls (`canPublishChanged`). This also covers undo, redo, history jump and restore, which
+commit without refreshing the controls themselves.
 
-**A. Publishing stays disabled after a failed save is retried successfully.** (verified, `state_machines.spec.cjs`)
-Save fails, so `unsavedSchema` is true and the Publish control is disabled with "unavailable while … a variable edit is
-unsaved". Clicking Retry save succeeds, the status clears and the Retry button hides, yet Publish stays disabled for at
-least ten seconds. It recovers only when some unrelated render refreshes it. Cause: the Retry handler calls
-`commitDecision()` without `publicationController.workingCopyChanged()`; the other save paths do call it. Four more
-`commitDecision()` callers in `dag_builder.js` (undo, redo, history jump, restore variable) have the same shape and may leave the
-publication badge and Publish control stale after a schema change; those were read but not exercised.
+**B. A revision conflict showed a Retry button that could never succeed.** (verified)
+Retry reused the stale revision. Retry is now hidden for that error; Save independent copy is the exit.
 
-**B. A revision conflict shows a Retry button that can never succeed.** (verified)
-When another tab has saved the same draft, the status reads "Not saved — Schema revision changed in another tab" with
-both Retry save and Save independent copy. Retry reuses the stale revision, so it fails every time (two clicks
-reproduced it). Save independent copy does recover: a new draft id, saving works, publishing is enabled.
+**C. A failed startup left an error page with no controls.** (verified)
+Every startup error now shows Try again and Start new view.
 
-**C. A failed startup leaves an error page with no controls.** (verified)
-`dag_builder.js` replaces the whole body on any startup error. Only a missing local schema gets a "Start new view"
-link. A network failure produces "Echo could not open this view / Failed to fetch" with no link or button; a manual
-reload recovers once the network is back.
+**D. An unknown task, or an explore focus that no longer exists, blamed the cause and outcome.** (verified)
+The messages now say "This link's focus variable is not in the referenced schema." and "This link names a task that
+Echo does not recognise."
 
-**D. Unknown task, or an explore focus that no longer exists, blames the wrong thing.** (verified)
-`?task=nonsense` and `?task=causes&causes_of=missing` both show "Permalink cause or outcome is absent from the
-referenced schema." and nothing else (same dead end as C).
+**E. Publishing was not blocked during Save independent copy.** (found by a random-sequence test)
+`saveIndependentCopy` now occupies the same in-flight slot as an ordinary commit, waits for any outstanding commit
+first, and so blocks publishing until it finishes.
 
-**E. A save in flight does not block publishing during "Save independent copy".** (found by the sequence test)
-`saveIndependentCopy` does not set `commitPending`, so `canPublish` is true while that write is outstanding. Low impact:
-publishing reads the in-memory schema, and the window is one IndexedDB write.
+**Invalid workflow mode in the URL.** `mode=bogus` was stored and written into every later link. Only `setup`, `dag`
+and `group_review` are accepted now; anything else opens the graph.
 
-### Lower severity
+**An edit made just before a reload could be lost.** The page now asks before unloading while a schema write is
+outstanding or has failed, using the same `beforeunload` guard as unsaved variable definitions.
 
-- **Invalid values are accepted from the URL and re-emitted.** `mode=bogus` becomes `workflowMode: "bogus"` (the page
-  renders like the dag view) and is written back into every later URL. `selected_edge` and `selected_variable` are not
-  checked against the graph; a stale id is stored and re-emitted with no visible error.
-- **An edit made just before a reload can be lost.** The write is queued in a microtask and is asynchronous. A reload
-  that lands before it completes loses the edit with no warning (reproduced by stalling the write 400 ms). There is no
-  `beforeunload` guard while `commitPending` is set.
+**Not changed:** `selected_edge` and `selected_variable` from the URL are still not checked against the graph, because
+the graph is not known when the link is applied. A stale id is stored and re-emitted without a visible error.
 
 ## 3. Checked and sound
 

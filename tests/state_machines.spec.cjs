@@ -1,5 +1,4 @@
 // Hidden state machines (see docs/state-machine-audit.md). Passing tests pin behaviour that was probed and found sound.
-// `test.fail` marks a confirmed defect: it passes while the defect exists and fails, prompting its removal, once it is fixed.
 const { test, expect } = require("./fixtures.cjs");
 const { chooseAnchors } = require("./support/identify.cjs");
 
@@ -56,7 +55,6 @@ const saveState = page => page.evaluate(() => ({
 }));
 
 test("a save that fails and is retried leaves nothing unsaved, so publishing is available again", async ({ browser }) => {
-  test.fail(true, "Retry save does not refresh the Publish control (dag_builder.js retryLocalSave), so it stays disabled as 'unsaved'.");
   const page = await open(browser);
   await page.goto(url); await ready(page); await pickAnchors(page);
   await page.evaluate(() => {
@@ -76,7 +74,7 @@ test("a save that fails and is retried leaves nothing unsaved, so publishing is 
   await page.locator("#retryLocalSave").click();
   await expect.poll(async () => (await saveState(page)).localId).not.toBeNull();
   await expect(page.locator("#retryLocalSave")).toBeHidden();
-  // Nothing is unsaved now, so Publish should be available. It only recovers when an unrelated render refreshes it.
+  // Nothing is unsaved now, so Publish is available again without waiting for an unrelated render.
   await page.waitForTimeout(500);
   expect((await saveState(page)).publishDisabled).toBe(false);
 });
@@ -107,7 +105,6 @@ test("a revision conflict offers an independent copy that restores saving and pu
 });
 
 test("Retry save is not offered when the revision conflict can only be resolved by a copy", async ({ browser }) => {
-  test.fail(true, "Retry reuses the stale revision, so it fails every time; the conflict message still shows both buttons.");
   const a = await open(browser);
   await a.goto(url); await ready(a); await pickAnchors(a);
   await excludeFirstClaim(a);
@@ -125,20 +122,20 @@ test("Retry save is not offered when the revision conflict can only be resolved 
 });
 
 test("a failed startup offers a way out of the error screen", async ({ browser }) => {
-  test.fail(true, "Only a missing local schema gets 'Start new view'; every other startup error leaves a page with no controls.");
   const page = await open(browser);
   await page.route(/layouts\/browser-v2\/[0-9a-f]{64}\/manifest\.json|published-schemas\/_registry/, route => route.abort("failed"));
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Echo could not open this view" })).toBeVisible({ timeout: 60000 });
-  await expect(page.locator("a, button")).not.toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Start new view" })).toBeVisible();
 });
 
 test("a link to a task or focus variable that no longer exists does not blame the cause and outcome", async ({ browser }) => {
-  test.fail(true, "An unknown task or a stale explore focus shows 'Permalink cause or outcome is absent from the referenced schema.'");
   const page = await open(browser);
-  await page.goto(`${url}&p=1&mode=dag&task=causes&causes_of=missing-group`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${url.replace("&task=identify", "")}&p=1&mode=dag&task=causes&causes_of=missing-group`, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Echo could not open this view" })).toBeVisible({ timeout: 90000 });
-  await expect(page.locator("main")).not.toContainText("cause or outcome is absent");
+  await expect(page.locator("main")).toContainText("focus variable is not in the referenced schema");
+  await expect(page.getByRole("link", { name: "Start new view" })).toBeVisible();
 });
 
 test("selecting a second edge while the first edge's evidence is still loading ends on the second edge", async ({ browser }) => {
@@ -173,4 +170,12 @@ test("a stale OAuth callback is ignored without contacting the provider", async 
   await ready(page);
   expect(calls).toEqual([]);
   expect(new URL(page.url()).searchParams.has("code")).toBe(false);
+});
+
+test("a link with an unknown workflow mode opens the graph and does not carry the mode forward", async ({ browser }) => {
+  const page = await open(browser);
+  await page.goto(`${url}&p=1&mode=bogus&iv=category-academic-achievement&dv=category-macroeconomic-context`);
+  await ready(page);
+  expect(await page.evaluate(() => window.__dagBuilderState.workflowMode)).toBe("dag");
+  await expect.poll(() => new URL(page.url()).searchParams.get("mode")).not.toBe("bogus");
 });

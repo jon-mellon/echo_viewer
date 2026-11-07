@@ -143,6 +143,12 @@ export function createPublicationController({
     statusTimer = setTimeout(() => void refreshPublicationState(), 150);
   }
 
+  // The save machine moved (saving, saved, failed, editor opened or closed): re-derive what the controls allow.
+  function canPublishChanged() {
+    refreshPublishVisibility();
+    void refreshPublicationState();
+  }
+
   function showShareCopied() {
     const button = elements.share;
     if (!button) return;
@@ -331,5 +337,5 @@ export function createPublicationController({
     showStatus(elements.status, "Variable memberships could not be verified. Editing and publishing remain disabled.", true);
   }
 
-  return { initialize, publish, share, publicPermalink, currentCanonical, refreshPublicationState, workingCopyChanged, setSchemaReady, setSchemaLoadFailed };
+  return { initialize, publish, share, publicPermalink, currentCanonical, refreshPublicationState, workingCopyChanged, canPublishChanged, setSchemaReady, setSchemaLoadFailed };
 }

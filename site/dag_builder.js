@@ -1293,10 +1293,12 @@ const persistentViewer = createPersistentViewer({
       indicator.setAttribute("aria-label", label);
     }
     if (els.localSaveStatus) els.localSaveStatus.textContent = saving || saved || message === "Published schema" ? "" : message;
-    if (els.retryLocalSave) els.retryLocalSave.hidden = !message.startsWith("Not saved");
+    // A stale revision fails the same way every time; only an independent copy resolves it.
+    if (els.retryLocalSave) els.retryLocalSave.hidden = !message.startsWith("Not saved") || message.includes("Schema revision changed");
     if (els.saveIndependentCopy) els.saveIndependentCopy.hidden =
       !message.includes("Schema revision changed");
   },
+  onSaveStateChange: () => publicationController?.canPublishChanged?.(),
   onSessionSaved: () => {
     if (els.localSaveStatus?.textContent.startsWith("Previous view not saved —")) {
       els.localSaveStatus.textContent = "";
@@ -2336,6 +2338,8 @@ const eventController = createDagEventController({
 // A variable definition is kept in memory until it is saved. Protect work in
 // progress from an accidental reload; OAuth has its own draft handoff.
 window.addEventListener("beforeunload", event => {
+  // A schema write that is still running (or has failed) would be lost with the page.
+  if (persistentViewer.saving) { event.preventDefault(); event.returnValue = ""; return; }
   const draft = state.definitionDraft;
   if (!draft || sessionStorage.getItem("echo-openrouter-definition-draft-v1")) return;
   if (!draft.source_group_ids?.length && !draft.new_label && !draft.new_description
@@ -2357,5 +2361,7 @@ init().catch((error) => {
     h("main", { className: "panel-section" }, h("h1", { textContent: missing ? "Local schema unavailable" : "Echo could not open this view" }),
       h("p", { textContent: error?.message || error }),
       missing ? h("label", { textContent: "Import draft" }, input) : null,
-      missing ? h("a", { href: "?new=1", textContent: "Start new view" }) : null));
+      // Whatever went wrong, leave a way out: the failure may be a dropped connection or a stale link.
+      missing ? null : h("p", {}, h("button", { type: "button", className: "btn", textContent: "Try again", onclick: () => window.location.reload() })),
+      h("a", { href: "?new=1", textContent: "Start new view" })));
 });
