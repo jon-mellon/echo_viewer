@@ -86,7 +86,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       if (sourceHydrations.has(source.group_id) || !source.variable_ids?.length) continue;
       const loading = hydrateVariableDetails(source.variable_ids, { skipNeighbors: true });
       sourceHydrations.set(source.group_id, loading);
-      void loading.catch(() => sourceHydrations.delete(source.group_id));
+      void loading.catch(() => {
+        if (sourceHydrations.get(source.group_id) === loading) sourceHydrations.delete(source.group_id);
+      });
     }
     try {
       const ids = row.local_variable_ids || await boundedSplitLookup(loadPublishedSplitMembership(row));
@@ -323,7 +325,9 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         const loading = hydrateVariableDetails(source.variable_ids, { skipNeighbors: true });
         sourceHydrations.set(sourceId, loading);
         // Continue will await this same promise; handle cancellation separately.
-        void loading.catch(() => sourceHydrations.delete(sourceId));
+        void loading.catch(() => {
+          if (sourceHydrations.get(sourceId) === loading) sourceHydrations.delete(sourceId);
+        });
       }
     }
   }

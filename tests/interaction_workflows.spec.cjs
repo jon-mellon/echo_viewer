@@ -700,3 +700,30 @@ test("a save finishing after navigation keeps the newer view in the address", as
   });
   expect(result).toEqual({ task: "consequences", local: true });
 });
+
+test("an old source loading failure cannot replace the new draft's in-flight load", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const sourceId = await page.evaluate(async () => {
+    const state = window.__dagBuilderState;
+    const group = state.project.groups.find(g => g.variable_ids?.some(id => !state.variableById.has(id)));
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    window.__sourceLoads = [];
+    dagDataSource.loadVariableMetadata = () => new Promise((resolve, reject) => window.__sourceLoads.push({ resolve, reject }));
+    return group.group_id;
+  });
+  await startCreate(page, "iv");
+  const source = page.locator(`#definitionSourceList input[data-source-id="${sourceId}"]`);
+  await source.check();
+  await expect.poll(() => page.evaluate(() => window.__sourceLoads.length)).toBe(1);
+  await page.locator(".definition-cancel:visible").first().click();
+  await startCreate(page, "iv");
+  await source.check();
+  await expect.poll(() => page.evaluate(() => window.__sourceLoads.length)).toBe(2);
+  await page.evaluate(() => window.__sourceLoads[0].reject(new Error("old load failed")));
+  await page.locator("#definitionContinue").click();
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => window.__sourceLoads.length)).toBe(2);
+  await page.evaluate(() => window.__sourceLoads[1].resolve([]));
+});
