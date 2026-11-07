@@ -3256,8 +3256,8 @@ h2 {
 .reset-here { border-color: var(--danger); color: var(--danger); }
 
 @media (max-width: 840px) {
-  .dag-body { --app-top: 52px; }
-  .task-bar { gap: var(--space-2); padding: 0 var(--space-2); }
+  .dag-body { --app-top: calc(52px + var(--mobile-status-height, 0px)); }
+  .task-bar { height: 52px; gap: var(--space-2); padding: 0 var(--space-2); }
   .schema-menu-title, .schema-menu-panel .menu-item > span,
   .edit-history-entry > span, .previous-session-title {
     overflow: visible; white-space: normal; overflow-wrap: anywhere;
