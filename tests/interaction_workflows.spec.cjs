@@ -191,9 +191,15 @@ test("evidence keeps available fields visible while concept labels load", async 
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
     await whenDagRendered();
-    const original = dagDataSource.loadVariableProvenance.bind(dagDataSource);
+    // Supply evidence without labels to exercise the separate loading path,
+    // regardless of whether this snapshot has a published evidence bundle.
+    dagDataSource.loadPanelEvidence = async ids => ({
+      links: ids.map(id => ({ raw_causal_link_id: id, source_variable_id: "test-source",
+        target_variable_id: "test-target", paper_title: "Test paper", paper_id: "test-paper" })),
+      variables: [],
+    });
     dagDataSource.loadVariableProvenance = ids => new Promise(resolve => {
-      window.__releaseConceptLabels = async () => resolve(await original(ids));
+      window.__releaseConceptLabels = () => resolve(ids.map(variable_id => ({ variable_id, concept_label: variable_id })));
     });
     const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__"
       && window.__dagBuilderState.project.links.some(link => link.edge_id === value
