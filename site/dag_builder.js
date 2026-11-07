@@ -194,10 +194,15 @@ function initElements() {
   // Reserve space below the mobile header for the full, potentially wrapped status.
   // Observe the border box so padding and the divider are included in the offset.
   if (els.localSaveStatus) {
+    // Only write when the whole-pixel height changes: the variable sits on <body>, so every write restyles the page.
+    let applied = -1;
     new ResizeObserver(entries => {
-      const height = entries[0].target.getBoundingClientRect().height;
+      const box = entries[0].borderBoxSize?.[0];
+      const height = Math.round(box ? box.blockSize : entries[0].contentRect.height);
+      if (height === applied) return;
+      applied = height;
       document.body.style.setProperty("--mobile-status-height", `${height}px`);
-    }).observe(els.localSaveStatus);
+    }).observe(els.localSaveStatus, { box: "border-box" });
   }
 
   els.confounderDisclosure.addEventListener("toggle", renderConfounderStatuses);
