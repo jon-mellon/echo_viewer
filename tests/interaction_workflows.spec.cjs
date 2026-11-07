@@ -603,3 +603,18 @@ for (const width of [390, 1440]) test(`unfinished evidence reason survives leavi
   await reason.selectOption("other");
   await expect(detail).toHaveValue("");
 });
+
+for (const width of [390, 1440]) test(`a partially selected Identify view survives reload at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  await page.locator("#identify-iv-input").fill("sleep");
+  await page.locator('#identifyGroupPicker button[data-group-id="category-sleep"]').click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("iv")).toBe("category-sleep");
+  await expect.poll(() => new URL(page.url()).searchParams.get("mode")).toBe("setup");
+  await page.reload();
+  await ready(page);
+  await expect(page.locator("#identify-iv-input")).toHaveValue("sleep");
+  await expect(page.locator('#identifyGroupPicker[data-picker-side="dv"]')).toBeVisible();
+});

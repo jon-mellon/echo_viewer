@@ -966,6 +966,15 @@ function chooseIdentifyVariable(side, groupId) {
   state.changingAnchorSide = side;
   assignGroupAsAnchor(side, groupId);
   state.changingAnchorSide = null;
+  // A single selected anchor is still an incomplete setup and must be
+  // represented in the URL so a reload can return to the next field.
+  const ivReady = Boolean(groupById(state.project.iv_group_id)?.variable_ids?.length);
+  const dvReady = Boolean(groupById(state.project.dv_group_id)?.variable_ids?.length);
+  if (!ivReady || !dvReady) {
+    state.workflowMode = "setup";
+    state.phase = ivReady ? "select_dv" : "select_iv";
+  }
+  persistentViewer.viewerChanged();
   setupGroupController.renderIdentifyPicker();
 }
 function seedLabel(side) { return groupEditorController.seedLabel(side); }
