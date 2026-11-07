@@ -4,7 +4,7 @@ const { describeVariable, includeConcepts } = require("./support/definition.cjs"
 const { chooseTask, openNav, closeNav } = require("./support/navigation.cjs");
 const { readFile } = require("node:fs/promises");
 
-const viewer = "http://127.0.0.1:8767/?task=identify";
+const viewer = `http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/?task=identify`;
 
 async function ready(page) {
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
@@ -132,7 +132,7 @@ test("variable search catalog preloads once and serves anchor search", async ({ 
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const catalogRequests = [];
   page.on("request", request => {
-    if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
+    catalogRequests.push(request.url());
   });
   await page.goto(viewer);
   await ready(page);
@@ -140,11 +140,12 @@ test("variable search catalog preloads once and serves anchor search", async ({ 
   expect(["loading", "ready"]).toContain(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus));
   await page.locator("#identify-iv-input").focus();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("ready");
-  const hasStaticCatalog = await page.evaluate(async () => {
-    const { SNAPSHOT_SEARCH_CATALOGS } = await import('/variable_search_catalog.mjs');
-    return Boolean(SNAPSHOT_SEARCH_CATALOGS[new URL(location.href).searchParams.get('data_version')]);
+  const catalogUrl = await page.evaluate(async () => {
+    const { searchCatalogs } = await import("/variable_search_catalog.mjs");
+    const url = searchCatalogs.url(new URL(location.href).searchParams.get("data_version"));
+    return url ? new URL(url, location.href).href : "";
   });
-  expect(catalogRequests).toHaveLength(hasStaticCatalog ? 1 : 0);
+  expect(catalogRequests.filter(url => url === catalogUrl)).toHaveLength(catalogUrl ? 1 : 0);
   await page.locator("#identify-iv-input").fill("education");
   await expect(page.locator("#identifyGroupPicker button[data-group-id]").first()).toBeVisible();
 });
@@ -155,7 +156,7 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
   const catalogRequests = [];
   page.on("request", request => {
     if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
-    if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
+    catalogRequests.push(request.url());
   });
   // This checks the precomputed search-catalog path available for this snapshot.
   await page.goto(`${viewer}&schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
@@ -174,7 +175,11 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
   await expect(page.locator("#provenancePanel tbody tr").first()).toBeVisible();
   await expect(page.locator("#provenancePanel .concept-loading")).toHaveCount(0);
   expect(parquetRequests.some(url => url.endsWith("/variable_layouts.parquet"))).toBe(false);
-  expect(catalogRequests).toHaveLength(1);
+  const catalogUrl = await page.evaluate(async () => {
+    const { searchCatalogs } = await import("/variable_search_catalog.mjs");
+    return new URL(searchCatalogs.url(new URL(location.href).searchParams.get("data_version")), location.href).href;
+  });
+  expect(catalogRequests.filter(url => url === catalogUrl)).toHaveLength(1);
 });
 
 test("evidence keeps available fields visible while concept labels load", async ({ page }) => {
