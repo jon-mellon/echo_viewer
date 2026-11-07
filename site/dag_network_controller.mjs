@@ -255,10 +255,10 @@ function tableRole(group) {
   const id = group.group_id;
   const anchors = studyAnchors();
   if (id === exploreFocusId()) return "Focus";
-  if (id === anchors.ivId) return "Ind var";
-  if (id === anchors.dvId) return "Dep var";
+  if (id === anchors.ivId) return "Cause";
+  if (id === anchors.dvId) return "Outcome";
   if (id === anchors.instrumentId) return "Instrument";
-  if (state.showExogeneity && state.exogeneityGroupIds?.has(id)) return "Common cause of instrument and Dep var";
+  if (state.showExogeneity && state.exogeneityGroupIds?.has(id)) return "Common cause of instrument and outcome";
   if (state.showExclusionViolations && state.exclusionViolationIds?.has(id)) return "Exclusion restriction violation";
   if (state.showCollidersOnly && state.colliderGroupIds?.has(id)) return "Collider";
   if (state.showConfoundersOnly && state.confounderGroupIds?.has(id)) return "Confounder";
@@ -281,7 +281,7 @@ async function renderDagTable(groups, links) {
   _dagTable ||= createDagTable({ container: els.dagTable, onOpenVariable: openVariable, onOpenEvidence: openEvidence, onSetStatus });
   const studyLinks = studyDesignEdgeData(groups, state.project, state.task).map(edge => ({
     edgeId: edge.id, sourceId: edge.from, targetId: edge.to,
-    note: edge.id === STUDY_DESIGN_EDGE_ID ? "Study relationship" : "Study instrument",
+    note: edge.id === STUDY_DESIGN_EDGE_ID ? "Project relationship" : "Project instrument",
   }));
   const view = pathView({ ...state, exploring: exploring() });
   const pathsByGroup = { exogeneity: state.exogeneityPathsByGroup, exclusion: state.exclusionPathsByGroup,

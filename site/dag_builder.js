@@ -55,8 +55,8 @@ const ROLE_LABELS = {
   possible_confounder: "Confounder candidate",
   possible_mediator: "Mediator candidate",
   possible_common_consequence_or_collider: "Common consequence",
-  other_possible_cause_of_dv: "Other cause of Dep var",
-  other_possible_cause_of_iv: "Other cause of Ind var",
+  other_possible_cause_of_dv: "Other cause of the outcome",
+  other_possible_cause_of_iv: "Other cause of the cause",
 };
 
 const GROUP_COLORS = {
@@ -699,7 +699,7 @@ async function deleteCustomVariable(groupId) {
   for (const key of ["focusedGroupId", "activeGroupId", "selectedEvidenceGroupId"]) {
     if (state[key] === groupId) state[key] = null;
   }
-  addToUndoHistory(`Deleted variable "${group?.label || groupId}"`, before);
+  addToUndoHistory(`Excluded variable "${group?.label || groupId}"`, before);
   invalidateVisibleCaches();
   renderAll();
   await persistentViewer.commitDecision();
@@ -733,7 +733,7 @@ function renderSearch(side, { renderPicker = true } = {}) {
   replaceChildren(container, matches.map(v => h("button", { className: "result-button", type: "button", dataset: { side, variableId: v.variable_id } },
     h("strong", { textContent: v.display_label || v.concept_label }),
     h("span", { textContent: truncate(v.raw_variable_text || v.concept_label, 110) }),
-    h("span", { textContent: `${v.paper_id || "unknown paper"} ${selected.has(v.variable_id) ? "(selected)" : ""}` }))));
+    h("span", { textContent: `${v.paper_id || "unknown study"} ${selected.has(v.variable_id) ? "(selected)" : ""}` }))));
   container.querySelectorAll(".result-button").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const variableId = btn.dataset.variableId;
@@ -953,7 +953,7 @@ function chooseIdentifyVariable(side, groupId) {
     state.phase = state.project.iv_group_id ? "select_dv" : "select_iv";
     state.selectedEdgeId = null;
     state.selectedEvidenceGroupId = null;
-    addToUndoHistory(`Remove "${label || side}" as ${side === "iv" ? "cause" : "outcome"}`, before, "anchors");
+    addToUndoHistory(`Exclude "${label || side}" as ${side === "iv" ? "cause" : "outcome"}`, before, "anchors");
     renderAll({ reuseLinks: true });
     return;
   }
@@ -987,7 +987,7 @@ function seedLabel(side) { return groupEditorController.seedLabel(side); }
 function applyProjectOperation(next) {
   if (state.publishedSchemaHydrating || state.publishedSchemaLoadFailed) {
     if (els.publicationStatus) {
-      els.publicationStatus.textContent = "Group memberships are still loading. Editing will unlock when they are ready.";
+      els.publicationStatus.textContent = "Variable memberships are still loading. Editing will unlock when they are ready.";
       els.publicationStatus.classList.add("publication-error");
     }
     return false;
@@ -1106,7 +1106,7 @@ function applyProjectOperation(next) {
         state.compiledUpdateTargetSchema = null;
         state.compiledUpdateChangedIds = null;
         state.compiledUpdateChangedRawIds = null;
-        console.warn("Incremental DAG update failed; a full local recomputation is required.", error);
+        console.warn("Incremental graph update failed; a full local recomputation is required.", error);
       }).finally(() => {
         if (state.compiledDagUpdatePromise === updatePromise) state.compiledDagUpdatePromise = null;
       });
@@ -1215,7 +1215,7 @@ function renderGroupEditor() {
       renderAll();
     }).catch(error => {
       state.pendingVariableMetadata = false;
-      console.warn("Could not lazily load group variable metadata.", error);
+      console.warn("Could not lazily load variable metadata.", error);
     });
   }
   const result = groupEditorController.renderGroupEditor();
@@ -1462,7 +1462,7 @@ function renderVariableComparison() {
 
   replaceChildren(els.edgeInspector, h("strong", { textContent: "Evidence between variables" }),
     h("div", { textContent: `${sourceLabel} ↔ ${targetLabel}` }),
-    h("div", { className: "small-note", textContent: `${rows.length} extracted evidence record${rows.length === 1 ? "" : "s"}; only “present” claims create DAG edges; “absent” and “uncertain” are shown for reference.` }));
+    h("div", { className: "small-note", textContent: `${rows.length} extracted claim${rows.length === 1 ? "" : "s"}; only “present” claims create graph links; “absent” and “uncertain” are shown for reference.` }));
   const evidenceRows = rows.map((link) => {
     const doi = isDoi(link.paper_id) ? link.paper_id.trim() : null;
     const paper = truncate(link.paper_title || link.paper_id, 44);
@@ -1501,7 +1501,7 @@ function loadLinkSupport(links) {
     if (state.edgeSupportById !== supportCache) return false;
     const returned = new Set(rows.map(row => row.raw_causal_link_id));
     if (missing.some(id => !returned.has(id))) {
-      throw new Error("Some sparse edge evidence is unavailable in this snapshot");
+      throw new Error("Some sparse link evidence is unavailable in this snapshot");
     }
     for (const row of rows) state.edgeSupportById.set(row.raw_causal_link_id, row);
     linkSupportFailed = false;
@@ -1509,7 +1509,7 @@ function loadLinkSupport(links) {
   }).catch(error => {
     if (state.edgeSupportById === supportCache) {
       linkSupportFailed = true;
-      console.error("Could not load sparse edge evidence", error);
+      console.error("Could not load sparse link evidence", error);
     }
     return false;
   }).finally(() => {
@@ -1582,7 +1582,7 @@ function computeVisibleLinks() {
   els.showExcludedLinks.textContent = `Excluded links (${excludedCount})`;
   const excludedFindingCount = Object.keys(state.project.finding_decisions || {}).length;
   els.showExcludedFindings.hidden = excludedFindingCount === 0;
-  els.showExcludedFindings.textContent = `Excluded findings (${excludedFindingCount})`;
+  els.showExcludedFindings.textContent = `Excluded claims (${excludedFindingCount})`;
   const studyGraph = effectiveStudyGraph({ ...state.project, groups: dagGroups() });
   state.studyGraph = studyGraph;
   const view = deriveDagView({
@@ -1654,7 +1654,7 @@ function persistFindingDecision() {
   if (state.activeGroupId && !persistentViewer.editorOpen) {
     void persistentViewer.commitDecision().then(() =>
       publicationController.workingCopyChanged()).catch(error =>
-      console.error("Could not save finding exclusion", error));
+      console.error("Could not save claim exclusion", error));
   }
 }
 
@@ -1667,8 +1667,8 @@ async function showExcludedFindings() {
   els.edgeInspector.hidden = false;
   els.provenancePanel.hidden = true;
   els.closeEvidencePane.hidden = false;
-  replaceChildren(els.edgeInspector, h("strong", { textContent: "Excluded findings" }),
-    h("div", { className: "small-note", textContent: "Loading findings…" }));
+  replaceChildren(els.edgeInspector, h("strong", { textContent: "Excluded claims" }),
+    h("div", { className: "small-note", textContent: "Loading claims…" }));
   refreshDagEdgeSelection();
   try {
     const missing = ids.filter(id => !state.rawLinksById.has(id));
@@ -1676,10 +1676,10 @@ async function showExcludedFindings() {
       state.rawLinksById.set(raw.raw_causal_link_id, raw);
     }
   } catch (error) {
-    console.warn("Could not load excluded findings.", error);
+    console.warn("Could not load excluded claims.", error);
   }
   if (state.selectedEdgeId || state.selectedEvidenceGroupId || els.edgeInspector.hidden) return;
-  replaceChildren(els.edgeInspector, h("strong", { textContent: "Excluded findings" }),
+  replaceChildren(els.edgeInspector, h("strong", { textContent: "Excluded claims" }),
     ...ids.filter(id => state.project.finding_decisions?.[id]).map(id => {
       const raw = state.rawLinksById.get(id);
       const source = state.variableById.get(raw?.source_variable_id)?.concept_label || raw?.source_variable_id || "";
@@ -1694,7 +1694,7 @@ async function showExcludedFindings() {
         const before = takeSnapshot();
         if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
         addDecision("finding_restored", { raw_causal_link_id: id });
-        addToUndoHistory("Restored finding", before, "finding-decision");
+        addToUndoHistory("Restored claim", before, "finding-decision");
         rebuildLinkDecision();
         persistFindingDecision();
         if (Object.keys(state.project.finding_decisions || {}).length) void showExcludedFindings();
@@ -1824,7 +1824,7 @@ function renderSelectedEdge() {
       }
     }).catch(error => {
       failedEvidenceEdgeId = loadingEdgeId;
-      console.warn("Could not lazily load aggregate-edge evidence.", error);
+      console.warn("Could not lazily load aggregate-link evidence.", error);
     }).finally(() => {
       if (pendingEdgeEvidencePromise !== load) return;
       pendingEdgeEvidencePromise = null;
@@ -1902,8 +1902,8 @@ function renderExportStatus() {
   const bidirectional = state.project.links.some((l) => l.direction_type === "BIDIRECTIONAL" && l.display_status !== "excluded");
   // Shown as the Causal diagram export's tooltip.
   els.exportWorkingMap.title = cycle || bidirectional
-    ? "Not a strict DAG: has cycles or two-way links"
-    : "Valid strict DAG";
+    ? "Not an acyclic graph: has cycles or two-way links"
+    : "Valid acyclic graph";
 }
 
 // ─── Decision log ──────────────────────────────────────────────────────────────
@@ -2224,7 +2224,7 @@ const exportController = createDagExportController({
     try {
       await loadMissing(Object.keys(state.project.finding_decisions || {}));
     } catch (error) {
-      console.warn("Could not load some excluded finding details for export.", error);
+      console.warn("Could not load some excluded claim details for export.", error);
     }
   },
 });

@@ -78,7 +78,7 @@ test("the root starts fresh and Previous Sessions restores a committed local sch
     const { buildPermalink } = await import("/dag_permalink.mjs");
     const { commitLocalSchema } = await import("/local_schema_store.mjs");
     const schema = structuredClone(state.data.grouping_sets[0]);
-    schema.groups[0].label = "Local persistence test group";
+    schema.groups[0].label = "Local persistence test variable";
     const movedVariable = schema.groups[0].variable_ids.find(id =>
       !schema.groups[1].variable_ids.includes(id));
     if (!movedVariable) throw new Error("Expected a variable that can be reassigned.");
@@ -88,7 +88,7 @@ test("the root starts fresh and Previous Sessions restores a committed local sch
       ![schema.groups[0].group_id, schema.groups[1].group_id]
         .includes(edge.group_a) && ![schema.groups[0].group_id, schema.groups[1].group_id]
         .includes(edge.group_b))?.edge_id;
-    if (!decidedEdge) throw new Error("Expected an unaffected edge for the decision check.");
+    if (!decidedEdge) throw new Error("Expected an unaffected link for the decision check.");
     schema.link_decisions = { ...(schema.link_decisions || {}),
       [decidedEdge]: { display_status: "excluded", exclude_reason: "private local reason" } };
     const id = crypto.randomUUID();
@@ -111,14 +111,14 @@ test("the root starts fresh and Previous Sessions restores a committed local sch
       .find(edge => edge.edge_id === decidedEdge)?.user_decision,
     localId: new URL(location.href).searchParams.get("local_schema"),
   }), decidedEdge);
-  expect(loaded.label).toBe("Local persistence test group");
+  expect(loaded.label).toBe("Local persistence test variable");
   expect(loaded.groups.find(group => group.group_id === targetGroup).variable_ids).toContain(movedVariable);
   expect(loaded.groups[0].variable_ids).not.toContain(movedVariable);
   expect(loaded.decision.exclude_reason).toBe("private local reason");
   expect(loaded.compiledDecision?.display_status).toBe("excluded");
   expect(loaded.localId).toBe(new URL(localUrl).searchParams.get("local_schema"));
   const savedSessionId = await page.evaluate(() => history.state.echoSessionId);
-  expect(localUrl).not.toContain("Local persistence test group");
+  expect(localUrl).not.toContain("Local persistence test variable");
   expect(localUrl).not.toContain("private local reason");
   const freshContext = await page.context().browser().newContext();
   const freshPage = await freshContext.newPage();

@@ -243,7 +243,7 @@ export function importSchemaGroups(project, groupingSet, linkLookup, timestamp) 
     const importedGroupId = `schema_${sourceGroup.group_id}`;
     project.groups.push({
       group_id: importedGroupId,
-      label: sourceGroup.label || "Imported group",
+      label: sourceGroup.label || "Imported variable",
       ...(sourceGroup.description ? { description: sourceGroup.description } : {}),
       variable_ids: remaining,
       seed_variable_ids: remaining.slice(),
@@ -297,14 +297,14 @@ export function splitCategories(project, {
 }) {
   splitId ||= `split_${newGroupId}`;
   const sourceIds = [...new Set(sourceGroupIds || [])];
-  if (!sourceIds.length) throw new Error("Choose at least one source category.");
+  if (!sourceIds.length) throw new Error("Choose at least one source variable.");
   if (!newGroupId || project.groups.some(group => group.group_id === newGroupId)) {
-    throw new Error("The new category must have a unique ID.");
+    throw new Error("The new variable must have a unique ID.");
   }
   if (!String(newLabel || "").trim()) throw new Error("Name the new variable.");
   const sourceGroups = sourceIds.map(id => project.groups.find(group => group.group_id === id));
   if (sourceGroups.some(group => !group?.variable_ids?.length)) {
-    throw new Error("Every source category must exist and contain variables.");
+    throw new Error("Every source variable must exist and contain variables.");
   }
   const eligible = new Set(sourceGroups.flatMap(group => group.variable_ids));
   const sourceGroupByVariable = Object.fromEntries(sourceGroups.flatMap(group =>
@@ -326,10 +326,10 @@ export function splitCategories(project, {
         edited_at: timestamp } };
   });
   const normalizedLabels = nextGroups.map(group => String(group.label || "").trim().toLowerCase()).filter(Boolean);
-  if (new Set(normalizedLabels).size !== normalizedLabels.length) throw new Error("Category names must be unique.");
+  if (new Set(normalizedLabels).size !== normalizedLabels.length) throw new Error("Variable names must be unique.");
   const labels = new Set(normalizedLabels);
   const normalizedNewLabel = String(newLabel).trim().toLowerCase();
-  if (labels.has(normalizedNewLabel)) throw new Error("Category names must be unique.");
+  if (labels.has(normalizedNewLabel)) throw new Error("Variable names must be unique.");
   const newGroup = {
     group_id: newGroupId, label: String(newLabel).trim(), variable_ids: [...carved],
     ...(String(newDescription || "").trim() ? { description: String(newDescription).trim() } : {}),
@@ -353,7 +353,7 @@ export function splitCategories(project, {
   };
   const owners = new Map();
   for (const group of next.groups) for (const id of group.variable_ids || []) {
-    if (owners.has(id)) throw new Error(`Variable ${id} belongs to more than one category.`);
+    if (owners.has(id)) throw new Error(`Variable ${id} belongs to more than one variable.`);
     owners.set(id, group.group_id);
   }
   return next;
@@ -388,7 +388,7 @@ export function updateSplitCategories(project, {
   if (!context || context.splitId !== splitId
     || sourceIds.length !== context.residuals.length
     || sourceIds.some(id => !context.residuals.some(group => group.group_id === id))) {
-    throw new Error("All categories produced by this split must still exist before it can be edited.");
+    throw new Error("All variables produced by this split must still exist before it can be edited.");
   }
   const { newGroup, residuals } = context;
   const resultIds = new Set([newGroupId, ...sourceIds]);
@@ -418,7 +418,7 @@ export function updateSplitCategories(project, {
   });
   const labels = nextGroups.map(group => String(group.label || "").trim().toLowerCase()).filter(Boolean);
   if (!String(newLabel || "").trim()) throw new Error("Name the new variable.");
-  if (new Set(labels).size !== labels.length) throw new Error("Category names must be unique.");
+  if (new Set(labels).size !== labels.length) throw new Error("Variable names must be unique.");
   return { ...project, groups: nextGroups,
     decisions: [...(project.decisions || []), {
       decision_id: `decision_${(project.decisions || []).length + 1}`,
@@ -441,7 +441,7 @@ export function customVariableContext(project, groupId) {
  */
 export function deleteSplitCategories(project, { groupId, timestamp }) {
   const context = customVariableContext(project, groupId);
-  if (!context) throw new Error("This variable was changed by a later edit and cannot be deleted.");
+  if (!context) throw new Error("This variable was changed by a later edit and cannot be excluded.");
   const { splitId, newGroup, residuals } = context;
   const owners = newGroup.provenance.source_group_by_variable;
   const returned = new Map(residuals.map(group => [group.group_id, []]));

@@ -210,7 +210,7 @@ test("evidence keeps available fields visible while concept labels load", async 
       state.variableById.delete(target);
       for (const [rawIds, from, to] of [[link.a_to_b_raw_link_ids || [], source, target], [link.b_to_a_raw_link_ids || [], target, source]]) {
         for (const rawId of rawIds) state.rawLinksById.set(rawId, { raw_causal_link_id: rawId,
-          paper_id: "10.1234/test", paper_title: "Example paper", source_variable_id: from, target_variable_id: to });
+          paper_id: "10.1234/test", paper_title: "Example study", source_variable_id: from, target_variable_id: to });
       }
       inspectDagEdge(id);
     }
@@ -256,7 +256,7 @@ test("evidence replaces the map, the fields and list stay, and Back to map resto
   await expect(pane).toBeHidden();
 });
 
-test("Map tab returns from mobile evidence to the DAG", async ({ page }) => {
+test("Map tab returns from mobile evidence to the graph", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(viewer);
@@ -588,8 +588,8 @@ for (const width of [390, 1440]) test(`unfinished evidence reason survives leavi
     api.inspectDagEdge("category-academic-achievement__category-macroeconomic-context");
   });
   await openEvidence();
-  await page.getByRole("button", { name: /^Exclude finding / }).first().click();
-  const reason = page.getByRole("combobox", { name: "Finding exclusion reason" });
+  await page.getByRole("button", { name: /^Exclude claim / }).first().click();
+  const reason = page.getByRole("combobox", { name: "Claim exclusion reason" });
   const detail = page.getByRole("textbox", { name: "Other exclusion reason" });
   await reason.selectOption("other");
   await detail.fill("A reason still being written");
@@ -598,7 +598,7 @@ for (const width of [390, 1440]) test(`unfinished evidence reason survives leavi
   await expect(reason).toHaveValue("other");
   await expect(detail).toHaveValue("A reason still being written");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page.getByRole("button", { name: /^Exclude finding / }).first().click();
+  await page.getByRole("button", { name: /^Exclude claim / }).first().click();
   await expect(reason).toHaveValue("not_relevant_to_target_population");
   await reason.selectOption("other");
   await expect(detail).toHaveValue("");
@@ -654,7 +654,7 @@ test("mobile reload returns to the open evidence pane", async ({ page }) => {
   await page.reload();
   await ready(page);
   await expect(page.locator("#closeEvidencePane")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Exclude finding / }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Exclude claim / }).first()).toBeVisible();
 });
 
 test("reload warns before discarding an unfinished variable definition", async ({ page }) => {
@@ -808,13 +808,13 @@ for (const width of [390, 1440]) test(`failed evidence loading is reported at ${
     api.inspectDagEdge("category-academic-achievement__category-macroeconomic-context");
   });
   await expect(page.getByText("Evidence could not be loaded. Try again.")).toBeVisible();
-  await expect(page.locator("#provenancePanel")).not.toContainText("No evidence records for this direction.");
+  await expect(page.locator("#provenancePanel")).not.toContainText("No claims for this direction.");
   await page.evaluate(async () => {
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
     dagDataSource.loadPanelEvidence = window.__loadPanelEvidence;
   });
   await page.getByRole("button", { name: "Retry evidence loading" }).click();
-  await expect(page.getByRole("button", { name: /^Exclude finding / }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Exclude claim / }).first()).toBeVisible();
 });
 
 for (const width of [390, 1440]) test(`the picker reports when saved variables could not be searched at ${width}px`, async ({ page }) => {

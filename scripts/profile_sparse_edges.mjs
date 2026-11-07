@@ -46,7 +46,7 @@ try {
     page.on('console', message => {
       if (message.type() !== 'error') return;
       console.error(message.text());
-      if (!expectedEvidenceFailure && message.text().includes('Could not load sparse edge evidence')) {
+      if (!expectedEvidenceFailure && message.text().includes('Could not load sparse link evidence')) {
         errors.push(message.text());
         void page.evaluate(error => { window.__sparseProfileFailure = error; }, message.text()).catch(() => {});
       }

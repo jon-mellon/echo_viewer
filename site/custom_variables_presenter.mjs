@@ -96,7 +96,7 @@ export function createCustomVariablesPresenter({ state, elements: els, normalize
     const loadingSplits = splitsLoading();
     sections.push(h("section", { className: "custom-variables-previous" },
       h("h2", {}, "Saved in other schemas", previous.length ? h("span", { className: "picker-count", textContent: ` · ${previous.length}` }) : null),
-      previous.length ? h("p", { className: "small-note", textContent: "Add one to this schema by splitting its source groups." }) : null,
+      previous.length ? h("p", { className: "small-note", textContent: "Add one to this schema by splitting its source variables." }) : null,
       ...previous.map(item => h("div", { className: "setup-group-picker-row" },
         h("div", {}, h("strong", { textContent: item.name }),
           h("span", { textContent: `From: ${(item.source_labels || item.source_group_ids || []).join(", ")}` })),
@@ -139,12 +139,12 @@ export function createCustomVariablesPresenter({ state, elements: els, normalize
     const label = group.label || group.group_id;
     const custom = group.source === "user_split";
     const changeable = custom && canChange(group);
-    const lockedTitle = "Changed by a later edit; it can no longer be edited or removed here.";
+    const lockedTitle = "Changed by a later edit; it can no longer be edited or Excluded here.";
     const sources = sourceLabels(group);
     if (confirmingId === group.group_id) {
       return h("tr", { className: "custom-variables-confirm" }, h("td", { colSpan: 3 },
         h("div", { className: "custom-variables-confirm-body" },
-          h("span", { textContent: `Remove “${label}” from this schema? Its ${group.variable_ids?.length || 0} concepts go back to ${sources.join(", ") || "where they came from"}. You can undo this.` }),
+          h("span", { textContent: `Exclude “${label}” from this schema? Its ${group.variable_ids?.length || 0} concepts go back to ${sources.join(", ") || "where they came from"}. You can undo this.` }),
           h("button", { className: "btn btn--danger", type: "button", dataset: { action: "confirm-delete", groupId: group.group_id },
             disabled: busy, textContent: deleting ? "Removing…" : "Remove" }),
           h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "cancel-delete", groupId: group.group_id },
@@ -165,7 +165,7 @@ export function createCustomVariablesPresenter({ state, elements: els, normalize
         custom ? h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "edit", groupId: group.group_id },
           disabled: busy || !changeable, title: changeable ? `Edit ${label}` : lockedTitle, textContent: "Edit", attrs: { "aria-label": `Edit ${label}` } }) : null,
         custom ? h("button", { className: "btn btn--ghost custom-variables-delete", type: "button", dataset: { action: "delete", groupId: group.group_id },
-          disabled: busy || !changeable, title: changeable ? `Remove ${label} from schema` : lockedTitle, textContent: "Remove from schema", attrs: { "aria-label": `Remove ${label} from schema` } }) : null));
+          disabled: busy || !changeable, title: changeable ? `Exclude ${label} from schema` : lockedTitle, textContent: "Exclude from schema", attrs: { "aria-label": `Exclude ${label} from schema` } }) : null));
   }
 
   function detailsRow(group) {
@@ -202,9 +202,9 @@ export function createCustomVariablesPresenter({ state, elements: els, normalize
     render();
     try {
       await onDelete(groupId);
-      status = `Removed “${label}” from this schema. Undo brings it back.`;
+      status = `Excluded “${label}” from this schema. Undo brings it back.`;
     } catch (error) {
-      status = `Could not remove “${label}”: ${error?.message || error}`;
+      status = `Could not Exclude “${label}”: ${error?.message || error}`;
     } finally {
       deleting = false;
       confirmingId = null;

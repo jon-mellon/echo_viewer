@@ -161,7 +161,7 @@ test("a concept without a loaded label has no exclude control", async () => {
   }
 });
 
-test("a finding's exclude control waits for both concept labels", () => {
+test("a claim's exclude control waits for both concept labels", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement: tagName => new Element(tagName),
     createTextNode: text => ({ textContent: text }) };
@@ -189,12 +189,12 @@ test("a finding's exclude control waits for both concept labels", () => {
     controller.renderProvenance();
     const exclude = elements.provenancePanel.findAll("button")[0];
     assert.equal(exclude.textContent, "×");
-    assert.equal(exclude["aria-label"], "Exclude finding r1");
+    assert.equal(exclude["aria-label"], "Exclude claim r1");
     assert.match(exclude.className, /finding-decision-button--exclude/);
     exclude.click();
-    assert.equal(globalThis.document.activeElement["aria-label"], "Finding exclusion reason");
+    assert.equal(globalThis.document.activeElement["aria-label"], "Claim exclusion reason");
     elements.provenancePanel.findAll("button").find(button => button.textContent === "Cancel").click();
-    assert.equal(globalThis.document.activeElement["aria-label"], "Exclude finding r1");
+    assert.equal(globalThis.document.activeElement["aria-label"], "Exclude claim r1");
     globalThis.document.activeElement.click();
     assert.ok(elements.provenancePanel.findAll("option")
       .some(option => option.textContent === "Concept miscategorized"));

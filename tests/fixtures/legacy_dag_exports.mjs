@@ -119,7 +119,7 @@ function buildLinksTable(fmt, keyMap) {
 
   if (fmt === "md") {
     return [
-      "| Source | Target | Direction | Papers |",
+      "| Source | Target | Direction | Studies |",
       "|--------|--------|:---------:|--------|",
       ...rows,
     ].join("\n") + "\n";
@@ -127,7 +127,7 @@ function buildLinksTable(fmt, keyMap) {
     return [
       "\\begin{longtable}{lllp{7cm}}",
       "\\toprule",
-      "Source & Target & Dir & Papers \\\\",
+      "Source & Target & Dir & Studies \\\\",
       "\\midrule",
       "\\endhead",
       ...rows,
@@ -209,26 +209,26 @@ async function exportMd() {
   const { bibText, keyMap } = await buildBibText(dois);
   const svgStr = getDagSvgString();
   const hasGraph = (state.visibleLinks || []).length > 0;
-  const ivLabel = groupById(state.project?.iv_group_id)?.label || "Independent variable";
-  const dvLabel = groupById(state.project?.dv_group_id)?.label || "Dependent variable";
+  const ivLabel = groupById(state.project?.iv_group_id)?.label || "Cause";
+  const dvLabel = groupById(state.project?.dv_group_id)?.label || "Outcome";
 
   const md = [
     `---`,
-    `title: "Working Causal Map"`,
+    `title: "Working Map"`,
     `bibliography: references.bib`,
     `link-citations: true`,
     `---`,
     ``,
-    `**Ind var:** ${ivLabel}  `,
-    `**Dep var:** ${dvLabel}`,
+    `**Cause:** ${ivLabel}  `,
+    `**Outcome:** ${dvLabel}`,
     ``,
     `*Constructed with DAG Builder [@${METHOD_BIB_KEY}].*`,
     ``,
     `## Causal Graph`,
     ``,
-    svgStr ? `![Causal DAG](dag.svg)`
+    svgStr ? `![Causal graph](dag.svg)`
       : hasGraph ? `*(Graph figure export is not yet available — the causal structure is listed in the Causal Links table below.)*`
-        : `*(No DAG to display — create groups and add edges first.)*`,
+        : `*(No graph to display — create variables and add links first.)*`,
     ``,
     `## Causal Links`,
     ``,
@@ -236,7 +236,7 @@ async function exportMd() {
     ...(buildExcludedLinksTable("md") ? [
       `## Excluded Links`,
       ``,
-      `The following edges were reviewed and excluded from the working causal map.`,
+      `The following links were reviewed and excluded from the working map.`,
       ``,
       buildExcludedLinksTable("md"),
     ] : []),
@@ -255,8 +255,8 @@ async function exportTex() {
   const dois = collectAllDagDois();
   const { bibText, keyMap } = await buildBibText(dois);
   const svgStr = getDagSvgString();
-  const ivLabel = groupById(state.project?.iv_group_id)?.label || "Independent variable";
-  const dvLabel = groupById(state.project?.dv_group_id)?.label || "Dependent variable";
+  const ivLabel = groupById(state.project?.iv_group_id)?.label || "Cause";
+  const dvLabel = groupById(state.project?.dv_group_id)?.label || "Outcome";
 
   const tex = [
     `\\documentclass{article}`,
@@ -269,25 +269,25 @@ async function exportTex() {
     `% To compile: pdflatex dag.tex && bibtex dag && pdflatex dag.tex && pdflatex dag.tex`,
     `% dag.svg must be converted to dag.pdf first (e.g. via Inkscape or rsvg-convert)`,
     ``,
-    `\\title{Working Causal Map}`,
+    `\\title{Working Map}`,
     `\\author{}`,
     `\\date{\\today}`,
     ``,
     `\\begin{document}`,
     `\\maketitle`,
     ``,
-    `\\noindent\\textbf{Ind var:} ${texEscape(ivLabel)}\\\\`,
-    `\\textbf{Dep var:} ${texEscape(dvLabel)}`,
+    `\\noindent\\textbf{Cause:} ${texEscape(ivLabel)}\\\\`,
+    `\\textbf{Outcome:} ${texEscape(dvLabel)}`,
     ``,
-    `This causal map was constructed using the DAG Builder method \\citep{${METHOD_BIB_KEY}}.`,
+    `This map was constructed using the DAG Builder method \\citep{${METHOD_BIB_KEY}}.`,
     ``,
     `\\section{Causal Graph}`,
     ``,
     svgStr
-      ? `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=\\textwidth]{dag.pdf}\n\\caption{Working causal map: ${texEscape(ivLabel)} $\\rightarrow$ ${texEscape(dvLabel)}}\n\\end{figure}`
+      ? `\\begin{figure}[h]\n\\centering\n\\includegraphics[width=\\textwidth]{dag.pdf}\n\\caption{Working map: ${texEscape(ivLabel)} $\\rightarrow$ ${texEscape(dvLabel)}}\n\\end{figure}`
       : ((state.visibleLinks || []).length
         ? `\\textit{Graph figure export is not yet available; the causal structure is listed in the Causal Links table below.}`
-        : `\\textit{No DAG to display --- create groups and add edges first.}`),
+        : `\\textit{No graph to display --- create variables and add links first.}`),
     ``,
     `\\section{Causal Links}`,
     ``,
@@ -296,7 +296,7 @@ async function exportTex() {
     ...(buildExcludedLinksTable("tex") ? [
       `\\section{Excluded Links}`,
       ``,
-      `The following edges were reviewed and excluded from the working causal map.`,
+      `The following links were reviewed and excluded from the working map.`,
       ``,
       buildExcludedLinksTable("tex"),
       ``,
@@ -339,8 +339,8 @@ function exportReusableGroupingSet() {
   const payload = {
     schema_version: "groupings-v1",
     grouping_set_id: `project_grouping_${Date.now()}`,
-    label: "Project groups",
-    description: "Reusable grouping set exported from non-Ind var/Dep var project groups.",
+    label: "Project variables",
+    description: "Reusable grouping set exported from non-cause/outcome project variables.",
     cache_compatibility: state.data.cache_compatibility,
     groups,
     rejected_variables: rejectedVariableEntries().map((entry) => ({

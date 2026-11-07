@@ -113,7 +113,7 @@ export function applyPermalink(params, state) {
   // Explore views are keyed by their focus variable, not a cause/outcome pair.
   const exploring = Boolean(state.task !== "identify" && state.task && state.explore?.[state.task]?.focusId);
   if ((!iv || !dv || iv === dv) && !partialSetup && !exploring) {
-    throw new Error("Permalink Ind var or Dep var is absent from the referenced schema.");
+    throw new Error("Permalink cause or outcome is absent from the referenced schema.");
   }
   state.project.iv_group_id = iv || "";
   state.project.dv_group_id = dv || "";

@@ -129,7 +129,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     validateGroupingSchema(schema);
     if (schema.schema_version !== GROUPING_FORMAT_VERSION
       || schema.membership_unit !== GROUPING_MEMBERSHIP_UNIT) {
-      throw new Error("Unsupported grouping schema format.");
+      throw new Error("Unsupported variable schema format.");
     }
     const id = localRecord?.id || crypto.randomUUID();
     const url = currentUrl(id);

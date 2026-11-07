@@ -11,7 +11,7 @@ export function fitDagImage(sourceWidth, sourceHeight, targetWidth = DAG_EXPORT_
 
 function canvasBlob(canvas) {
   return new Promise((resolve, reject) => canvas.toBlob(
-    blob => blob ? resolve(blob) : reject(new Error("Could not render the causal map image.")),
+    blob => blob ? resolve(blob) : reject(new Error("Could not render the graph image.")),
     "image/png",
   ));
 }

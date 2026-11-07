@@ -21,7 +21,7 @@ function fixture() {
     cacheCompatibility: { version: 'test' }, rejectedVariables: [],
     hiddenVariableIds: ['bad', 'bad2'], selectedUoa: 'person', phase: 'build', workflowMode: 'group_review',
     seeds: { iv: new Set(['v1']), dv: new Set(['v2']) }, dagLayoutMode: 'auto' };
-  const metadata = new Map([['10.1234/one', { author: [{ family: 'Smith', given: 'A' }], published: { 'date-parts': [[2020]] }, title: ['Test paper'], type: 'journal-article' }]]);
+  const metadata = new Map([['10.1234/one', { author: [{ family: 'Smith', given: 'A' }], published: { 'date-parts': [[2020]] }, title: ['Test study'], type: 'journal-article' }]]);
   return { input, metadata };
 }
 
@@ -44,19 +44,19 @@ test('document exports record excluded links and findings with available reasons
   const tex = exports.buildLatexFiles(input, bibliography)[0].data;
   assert.match(md, /## Excluded Links[\s\S]*Tax_50% \| Income &amp; wealth \| Confounded \\\| uncertain &amp; sensitive/);
   assert.match(md, /Other \| missing \| \(no reason recorded\)/);
-  assert.match(md, /## Excluded Findings[\s\S]*\*\*Paper:\*\* A &amp; B/);
+  assert.match(md, /## Excluded Claims[\s\S]*\*\*Study:\*\* A &amp; B/);
   assert.ok(md.includes('**Link:** Income &amp; wealth → Tax\\_50%'));
   assert.ok(md.includes('**Reason:** Other: Wrong sample | cohort'));
-  assert.match(md, /\*\*Paper:\*\* Paper unavailable[\s\S]*\*\*Link:\*\* Link unavailable[\s\S]*\*\*Reason:\*\* Concept miscategorized/);
+  assert.match(md, /\*\*Study:\*\* Study unavailable[\s\S]*\*\*Link:\*\* Link unavailable[\s\S]*\*\*Reason:\*\* Concept miscategorized/);
   assert.doesNotMatch(md, /Finding ID|\| Paper \|/);
   assert.doesNotMatch(md, /Excluded Variables|Low \\\| quality/);
   assert.match(tex, /\\section\{Excluded Links\}[\s\S]*Confounded \| uncertain \\& sensitive/);
-  assert.match(tex, /\\section\{Excluded Findings\}[\s\S]*\\textbf\{Paper:\} A \\& B[\s\S]*\\textbf\{Link:\} Income \\& wealth[\s\S]*\\textbf\{Reason:\} Other: Wrong sample/);
+  assert.match(tex, /\\section\{Excluded Claims\}[\s\S]*\\textbf\{Study:\} A \\& B[\s\S]*\\textbf\{Link:\} Income \\& wealth[\s\S]*\\textbf\{Reason:\} Other: Wrong sample/);
   assert.doesNotMatch(tex, /Finding ID|\\begin\{longtable\}[\s\S]*Finding ID/);
   assert.doesNotMatch(tex, /Excluded Variables|low\\_quality/);
 });
 
-test('excluded findings appear only when restoring them would put their edge in this DAG view', () => {
+test('excluded claims appear only when restoring them would put their link in this graph view', () => {
   const groups = [
     { group_id: 'iv', variable_ids: ['vi'] }, { group_id: 'dv', variable_ids: ['vd'] },
     { group_id: 'c', variable_ids: ['vc1', 'vc2'] }, { group_id: 'z', variable_ids: ['vz'] },
@@ -70,16 +70,16 @@ test('excluded findings appear only when restoring them would put their edge in 
     finding_decisions: Object.fromEntries(['relevant', 'irrelevant', 'internal', 'stale']
       .map(id => [id, { display_status: 'excluded', reason_code: 'other' }])) };
   const rawLinksById = new Map([
-    ['relevant', { source_variable_id: 'vc1', target_variable_id: 'vd', paper_title: 'Relevant paper' }],
-    ['irrelevant', { source_variable_id: 'vz', target_variable_id: 'vd', paper_title: 'Irrelevant paper' }],
-    ['internal', { source_variable_id: 'vc1', target_variable_id: 'vc2', paper_title: 'Internal paper' }],
+    ['relevant', { source_variable_id: 'vc1', target_variable_id: 'vd', paper_title: 'Relevant study' }],
+    ['irrelevant', { source_variable_id: 'vz', target_variable_id: 'vd', paper_title: 'Irrelevant study' }],
+    ['internal', { source_variable_id: 'vc1', target_variable_id: 'vc2', paper_title: 'Internal study' }],
   ]);
   const relevance = relevantExclusions({ project, groups, links, rawLinksById,
     viewOptions: { showConfoundersOnly: true, hideIrrelevantDiagnosticLinks: true } });
   assert.deepEqual(relevance.findingIds, ['relevant']);
   const md = exports.buildExcludedFindingsList('md', { project, rawLinksById,
     relevantExcludedFindingIds: relevance.findingIds });
-  assert.match(md, /Relevant paper/);
+  assert.match(md, /Relevant study/);
   assert.doesNotMatch(md, /Irrelevant paper|Internal paper|stale/);
 });
 
@@ -98,7 +98,7 @@ test('an excluded finding stays out when its edge is independently excluded', ()
   assert.deepEqual(relevance.findingIds, []);
 });
 
-test('excluded links appear only when restoring them would put their edge in this DAG view', () => {
+test('excluded links appear only when restoring them would put their link in this graph view', () => {
   const groups = ['iv', 'dv', 'c', 'z'].map(group_id => ({ group_id, variable_ids: [group_id] }));
   const links = [
     { edge_id: 'c__iv', group_a: 'c', group_b: 'iv', direction_type: 'A_TO_B', display_status: 'active_by_default' },
@@ -123,9 +123,9 @@ test('document exports omit exclusion sections with no counterfactually visible 
   input.relevantExcludedLinkIds = [];
   input.relevantExcludedFindingIds = [];
   const bib = exports.buildBibText(exports.collectAllDagDois(input), metadata);
-  assert.doesNotMatch(exports.buildMarkdownFiles(input, bib)[0].data, /## Excluded Links|## Excluded Findings/);
+  assert.doesNotMatch(exports.buildMarkdownFiles(input, bib)[0].data, /## Excluded Links|## Excluded Claims/);
   assert.doesNotMatch(exports.buildLatexFiles(input, bib)[0].data,
-    /\\section\{Excluded Links\}|\\section\{Excluded Findings\}/);
+    /\\section\{Excluded Links\}|\\section\{Excluded Claims\}/);
 });
 
 test('document exports include each potential confounder and its local status text', () => {
@@ -155,7 +155,7 @@ for (const scenario of ['normal', 'empty', 'bidirectional', 'missing-group', 'sv
     assert.deepEqual(bibliography.keyMap, expected.bibliography.keyMap);
     const expectedMd = expected.md.map(file => file.name === 'references.bib'
       ? { ...file, data: bibliography.bibText }
-      : { ...file, data: file.data.replace('create groups and add edges first', 'choose groups with evidence links first') });
+      : { ...file, data: file.data.replace('create variables and add links first', 'choose variables with evidence links first') });
     assert.deepEqual(exports.buildMarkdownFiles(input, bibliography, svg), expectedMd);
     const latex = exports.buildLatexFiles(input, bibliography, svg);
     assert.deepEqual(latex.find(file => file.name === 'references.bib'), { name: 'references.bib', data: bibliography.bibText });
@@ -230,7 +230,7 @@ test('document exports include the public permalink when supplied', () => {
   const markdown = exports.buildMarkdownFiles(input, bibliography)[0].data;
   const latex = exports.buildLatexFiles(input, bibliography)[0].data;
   assert.match(markdown, /\[View the public causal map\]\(<https:\/\/viewer\.example\/\?p=1&schema=published>\)/);
-  assert.match(latex, /Public causal map: \\url\{https:\/\/viewer\.example\/\?p=1&schema=published\}/);
+  assert.match(latex, /Public map: \\url\{https:\/\/viewer\.example\/\?p=1&schema=published\}/);
   assert.match(latex, /\\usepackage\{xurl\}/);
   assert.match(latex, /p\{0\.22\\textwidth\}p\{0\.22\\textwidth\}cp\{0\.38\\textwidth\}/);
 });
@@ -250,7 +250,7 @@ test('Markdown export embeds and references the rendered causal-map image', () =
   const bibliography = exports.buildBibText(exports.collectAllDagDois(input), metadata);
   const png = new Uint8Array([137, 80, 78, 71]);
   const files = exports.buildMarkdownFiles(input, bibliography, null, png);
-  assert.match(files[0].data, /!\[Causal DAG\]\(dag-graph\.png\)/);
+  assert.match(files[0].data, /!\[Causal graph\]\(dag-graph\.png\)/);
   assert.deepEqual(files.find(file => file.name === 'dag-graph.png')?.data, png);
 });
 
@@ -262,12 +262,12 @@ test('Markdown and LaTeX exports both include enriched references beyond the pre
   input.rawLinksById = new Map(dois.map((doi, index) => [`paper-${index}`, { paper_id: doi }]));
   const bibliography = exports.buildBibText(exports.collectAllDagDois(input), new Map([
     [dois[24], { author: [{ family: 'Taylor' }], published: { 'date-parts': [[2025]] },
-      title: ['Last paper'], type: 'journal-article' }],
+      title: ['Last study'], type: 'journal-article' }],
   ]));
   for (const buildFiles of [exports.buildMarkdownFiles, exports.buildLatexFiles]) {
     const files = buildFiles(input, bibliography);
     assert.match(files.find(file => file.name === 'references.bib').data,
-      /@article\{taylor2025,[\s\S]*title   = \{Last paper\}/);
+      /@article\{taylor2025,[\s\S]*title   = \{Last study\}/);
     assert.match(files[0].data, /taylor2025/);
   }
 });

@@ -25,7 +25,7 @@ export function excludeButton({ label, groupLabel, disabled, dataset = {} }) {
   return h("button", {
     className: "group-concept-exclude", type: "button", dataset,
     attrs: { "aria-label": `Exclude ${label} from ${groupLabel}` },
-    title: `Remove ${label} from this variable`,
+    title: `Exclude ${label} from this variable`,
     disabled, textContent: "Exclude",
   });
 }

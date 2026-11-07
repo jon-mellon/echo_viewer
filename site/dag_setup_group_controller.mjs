@@ -161,7 +161,7 @@ export function createDagSetupGroupController({
         disabled: state.publishedSchemaHydrating || state.publishedSchemaLoadFailed,
         onRestore: (id, label) => restoreConcept(group.group_id, id, label) }),
       priority?.matchedCount ? h("div", { className: "small-note",
-        textContent: "Concepts used by visible DAG links first" }) : null,
+        textContent: "Concepts used by visible graph links first" }) : null,
       pageIds.length ? h("ol", {
         start: start + 1,
         className: priority?.matchedCount > 0 && priority.matchedCount === start && start < ids.length
@@ -285,8 +285,8 @@ export function createDagSetupGroupController({
       editButton?.addEventListener("click", () => startEditSplit?.(group.group_id));
       const detail = h("details", { className: "variable-panel-item", dataset: { groupId: group.group_id }, open: expandedVariableIds.has(group.group_id) },
         h("summary", {}, h("span", { textContent: group.label || group.group_id }),
-          group.group_id === project.iv_group_id ? h("span", { className: "variable-panel-role", textContent: "Ind var" }) : null,
-          group.group_id === project.dv_group_id ? h("span", { className: "variable-panel-role", textContent: "Dep var" }) : null,
+          group.group_id === project.iv_group_id ? h("span", { className: "variable-panel-role", textContent: "Cause" }) : null,
+          group.group_id === project.dv_group_id ? h("span", { className: "variable-panel-role", textContent: "Outcome" }) : null,
           group.group_id === project.instrument_group_id ? h("span", { className: "variable-panel-role", textContent: "Instrument" }) : null),
         h("p", { textContent: group.description || "No definition available." }), editButton, concepts);
       detail.addEventListener("toggle", () => {
@@ -316,14 +316,14 @@ export function createDagSetupGroupController({
 
   function hint() {
     const hints = {
-      select_dv: "Search the existing groups for the outcome, or choose Define new group to build a new dependent-variable group from raw variables.",
-      define_dv: "Use Draw + / Draw − to adjust the dependent-variable group boundary. Confirm when the group is substantively correct.",
-      select_iv: "Search the existing groups for the independent variable, or choose Define new group to build a new group from raw variables.",
-      select_instrument: "Choose an optional instrument from an existing group, define a new group, or select None.",
-      define_iv: "Adjust the independent-variable group boundary. Confirm when satisfied.",
-      schema_choice: "Choose whether to load the default grouping schema. Loaded groups participate in the DAG immediately.",
+      select_dv: "Search the existing variables for the outcome, or choose Define new variable to build a new outcome variable from concepts.",
+      define_dv: "Use Draw + / Draw − to adjust the outcome variable boundary. Confirm when the variable is substantively correct.",
+      select_iv: "Search the existing variables for the cause, or choose Define new variable to build a new variable from concepts.",
+      select_instrument: "Choose an optional instrument from an existing variable, define a new variable, or select None.",
+      define_iv: "Adjust the cause variable boundary. Confirm when satisfied.",
+      schema_choice: "Choose whether to load the default variable schema. Loaded variables participate in the graph immediately.",
     };
-    return hints[state.phase] || "Edit groups here. Close the group editor to inspect causal edges in the graph panel.";
+    return hints[state.phase] || "Edit variables here. Close the variable editor to inspect causal links in the graph panel.";
   }
 
   function renderStatus() {
@@ -336,7 +336,7 @@ export function createDagSetupGroupController({
           : state.definitionDraft.step === "partition" ? "Construct" : "Review";
         elements.dagStatusBadge.className = "badge";
         elements.workflowHint.textContent = state.definitionDraft.step === "sources"
-          ? "Choose the existing categories whose underlying concepts should be available."
+          ? "Choose the existing variables whose underlying concepts should be available."
           : "Use the Variables tab to tap points or draw around them. Return to Setup to search, review, and save.";
         elements.ivSearchBlock.hidden = true;
         elements.dvSearchBlock.hidden = true;
@@ -350,18 +350,18 @@ export function createDagSetupGroupController({
       const changingDv = state.changingAnchorSide === "dv";
       const changingInstrument = (state.changingAnchorSide === "instrument" || state.phase === "select_instrument") && ivSet && dvSet;
       elements.currentStepTitle.textContent = !ivSet || changingIv
-        ? "Select independent variable"
-        : !dvSet || changingDv ? "Select dependent variable"
+        ? "Select cause"
+        : !dvSet || changingDv ? "Select outcome"
           : changingInstrument ? "Select instrument (optional)" : "Setup complete";
       elements.dagStatusBadge.textContent = changingInstrument ? "Instrument"
-        : ivSet && dvSet ? "Ready" : ivSet ? "Select Dep var" : "Select Ind var";
+        : ivSet && dvSet ? "Ready" : ivSet ? "Select outcome" : "Select cause";
       elements.dagStatusBadge.className = `badge${ivSet && dvSet && !changingInstrument ? " muted" : ""}`;
       elements.workflowHint.textContent = !ivSet || changingIv
-        ? "Choose the independent-variable group from the default schema."
+        ? "Choose the cause variable from the default schema."
         : !dvSet || changingDv
-          ? "Choose the dependent-variable group."
-          : changingInstrument ? "Choose an instrument, define a new group, or select None."
-            : "The overall DAG is ready.";
+          ? "Choose the outcome variable."
+          : changingInstrument ? "Choose an instrument, define a new variable, or select None."
+            : "The overall graph is ready.";
       elements.ivSearchBlock.hidden = ivSet && !changingIv;
       elements.dvSearchBlock.hidden = !ivSet || (dvSet && !changingDv) || changingIv;
       elements.instrumentSearchBlock.hidden = !changingInstrument;
@@ -373,14 +373,14 @@ export function createDagSetupGroupController({
       elements.dagStatusBadge.className = "badge muted";
       return;
     }
-    const labels = { select_dv: "Select Dep var", define_dv: "Define Dep var", select_iv: "Select Ind var",
+    const labels = { select_dv: "Select outcome", define_dv: "Define outcome", select_iv: "Select cause",
       select_instrument: "Instrument",
-      define_iv: "Define Ind var", schema_choice: "Schema", build: "Build map" };
-    const titles = { select_dv: "Select dependent variable",
+      define_iv: "Define cause", schema_choice: "Schema", build: "Build map" };
+    const titles = { select_dv: "Select outcome",
       select_instrument: "Select instrument (optional)",
-      define_dv: "Define dependent-variable group", select_iv: "Select independent variable",
-      define_iv: "Define independent-variable group", schema_choice: "Load candidate grouping schema?", build: "Build causal map" };
-    elements.currentStepTitle.textContent = titles[state.phase] || "Build causal map";
+      define_dv: "Define outcome variable", select_iv: "Select cause",
+      define_iv: "Define cause variable", schema_choice: "Load candidate variable schema?", build: "Build map" };
+    elements.currentStepTitle.textContent = titles[state.phase] || "Build map";
     elements.dagStatusBadge.textContent = labels[state.phase] || "Build";
     elements.dagStatusBadge.className = "badge";
     elements.workflowHint.textContent = hint();
@@ -420,8 +420,8 @@ export function createDagSetupGroupController({
     const toggle = side === "dv" ? elements.dvDefineNew : elements.ivDefineNew;
     const isNew = side !== "instrument" && state.anchorSearchMode[side] === "new";
     if (side !== "instrument") {
-      label.textContent = isNew ? "Search raw variables" : "Search existing groups";
-      toggle.textContent = isNew ? "Back to existing groups" : "Define new group";
+      label.textContent = isNew ? "Search concepts" : "Search existing variables";
+      toggle.textContent = isNew ? "Back to existing variables" : "Define new variable";
     }
     input.placeholder = isNew ? (side === "dv" ? "Income, prejudice, labor-market outcome" : "Education, religiosity, parental status") : "Search variable or underlying concept";
     if (isNew) { container.hidden = true; container.replaceChildren(); return; }
@@ -449,19 +449,19 @@ export function createDagSetupGroupController({
     const emptyTitle = query && state.variableSearchStatus === "loading"
       ? "Loading concept search…"
       : query && state.publishedSchemaHydrating
-        ? "Loading group memberships…"
+        ? "Loading variable memberships…"
         : query && state.variableSearchStatus === "error"
           ? "Concept search unavailable"
-          : "No matching existing groups";
+          : "No matching existing variables";
     const title = !groups.length ? emptyTitle
       : query && state.variableSearchStatus === "loading"
-        ? "Existing groups · concept search loading…"
+        ? "Existing variables · concept search loading…"
         : query && state.variableSearchStatus === "error"
-          ? "Existing groups · concept search unavailable"
-          : "Existing groups";
+          ? "Existing variables · concept search unavailable"
+          : "Existing variables";
     const resultStatus = pickerA11y(container, input,
       { rowSelector: "button[data-group-id], button[data-select-none]", itemSelector: ".setup-group-picker-row", detailSelector: "summary" });
-    resultStatus.textContent = `${resultCountText(groups.length, "group")}. Use the arrow keys to move through them.`;
+    resultStatus.textContent = `${resultCountText(groups.length, "variable")}. Use the arrow keys to move through them.`;
     replaceChildren(container, resultStatus, noneRow, h("div", { className: "setup-group-picker-title", textContent: title }),
       h("div", { className: "setup-group-picker-list" }, defineRow, ...rows));
     container.querySelectorAll("button[data-group-id]").forEach(button =>
@@ -534,7 +534,7 @@ export function createDagSetupGroupController({
     const status = pick?.requiresMembership && state.publishedSchemaLoadFailed ? "Variable data could not be loaded. Reload to try again."
       : pick?.requiresMembership && state.publishedSchemaHydrating ? "Loading variable data before selection…"
       : query && state.variableSearchStatus === "loading" ? "Concept search is loading; matching variable names only for now."
-      : query && state.publishedSchemaHydrating ? "Loading group memberships…"
+      : query && state.publishedSchemaHydrating ? "Loading variable memberships…"
         : query && state.variableSearchStatus === "error" ? "Concept search is unavailable; matching variable names only." : "";
     const clearButton = () => h("button", { className: "btn btn--sm", type: "button", dataset: { clearFocusSearch: "true" }, textContent: "Clear search" });
     // A quiet label over each list: the variables are what is being chosen, so they outrank their headings.
@@ -626,7 +626,7 @@ export function createDagSetupGroupController({
         disabled: state.publishedSchemaLoadFailed || (state.publishedSchemaHydrating && !state.publishedMembershipReadyGroups.has(item.groupId)),
         title: state.publishedSchemaLoadFailed ? "This published schema could not be verified"
           : state.publishedSchemaHydrating && !state.publishedMembershipReadyGroups.has(item.groupId)
-            ? "This group's memberships are still loading" : "",
+            ? "This variable's memberships are still loading" : "",
         textContent: state.publishedSchemaLoadFailed ? "Unavailable"
           : state.publishedSchemaHydrating && !state.publishedMembershipReadyGroups.has(item.groupId) ? "Loading…" : "Open" })))));
     elements.groupList.querySelectorAll("button").forEach(button => button.addEventListener("click", () => {
@@ -649,7 +649,7 @@ export function createDagSetupGroupController({
     elements.groupingSetSelect.title = active ? setName(active) : "";
     const count = active?.groups?.length || 0;
     elements.groupingSummary.textContent = active
-      ? `${count} variable ${count === 1 ? "group" : "groups"}`
+      ? `${count} variable ${count === 1 ? "variable" : "variables"}`
       : "No schema loaded";
   }
 

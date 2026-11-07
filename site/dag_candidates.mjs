@@ -85,11 +85,11 @@ export function buildCandidateQueue(project, inputs) {
     const yConnected = cToY || yToC;
     const roles = [];
     const why = [];
-    if (cToX && cToY) { roles.push("possible_confounder"); why.push(`${group.label} → Ind var group; ${group.label} → Dep var group`); }
-    if (xToC && cToY) { roles.push("possible_mediator"); why.push(`Ind var group → ${group.label} → Dep var group`); }
-    if (xToC && yToC) { roles.push("possible_common_consequence_or_collider"); why.push(`Ind var group → ${group.label} ← Dep var group`); }
-    if (cToY && !xConnected) { roles.push("other_possible_cause_of_dv"); why.push(`${group.label} → Dep var group`); }
-    if (cToX && !yConnected) { roles.push("other_possible_cause_of_iv"); why.push(`${group.label} → Ind var group`); }
+    if (cToX && cToY) { roles.push("possible_confounder"); why.push(`${group.label} → cause; ${group.label} → outcome`); }
+    if (xToC && cToY) { roles.push("possible_mediator"); why.push(`Cause → ${group.label} → outcome`); }
+    if (xToC && yToC) { roles.push("possible_common_consequence_or_collider"); why.push(`Cause → ${group.label} ← outcome`); }
+    if (cToY && !xConnected) { roles.push("other_possible_cause_of_dv"); why.push(`${group.label} → outcome`); }
+    if (cToX && !yConnected) { roles.push("other_possible_cause_of_iv"); why.push(`${group.label} → cause`); }
     if (!roles.length) continue;
     const orderedRoles = roles.sort((a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b));
     queue.push({
