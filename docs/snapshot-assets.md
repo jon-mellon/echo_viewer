@@ -3,52 +3,74 @@
 Updated: 2026-11-06
 
 The viewer reads evidence from an immutable **evidence snapshot** on the data host. Querying it directly needs the
-DuckDB WebAssembly engine (a 34 MB download, plus extensions and large parquet files), which is slow on a phone. For
-the common questions the viewer instead reads small precomputed files, **bound to one snapshot id**. When a snapshot has
-no such files the viewer silently falls back to the engine, so the app still works but is very much slower.
+DuckDB WebAssembly engine (a 34 MB download, plus extensions and large Parquet files), which is slow on a phone. For the
+common questions the viewer instead reads small precomputed files, each a pure function of one snapshot. When a snapshot
+has none the viewer silently falls back to the engine: the app still works, but very much slower. On a Slow-4G connection
+with a 4x CPU slowdown, opening a saved variable took more than two minutes without them (it never finished) and about
+one second with them.
 
-On a Slow-4G connection with a 4x CPU slowdown, opening a saved variable took more than two minutes without the
-variable-map bundles (it never finished) and about one second with them.
+## Who builds them and where they live
 
-## What exists, per snapshot
+The **data pipeline** builds them with the snapshot and publishes them beside it; this repo no longer commits them.
+They are produced by `harvest_abstracts/analysis/10k/echo_viewer_bundle/viewer_assets.py`, which the bundle builders call
+(failing the build if the set is incomplete or does not cover every schema group), the validator re-checks, and the
+uploader requires before it will publish a snapshot. They sit under the snapshot's layout folder, behind one sidecar
+manifest the viewer discovers:
 
-| Asset | Binding | Generator | Used for |
-| --- | --- | --- | --- |
-| Variable search catalog | `SNAPSHOT_SEARCH_CATALOGS` in `site/variable_search_catalog.mjs` | `scripts/generate_variable_search_catalog.mjs` | Search and concept labels |
-| **Variable map bundles** | `VARIABLE_MAP_BINDINGS` in `site/variable_map_catalog.mjs` | `scripts/generate_variable_maps.mjs` | Opening a variable group's details (the definition and saved-variable flows) |
-| Variable neighbor bundles | `VARIABLE_NEIGHBOR_BINDINGS` | `scripts/generate_variable_neighbors.mjs` | Similar-variable suggestions in the group editor |
-| Variable incident bundles | `VARIABLE_INCIDENT_BINDINGS` | `scripts/generate_variable_neighbors.mjs ... incidents` | Raw links touching a variable |
-| Evidence panel bundles | `EVIDENCE_PANEL_BINDINGS` | `scripts/generate_evidence_panels.mjs` | Opening an edge's evidence |
+```
+https://data.epistemicinfra.org/evidence/layouts/browser-v2/<snapshot>/viewer-assets/
+  manifest.json              format echo-viewer-assets-v1; lists each asset with its size and SHA-256
+  search-catalog.json.gz     variable labels for search
+  variable-maps/             one file per variable group (category), plus index.json.gz
+  variable-neighbors/        neighbors bucketed by the first two hex characters of a variable id
+  variable-incidents/        raw links bucketed the same way
+  evidence-panels/           the evidence behind each grouped edge
+```
 
-`node scripts/register_snapshot_assets.mjs <snapshot id>` generates and registers the first two. It downloads the
-snapshot's `variable_occurrences` and `variable_layouts` parquet files, checks them against the sizes and SHA-256 hashes
-in the snapshot manifest, writes the bundles under `site/`, and adds the bindings. It is deterministic: running it
-again changes nothing.
+The existing snapshot files are never rewritten (they are immutable and cached for a year); the sidecar is a new key.
 
-**Status for the current default snapshot (`8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849`):**
-search catalog and variable map bundles are registered. Neighbor, incident and evidence-panel bundles are not; those
-features use the engine. `tests/default_snapshot_assets.test.mjs` fails if the default snapshot loses its search
-catalog or its map bundles, or if a bundle no longer matches its registered hash.
+## How the viewer finds and uses them
 
-## How a variable map bundle is matched
+`site/viewer_assets.mjs` fetches `viewer-assets/manifest.json` for the snapshot once (`ParquetManifestDagDataSource.bindViewerAssets`),
+before any catalog is consulted, and binds what it lists into the catalogs, replacing any committed binding for that
+snapshot. Every file is verified against the size and SHA-256 in its index before use. If a snapshot has no sidecar the
+committed bindings (below) are used, and if there are none the viewer falls back to the engine, with a console warning
+and an `echo:viewer-assets:missing` performance mark so the slow path is never silent.
 
-The generator groups the snapshot's variables by `category`, writes one gzip file per group, and keys it by
-`sha256(sorted unique variable ids joined by "\n")`. At run time the viewer hashes the ids it wants and looks for that
-key. So a lookup only hits when it asks for **exactly** a published group: a custom or split variable, a group with a
-split carved out of it, or a partly loaded group falls back to the engine. Bundles for the default schema's groups cover
-the common case; they must be regenerated whenever the snapshot or the default schema's group membership changes.
+Formats are the contract between the two repos. `tests/fixtures/viewer-assets/` is the output of `viewer_assets.py` for a
+six-variable snapshot, and `tests/viewer_assets.test.mjs` opens every kind of asset from it through the real catalogs.
 
-## Why this belongs in the data publication workflow
+### How a variable map bundle is matched
 
-These files are a pure function of a published snapshot, yet they are generated by hand in this repo and committed to
-git (about 25 MB per snapshot for the maps alone). A snapshot was promoted to the default without them, and the viewer
-quietly became slow. The assets should be produced where the snapshot is built and published
-(`harvest_abstracts/analysis/10k/echo_viewer_bundle`), uploaded next to it, and checked by its validation step; the
-viewer would then bind to their URLs instead of committed files. A snapshot should not be publishable as a default
-until its assets exist.
+The pipeline groups the snapshot's variables by `category`, writes one file per group, and keys it by
+`sha256(sorted unique variable ids joined by "\n")`. The viewer hashes the ids it wants and looks for that key, so a lookup
+only hits for **exactly** a published group. A custom or split variable, a group with a split carved out of it, or a
+partly loaded group falls back to the engine. The pipeline checks that every group of the grouping schema it builds has a
+bundle.
 
-What the pipeline must emit for each snapshot, in the formats above:
+## Promoting a snapshot to the default
 
-- `index.json.gz`: `{ format: "echo-variable-map-index-v1", evidence_snapshot, layout_source, entries: { <group key>: { sha256, bytes } } }`
-- one `<sha256>.json.gz` per group: `{ format: "echo-variable-map-v1", evidence_snapshot, layout_source, variables: [ ...variable_occurrences columns except field_preview_json and metadata_blob_json, plus map_x and map_y ] }`, sorted by `index`
-- the index's byte length and SHA-256, to register as the binding
+`scripts/check_snapshot_assets.mjs` (`npm run check:snapshot-assets`) runs in the deploy and profile workflows. It fetches the
+default snapshot's sidecar from the data host, checks every file it lists, and fails if anything is missing or changed.
+If nothing is published yet it accepts the bundles committed under `site/` with a warning, and fails if there are neither.
+Once a snapshot's assets are published, delete its committed bundles (`site/variable-maps/<snapshot>/`,
+`site/search-catalogs/<snapshot>.json.gz` and the matching binding entries); the check then becomes the only gate.
+
+A snapshot built before this existed can be backfilled from the public data host without the original run (see the
+pipeline's README).
+
+## Committed bindings (fallback)
+
+| Asset | Table | Generator |
+| --- | --- | --- |
+| Search catalog | `SNAPSHOT_SEARCH_CATALOGS` in `site/variable_search_catalog.mjs` | `scripts/generate_variable_search_catalog.mjs` |
+| Variable maps | `VARIABLE_MAP_BINDINGS` in `site/variable_map_catalog.mjs` | `scripts/generate_variable_maps.mjs` |
+| Neighbors, incidents, evidence panels | `VARIABLE_NEIGHBOR_BINDINGS`, `VARIABLE_INCIDENT_BINDINGS`, `EVIDENCE_PANEL_BINDINGS` | `scripts/generate_variable_neighbors.mjs`, `scripts/generate_evidence_panels.mjs` |
+
+`scripts/register_snapshot_assets.mjs` generates and registers the first two offline. These are a fallback for working
+offline or for a snapshot the pipeline did not build; the pipeline's Python port of the generators was checked to produce
+decoded payloads identical to these on the current snapshot.
+
+For the current default snapshot (`8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849`) the search catalog and
+variable maps are committed. Neighbor, incident and evidence-panel bundles are not; those features use the engine until
+the snapshot's assets are published.

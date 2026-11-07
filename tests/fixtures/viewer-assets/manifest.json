@@ -1,0 +1,48 @@
+{
+  "assets": {
+    "evidence_panels": {
+      "index": {
+        "bytes": 277,
+        "sha256": "40592b754a9e3b7efee44da95b803aba4823c6806e2d9cc1de518d5aaa00a8ec"
+      },
+      "panels": 2,
+      "root": "evidence-panels/"
+    },
+    "search_catalog": {
+      "bytes": 305,
+      "count": 6,
+      "path": "search-catalog.json.gz",
+      "sha256": "6f8e8950c6e9a91a036061c335f0a6760e856f954ec934a326d5cc6ee8fbc3a5"
+    },
+    "variable_incidents": {
+      "index": {
+        "bytes": 382,
+        "sha256": "a80054138f41bfaddcf2d4b301dc9b30d7a7866b8ae7aa83026c1382156c1fe9"
+      },
+      "root": "variable-incidents/",
+      "rows": 6
+    },
+    "variable_maps": {
+      "groups": 3,
+      "index": {
+        "bytes": 376,
+        "sha256": "074b81ecc2253460ed08a026057fe9f2f2b22d8c52d3f1465cc3146958eb18f0"
+      },
+      "layout_source": "pca-v1",
+      "root": "variable-maps/",
+      "variables": 6
+    },
+    "variable_neighbors": {
+      "index": {
+        "bytes": 382,
+        "sha256": "b64cd7aa8609a207e1fd56933582bfa381a63684da6c7ad7c387594cc86853ed"
+      },
+      "root": "variable-neighbors/",
+      "rows": 2
+    }
+  },
+  "evidence_snapshot": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "format": "echo-viewer-assets-v1",
+  "generator": "harvest_abstracts/analysis/10k/echo_viewer_bundle/viewer_assets.py v1",
+  "skipped": {}
+}

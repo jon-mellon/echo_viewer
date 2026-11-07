@@ -205,14 +205,14 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
     // instantiation and snapshot validation, over a second). Start it once the
     // schema work is done, in idle time, unless the snapshot has evidence bundles
     // (which never need it) or the user asked to save data.
-    const prewarmEvidenceEngine = () => new Promise(resolve => {
+    const prewarmEvidenceEngine = () => Promise.resolve(dagDataSource.bindViewerAssets?.()).then(() => new Promise(resolve => {
       // Startup has already painted. Warm the engine in idle time even when
       // the start page is showing, so the first evidence click is ready.
       if (globalThis.navigator?.connection?.saveData || dagDataSource.hasEvidencePanelBundles()) { resolve(); return; }
       const start = () => void dagDataSource.ensureEvidenceConnection({ variableIds: [] }).catch(() => {}).finally(resolve);
       if (typeof globalThis.requestIdleCallback === "function") globalThis.requestIdleCallback(start, { timeout: 5000 });
       else setTimeout(start, 1000);
-    });
+    }));
     const preload = () => void prewarmEvidenceEngine();
     // A fresh project carries placeholder anchor IDs, so check for real groups.
     const anchored = side => (state.project.groups || []).some(group => group.group_id === state.project[`${side}_group_id`]);

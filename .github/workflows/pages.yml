@@ -59,6 +59,9 @@ jobs:
         run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink node scripts/ci_retry.mjs npm run profile
       - name: Enforce mobile permalink performance budgets
         run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
+      - name: Check the default snapshot's viewer assets are published
+        run: npm run check:snapshot-assets
+
       - name: Enforce mobile diagnostic switching budgets
         run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
       - name: Enforce mobile causes and consequences budgets

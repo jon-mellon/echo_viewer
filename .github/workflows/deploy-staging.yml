@@ -53,6 +53,9 @@ jobs:
           key: published-schemas-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/published_schema_cache.cjs') }}
           restore-keys: published-schemas-
 
+      - name: Check the default snapshot's viewer assets are published
+        run: npm run check:snapshot-assets
+
       - name: Enforce mobile diagnostic switching budgets
         run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
 

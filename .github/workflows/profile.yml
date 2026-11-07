@@ -40,6 +40,9 @@ jobs:
       - run: PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
       - run: PROFILE_SCENARIO=permalink node scripts/ci_retry.mjs npm run profile
       - run: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
+      - name: Check the default snapshot's viewer assets are published
+        run: npm run check:snapshot-assets
+
       - name: Enforce mobile diagnostic switching budgets
         run: npm run profile:diagnostics
       - name: Enforce evidence loading budgets on the default snapshot
