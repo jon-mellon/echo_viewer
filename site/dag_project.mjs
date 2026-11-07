@@ -62,12 +62,17 @@ export function clearAnchor(project, side) {
 export function addMembers(project, groupId, memberIds, timestamp) {
   if (!project.groups.some(group => group.group_id === groupId)) return project;
   const members = new Set(memberIds);
-  return { ...project, groups: project.groups.map(group => ({ ...group,
-    variable_ids: group.group_id === groupId
-      ? [...group.variable_ids, ...[...members].filter(id => !group.variable_ids.includes(id))]
-      : (group.variable_ids || []).filter(id => !members.has(id)),
-    updated_at: timestamp,
-  })) };
+  return { ...project, groups: project.groups.map(group => {
+    const current = group.variable_ids || [];
+    if (group.group_id === groupId) {
+      const have = new Set(current);
+      const added = [...members].filter(id => !have.has(id));
+      return added.length ? { ...group, variable_ids: [...current, ...added], updated_at: timestamp } : group;
+    }
+    // Other groups lose the moved concepts; untouched groups keep their identity and timestamp.
+    const kept = current.filter(id => !members.has(id));
+    return kept.length === current.length ? group : { ...group, variable_ids: kept, updated_at: timestamp };
+  }) };
 }
 
 export function removeMembers(project, groupId, memberIds, timestamp) {
@@ -75,7 +80,7 @@ export function removeMembers(project, groupId, memberIds, timestamp) {
   const group = project.groups.find(g => g.group_id === groupId);
   if (!group) return project;
   return updateGroup(project, groupId, {
-    variable_ids: group.variable_ids.filter(id => !drop.has(id)), updated_at: timestamp,
+    variable_ids: (group.variable_ids || []).filter(id => !drop.has(id)), updated_at: timestamp,
   });
 }
 
@@ -138,7 +143,7 @@ export function restoreSnapshot(project, json) {
     } };
   }
   return { project: { ...project, groups: snap.groups.map(withoutGroupReviewStatus),
-    link_decisions: snap.link_decisions,
+    link_decisions: snap.link_decisions || {},
     finding_decisions: snap.finding_decisions || {},
     confounder_statuses: snap.confounder_statuses || {},
     collider_statuses: snap.collider_statuses || {},

@@ -699,9 +699,19 @@ async function deleteCustomVariable(groupId) {
   const group = groupById(groupId);
   const before = takeSnapshot();
   const next = projectOps.deleteSplitCategories(state.project, { groupId, timestamp: nowIso() });
+  const selectedLink = (state.project.links || []).find(link => link.edge_id === state.selectedEdgeId);
   if (applyProjectOperation(next) === false) throw new Error("Variable memberships are still loading. Try again in a moment.");
   for (const key of ["focusedGroupId", "activeGroupId", "selectedEvidenceGroupId"]) {
     if (state[key] === groupId) state[key] = null;
+  }
+  // Nothing the user had open may keep pointing at the variable that no longer exists.
+  if (selectedLink && (selectedLink.group_a === groupId || selectedLink.group_b === groupId)) state.selectedEdgeId = null;
+  for (const view of Object.values(state.explore || {})) {
+    if (view.focusId === groupId) { view.focusId = null; view.excluded = []; }
+    else if (view.excluded?.includes(groupId)) view.excluded = view.excluded.filter(id => id !== groupId);
+  }
+  if (state.identifyExclusion?.ids?.includes(groupId)) {
+    state.identifyExclusion = { ...state.identifyExclusion, ids: state.identifyExclusion.ids.filter(id => id !== groupId) };
   }
   addToUndoHistory(`Excluded variable "${group?.label || groupId}"`, before);
   invalidateVisibleCaches();
