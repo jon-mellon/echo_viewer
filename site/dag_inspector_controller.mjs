@@ -287,7 +287,7 @@ export function createDagInspectorController({
             ? "Definition loading…" : "No definition has been written for this variable.") }))));
   }
 
-  function renderProvenance() {
+  function renderProvenance(focusPage = null) {
     const link = selectedEdge();
     if (!link) { elements.provenancePanel.hidden = true; return; }
     elements.provenancePanel.hidden = false;
@@ -302,10 +302,11 @@ export function createDagInspectorController({
       replaceChildren(elements.provenancePanel, h("div", { className: "small-note", textContent: "No evidence records for this link." }));
       return;
     }
+    let findingFocusTarget = null;
     const uoaHint = { shown: false };
     const renderRow = ({ raw, source, target }) => {
       const doi = isDoi(raw.paper_id) ? raw.paper_id.trim() : null;
-      const title = truncate(raw.paper_title || raw.paper_id, 44);
+      const title = raw.paper_title || raw.paper_id || "";
       const paper = doi
         ? h("a", { href: safeUrl(`https://doi.org/${encodeURIComponent(doi)}`), target: "_blank", rel: "noopener", title: raw.paper_title || doi, textContent: title })
         : document.createTextNode(title);
@@ -344,12 +345,13 @@ export function createDagInspectorController({
           persistFindingDecision();
         } else {
           pendingFindingId = pendingFindingId === id ? null : id;
-          renderProvenance();
+          renderProvenance({ findingId: id, control: pendingFindingId ? "reason" : "action" });
         }
       });
+      if (focusPage?.findingId === id && focusPage.control === "action") findingFocusTarget = action;
       const row = h("tr", { className: excluded ? "finding-excluded" : "" }, h("td", {}, paper), conceptCell(source.concept, raw.source_variable_id),
         conceptCell(target.concept, raw.target_variable_id),
-        cell(raw.causal_link_existence || "present"), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(truncate(raw.target_population || "", 60)),
+        cell(raw.causal_link_existence || "present"), cell((raw.identification_strategy || "").replaceAll("_", " ")), cell(raw.target_population || ""),
         h("td", {}, excluded ? h("span", { className: "finding-excluded-label",
           textContent: `Excluded${reasonLabel ? `: ${reasonLabel}` : ""} ` }) : null, action));
       if (pendingFindingId !== id || !canDecide) return row;
@@ -357,14 +359,24 @@ export function createDagInspectorController({
         h("option", { value: "not_relevant_to_target_population", textContent: "Not relevant to target population" }),
         h("option", { value: "concept_miscategorized", textContent: "Concept miscategorized" }),
         h("option", { value: "other", textContent: "Other" }));
+      if (focusPage?.findingId === id && focusPage.control === "reason") findingFocusTarget = reason;
       const detail = h("textarea", { className: "dag-textarea", rows: 2,
-        placeholder: "Enter the reason (kept private)", attrs: { "aria-label": "Other exclusion reason" } });
+        placeholder: "Enter the reason (kept private)", attrs: { "aria-label": "Other exclusion reason", "aria-describedby": "finding-reason-error" } });
+      const detailError = h("p", { id: "finding-reason-error", className: "small-note is-error", role: "alert", hidden: true,
+        textContent: "Enter a reason for excluding this finding." });
+      const clearDetailError = () => { detailError.hidden = true; detail.removeAttribute("aria-invalid"); };
       detail.hidden = true;
-      reason.addEventListener("change", () => { detail.hidden = reason.value !== "other"; });
+      reason.addEventListener("change", () => { detail.hidden = reason.value !== "other"; clearDetailError(); });
+      detail.addEventListener("input", clearDetailError);
       const confirm = h("button", { className: "btn btn--primary btn--sm", type: "button", textContent: "Confirm exclusion" });
       confirm.addEventListener("click", () => {
         const reasonText = detail.value.trim();
-        if (reason.value === "other" && !reasonText) { detail.focus(); return; }
+        if (reason.value === "other" && !reasonText) {
+          detailError.hidden = false;
+          detail.setAttribute("aria-invalid", "true");
+          detail.focus();
+          return;
+        }
         const before = takeSnapshot();
         const findingDecision = { display_status: "excluded", reason_code: reason.value,
           ...(reason.value === "other" ? { reason_text: reasonText } : {}), timestamp: nowIso() };
@@ -376,11 +388,11 @@ export function createDagInspectorController({
         persistFindingDecision();
       });
       const cancel = h("button", { className: "btn btn--ghost btn--sm", type: "button", textContent: "Cancel" });
-      cancel.addEventListener("click", () => { pendingFindingId = null; renderProvenance(); });
+      cancel.addEventListener("click", () => { pendingFindingId = null; renderProvenance({ findingId: id, control: "action" }); });
       return [row, h("tr", { className: "finding-reason-tr" }, h("td", { colSpan: 7, className: "finding-reason-row" },
         h("div", { className: "exclude-reason-row" },
           h("span", { className: "exclude-reason-label", textContent: "Why exclude this finding?" }),
-          reason, detail,
+          reason, detail, detailError,
           h("p", { className: "exclude-reason-hint", textContent: "The finding stops counting toward this link; you can restore it later." }),
           h("div", { className: "exclude-reason-actions" }, confirm, cancel))))];
     };
@@ -389,14 +401,26 @@ export function createDagInspectorController({
       provenancePagesEdgeId = link.edge_id;
       provenancePages.clear();
     }
+    let pageFocusTarget = null;
     const renderSection = section => {
       const page = inspector.provenancePage(section.rows, provenancePages.get(section.direction) || 0, provenancePageSize);
       provenancePages.set(section.direction, page.page);
-      const goTo = next => {
+      const goTo = (next, control) => {
         provenancePages.set(section.direction, next);
         pendingFindingId = null;
-        renderProvenance();
+        renderProvenance({ direction: section.direction, control });
       };
+      const directionLabel = `${section.sourceLabel} to ${section.targetLabel}`;
+      const previous = h("button", { className: "btn", type: "button", disabled: page.page === 0,
+        textContent: "Previous", attrs: { "aria-label": `Previous evidence for ${directionLabel}` },
+        onclick: () => goTo(page.page - 1, "previous") });
+      const next = h("button", { className: "btn", type: "button", disabled: page.page >= page.pageCount - 1,
+        textContent: "Next", attrs: { "aria-label": `Next evidence for ${directionLabel}` },
+        onclick: () => goTo(page.page + 1, "next") });
+      if (focusPage?.direction === section.direction) {
+        const preferred = focusPage.control === "previous" ? previous : next;
+        pageFocusTarget = preferred.disabled ? (preferred === previous ? next : previous) : preferred;
+      }
       const rejectedCount = section.rows.filter(({ raw }) =>
         state.project.finding_decisions?.[raw.raw_causal_link_id]?.display_status === "excluded").length;
       const records = `${section.rows.length} record${section.rows.length === 1 ? "" : "s"}${rejectedCount ? ` · ${rejectedCount} rejected` : ""}`;
@@ -408,13 +432,12 @@ export function createDagInspectorController({
           h("tbody", {}, page.rows.length ? page.rows.map(renderRow)
             : h("tr", {}, h("td", { colSpan: headings.length, textContent: "No evidence records for this direction." })))),
         page.pageCount > 1 ? h("div", { className: "provenance-pagination" },
-          h("button", { className: "btn", type: "button", disabled: page.page === 0,
-            textContent: "Previous", onclick: () => goTo(page.page - 1) }),
+          previous,
           h("span", { textContent: `${page.start + 1}–${page.end} of ${page.total}` }),
-          h("button", { className: "btn", type: "button", disabled: page.page >= page.pageCount - 1,
-            textContent: "Next", onclick: () => goTo(page.page + 1) })) : null);
+          next) : null);
     };
     replaceChildren(elements.provenancePanel, model.sections.map(renderSection));
+    (findingFocusTarget || pageFocusTarget)?.focus();
   }
 
   return { renderEdge, renderProvenance, renderGroupDefinition, selectedEdge };

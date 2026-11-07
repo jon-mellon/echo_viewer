@@ -1,4 +1,5 @@
 const { test, expect } = require("./fixtures.cjs");
+const viewerBase = `http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}`;
 const { chooseAnchor, chooseAnchors, startCreate, openIdentifyField, closeSchemaWorkspace, editSchemaButton, createVariableFromSchema, editVariableButton } = require("./support/identify.cjs");
 const { watchBrowserErrors } = require("./browser_errors.cjs");
 const { describeVariable, startAiSplit, includeConcepts } = require("./support/definition.cjs");
@@ -13,7 +14,7 @@ test("DAG2 defines a canonical variable from per-source residual slices", async 
     }
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto(`${viewerBase}/?task=identify`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
 
   await expect(page.locator("#identify-iv-input")).toBeVisible();
@@ -158,7 +159,7 @@ test("Variables list definition and split editing are reachable on desktop and m
     localStorage.clear();
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto(`${viewerBase}/?task=identify`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
     && window.__dagBuilderState?.publishedSchemaHydrated
     && !window.__dagBuilderState?.publishedSchemaHydrating);
@@ -178,6 +179,7 @@ test("Variables list definition and split editing are reachable on desktop and m
   await includeConcepts(page, [variableId]);
   await page.locator("#definitionResidualLabels input").fill("Browser list residual");
   await page.locator("#definitionSave").click();
+  await expect(page.locator("#definitionBlock")).toBeHidden();
   await expect(editSchemaButton(page)).toBeVisible();
   const splitId = await page.evaluate(() => window.__dagBuilderState.project.groups
     .find(group => group.label === "Browser list variable")?.group_id);
@@ -235,7 +237,7 @@ test("OpenRouter returns to the variable picker with the current anchors", async
       }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
     });
   });
-  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto(`${viewerBase}/?task=identify`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20 && window.__dagBuilderState?.publishedSchemaHydrated);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups.filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   await chooseAnchors(page, anchors[0], anchors[1]);
@@ -261,7 +263,7 @@ test("a new variable can be defined through the mobile controls", async ({ page 
     localStorage.clear();
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto(`${viewerBase}/?task=identify`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
     && window.__dagBuilderState?.publishedSchemaHydrated
     && !window.__dagBuilderState?.publishedSchemaHydrating);
@@ -344,7 +346,7 @@ for (const device of [
       await page.addInitScript(() => {
         sessionStorage.setItem("echo-viewer-password-accepted", "yes");
       });
-      await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+      await page.goto(`${viewerBase}/?task=identify`, { waitUntil: "domcontentloaded" });
       await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
         && window.__dagBuilderState?.publishedSchemaHydrated);
       await startCreate(page, "iv");
@@ -486,7 +488,7 @@ test("Jev test and full split resume saved batches after failure and reload", as
   });
   try {
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+    await page.goto(`${viewerBase}/?task=identify`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await startCreate(page, "iv");
@@ -512,6 +514,16 @@ test("Jev test and full split resume saved batches after failure and reload", as
     await page.locator("#definitionAiRun").click();
     await expect(page.locator("#definitionAiFullRun")).toBeVisible();
     expect(requestedBatches[2]).toEqual(failedTestBatch);
+    expect(decisions).toBe(5);
+    // A corrected sample suggestion survives leaving and resuming the draft.
+    const firstChoice = page.locator('#definitionAiRows button[data-ai-side="leftover"]').first();
+    const reviewedId = await firstChoice.getAttribute("data-variable-id");
+    await firstChoice.click();
+    await expect(page.locator(`#definitionAiRows button[data-variable-id="${reviewedId}"][data-ai-side="leftover"]`)).toBeFocused();
+    await page.locator("#definitionPartitionStep .definition-cancel").click();
+    await startCreate(page, "iv");
+    await page.locator("#definitionResumeList button", { hasText: "Resume" }).click();
+    await expect(page.locator(`#definitionAiRows button[data-variable-id="${reviewedId}"][data-ai-side="leftover"]`)).toHaveAttribute("aria-pressed", "true");
     expect(decisions).toBe(5);
     await page.locator("#definitionAiFullRun").click();
     await expect(page.locator("#definitionAiStatus")).toContainText("Full run paused");
@@ -595,7 +607,7 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
   });
   try {
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+    await page.goto(`${viewerBase}/?task=identify`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await startCreate(page, "iv");
@@ -616,6 +628,50 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
   } finally {
     await context.close();
   }
+});
+
+test("a source smaller than the sample can be reviewed and applied without a zero-item run", async ({ page }) => {
+  await page.route("https://openrouter.ai/auth?**", async route => {
+    const address = new URL(route.request().url());
+    const callback = new URL(address.searchParams.get("callback_url"));
+    callback.searchParams.set("code", "test-code");
+    callback.searchParams.set("state", address.searchParams.get("state"));
+    await route.fulfill({ status: 302, headers: { location: callback.href } });
+  });
+  await page.route("https://openrouter.ai/api/**", async route => {
+    const request = route.request();
+    const headers = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-headers": "authorization, content-type" };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    let body;
+    if (request.url().endsWith("/auth/keys")) body = { key: "sk-or-test" };
+    else if (request.url().endsWith("/v1/key")) body = { data: { limit: 5, limit_reset: null, limit_remaining: 5 } };
+    else if (request.url().includes("/v1/model/")) body = { data: { pricing: { prompt: "0", completion: "0", request: "0" } } };
+    else if (request.url().endsWith("/alpha/decisions")) {
+      const questions = request.postDataJSON().questions;
+      body = { answers: Object.fromEntries(Object.keys(questions).map((id, index) => [id,
+        { type: "choice", choice: index % 2 ? "leftover" : "new", probabilities: { new: 0.9, leftover: 0.9 } }])) };
+    } else throw new Error(`Unexpected OpenRouter request: ${request.url()}`);
+    return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify(body) });
+  });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${viewerBase}/?task=identify`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState?.publishedSchemaHydrated);
+  await startCreate(page, "iv");
+  await startAiSplit(page, { source: "gender", label: "Gender subset", description: "A subset of the gender concepts for this test." });
+  expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids.length)).toBeLessThanOrEqual(50);
+  await page.locator("#definitionAiConnect").click();
+  await expect(page.locator("#definitionAiRun")).toBeEnabled();
+  await page.locator("#definitionAiRun").click();
+  await expect(page.locator("#definitionAiApply")).toBeVisible();
+  await expect(page.locator("#definitionAiFullRun")).toBeHidden();
+  await page.locator("#definitionPartitionStep .definition-cancel").click();
+  await startCreate(page, "iv");
+  await page.locator("#definitionResumeList button", { hasText: "Resume" }).click();
+  await expect(page.locator("#definitionAiApply")).toBeVisible();
+  await page.locator("#definitionAiApply").click();
+  await expect(page.locator("#definitionSave")).toBeEnabled();
 });
 
 test("a published split appears after source selection and opens for review", async ({ page }) => {
@@ -833,16 +889,19 @@ test("add a saved variable to the schema without selecting an analysis role", as
 });
 
 test("definition source search matches constituent variables, not only category names", async ({ page }) => {
-  const fs = require("node:fs"), zlib = require("node:zlib");
+  const zlib = require("node:zlib");
   const { PRODUCTION_EVIDENCE_MANIFEST } = await import("../site/dag_data_config.mjs");
   const snapshot = PRODUCTION_EVIDENCE_MANIFEST.match(/browser-v2\/([0-9a-f]{64})\//)[1];
-  const catalog = JSON.parse(zlib.gunzipSync(fs.readFileSync(`site/search-catalogs/${snapshot}.json.gz`)));
+  // The default snapshot's catalog is published beside its evidence, not committed.
+  const published = await fetch(`https://data.epistemicinfra.org/evidence/layouts/browser-v2/${snapshot}/viewer-assets/search-catalog.json.gz`);
+  expect(published.ok).toBe(true);
+  const catalog = JSON.parse(zlib.gunzipSync(Buffer.from(await published.arrayBuffer())));
   const labelOf = new Map(catalog.records.map(row => [row[0], row[1] || row[2]]));
   await page.addInitScript(() => {
     localStorage.clear();
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+  await page.goto(`${viewerBase}/?task=identify`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20);
   await page.waitForFunction(() => window.__dagBuilderState.publishedSchemaHydrated && !window.__dagBuilderState.publishedSchemaHydrating);
   // Pick a variable whose own label is not part of its category's name.
@@ -909,7 +968,7 @@ test("Classify 50 more appends to the list, sorts new first, and applying leaves
   });
   try {
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-    await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+    await page.goto(`${viewerBase}/?task=identify`, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
       && window.__dagBuilderState?.publishedSchemaHydrated);
     await startCreate(page, "iv");
@@ -973,7 +1032,7 @@ test("Exploration creates a variable from its picker, which becomes the focus wi
     }
     sessionStorage.setItem("echo-viewer-password-accepted", "yes");
   });
-  await page.goto("http://127.0.0.1:8767/?task=causes", { waitUntil: "domcontentloaded" });
+  await page.goto(`${viewerBase}/?task=causes`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
     && window.__dagBuilderState.publishedSchemaHydrated && !window.__dagBuilderState.publishedSchemaHydrating);
 
@@ -1006,7 +1065,7 @@ test("a saved AI split is not restored on load; Define offers it in Causes and r
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const ready = () => page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
     && window.__dagBuilderState.publishedSchemaHydrated);
-  await page.goto("http://127.0.0.1:8767/?task=causes", { waitUntil: "domcontentloaded" });
+  await page.goto(`${viewerBase}/?task=causes`, { waitUntil: "domcontentloaded" });
   await ready();
   await page.evaluate(async () => {
     const { saveJevRun } = await import("/definition_jev_checkpoint.mjs");

@@ -18,7 +18,9 @@ class Element {
   replaceChildren(...children) { this.children = children; this.ownText = ""; }
   addEventListener(type, listener) { this.listeners.set(type, listener); }
   setAttribute(name, value) { this[name] = value; }
+  removeAttribute(name) { delete this[name]; }
   click() { this.listeners.get("click")?.(); }
+  focus() { globalThis.document.activeElement = this; }
   querySelector(selector) {
     return this.querySelectorAll(selector)[0] || null;
   }
@@ -82,6 +84,34 @@ test("group definition renders before concepts and paginates ten at a time", asy
   } finally {
     globalThis.document = previousDocument;
   }
+});
+
+test("evidence shows complete study details and keeps focus within the paged direction", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => new Element(tagName),
+    createTextNode: text => ({ textContent: text }) };
+  try {
+    const title = "A full paper title that is deliberately longer than forty-four characters for readers";
+    const population = "A population description that is deliberately longer than sixty characters and remains important";
+    const ids = Array.from({ length: 6 }, (_, i) => `r${i}`);
+    const edge = { edge_id: "a__b", group_a: "a", group_b: "b", a_to_b_raw_link_ids: ids, b_to_a_raw_link_ids: [] };
+    const state = { project: { groups: [{ group_id: "a", label: "Exposure", variable_ids: ["v1"] },
+      { group_id: "b", label: "Outcome", variable_ids: ["v2"] }], links: [edge], finding_decisions: {}, link_decisions: {} },
+    selectedEdgeId: edge.edge_id, rawLinksById: new Map(ids.map(id => [id, { raw_causal_link_id: id,
+      paper_id: "10.1234/example", paper_title: title, target_population: population,
+      source_variable_id: "v1", target_variable_id: "v2" }])),
+    variableById: new Map([["v1", { concept_label: "Source" }], ["v2", { concept_label: "Target" }]]) };
+    const elements = { edgeInspector: new Element("div"), closeEvidencePane: new Element("button"), provenancePanel: new Element("div") };
+    const controller = createDagInspectorController({ state, elements });
+    controller.renderProvenance();
+    assert.match(elements.provenancePanel.textContent, new RegExp(title));
+    assert.match(elements.provenancePanel.textContent, new RegExp(population));
+    const next = elements.provenancePanel.findAll("button").find(button => button.textContent === "Next");
+    assert.equal(next["aria-label"], "Next evidence for Exposure to Outcome");
+    next.click();
+    assert.match(elements.provenancePanel.textContent, /6–6 of 6/);
+    assert.equal(globalThis.document.activeElement["aria-label"], "Previous evidence for Exposure to Outcome");
+  } finally { globalThis.document = previousDocument; }
 });
 
 test("tall panels load a bounded larger page and reuse cached labels", async () => {
@@ -162,8 +192,26 @@ test("a finding's exclude control waits for both concept labels", () => {
     assert.equal(exclude["aria-label"], "Exclude finding r1");
     assert.match(exclude.className, /finding-decision-button--exclude/);
     exclude.click();
+    assert.equal(globalThis.document.activeElement["aria-label"], "Finding exclusion reason");
+    elements.provenancePanel.findAll("button").find(button => button.textContent === "Cancel").click();
+    assert.equal(globalThis.document.activeElement["aria-label"], "Exclude finding r1");
+    globalThis.document.activeElement.click();
     assert.ok(elements.provenancePanel.findAll("option")
       .some(option => option.textContent === "Concept miscategorized"));
+    const reasonSelect = elements.provenancePanel.findAll("select")[0];
+    reasonSelect.value = "other";
+    reasonSelect.listeners.get("change")();
+    elements.provenancePanel.findAll("textarea")[0].value = "";
+    elements.provenancePanel.findAll("button").find(button => button.textContent === "Confirm exclusion").click();
+    const reasonDetail = elements.provenancePanel.findAll("textarea")[0];
+    const error = elements.provenancePanel.findAll("p").find(item => item.id === "finding-reason-error");
+    assert.equal(error.hidden, false);
+    assert.equal(reasonDetail["aria-invalid"], "true");
+    assert.equal(globalThis.document.activeElement, reasonDetail);
+    reasonDetail.value = "Relevant detail";
+    reasonDetail.listeners.get("input")();
+    assert.equal(error.hidden, true);
+    assert.equal(reasonDetail["aria-invalid"], undefined);
     elements.provenancePanel.findAll("select")[0].value = "concept_miscategorized";
     elements.provenancePanel.findAll("textarea")[0].value = "";
     elements.provenancePanel.findAll("button")

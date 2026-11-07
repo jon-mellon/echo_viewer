@@ -81,6 +81,8 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   let checkpointDescription = null;
   let checkpointSignature = null;
   let restorePromise = null;
+  // Serialize edits so a quick sequence of review choices is saved in order.
+  let pendingReviewSaves = Promise.resolve();
 
   function eligibleSignature(draft) {
     return (draft?.eligible_variable_ids || []).join("\u0000");
@@ -94,7 +96,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     checkpointDescription = null;
     checkpointSignature = null;
     restorePromise = null;
-    if (oldId && !keepCheckpoint) void deleteJevRun(oldId).catch(error =>
+    if (oldId && !keepCheckpoint) void pendingReviewSaves.then(() => deleteJevRun(oldId)).catch(error =>
       console.warn("Could not remove Jev checkpoint.", error));
     preview = null;
     previewDraft = null;
@@ -217,6 +219,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     checkpointSignature = signature;
     const revision = runRevision;
     restorePromise = (async () => {
+      await pendingReviewSaves;
       const id = await jevRunId(checkpointSource(draft, description));
       const saved = await loadJevRun(id);
       if (revision !== runRevision || draft !== getDraft()
@@ -341,6 +344,9 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   const bySide = (a, b) => a.side === b.side ? a.confidence - b.confidence : a.side === "new" ? -1 : 1;
 
   function renderReviewRows(draft) {
+    const active = document.activeElement;
+    const focusedChoice = els.definitionAiRows.contains(active) && active?.dataset?.aiSide
+      ? { variableId: active.dataset.variableId, side: active.dataset.aiSide } : null;
     els.definitionAiReviewTools.hidden = false;
     els.definitionAiReviewFilter.value = reviewFilter;
     const rows = [...(reviewFilter === "spot" ? spotRows
@@ -371,11 +377,31 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     els.definitionAiRows.querySelectorAll("button[data-ai-side]").forEach(button =>
       button.addEventListener("click", () => {
         const item = preview.find(entry => entry.id === button.dataset.variableId);
-        if (item) item.side = button.dataset.aiSide;
+        if (!item) return;
+        item.side = button.dataset.aiSide;
+        const batch = checkpoint?.batches.find(entry => entry.results.some(result => result.id === item.id));
+        if (batch) {
+          const savedItem = batch.results.find(result => result.id === item.id);
+          savedItem.side = item.side;
+          const runId = checkpoint.run.id;
+          const results = structuredClone(batch.results);
+          pendingReviewSaves = pendingReviewSaves.then(() => saveJevBatch(runId, batch.phase, batch.offset, results, batch.inputTokens))
+            .catch(error => { message = `Could not save that review choice in this browser: ${error.message}`; render(); });
+        } else {
+          message = "Could not save that review choice in this browser.";
+          render();
+        }
         onPreviewChange(preview.filter(entry => entry.side === "new").map(entry => entry.id), previewMode);
         renderSummary(draft);
         renderReviewRows(draft);
+        [...els.definitionAiRows.querySelectorAll("button[data-ai-side]")]
+          .find(candidate => candidate.dataset.variableId === item.id && candidate.dataset.aiSide === item.side)?.focus({ preventScroll: true });
       }));
+    if (focusedChoice) {
+      [...els.definitionAiRows.querySelectorAll("button[data-ai-side]")]
+        .find(button => button.dataset.variableId === focusedChoice.variableId && button.dataset.aiSide === focusedChoice.side)
+        ?.focus({ preventScroll: true });
+    }
   }
 
   function setStep(element, stepState) {
@@ -694,9 +720,9 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       testDescription = description;
       preview = outcome.results;
       previewDraft = draft;
-      previewMode = "test";
+      previewMode = testResults.length === draft.eligible_variable_ids.length ? "full" : "test";
       spotRows = spotCheckResults(preview);
-      onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "test");
+      onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), previewMode);
       message = "";
     } catch (error) {
       if (revision === runRevision) message = `Test paused: ${error.message} Completed batches are saved in this browser. Resume the test when ready.`;
@@ -742,8 +768,9 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       testResults = [...testResults, ...outcome.results];
       testInputTokens = testInputTokens === null || outcome.inputTokens === null ? null : testInputTokens + outcome.inputTokens;
       preview = testResults;
+      previewMode = testResults.length === draft.eligible_variable_ids.length ? "full" : "test";
       spotRows = spotCheckResults(preview);
-      onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), "test");
+      onPreviewChange(preview.filter(item => item.side === "new").map(item => item.id), previewMode);
       message = "";
     } catch (error) {
       if (revision === runRevision) message = `Labeling paused: ${error.message} Completed batches are saved in this browser. Resume when ready.`;

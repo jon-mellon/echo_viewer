@@ -638,7 +638,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     if (filter && toolbar && filter.parentElement !== toolbar) toolbar.append(filter);
     if (key === identifyListKey) return;
     identifyListKey = key;
-    els.summary.textContent = !rows.length ? `No ${noun} at this path length and paper count. Reviewed decisions remain below.` : "";
+    els.summary.textContent = !rows.length ? `No ${noun} were found with the current path length and paper count.` : "";
     els.summary.hidden = Boolean(rows.length);
     const sections = [
       // Where a variable came from is a schema question; review treats every variable alike.
