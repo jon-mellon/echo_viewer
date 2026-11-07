@@ -10,7 +10,7 @@ export function createVariableReviewController({ state, onCommit, onCancel = () 
   const content = h("div", { className: "variable-review-content" });
   const error = h("p", { className: "review-error", attrs: { role: "alert" }, hidden: true });
   const cancel = h("button", { type: "button", className: "btn", textContent: "Cancel" });
-  const confirm = h("button", { type: "button", className: "btn btn--primary", textContent: "Confirm decision" });
+  const confirm = h("button", { type: "button", className: "btn btn--primary", textContent: "Confirm status" });
   const dialog = h("dialog", { id: "variableReviewDialog", className: "publication-dialog variable-review-dialog",
     attrs: { "aria-labelledby": "variableReviewTitle" } }, title, content,
     h("div", { className: "variable-review-footer" }, error,
@@ -37,13 +37,13 @@ export function createVariableReviewController({ state, onCommit, onCancel = () 
       return;
     }
     const note = h("textarea", { id: "variableReviewNote", className: "search-input", rows: 4, value: existing.text || "", required: true,
-      attrs: { "aria-label": "Reason for this decision" } });
+      attrs: { "aria-label": "Reason for this status" } });
     pending = { kind, groupId, status, scopeKey: diagnosticKey(state.project, kind, groupId), note };
     title.textContent = `${spec.statuses[status]}: ${label(groupId)}`;
     error.hidden = true;
     confirm.disabled = false;
     replaceChildren(content,
-      h("p", { textContent: "This decision keeps the variable and its links on the map and shades it lighter." }),
+      h("p", { textContent: "This status keeps the variable and its links on the map and shades it lighter." }),
       h("label", { className: "review-note-label", htmlFor: "variableReviewNote", textContent: "Reason (required; kept private)" }), note);
     dialog.showModal();
     note.focus();
@@ -53,8 +53,8 @@ export function createVariableReviewController({ state, onCommit, onCancel = () 
     if (!pending) return;
     try {
       const { kind, groupId, status, note, scopeKey } = pending;
-      if (diagnosticKey(state.project, kind, groupId) !== scopeKey) throw new Error("The study changed. Reopen this decision.");
-      if (!note.value.trim()) { note.setAttribute("aria-invalid", "true"); note.focus(); throw new Error("Explain the reason for this decision."); }
+      if (diagnosticKey(state.project, kind, groupId) !== scopeKey) throw new Error("The project changed. Reopen this status.");
+      if (!note.value.trim()) { note.setAttribute("aria-invalid", "true"); note.focus(); throw new Error("Explain the reason for this status."); }
       dialog.close(); pending = null;
       onCommit(kind, groupId, { status, text: note.value.trim() });
     } catch (problem) { showProblem(problem); }

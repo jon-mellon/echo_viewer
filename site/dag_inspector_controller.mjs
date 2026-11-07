@@ -89,8 +89,8 @@ export function createDagInspectorController({
       keys.flatMap((key, index) => [index ? h("br") : null, document.createTextNode(key)])) : null;
     replaceChildren(elements.edgeInspector,
       h("strong", { textContent: `${sourceLabel} → ${targetLabel}` }),
-      h("div", { textContent: "Focal study relationship; not itself an evidence link." }),
-      h("div", { textContent: rawIds.length ? `${rawIds.length} evidence record(s) attached across both directions.` : "No raw evidence records attached." }), papers);
+      h("div", { textContent: "Focal project relationship; not itself an evidence link." }),
+      h("div", { textContent: rawIds.length ? `${rawIds.length} claim(s) attached across both directions.` : "No claims attached." }), papers);
   }
 
   function renderGroupDefinition() {
@@ -137,7 +137,7 @@ export function createDagInspectorController({
         h("h3", {}, `${group.label || group.group_id} `,
           h("span", { className: "provenance-count", textContent: "Definition" })),
         h("p", { className: "group-definition-text", textContent: group.description || (state.publishedSchemaHydrating
-          ? "Definition loading…" : "No definition available for this group.") })),
+          ? "Definition loading…" : "No definition available for this variable.") })),
       h("section", { className: "provenance-direction group-concepts" },
         h("h3", {}, "Underlying concepts ",
           h("span", { className: "provenance-count", textContent: count ? `(${count} concept${count === 1 ? "" : "s"})` : "" })),
@@ -146,7 +146,7 @@ export function createDagInspectorController({
           disabled: state.publishedSchemaHydrating || state.publishedSchemaLoadFailed,
           onRestore: (id, label) => restoreConcept(group.group_id, id, label) }),
         priority?.matchedCount ? h("div", { className: "small-note",
-          textContent: "Concepts used by visible DAG links first" }) : null,
+          textContent: "Concepts used by visible graph links first" }) : null,
         pageIds.length ? h("ol", {
           start: start + 1,
           className: priority?.matchedCount > 0 && priority.matchedCount === start && start < ids.length
@@ -270,9 +270,9 @@ export function createDagInspectorController({
     const provenance = inspector.provenanceModel(link, state.project, state.rawLinksById, state.variableById, diagnosticView());
     const rejectedCount = provenance.rows.filter(({ raw }) =>
       state.project.finding_decisions?.[raw.raw_causal_link_id]?.display_status === "excluded").length;
-    const records = `${model.rawCount} evidence record${model.rawCount === 1 ? "" : "s"}${rejectedCount ? ` · ${rejectedCount} rejected` : ""}`;
+    const records = `${model.rawCount} claim${model.rawCount === 1 ? "" : "s"}${rejectedCount ? ` · ${rejectedCount} rejected` : ""}`;
     const meta = [link.is_target_relation ? "Target relationship" : null,
-      sourcesLoading || evidenceLoadFailed() ? null : model.rawCount || rejectedCount ? records : "No evidence records"].filter(Boolean).join(" · ");
+      sourcesLoading || evidenceLoadFailed() ? null : model.rawCount || rejectedCount ? records : "No claims"].filter(Boolean).join(" · ");
     replaceChildren(elements.edgeInspector,
       h("header", { className: "evidence-header" },
         h("h2", { className: "evidence-title", textContent: `${model.sourceLabel} ${model.arrow} ${model.targetLabel}` }),
@@ -312,7 +312,7 @@ export function createDagInspectorController({
       link, state.project, state.rawLinksById, state.variableById, diagnosticView(),
     );
     if (!model.rawIds.length) {
-      replaceChildren(elements.provenancePanel, h("div", { className: "small-note", textContent: "No evidence records for this link." }));
+      replaceChildren(elements.provenancePanel, h("div", { className: "small-note", textContent: "No claims for this link." }));
       return;
     }
     let findingFocusTarget = null;
@@ -346,14 +346,14 @@ export function createDagInspectorController({
         ? "btn btn--ghost btn--sm finding-decision-button finding-decision-button--restore"
         : "btn btn--sm btn--icon finding-decision-button finding-decision-button--exclude",
         type: "button", textContent: excluded ? "Restore" : "×",
-        title: excluded ? "Restore finding" : "Exclude finding",
-        attrs: { "aria-label": `${excluded ? "Restore" : "Exclude"} finding ${id}` } }) : null;
+        title: excluded ? "Restore claim" : "Exclude claim",
+        attrs: { "aria-label": `${excluded ? "Restore" : "Exclude"} claim ${id}` } }) : null;
       action?.addEventListener("click", () => {
         if (excluded) {
           const before = takeSnapshot();
           if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
           addDecision("finding_restored", { raw_causal_link_id: id });
-          addToUndoHistory("Restored finding", before, "finding-decision");
+          addToUndoHistory("Restored claim", before, "finding-decision");
           rebuildLinkDecision();
           persistFindingDecision();
         } else {
@@ -369,7 +369,7 @@ export function createDagInspectorController({
         h("td", {}, excluded ? h("span", { className: "finding-excluded-label",
           textContent: `Excluded${reasonLabel ? `: ${reasonLabel}` : ""} ` }) : null, action));
       if (pendingFindingId !== id || !canDecide) return row;
-      const reason = h("select", { className: "select-input", attrs: { "aria-label": "Finding exclusion reason" } },
+      const reason = h("select", { className: "select-input", attrs: { "aria-label": "Claim exclusion reason" } },
         h("option", { value: "not_relevant_to_target_population", textContent: "Not relevant to target population" }),
         h("option", { value: "concept_miscategorized", textContent: "Concept miscategorized" }),
         h("option", { value: "other", textContent: "Other" }));
@@ -377,7 +377,7 @@ export function createDagInspectorController({
       const detail = h("textarea", { className: "dag-textarea", rows: 2,
         placeholder: "Enter the reason (kept private)", attrs: { "aria-label": "Other exclusion reason", "aria-describedby": "finding-reason-error" } });
       const detailError = h("p", { id: "finding-reason-error", className: "small-note is-error", role: "alert", hidden: true,
-        textContent: "Enter a reason for excluding this finding." });
+        textContent: "Enter a reason for excluding this claim." });
       const clearDetailError = () => { detailError.hidden = true; detail.removeAttribute("aria-invalid"); };
       reason.value = pendingFindingReason.code;
       detail.value = pendingFindingReason.text;
@@ -403,7 +403,7 @@ export function createDagInspectorController({
         if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, findingDecision)) === false) return;
         clearPendingFinding();
         addDecision("finding_excluded", { raw_causal_link_id: id });
-        addToUndoHistory("Excluded finding", before, "finding-decision");
+        addToUndoHistory("Excluded claim", before, "finding-decision");
         rebuildLinkDecision();
         persistFindingDecision();
       });
@@ -411,9 +411,9 @@ export function createDagInspectorController({
       cancel.addEventListener("click", () => { clearPendingFinding(); renderProvenance({ findingId: id, control: "action" }); });
       return [row, h("tr", { className: "finding-reason-tr" }, h("td", { colSpan: 7, className: "finding-reason-row" },
         h("div", { className: "exclude-reason-row" },
-          h("span", { className: "exclude-reason-label", textContent: "Why exclude this finding?" }),
+          h("span", { className: "exclude-reason-label", textContent: "Why exclude this claim?" }),
           reason, detail, detailError,
-          h("p", { className: "exclude-reason-hint", textContent: "The finding stops counting toward this link; you can restore it later." }),
+          h("p", { className: "exclude-reason-hint", textContent: "The claim stops counting toward this link; you can restore it later." }),
           h("div", { className: "exclude-reason-actions" }, confirm, cancel))))];
     };
     const headings = ["Paper", "Source concept", "Target concept", "Claim", "Strategy", "Population", "Decision"];
@@ -450,7 +450,7 @@ export function createDagInspectorController({
         h("table", { className: "provenance-table provenance-table--edge" },
           h("thead", {}, h("tr", {}, headings.map(label => h("th", { textContent: label })))),
           h("tbody", {}, page.rows.length ? page.rows.map(renderRow)
-            : h("tr", {}, h("td", { colSpan: headings.length, textContent: "No evidence records for this direction." })))),
+            : h("tr", {}, h("td", { colSpan: headings.length, textContent: "No claims for this direction." })))),
         page.pageCount > 1 ? h("div", { className: "provenance-pagination" },
           previous,
           h("span", { textContent: `${page.start + 1}–${page.end} of ${page.total}` }),

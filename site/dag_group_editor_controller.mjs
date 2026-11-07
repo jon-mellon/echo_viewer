@@ -32,7 +32,7 @@ function beginTargetGroup(side) {
 
   const group = ensureGroup({
     group_id: groupId,
-    label: clean(input.value) || seedLabel(side) || (isDv ? "Dependent variable" : "Independent variable"),
+    label: clean(input.value) || seedLabel(side) || (isDv ? "Outcome" : "Cause"),
     variable_ids: seedMembers,
     seed_variable_ids: seedMembers.slice(),
     excluded_nearby_variable_ids: [],
@@ -46,7 +46,7 @@ function beginTargetGroup(side) {
   });
   resolveGroupMembershipConflicts(group);
   Object.assign(state, workflow.transition(state, { type: "open-editor", groupId, side }));
-  addToUndoHistory("Create target group", before);
+  addToUndoHistory("Create target variable", before);
   renderAll();
 }
 
@@ -69,11 +69,11 @@ function assignGroupAsAnchor(side, sourceGroupId) {
   }
   const before = takeSnapshot("anchors");
   const variableIds = (source.variable_ids || []).slice();
-  const label = clean(source.label) || (side === "dv" ? "Dependent variable" : "Independent variable");
+  const label = clean(source.label) || (side === "dv" ? "Outcome" : "Cause");
   if (!promoteGroupToAnchor(side, sourceGroupId)) return;
   Object.assign(state, workflow.transition(state, { type: "anchor-selected", side, groupId: sourceGroupId }));
   addDecision(`group_promoted_to_${side}`, { source_group_id: sourceGroupId, target_group_id: sourceGroupId });
-  addToUndoHistory(`Use "${label}" as ${side.toUpperCase()}`, before, "anchors");
+  addToUndoHistory(`Use "${label}" as ${side === "iv" ? "cause" : "outcome"}`, before, "anchors");
   // Anchor roles do not change group membership or aggregated evidence links.
   renderAll({ reuseLinks: true, reuseDagGeometry: true });
   notifyWhenAnchorsReady();
@@ -101,7 +101,7 @@ function createCustomGroup() {
   const groupId = `g_custom_${Date.now()}`;
   ensureGroup({
     group_id: groupId,
-    label: "New group",
+    label: "New variable",
     variable_ids: [],
     excluded_nearby_variable_ids: [],
     boundary_geometry: { polygons: [] },
@@ -113,7 +113,7 @@ function createCustomGroup() {
     updated_at: nowIso(),
   });
   Object.assign(state, workflow.transition(state, { type: "open-editor", groupId }));
-  addToUndoHistory("Create group", before);
+  addToUndoHistory("Create variable", before);
   if (state.workflowMode === "setup") setWorkflowMode("group_review");
   renderAll();
   setTimeout(() => { els.groupLabelInput?.focus(); els.groupLabelInput?.select(); }, 60);
@@ -158,7 +158,7 @@ function renderGroupEditor() {
     btn.addEventListener("click", () => {
       const before = takeSnapshot();
       removeVariableFromGroup(group, btn.dataset.variableId);
-      addToUndoHistory(`Removed variable from "${group.label}"`, before);
+      addToUndoHistory(`Excluded concept from "${group.label}"`, before);
       renderAll();
     });
   });
@@ -196,7 +196,7 @@ function renderGroupSeedSearch() {
       addVariableToGroup(g, btn.dataset.variableId);
       state.selectedVariableId = btn.dataset.variableId;
       if (g.variable_ids.some((id) => !had.has(id))) {
-        addToUndoHistory(`Added variable to "${g.label}"`, before);
+        addToUndoHistory(`Added concept to "${g.label}"`, before);
       }
       els.groupSeedInput.value = "";
       renderAll();
@@ -217,7 +217,7 @@ function renderNeighborSuggestions(group) {
     btn.addEventListener("click", () => {
       const before = takeSnapshot();
       addVariableToGroup(group, btn.dataset.variableId);
-      addToUndoHistory(`Added variable to "${group.label}"`, before);
+      addToUndoHistory(`Added concept to "${group.label}"`, before);
       renderAll();
     });
   });
@@ -265,7 +265,7 @@ function removeTopNeighborsFromActiveGroup() {
   applyProjectOperation(projectOps.updateGroup(state.project, group.group_id, {
     variable_ids: group.variable_ids.filter(id => protectedSeeds.has(id)), updated_at: nowIso(),
   }));
-  addToUndoHistory(`Removed non-seed variables from "${group.label}"`, before);
+  addToUndoHistory(`Excluded non-seed concepts from "${group.label}"`, before);
   renderAll();
 }
 
@@ -274,7 +274,7 @@ function clearActiveGroupVariables() {
   if (!group) return;
   const before = takeSnapshot();
   applyProjectOperation(projectOps.updateGroup(state.project, group.group_id, { variable_ids: [], updated_at: nowIso() }));
-  addToUndoHistory(`Cleared all variables from "${group.label}"`, before);
+  addToUndoHistory(`Excluded all concepts from "${group.label}"`, before);
   renderAll();
 }
 
@@ -284,13 +284,13 @@ function selectActiveAnchor() {
   const group = activeGroup();
   if (!group) return;
   if (!group.variable_ids.length) {
-    window.alert("A group must contain at least one variable.");
+    window.alert("A variable must contain at least one concept.");
     return;
   }
   const before = takeSnapshot();
   if (!promoteGroupToAnchor(side, group.group_id)) return;
   applyProjectOperation(projectOps.updateGroup(state.project, group.group_id, {
-    label: clean(els.groupLabelInput.value) || group.label || "Unnamed group",
+    label: clean(els.groupLabelInput.value) || group.label || "Unnamed variable",
     notes: els.groupNotesInput.value, updated_at: nowIso(),
   }));
 
@@ -301,7 +301,7 @@ function selectActiveAnchor() {
     els.ivInput.focus();
   }
   addDecision("anchor_selected", { group_id: group.group_id, variable_ids: group.variable_ids.slice() });
-  addToUndoHistory(`Use "${group.label}" as ${group.type.toUpperCase()}`, before);
+  addToUndoHistory(`Use "${group.label}" as ${group.type === "iv" ? "cause" : "outcome"}`, before);
   renderAll();
   notifyWhenAnchorsReady();
 }
@@ -309,7 +309,7 @@ function selectActiveAnchor() {
 function resolveGroupMembershipConflicts(group) {
   const conflicts = projectOps.membershipConflicts(state.project.groups, group);
   if (!conflicts.length) return;
-  const move = window.confirm(`${conflicts.length} variable(s) are already in other groups. Move them into "${group.label}"? Cancel keeps existing assignments.`);
+  const move = window.confirm(`${conflicts.length} concept(s) are already in other variables. Move them into "${group.label}"? Cancel keeps existing assignments.`);
   for (const { groupId, variableId } of conflicts) {
     removeVariableFromGroup(move ? groupById(groupId) : group, variableId);
   }

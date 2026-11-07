@@ -119,7 +119,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
           state.compiledDagUpdating = false;
           renderAll();
         } catch (error) {
-          console.warn("Could not apply the draft's edge changes; a full local recomputation is required.", error);
+          console.warn("Could not apply the draft's link changes; a full local recomputation is required.", error);
           state.compiledDagValid = false;
         } finally {
           state.compiledDagUpdating = false;

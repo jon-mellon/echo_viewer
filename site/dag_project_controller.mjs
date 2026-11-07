@@ -96,7 +96,7 @@ export function createDagProjectController({
     try {
       persistence.writeProject(storage, storageKey(), payload());
     } catch (error) {
-      warn("Could not autosave DAG project", error);
+      warn("Could not autosave project", error);
     }
   }
 
@@ -121,7 +121,7 @@ export function createDagProjectController({
       applyLoaded(saved);
       return true;
     } catch (error) {
-      warn("Could not restore autosaved DAG project", error);
+      warn("Could not restore autosaved project", error);
       return false;
     }
   }

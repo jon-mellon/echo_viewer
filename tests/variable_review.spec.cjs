@@ -54,7 +54,7 @@ test("an empty instrument diagnostic describes the filtered result without inven
   await setup(page, { instrument: true });
   await page.locator("#toggleExogeneity").dispatchEvent("click");
   await expect(page.locator("#exploreSummary")).toHaveText(
-    "No common causes of the instrument and outcome were found with the current path length and paper count.");
+    "No common causes of the instrument and outcome were found with the current path length and study count.");
   await expect(page.locator("#exploreResults .variable-review-row")).toHaveCount(0);
 });
 
@@ -82,10 +82,10 @@ test("other decisions require a private reason and keep the variable in place", 
   const menu = page.locator('.variable-disposition[data-group-id="c"]');
   const dialog = page.locator("#variableReviewDialog");
   await menu.selectOption("removed_other");
-  await dialog.getByRole("button", { name: "Confirm decision" }).click();
+  await dialog.getByRole("button", { name: "Confirm status" }).click();
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("textbox", { name: "Reason for this decision" }).fill("This variable is outside this study population.");
-  await dialog.getByRole("button", { name: "Confirm decision" }).click();
+  await dialog.getByRole("textbox", { name: "Reason for this status" }).fill("This variable is outside this project population.");
+  await dialog.getByRole("button", { name: "Confirm status" }).click();
   await expect(page.locator('.variable-review-row[data-group-id="c"]')).toContainText("Private note:");
   await expect(page.locator('.variable-review-row[data-group-id="c"]')).toHaveClass(/is-accounted/);
   await expect(page.locator('[data-section="rejected"]')).toHaveCount(0);

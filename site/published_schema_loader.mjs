@@ -102,14 +102,14 @@ export async function loadPublishedSchema(publicationId, client = null, fetchImp
   let compiledFallbackReason = null;
   try {
     if (!publication.compiled_manifest_path || !publication.compiler_version) {
-      throw new Error("Published schema has no compiled DAG artifact.");
+      throw new Error("Published schema has no compiled graph artifact.");
     }
     const manifestResponse = await cachingFetch(new URL(publication.compiled_manifest_path, baseUrl));
-    if (!manifestResponse.ok) throw new Error("Published schema has no compiled DAG artifact.");
+    if (!manifestResponse.ok) throw new Error("Published schema has no compiled graph artifact.");
     const manifest = await manifestResponse.json();
     const dagPath = manifest.artifacts?.dag?.path || COMPILED_DAG_PATH;
     const dagResponse = await cachingFetch(new URL(dagPath, baseUrl));
-    if (!dagResponse.ok) throw new Error("Published schema has no compiled DAG artifact.");
+    if (!dagResponse.ok) throw new Error("Published schema has no compiled graph artifact.");
     const dag = await dagResponse.json();
     if (publication.compiled_manifest_hash
         && await sha256Hex(stableJsonBytes(manifest)) !== publication.compiled_manifest_hash) {
@@ -120,12 +120,12 @@ export async function loadPublishedSchema(publicationId, client = null, fetchImp
     compiledFallbackReason = error instanceof Error ? error.message : String(error);
   }
   if (!compiledDag) {
-    throw new Error(`Published schema has no valid compiled DAG: ${compiledFallbackReason}`);
+    throw new Error(`Published schema has no valid compiled graph: ${compiledFallbackReason}`);
   }
   const schema = {
     schema_version: GROUPING_FORMAT_VERSION,
     grouping_set_id: publication.id,
-    label: publication.title || "Published grouping schema",
+    label: publication.title || "Published variable schema",
     description: publication.description || "",
     membership_unit: GROUPING_MEMBERSHIP_UNIT,
     built_against: { record_signature: publication.evidence_snapshot },

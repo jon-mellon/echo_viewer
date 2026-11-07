@@ -55,7 +55,7 @@ test("exclusion hover draws the complete instrument-to-Dep var path in teal", ()
   assert.equal(model.nodeUpdates.find(node => node.id === "k").color.border, "#176b80");
   assert.equal(model.nodeUpdates.find(node => node.id === "x").opacity, 0.16);
   assert.ok(model.edgeUpdates.every(edge => edge.id !== "instrument-study"));
-  assert.match(model.edgeUpdates[0].title, /Instrument-to-Dep var exclusion path/);
+  assert.match(model.edgeUpdates[0].title, /Instrument-to-outcome exclusion path/);
 });
 
 test("polyline helpers separate overlapping runs and place clear arrowheads", () => {

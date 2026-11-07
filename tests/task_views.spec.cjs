@@ -446,7 +446,7 @@ test("mobile home stays on one document while evidence warms in the background",
   }
 });
 
-test("paper counts come from the DAG: results are immediate and no findings are counted or downloaded", async ({ page }) => {
+test("study counts come from the graph: results are immediate and no claims are counted or downloaded", async ({ page }) => {
   const findings = [];
   page.on("request", request => {
     if (/\/causal_link_occurrences\.parquet/.test(request.url())) findings.push(request.url());
@@ -504,7 +504,7 @@ test("a notice appears only when there is nothing to list, and goes away with re
   await page.locator(".list-filter-papers").fill("99999");
   await expect(page.locator(".explore-row")).toHaveCount(0);
   await expect(page.locator("#exploreSummary")).toBeVisible();
-  await expect(page.locator("#exploreSummary")).toContainText("No causes of sleep were found at this distance and paper count");
+  await expect(page.locator("#exploreSummary")).toContainText("No causes of sleep were found at this distance and study count");
   await expect.poll(() => page.evaluate(() => window.__emptyResultNetwork?.getScale() ?? Infinity)).toBeLessThanOrEqual(2.5);
   await page.locator(".list-filter-papers").fill("2");
   await expect(page.locator(".explore-row").first()).toBeVisible();

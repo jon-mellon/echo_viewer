@@ -203,7 +203,7 @@ export function createDagExportController({
       if (!input) setBusy(false);
     }
     if (!exportData.collectAllDagDois(input).length && !input.visibleLinks?.length) {
-      alertImpl("No links in the DAG yet.");
+      alertImpl("No links in the graph yet.");
       setBusy(false);
       return;
     }

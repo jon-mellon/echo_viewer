@@ -94,7 +94,7 @@ export function createDefinitionWorkflowPresenter({ state, elements: els, normal
       ? "The remaining concepts stay in each original variable, which keeps its current name."
       : "Concepts you don't include stay where they are. Each original variable keeps its name unless you rename it here.";
     els.definitionConceptsIntro.textContent = draft.replaces_group_id
-      ? `This replaces “${draft.replaces_label}” in this schema. Its concepts return to their source groups before “${truncate(name, 60)}” is added. Nothing changes until you confirm.`
+      ? `This replaces “${draft.replaces_label}” in this schema. Its concepts return to their source variables before “${truncate(name, 60)}” is added. Nothing changes until you confirm.`
       : draft.published_split
       ? `Adding “${truncate(name, 60)}” moves these concepts from the original variables into this variable.`
       : `Select which concepts belong in “${truncate(name, 60)}”.`;

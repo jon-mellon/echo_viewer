@@ -29,7 +29,7 @@ function icon(name) {
 export function customVariableActions({ group, canChange = () => true, onEdit = () => {}, onDelete = async () => {} }) {
   const label = group.label || group.group_id;
   const changeable = canChange(group);
-  const locked = "Changed by a later edit; it can no longer be edited or deleted here.";
+  const locked = "Changed by a later edit; it can no longer be edited or excluded here.";
   const wrap = h("span", { className: "custom-row-actions" });
   const showIcons = () => {
     wrap.replaceChildren(
@@ -37,19 +37,19 @@ export function customVariableActions({ group, canChange = () => true, onEdit = 
         title: changeable ? `Edit ${label}` : locked, attrs: { "aria-label": `Edit ${label}` },
         onclick: () => onEdit(group.group_id) }, icon("pencil")),
       h("button", { type: "button", className: "btn btn--icon btn--ghost custom-row-delete", disabled: !changeable,
-        title: changeable ? `Delete ${label}` : locked, attrs: { "aria-label": `Delete ${label}` },
+        title: changeable ? `Exclude ${label}` : locked, attrs: { "aria-label": `Exclude ${label}` },
         onclick: () => showConfirm() }, icon("trash")));
   };
   const showConfirm = () => {
     const keep = h("button", { type: "button", className: "btn btn--sm btn--ghost", textContent: "Keep",
       onclick: () => { showIcons(); wrap.querySelector(".custom-row-delete")?.focus(); } });
-    const remove = h("button", { type: "button", className: "btn btn--sm btn--danger", textContent: "Delete",
-      title: `Delete ${label}; its concepts go back to where they came from. You can undo this.`,
+    const remove = h("button", { type: "button", className: "btn btn--sm btn--danger", textContent: "Exclude",
+      title: `Exclude ${label}; its concepts go back to where they came from. You can undo this.`,
       onclick: async () => {
         remove.disabled = keep.disabled = true;
-        remove.textContent = "Deleting…";
+        remove.textContent = "Excluding…";
         try { await onDelete(group.group_id); } catch (error) {
-          console.error("Could not delete custom variable", error);
+          console.error("Could not exclude custom variable", error);
           showIcons();
         }
       } });

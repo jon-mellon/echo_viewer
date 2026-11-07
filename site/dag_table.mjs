@@ -59,10 +59,10 @@ export function enumeratePaths(outgoing, fromId, toId, { blocked = [], maxLength
 
 /** The route labels each view shows, and where its paths come from. */
 const PATH_VIEWS = {
-  confounders: { fields: ["toIv", "toDv"], headers: ["Path to Ind var", "Path to Dep var"], candidate: "Confounder" },
-  exogeneity: { fields: ["toIv", "toDv"], headers: ["Path to Instrument", "Path to Dep var"], candidate: "Common cause" },
-  colliders: { fields: ["fromIv", "fromDv"], headers: ["Path from Ind var", "Path from Dep var"], candidate: "Collider" },
-  exclusion: { fields: ["toDv"], headers: ["Path to Dep var"], candidate: "Variable" },
+  confounders: { fields: ["toIv", "toDv"], headers: ["Path to cause", "Path to outcome"], candidate: "Confounder" },
+  exogeneity: { fields: ["toIv", "toDv"], headers: ["Path to Instrument", "Path to outcome"], candidate: "Common cause" },
+  colliders: { fields: ["fromIv", "fromDv"], headers: ["Path from cause", "Path from outcome"], candidate: "Collider" },
+  exclusion: { fields: ["toDv"], headers: ["Path to outcome"], candidate: "Variable" },
 };
 
 /** Identify's table for each diagnostic, in the side panel's Cause and Outcome words. */
@@ -284,7 +284,7 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
   function studyTable() {
     if (!model.study.length) return [];
     return [el("table", { class: "dag-table", id: "dagStudyTable" },
-      el("caption", { text: "Study design" }),
+      el("caption", { text: "Project design" }),
       el("tbody", {}, ...model.study.map(row => el("tr", {}, pathCell(row.chains[0]), el("td", { text: row.note })))))];
   }
 
@@ -369,8 +369,8 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
       const arrow = both ? "⟷" : causes ? "→" : "←";
       const papers = entry.papers === null || entry.papers === undefined ? "" : ` (${entry.papers})`;
       const pill = button(`${arrow} ${entry.targetLabel}`,
-        causes ? `Show the evidence that ${entry.label} causes ${entry.targetLabel}${papers ? `, ${entry.papers} papers` : ""}`
-          : `Show the evidence that ${entry.targetLabel} causes ${entry.label}${papers ? `, ${entry.papers} papers` : ""}`,
+        causes ? `Show the evidence that ${entry.label} causes ${entry.targetLabel}${papers ? `, ${entry.papers} studies` : ""}`
+          : `Show the evidence that ${entry.targetLabel} causes ${entry.label}${papers ? `, ${entry.papers} studies` : ""}`,
         () => onOpenEvidence(entry.edgeId),
         { class: `btn btn--ghost dag-table-action dag-table-link${selected ? " selected" : ""}`, "data-edge-id": entry.edgeId,
           "aria-pressed": selected ? "true" : "false" });
@@ -428,7 +428,7 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
   /** Identify's study arrows (cause → outcome, instrument → cause) as one quiet line above the table. */
   function studyLine() {
     if (!model.study.length) return [];
-    return [el("p", { class: "dag-table-study" }, el("span", { class: "dag-table-caption-note", text: "Study design: " }),
+    return [el("p", { class: "dag-table-study" }, el("span", { class: "dag-table-caption-note", text: "Project design: " }),
       ...model.study.map(row => {
         const [from, to] = row.chains[0].nodes;
         return linkPill(row.id, `${from.label} → ${to.label}`, `${row.note}: show the evidence that ${from.label} causes ${to.label}`);
@@ -459,7 +459,7 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
   function statusCell(entry, spec) {
     const select = el("select", { class: "select-input dag-table-status", "data-group-id": entry.id, "aria-label": `Status for ${entry.label}` },
       ...spec.options.map(option => el("option", { value: option.value, title: option.title, text: option.label })));
-    if (entry.status.status === "other") select.append(el("option", { value: "other", text: "Other (previous decision)" }));
+    if (entry.status.status === "other") select.append(el("option", { value: "other", text: "Other (previous status)" }));
     select.value = entry.status.status;
     select.classList.toggle("is-unaddressed", entry.status.status === "unaddressed");
     const note = el("span", { class: "small-note", text: ["removed_other", "other"].includes(entry.status.status) && entry.status.text ? `Private note: ${entry.status.text}` : "" });

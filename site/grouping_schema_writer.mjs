@@ -42,7 +42,7 @@ export function stableJson(value) {
 }
 
 function groupFilename(groupId) {
-  if (!groupId) throw new Error("Every published group must have a non-empty group_id.");
+  if (!groupId) throw new Error("Every published variable must have a non-empty group_id.");
   return `${encodeURIComponent(groupId).replace(/[!'()*]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`)}.tsv`;
 }
 
@@ -67,7 +67,7 @@ function validateSchema(schema) {
     groupIds.add(group.group_id);
     for (const variableId of group.variable_ids) {
       if (!variableId || (owners.has(variableId) && owners.get(variableId) !== group.group_id)) {
-        throw new Error(`Canonical variable ${variableId} has conflicting group ownership.`);
+        throw new Error(`Canonical variable ${variableId} has conflicting variable ownership.`);
       }
       owners.set(variableId, group.group_id);
     }

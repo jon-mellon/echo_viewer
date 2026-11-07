@@ -27,7 +27,7 @@ function visNodeData(group, layoutPoint, layoutParams = {}) {
     && diagnosticRole === "mediator";
   const isSelected = group.group_id === state.activeGroupId;
   const color = isConfounder ? "#c62828" : isCollider ? "#801744" : isPathMediator ? "#6b7280" : groupColor(group);
-  const roleTag = isIv ? " (Ind var)" : isDv ? " (Dep var)" : "";
+  const roleTag = isIv ? " (cause)" : isDv ? " (outcome)" : "";
   const mediatorTag = isPathMediator ? " · path mediator" : "";
   const maxChars = layoutParams.nodeMaxWidth <= 170 ? 18 : 22;
   return {
@@ -81,7 +81,7 @@ function edgeHoverText(link) {
   const { sourceLabel, targetLabel, arrow } = directedGroupLabels(link, "<->");
   const lines = [`${sourceLabel} ${arrow} ${targetLabel}`];
   if (link.is_target_relation) lines.push("Target relation");
-  if (link.is_manual) lines.push("Manual edge");
+  if (link.is_manual) lines.push("Manual link");
   const keys = [...new Set([...link.a_to_b_paper_table_keys, ...link.b_to_a_paper_table_keys])].slice(0, 8);
   if (keys.length) { lines.push("Papers/tables:"); lines.push(...keys); }
   else if (!link.is_manual) lines.push("No provenance.");

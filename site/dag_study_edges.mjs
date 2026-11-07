@@ -23,11 +23,11 @@ export function studyDesignEdgeData(groups, project, task = "identify") {
     shadow: { enabled: true, color: "rgba(22,138,82,0.32)", size: 8, x: 0, y: 1 },
   };
   const edges = [{ ...style, id: STUDY_DESIGN_EDGE_ID, from: ivId, to: dvId,
-    title: `Selected study relationship: Ind var → Dep var (not an evidence link). ${evidenceCount} evidence record(s) attached.` }];
+    title: `Selected project relationship: Cause → outcome (not an evidence link). ${evidenceCount} claim(s) attached.` }];
   const instrumentId = project?.instrument_group_id;
   if (groupIds.has(instrumentId) && instrumentId !== ivId && instrumentId !== dvId) {
     edges.push({ ...style, id: STUDY_INSTRUMENT_EDGE_ID, from: instrumentId, to: ivId,
-      title: "Selected study relationship: Instrument → Ind var (not an evidence link)." });
+      title: "Selected project relationship: Instrument → cause (not an evidence link)." });
   }
   return edges;
 }

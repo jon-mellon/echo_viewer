@@ -132,7 +132,7 @@ try {
         await menu(2).selectOption('removed_other');
         await dialog.locator('textarea').fill('Outside the study population.');
         await measure('remove variable', budgets.removal,
-          () => dialog.getByRole('button', { name: 'Confirm decision' }).click(), settled);
+          () => dialog.getByRole('button', { name: 'Confirm status' }).click(), settled);
         await measure('restore variable', budgets.restore,
           () => page.locator(`.variable-disposition[data-group-id="${removedId}"]`).selectOption('unaddressed'), settled);
         // Each decision schedules a hash of the working copy against the publication.

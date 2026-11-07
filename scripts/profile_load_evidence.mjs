@@ -108,7 +108,7 @@ try {
         performance.mark('load-evidence-start');
         api.inspectDagEdge(id);
       }, edgeId);
-      await page.getByRole('button', { name: /^Exclude finding / }).first().waitFor({ timeout: 180000 });
+      await page.getByRole('button', { name: /^Exclude claim / }).first().waitFor({ timeout: 180000 });
     });
     await measure('remaining evidence metadata', async () => {
       await page.waitForFunction(() => !window.__dagBuilderState.pendingEdgeEvidence, null, { timeout: 180000 });
@@ -116,28 +116,28 @@ try {
     result.evidence = await page.evaluate(() => {
       const s = window.__dagBuilderState;
       return { rawLinks: s.rawLinksById.size, variables: s.variableById.size,
-        findings: document.querySelectorAll('button[aria-label^="Exclude finding "]').length,
+        findings: document.querySelectorAll('button[aria-label^="Exclude claim "]').length,
         measures: performance.getEntriesByType('measure').filter(e => e.name.includes('evidence')).map(e => ({ name: e.name, ms: e.duration })) };
     });
     await page.locator('#closeEvidencePane').click();
     await measure('warm edge selection to visible findings', async () => {
       await page.evaluate(async id => (await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src)).inspectDagEdge(id), edgeId);
-      await page.getByRole('button', { name: /^Exclude finding / }).first().waitFor();
+      await page.getByRole('button', { name: /^Exclude claim / }).first().waitFor();
       await page.waitForFunction(() => !window.__dagBuilderState.pendingEdgeEvidence);
     });
     if (process.env.PROFILE_VERIFY_PAGINATION === '1') {
       const section = page.locator('.provenance-direction').first();
-      const before = await section.getByRole('button', { name: /^Exclude finding / }).first().getAttribute('aria-label');
+      const before = await section.getByRole('button', { name: /^Exclude claim / }).first().getAttribute('aria-label');
       await measure('next page to visible findings', async () => {
         await section.getByRole('button', { name: 'Next', exact: true }).click();
         await page.waitForFunction(() => !window.__dagBuilderState.pendingEdgeEvidence, null, { timeout: 180000 });
-        await section.getByRole('button', { name: /^Exclude finding / }).first().waitFor();
+        await section.getByRole('button', { name: /^Exclude claim / }).first().waitFor();
       });
-      const after = await section.getByRole('button', { name: /^Exclude finding / }).first().getAttribute('aria-label');
+      const after = await section.getByRole('button', { name: /^Exclude claim / }).first().getAttribute('aria-label');
       if (before === after) throw new Error('Next page did not change findings');
       await section.getByRole('button', { name: 'Previous', exact: true }).click();
       await page.waitForFunction(() => !window.__dagBuilderState.pendingEdgeEvidence);
-      if (await section.getByRole('button', { name: /^Exclude finding / }).first().getAttribute('aria-label') !== before) throw new Error('Previous page did not restore findings');
+      if (await section.getByRole('button', { name: /^Exclude claim / }).first().getAttribute('aria-label') !== before) throw new Error('Previous page did not restore findings');
       result.paginationVerified = true;
     }
     result.requests = [...requests];

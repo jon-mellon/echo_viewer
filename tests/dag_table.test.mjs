@@ -35,7 +35,7 @@ test("each confounder retains its paths to the Ind var and Dep var, one link per
     ["gone", { toIv: ["gone", "iv"], toDv: ["gone", "dv"] }],
   ]);
   const model = dagTableModel({ view: "confounders", groups, links, pathsByGroup, anchors, maxPathLength: 2 });
-  assert.deepEqual(model.headers, ["Path to Ind var", "Path to Dep var"]);
+  assert.deepEqual(model.headers, ["Path to cause", "Path to outcome"]);
   assert.equal(model.candidateHeader, "Confounder");
   assert.deepEqual(model.rows.map(row => row.id), ["c1", "c2"], "candidates are listed by name; groups that are not drawn are left out");
   const [c1, c2] = model.rows;
@@ -77,12 +77,12 @@ test("paths are enumerated shortest first, avoid blocked variables and never rep
 test("collider and exogeneity rows use their own columns and path fields", () => {
   const colliders = dagTableModel({ view: "colliders", groups, links, anchors, maxPathLength: 1, pathsByGroup: new Map([
     ["c1", { fromIv: ["iv", "c1"], fromDv: ["dv", "c1"] }]]) });
-  assert.deepEqual(colliders.headers, ["Path from Ind var", "Path from Dep var"]);
+  assert.deepEqual(colliders.headers, ["Path from cause", "Path from outcome"]);
   assert.equal(colliders.candidateHeader, "Collider");
   assert.deepEqual(colliders.rows[0].lines[0].map(ids), [["iv", "c1"], ["dv", "c1"]]);
   const exogeneity = dagTableModel({ view: "exogeneity", groups, links, anchors: { ...anchors, instrumentId: "m" }, pathsByGroup: new Map([
     ["c2", { toIv: ["c2", "m"], toDv: ["c2", "dv"] }]]) });
-  assert.deepEqual(exogeneity.headers, ["Path to Instrument", "Path to Dep var"]);
+  assert.deepEqual(exogeneity.headers, ["Path to Instrument", "Path to outcome"]);
   const exclusion = dagTableModel({ view: "exclusion", groups, links, anchors, pathsByGroup: new Map([["iv", ["iv", "m", "c2", "dv"]]]) });
   assert.deepEqual(exclusion.rows[0].lines[0][0].edgeIds, ["m-iv", "c2-m", "c2-dv"]);
 });

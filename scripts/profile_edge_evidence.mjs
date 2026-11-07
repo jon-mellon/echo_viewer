@@ -75,11 +75,11 @@ try {
             api.inspectDagEdge(edge);
             const deadline = start + 90000;
             while (performance.now() < deadline) {
-              const done = document.querySelector('button[aria-label^="Exclude finding "]') && !window.__dagBuilderState.pendingEdgeEvidence;
+              const done = document.querySelector('button[aria-label^="Exclude claim "]') && !window.__dagBuilderState.pendingEdgeEvidence;
               if (done) break;
               await new Promise(resolve => setTimeout(resolve, 20));
             }
-            return { edge, ms: performance.now() - start, findings: document.querySelectorAll('button[aria-label^="Exclude finding "]').length,
+            return { edge, ms: performance.now() - start, findings: document.querySelectorAll('button[aria-label^="Exclude claim "]').length,
               pending: Boolean(window.__dagBuilderState.pendingEdgeEvidence) };
           }, { apiUrl, edge });
           const budget = index === 0 ? budgets.firstEdgeMs : budgets.nextEdgeMs;
