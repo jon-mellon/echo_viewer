@@ -955,7 +955,6 @@ function chooseIdentifyVariable(side, groupId) {
     state.selectedEvidenceGroupId = null;
     addToUndoHistory(`Remove "${label || side}" as ${side === "iv" ? "cause" : "outcome"}`, before, "anchors");
     renderAll({ reuseLinks: true });
-    setupGroupController.renderIdentifyPicker();
     return;
   }
   if (groupId === state.project?.[`${side}_group_id`] && groupById(groupId)?.variable_ids?.length) {
@@ -975,7 +974,9 @@ function chooseIdentifyVariable(side, groupId) {
     state.phase = ivReady ? "select_dv" : "select_iv";
   }
   persistentViewer.viewerChanged();
-  setupGroupController.renderIdentifyPicker();
+  // Successful assignments already rendered the picker in renderAll(). Only
+  // redraw here if the assignment was rejected and no full render occurred.
+  if (state.project?.[`${side}_group_id`] !== groupId) setupGroupController.renderIdentifyPicker();
 }
 function seedLabel(side) { return groupEditorController.seedLabel(side); }
 // Event handlers retain group references through edits. Apply pure results while
