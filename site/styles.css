@@ -4132,6 +4132,11 @@ h2 {
 
 /* Sidebar: the subsections start a step below the search box that filters them. */
 #focusSearchBlock > #focusGroupPicker { margin-top: var(--space-4); }
+/* On mobile, let the panel scroll the whole picker instead of limiting the
+   list to 340px and leaving the lower part of the screen empty. */
+@media (max-width: 840px) {
+  #focusSearchBlock > #focusGroupPicker { height: auto; overflow: visible; }
+}
 @media (min-width: 841px) {
   #definitionWorkspace .search-results { max-height: 320px; }
   #definitionWorkspace .search-results > * { flex-shrink: 0; }
