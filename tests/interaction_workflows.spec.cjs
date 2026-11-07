@@ -656,3 +656,19 @@ test("mobile reload returns to the open evidence pane", async ({ page }) => {
   await expect(page.locator("#closeEvidencePane")).toBeVisible();
   await expect(page.getByRole("button", { name: /^Exclude finding / }).first()).toBeVisible();
 });
+
+test("reload warns before discarding an unfinished variable definition", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  await startCreate(page, "iv");
+  await page.locator("#definitionSourceList input[data-source-id]").first().check();
+  const selectedSource = page.locator("#definitionSourceList input[data-source-id]").first();
+  const dialogPromise = page.waitForEvent("dialog");
+  const reloadPromise = page.reload({ timeout: 3000 }).catch(() => {});
+  const dialog = await dialogPromise;
+  expect(dialog.type()).toBe("beforeunload");
+  await dialog.dismiss();
+  await reloadPromise;
+  await expect(selectedSource).toBeChecked();
+});

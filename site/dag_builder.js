@@ -2323,6 +2323,17 @@ const eventController = createDagEventController({
   showExcludedLinks, showExcludedFindings,
 });
 
+// A variable definition is kept in memory until it is saved. Protect work in
+// progress from an accidental reload; OAuth has its own draft handoff.
+window.addEventListener("beforeunload", event => {
+  const draft = state.definitionDraft;
+  if (!draft || sessionStorage.getItem("echo-openrouter-definition-draft-v1")) return;
+  if (!draft.source_group_ids?.length && !draft.new_label && !draft.new_description
+      && !draft.replaces_group_id && !draft.new_variable_ids?.length) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
+
 // ─── Boot ──────────────────────────────────────────────────────────────────────
 
 init().catch((error) => {
