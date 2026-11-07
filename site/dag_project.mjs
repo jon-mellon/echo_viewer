@@ -110,7 +110,8 @@ export function snapshotProject(project, phase) {
     rejected_variables: project.rejected_variables,
     restored_variable_ids: project.restored_variable_ids, decisions: project.decisions,
     iv_group_id: project.iv_group_id, dv_group_id: project.dv_group_id,
-    instrument_group_id: project.instrument_group_id, phase });
+    instrument_group_id: project.instrument_group_id,
+    active_grouping_set_id: project.active_grouping_set_id, phase });
 }
 
 // Anchor promotion changes roles and its decision log, never memberships.
@@ -146,9 +147,12 @@ export function restoreSnapshot(project, json) {
     rejected_variables: snap.rejected_variables || [],
     restored_variable_ids: snap.restored_variable_ids || [],
     decisions: snap.decisions || [],
-    iv_group_id: snap.iv_group_id || project.iv_group_id,
-    dv_group_id: snap.dv_group_id || project.dv_group_id,
-    instrument_group_id: snap.instrument_group_id || null }, phase: snap.phase };
+    // An empty or null anchor is a real state (cleared role); only a field absent from an old snapshot falls back.
+    iv_group_id: Object.hasOwn(snap, "iv_group_id") ? snap.iv_group_id : project.iv_group_id,
+    dv_group_id: Object.hasOwn(snap, "dv_group_id") ? snap.dv_group_id : project.dv_group_id,
+    instrument_group_id: snap.instrument_group_id || null,
+    // Groups and the grouping set they came from must travel together.
+    active_grouping_set_id: snap.active_grouping_set_id ?? project.active_grouping_set_id }, phase: snap.phase };
 }
 
 export function replaceSchemaGroups(project, groupingSet, clusterOf, clusterMembers) {
@@ -319,7 +323,8 @@ export function splitCategories(project, {
     if (!variable_ids.length) throw new Error(`The leftover for ${group.label || group.group_id} cannot be empty.`);
     const label = String(residualLabels[group.group_id] || "").trim();
     if (!label) throw new Error(`Name the leftover for ${group.label || group.group_id}.`);
-    const type = ["iv", "dv"].includes(role) && group.type === role ? null : group.type;
+    const type = ["iv", "dv"].includes(role) && (group.type === role || group.group_id === project[`${role}_group_id`])
+      ? null : group.type;
     return { ...group, label, variable_ids, type, updated_at: timestamp,
       provenance: { operation: "split_categories", split_id: splitId, prior_label: group.label || "",
         source_group_ids: [group.group_id], source_group_ids_retained_as_residuals: true,
@@ -341,7 +346,12 @@ export function splitCategories(project, {
       ...(reusedFrom ? { reused_from_split_id: reusedFrom.split_id, reused_from_group_id: reusedFrom.group_id } : {}),
       source_group_ids_retained_as_residuals: true, edited_at: timestamp },
   };
-  const next = { ...project, groups: [...nextGroups, newGroup],
+  // A new cause/outcome replaces the previous one, which becomes an ordinary variable.
+  const previousAnchorId = ["iv", "dv"].includes(role) ? project[`${role}_group_id`] : null;
+  const demoted = previousAnchorId
+    ? nextGroups.map(group => group.group_id === previousAnchorId && group.type === role ? { ...group, type: null } : group)
+    : nextGroups;
+  const next = { ...project, groups: [...demoted, newGroup],
     ...(["iv", "dv"].includes(role) ? { [`${role}_group_id`]: newGroupId } : {}),
     ...(role === "instrument" ? { instrument_group_id: newGroupId } : {}),
     decisions: [...(project.decisions || []), {
