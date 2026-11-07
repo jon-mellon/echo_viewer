@@ -92,7 +92,7 @@ test("the start page leads to causes and consequences views that behave like Ide
   await expect(page.locator("#taskMenuValue")).toHaveText("Exploration");
   await expect(page.locator("#focusInput")).toHaveValue("");
   await expect(page.locator("#exploreView")).toBeVisible();
-  await expect(page.locator("#focusInput")).toHaveAttribute("placeholder", "Search group or constituent variable");
+  await expect(page.locator("#focusInput")).toHaveAttribute("placeholder", "Search variable or underlying concept");
   await expect(pick(page, "category-sleep")).toContainText("sleep");
   await page.locator("#focusInput").fill("zzzzzzunmatched");
   await expect(page.locator("#focusGroupPicker")).toContainText(/No match(es found yet|ing variables)/);

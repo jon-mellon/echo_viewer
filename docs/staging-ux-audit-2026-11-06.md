@@ -48,7 +48,7 @@ Rechecked live staging after the first audit was merged (staging commit `a03a64e
 - A manual In/Out correction in the AI review reverted after an interrupted run was resumed. Review changes are now saved to the local classification checkpoint in order, and a failed save is reported; focus also remains on the changed control when it is still visible.
 - When a sample or “classify more” round had already covered every concept, the interface required an extra “Classify the remaining 0 concepts” step. Completed classifications are now ready for review and application immediately, both before and after resumption.
 
-The fixes were checked with controller tests and local Chromium fixtures, including pagination, focus, validation and resuming reviewed AI suggestions. These fixtures use synthetic evidence or mocked classification responses; the full local application browser test has the registry limitation described below. No actual exclusion, import, export or publication was performed during the live review.
+The fixes were checked with controller tests and local Chromium fixtures, including pagination, focus, validation and resuming reviewed AI suggestions. These fixtures use synthetic evidence or mocked classification responses. No actual exclusion, import, export or publication was performed during the live review.
 
 ### Paid custom-split check
 
@@ -60,4 +60,4 @@ The two task choices have concrete examples, selected anchors remain visible, ev
 
 ## Verification and limits
 
-The complete `npm test` suite passed using the existing pinned Dagitty cache. Local browser checks verified visibility transitions and wrapping against the stylesheet, the single-node fit using the actual graph renderer, and the creation presenter's focus, progress, and name-validation behavior with a synthetic fixture. The focused full-application Playwright test timed out at startup because the local preview reported “Failed to fetch” and its published-schema registry request returned 404; it did not reach the new assertions. Live staging itself loaded and supported the walkthrough. No publication or deployment was performed.
+The complete `npm test` suite passed using the existing pinned Dagitty cache. Local browser checks verified visibility transitions and wrapping against the stylesheet, the single-node fit using the actual graph renderer, and the creation presenter's focus, progress, and name-validation behavior with a synthetic fixture. The initial full-application Playwright attempt could not load the local published-schema registry. After incorporating current staging, four focused full-application browser tests passed using an isolated test port, including AI recovery, the small-source case, schema inspection and the empty instrument diagnostic. Live staging itself loaded and supported the walkthrough. No publication or deployment was performed.

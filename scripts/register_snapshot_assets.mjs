@@ -1,8 +1,13 @@
 #!/usr/bin/env node
+// LEGACY / OFFLINE USE. The data pipeline now builds, verifies and publishes these assets with every snapshot
+// (harvest_abstracts: analysis/10k/echo_viewer_bundle/viewer_assets.py), and the viewer finds them beside the snapshot, so
+// nothing needs committing here. This script remains for working offline or on a snapshot the pipeline did not build;
+// the bundles it commits are a fallback the viewer uses only when nothing is published.
 // Generate and register the static assets a published evidence snapshot needs
-// for fast evidence loading: today, its variable search catalog (concept labels
-// for every endpoint, keyed by snapshot). Run this when a snapshot is published,
-// before it becomes a default. Usage:
+// for fast evidence loading: its variable search catalog (concept labels for every
+// endpoint) and its variable map bundles (one per variable group, so a group's
+// details open without the 34 MB query engine). Run this when a snapshot is
+// published, before it becomes a default. Usage:
 //   node scripts/register_snapshot_assets.mjs <64-hex snapshot id> [work-dir]
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -52,4 +57,39 @@ else {
   const insertAt = moduleSource.indexOf("});", moduleSource.indexOf(marker));
   writeFileSync(modulePath, moduleSource.slice(0, insertAt) + binding + moduleSource.slice(insertAt));
   console.log(`Registered ${snapshot} in site/variable_search_catalog.mjs`);
+}
+
+// Variable map bundles: one small file per group of variables, keyed by a hash of the group's ids.
+async function download(name) {
+  const integrityEntry = layout.identity.legacy_relation_integrity[name];
+  const url = new URL(integrityEntry.url, new URL(`/${legacyManifest}`, DATA_HOST)).href;
+  const reply = await fetch(url);
+  if (!reply.ok) throw new Error(`GET ${url}: HTTP ${reply.status}`);
+  const data = Buffer.from(await reply.arrayBuffer());
+  if (data.length !== integrityEntry.bytes || createHash("sha256").update(data).digest("hex") !== integrityEntry.sha256) {
+    throw new Error(`Downloaded ${name} does not match the manifest`);
+  }
+  const path = join(workDir, `${snapshot}.${name}.parquet`);
+  writeFileSync(path, data);
+  return path;
+}
+const layoutsParquet = await download("variable_layouts");
+const manifestPath = join(workDir, `${snapshot}.manifest.json`);
+writeFileSync(manifestPath, JSON.stringify(layout));
+const mapsSummary = JSON.parse(execFileSync("node", [join(root, "scripts/generate_variable_maps.mjs"), parquet, layoutsParquet, manifestPath, join(root, "site/variable-maps")],
+  { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }).trim().split("\n").pop());
+const mapModulePath = join(root, "site/variable_map_catalog.mjs");
+const mapSource = readFileSync(mapModulePath, "utf8");
+const mapBinding = `  "${snapshot}": {
+    root: "/variable-maps/${snapshot}/",
+    layoutSource: "${mapsSummary.layoutSource}", bytes: ${mapsSummary.indexBytes},
+    sha256: "${mapsSummary.indexSha256}",
+  },
+`;
+if (mapSource.includes(`"${snapshot}":`)) console.log("Variable map binding already registered; check its bytes and sha256 against the generated index.");
+else {
+  const marker = "export const VARIABLE_MAP_BINDINGS = Object.freeze({\n";
+  if (!mapSource.includes(marker)) throw new Error("variable_map_catalog.mjs no longer has the expected binding table");
+  writeFileSync(mapModulePath, mapSource.replace(marker, marker + mapBinding));
+  console.log(`Registered ${snapshot} in site/variable_map_catalog.mjs (${mapsSummary.groups} groups, ${mapsSummary.variables} variables)`);
 }

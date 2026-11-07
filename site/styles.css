@@ -1535,27 +1535,68 @@ h2 {
   border-top: 1px dashed var(--border);
 }
 
-.group-concept-exclude {
+.group-concept-note { margin: var(--space-1) 0 var(--space-3); max-width: 60ch; }
+.group-concepts .small-note + ol,
+.group-concept-excluded + .small-note { margin-top: var(--space-2); }
+
+.group-concepts li,
+.group-concept-excluded li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.group-concept-exclude,
+.group-concept-restore {
+  flex: none;
+  min-height: var(--control-sm);
   margin-left: var(--space-1);
-  padding: 0 var(--space-1);
-  border: 0;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--danger);
-  font-size: var(--text-lg);
-  line-height: 1;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
 .group-concept-exclude:hover,
 .group-concept-exclude:focus-visible {
-  color: var(--danger);
+  border-color: var(--danger);
   background: var(--danger-subtle);
-  border-radius: var(--radius-sm);
+  color: var(--danger);
 }
 
-.group-concept-exclude:disabled {
+.group-concept-restore:hover,
+.group-concept-restore:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.group-concept-exclude:disabled,
+.group-concept-restore:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+.group-concept-excluded {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.group-concept-excluded summary { cursor: pointer; font-size: var(--text-sm); color: var(--text-muted); }
+.group-concept-excluded ul { margin: var(--space-2) 0 0; padding: 0; list-style: none; }
+.group-concept-excluded li { padding: var(--space-1) 0; color: var(--text-muted); }
+.group-concept-excluded li span { text-decoration: line-through; text-decoration-color: var(--border); }
+
+@media (pointer: coarse) {
+  .group-concept-exclude,
+  .group-concept-restore { min-height: var(--control-touch); min-width: var(--control-touch); }
 }
 
 .group-concept-pagination,
@@ -2009,6 +2050,12 @@ h2 {
   font-size: var(--text-sm);
 }
 
+.uoa-hint-wrap { position: relative; }
+.uoa-hint { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
+.uoa-hint:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.uoa-hint-popover { position: absolute; z-index: 5; top: 100%; left: 0; width: 260px; margin-top: var(--space-1); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-sm); color: var(--text); font-size: var(--text-sm); line-height: var(--leading-tight); }
+.uoa-hint-popover[hidden] { display: none; }
+.uoa-hint-wrap:hover .uoa-hint-popover[hidden] { display: block; }
 .provenance-table .provenance-concept {
   min-width: 220px;
   max-width: 360px;
@@ -2688,6 +2735,26 @@ h2 {
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Keyboard shortcut past the diagram: invisible until it takes focus. */
+.dag-table-skip:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.dag-table-skip:focus {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
 }
 
 /* Explore: the selected variable is one clickable control with a chevron. */
@@ -3752,6 +3819,27 @@ h2 {
   line-height: var(--leading-tight);
   overflow-wrap: anywhere;
 }
+.evidence-definitions {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.evidence-definition h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-md);
+  font-weight: var(--weight-strong);
+}
+.evidence-definition .provenance-count {
+  color: var(--text-muted);
+  font-weight: var(--weight-normal);
+}
+.evidence-definition .group-definition-text {
+  max-width: 75ch;
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+}
+.evidence-definition .group-definition-text.is-empty { color: var(--text-muted); font-style: italic; }
 .evidence-meta {
   margin: var(--space-1) 0 0;
   color: var(--text-muted);
@@ -4379,6 +4467,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .picker-section { margin-top: var(--space-3); }
 .picker-label { margin: 0 0 var(--space-1); padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--text-sm); font-weight: var(--weight-medium); line-height: var(--leading-tight); }
 .picker-count { font-weight: var(--weight-normal); }
+.picker-help { margin: 0 0 var(--space-2); padding: 0 var(--space-2); color: var(--text-muted); font-size: var(--text-sm); line-height: var(--leading-tight); }
 .picker-create { display: flex; align-items: center; justify-content: flex-start; gap: var(--space-2); width: 100%; margin: 0 0 var(--space-1); border-color: transparent; background: transparent; color: var(--accent); font-weight: var(--weight-medium); }
 .picker-create:hover { background: var(--accent-subtle); }
 #identifyGroupPicker { height: min(65vh, 520px); }
@@ -4397,10 +4486,14 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* Picker definitions stay available without selecting the variable. */
 .picker-variable-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: var(--space-1); }
 .picker-variable-info { display: contents; }
+/* An open <details> wraps its body in a ::details-content box; unless that is display: contents it becomes a stray auto grid column that squeezes the row's label. */
+.picker-variable-info::details-content { display: contents; }
 .picker-variable-info summary, .picker-saved-info { cursor: pointer; color: var(--text-muted); }
 .picker-variable-info summary { list-style: none; padding: var(--space-2); }
 .picker-variable-info summary::-webkit-details-marker { display: none; }
 .picker-variable-info p { grid-column: 1 / -1; margin: 0; padding: var(--space-2); color: var(--text-muted); white-space: pre-line; }
+/* display: contents on <details> lets iOS Safari render the closed content, so hide it explicitly. */
+.picker-variable-info:not([open]) p { display: none; }
 .evidence-back-variables { display: none; }
 @media (max-width: 840px) {
   .evidence-from-variables .evidence-back-map { display: none; }

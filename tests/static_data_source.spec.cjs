@@ -1,4 +1,5 @@
 const { test, expect } = require("./fixtures.cjs");
+const { isViewerAssetsProbe404 } = require("./browser_errors.cjs");
 
 const base = process.env.DAG_VIEWER_URL || "http://127.0.0.1:8767";
 const snapshotId = "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0";
@@ -101,7 +102,7 @@ for (const route of ["/"]) {
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
     page.on("console", message => {
-      if (message.type() === "error") errors.push(message.text());
+      if (message.type() === "error" && !isViewerAssetsProbe404(message)) errors.push(message.text());
     });
     const parquetRequests = [];
     page.on("request", request => {

@@ -201,14 +201,14 @@
             <div class="search-block identify-field" data-side="iv">
               <label class="identify-field-label" for="identify-iv-input">Cause <span class="identify-selection-status" hidden>✓ Selected</span></label>
               <div class="focus-input-wrap">
-                <input id="identify-iv-input" class="search-input identify-input" type="search" data-side="iv" placeholder="Search group or constituent variable" autocomplete="off">
+                <input id="identify-iv-input" class="search-input identify-input" type="search" data-side="iv" placeholder="Search variable or underlying concept" autocomplete="off">
                 <button class="focus-clear identify-clear" type="button" data-side="iv" title="Clear the cause" aria-label="Clear the cause" hidden>×</button>
               </div>
             </div>
             <div class="search-block identify-field" data-side="dv">
               <label class="identify-field-label" for="identify-dv-input">Outcome <span class="identify-selection-status" hidden>✓ Selected</span></label>
               <div class="focus-input-wrap">
-                <input id="identify-dv-input" class="search-input identify-input" type="search" data-side="dv" placeholder="Search group or constituent variable" autocomplete="off">
+                <input id="identify-dv-input" class="search-input identify-input" type="search" data-side="dv" placeholder="Search variable or underlying concept" autocomplete="off">
                 <button class="focus-clear identify-clear" type="button" data-side="dv" title="Clear the outcome" aria-label="Clear the outcome" hidden>×</button>
               </div>
             </div>
@@ -227,7 +227,7 @@
               <button id="focusPickerCancel" class="btn btn--ghost" type="button" hidden>Cancel</button>
             </div>
             <div class="focus-input-wrap">
-              <input id="focusInput" class="search-input" type="search" placeholder="Search group or constituent variable" autocomplete="off">
+              <input id="focusInput" class="search-input" type="search" placeholder="Search variable or underlying concept" autocomplete="off">
               <button id="focusClear" class="focus-clear" type="button" title="Clear the variable and start over" aria-label="Clear the primary variable" hidden>×</button>
             </div>
             <div id="focusGroupPicker" class="setup-group-picker" hidden></div>
@@ -278,7 +278,7 @@
               <label class="dag-label" for="instrumentInput">Search existing groups</label>
               <button id="instrumentDefineNew" class="btn btn--ghost" type="button">Define new group</button>
             </div>
-            <input id="instrumentInput" class="search-input" type="search" placeholder="Search group or constituent variable">
+            <input id="instrumentInput" class="search-input" type="search" placeholder="Search variable or underlying concept">
             <div id="instrumentGroupPicker" class="setup-group-picker"></div>
           </div>
 
@@ -662,8 +662,9 @@
             </div>
           </div>
           <div class="dag-network-wrapper">
+            <button id="dagTableSkip" class="btn dag-table-skip" type="button">Skip the diagram and open the table of variables and links</button>
             <div id="dagNetwork" class="dag-network"></div>
-            <div id="dagTable" class="dag-table-view" hidden tabindex="-1" aria-label="Variables and links as tables"></div>
+            <div id="dagTable" class="dag-table-view" role="region" hidden tabindex="-1" aria-label="Variables and links as tables"></div>
             <p id="exploreGraphHint" class="explore-graph-hint" hidden></p>
             <div id="diagnosticOverlapKey" class="diagnostic-overlap-key" hidden></div>
             <!-- Graph view controls float over the graph's bottom-right corner (Lucide icons). -->

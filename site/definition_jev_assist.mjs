@@ -344,6 +344,9 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
   const bySide = (a, b) => a.side === b.side ? a.confidence - b.confidence : a.side === "new" ? -1 : 1;
 
   function renderReviewRows(draft) {
+    const active = document.activeElement;
+    const focusedChoice = els.definitionAiRows.contains(active) && active?.dataset?.aiSide
+      ? { variableId: active.dataset.variableId, side: active.dataset.aiSide } : null;
     els.definitionAiReviewTools.hidden = false;
     els.definitionAiReviewFilter.value = reviewFilter;
     const rows = [...(reviewFilter === "spot" ? spotRows
@@ -394,6 +397,11 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
         [...els.definitionAiRows.querySelectorAll("button[data-ai-side]")]
           .find(candidate => candidate.dataset.variableId === item.id && candidate.dataset.aiSide === item.side)?.focus({ preventScroll: true });
       }));
+    if (focusedChoice) {
+      [...els.definitionAiRows.querySelectorAll("button[data-ai-side]")]
+        .find(button => button.dataset.variableId === focusedChoice.variableId && button.dataset.aiSide === focusedChoice.side)
+        ?.focus({ preventScroll: true });
+    }
   }
 
   function setStep(element, stepState) {

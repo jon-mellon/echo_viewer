@@ -79,6 +79,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       ...sourceLabels(group)].join(" ")).includes(query))
       .sort((a, b) => Number(b.source === "user_split") - Number(a.source === "user_split"));
     const highlight = state.customVariablesHighlight;
+    if (state.customVariablesNotice) { status = state.customVariablesNotice; state.customVariablesNotice = ""; }
     if (highlight && all.some(group => group.group_id === highlight) && !status) {
       status = `Added “${all.find(group => group.group_id === highlight).label}” to this schema.`;
     }

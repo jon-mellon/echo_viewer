@@ -53,6 +53,9 @@ jobs:
           key: published-schemas-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/published_schema_cache.cjs') }}
           restore-keys: published-schemas-
 
+      - name: Check the default snapshot's viewer assets are published
+        run: npm run check:snapshot-assets
+
       - name: Enforce mobile diagnostic switching budgets
         run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
 
@@ -172,6 +175,7 @@ jobs:
             dist/site/ staging-pages/
 
       - name: Publish staging
+        id: publish
         working-directory: staging-pages
         run: |
           git config user.name "github-actions[bot]"
@@ -186,3 +190,32 @@ jobs:
 
           git commit -m "Deploy Echo staging from $GITHUB_SHA"
           git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Pushing to the publishing repository is not deploying: GitHub Pages builds it afterwards, and that
+      # build can fail or stall without this job noticing. Wait for the build of the pushed commit and fail
+      # this job unless it finishes as "built".
+      - name: Confirm GitHub Pages deployed the commit
+        if: steps.publish.outputs.sha != ''
+        env:
+          GH_TOKEN: ${{ secrets.STAGING_REPO_TOKEN }}
+          SHA: ${{ steps.publish.outputs.sha }}
+        run: |
+          deadline=$((SECONDS + 900))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if ! builds=$(gh api "repos/jon-mellon/echo_viewer_staging/pages/builds?per_page=10" 2>&1); then
+              echo "::error::Could not read the Pages build status (the token needs Pages read access): $builds"
+              exit 1
+            fi
+            status=$(jq -r --arg sha "$SHA" '[.[] | select(.commit == $sha)][0].status // "pending"' <<<"$builds")
+            echo "Pages build for ${SHA:0:7}: $status"
+            case "$status" in
+              built) exit 0 ;;
+              errored)
+                echo "::error::GitHub Pages failed to deploy ${SHA:0:7}. The live staging site is still serving an older build; see the \"pages build and deployment\" run in jon-mellon/echo_viewer_staging."
+                exit 1 ;;
+            esac
+            sleep 20
+          done
+          echo "::error::GitHub Pages did not finish deploying ${SHA:0:7} within 15 minutes; the live staging site may be stale."
+          exit 1

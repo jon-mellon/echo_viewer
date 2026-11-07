@@ -91,7 +91,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   const visibilityChanges = [];
   const dagNetwork = { clientWidth: 630, clientHeight: 700,
     style: { set visibility(value) { visibilityChanges.push(value); } },
-    addEventListener() {}, removeEventListener() {} };
+    setAttribute() {}, addEventListener() {}, removeEventListener() {} };
   class DataSet {
     constructor(items) { this.items = new Map(items.map(item => [item.id, item])); this.updateCalls = []; }
     getIds() { return [...this.items.keys()]; }
@@ -121,7 +121,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
     canvasToDOM(point) { return point; }
   }
   const controller = createDagNetworkController({ state,
-    elements: { dagNetwork, dagTable: { hidden: true }, dagViewGraph: switchStub(), dagViewTable: switchStub() },
+    elements: { dagNetwork, dagTable: { hidden: true }, dagTableSkip: { hidden: false }, dagViewGraph: switchStub(), dagViewTable: switchStub() },
     visApi: { DataSet, Network },
     clusterRep: id => id, groupColor: () => "#000", dagGroups: () => groups,
     groupById: id => groups.find(group => group.group_id === id),
@@ -331,7 +331,7 @@ test("a render that a newer one supersedes still releases whoever was waiting on
     componentGroupIds: new Set(["a", "b"]), variableById: new Map(), dagLayoutMode: "auto", selectedEdgeId: null,
     colliderGroupIds: new Set(), colliderPathGroupIds: new Set(), confounderGroupIds: new Set(),
     confounderPathGroupIds: new Set(), visibleLinks: [] };
-  const element = { clientWidth: 630, clientHeight: 700, style: {}, addEventListener() {}, removeEventListener() {} };
+  const element = { clientWidth: 630, clientHeight: 700, style: {}, setAttribute() {}, addEventListener() {}, removeEventListener() {} };
   class DataSet {
     constructor(items = []) { this.items = new Map(items.map(item => [item.id, item])); }
     getIds() { return [...this.items.keys()]; }
@@ -359,7 +359,7 @@ test("a render that a newer one supersedes still releases whoever was waiting on
     }
   };
   try {
-    const controller = createDagNetworkController({ state, elements: { dagNetwork: element, dagTable: { hidden: true },
+    const controller = createDagNetworkController({ state, elements: { dagNetwork: element, dagTable: { hidden: true }, dagTableSkip: { hidden: false },
       dagViewGraph: switchStub(), dagViewTable: switchStub() }, visApi: { DataSet, Network }, clusterRep: id => id,
     groupColor: () => "#000", dagGroups: () => groups, groupById: id => groups.find(group => group.group_id === id),
     drawMap() {}, setMapMode() {}, renderAll() {}, selectEdge() {} });
