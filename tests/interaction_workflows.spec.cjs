@@ -4,7 +4,7 @@ const { describeVariable, includeConcepts } = require("./support/definition.cjs"
 const { chooseTask, openNav, closeNav } = require("./support/navigation.cjs");
 const { readFile } = require("node:fs/promises");
 
-const viewer = "http://127.0.0.1:8767/?task=identify";
+const viewer = `http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/?task=identify`;
 
 async function ready(page) {
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
@@ -132,7 +132,7 @@ test("variable search catalog preloads once and serves anchor search", async ({ 
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const catalogRequests = [];
   page.on("request", request => {
-    if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
+    catalogRequests.push(request.url());
   });
   await page.goto(viewer);
   await ready(page);
@@ -140,11 +140,12 @@ test("variable search catalog preloads once and serves anchor search", async ({ 
   expect(["loading", "ready"]).toContain(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus));
   await page.locator("#identify-iv-input").focus();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("ready");
-  const hasStaticCatalog = await page.evaluate(async () => {
-    const { SNAPSHOT_SEARCH_CATALOGS } = await import('/variable_search_catalog.mjs');
-    return Boolean(SNAPSHOT_SEARCH_CATALOGS[new URL(location.href).searchParams.get('data_version')]);
+  const catalogUrl = await page.evaluate(async () => {
+    const { searchCatalogs } = await import('/variable_search_catalog.mjs');
+    const url = searchCatalogs.url(new URL(location.href).searchParams.get('data_version'));
+    return url && typeof DecompressionStream === "function" ? new URL(url, location.href).href : "";
   });
-  expect(catalogRequests).toHaveLength(hasStaticCatalog ? 1 : 0);
+  expect(catalogRequests.filter(url => url === catalogUrl)).toHaveLength(catalogUrl ? 1 : 0);
   await page.locator("#identify-iv-input").fill("education");
   await expect(page.locator("#identifyGroupPicker button[data-group-id]").first()).toBeVisible();
 });
@@ -155,7 +156,7 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
   const catalogRequests = [];
   page.on("request", request => {
     if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
-    if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
+    catalogRequests.push(request.url());
   });
   // This checks the precomputed search-catalog path available for this snapshot.
   await page.goto(`${viewer}&schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
@@ -174,7 +175,11 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
   await expect(page.locator("#provenancePanel tbody tr").first()).toBeVisible();
   await expect(page.locator("#provenancePanel .concept-loading")).toHaveCount(0);
   expect(parquetRequests.some(url => url.endsWith("/variable_layouts.parquet"))).toBe(false);
-  expect(catalogRequests).toHaveLength(1);
+  const catalogUrl = await page.evaluate(async () => {
+    const { searchCatalogs } = await import('/variable_search_catalog.mjs');
+    return new URL(searchCatalogs.url(new URL(location.href).searchParams.get('data_version')), location.href).href;
+  });
+  expect(catalogRequests.filter(url => url === catalogUrl)).toHaveLength(1);
 });
 
 test("evidence keeps available fields visible while concept labels load", async ({ page }) => {
@@ -186,16 +191,29 @@ test("evidence keeps available fields visible while concept labels load", async 
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
     await whenDagRendered();
-    // Published evidence-panel bundles carry labels with the links; the engine path loads them separately.
-    dagDataSource.loadPanelEvidence = async () => null;
-    const original = dagDataSource.loadVariableProvenance.bind(dagDataSource);
-    dagDataSource.loadVariableProvenance = ids => new Promise(resolve => {
-      window.__releaseConceptLabels = async () => resolve(await original(ids));
+    // Supply findings and hold back their labels, independent of whether the
+    // snapshot's precomputed bundle normally includes both together.
+    dagDataSource.loadPanelEvidence = async ids => ({
+      links: ids.map(id => ({ raw_causal_link_id: id, paper_id: "test-paper",
+        source_variable_id: "test-source", target_variable_id: "test-target" })),
+      variables: [],
+    });
+    dagDataSource.loadVariableProvenance = () => new Promise(resolve => {
+      window.__releaseConceptLabels = () => resolve([
+        { variable_id: "test-source", concept_label: "Source" },
+        { variable_id: "test-target", concept_label: "Target" },
+      ]);
     });
     const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__"
       && window.__dagBuilderState.project.links.some(link => link.edge_id === value
         && (link.a_to_b_raw_link_ids?.length || link.b_to_a_raw_link_ids?.length)));
-    if (id) inspectDagEdge(id);
+    if (id) {
+      const link = window.__dagBuilderState.project.links.find(item => item.edge_id === id);
+      for (const rawId of [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]) {
+        window.__dagBuilderState.rawLinksById.delete(rawId);
+      }
+      inspectDagEdge(id);
+    }
     return id;
   });
   expect(edgeId).toBeTruthy();
