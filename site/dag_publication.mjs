@@ -175,11 +175,18 @@ export function createPublicationController({
       }
       if (!await confirmPublicPublication(elements.confirmation, windowApi)) return null;
       showStatus(elements.status, "Canonicalizing current working schema…");
+      const schema = structuredClone(getWorkingSchema());
+      const preparationRevision = statusRevision;
+      const compiledDag = getCompiledDag();
+      const compileInput = await getCompileInput();
+      if (preparationRevision !== statusRevision || JSON.stringify(schema) !== JSON.stringify(getWorkingSchema())) {
+        throw new Error("The working copy changed while preparing publication. Please try again.");
+      }
       const result = await publishSchema({
-        schema: getWorkingSchema(),
+        schema,
         previousPublication: getPublicationState(),
-        compiledDag: getCompiledDag(),
-        compileInput: await getCompileInput(),
+        compiledDag,
+        compileInput,
         cryptoApi,
         onProgress: (current, total, path) => showStatus(elements.status, `Uploading ${current}/${total}: ${path}`),
       });

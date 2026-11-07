@@ -761,3 +761,33 @@ for (const mode of ["publish", "share"]) test(`a ${mode} finishing after another
   }, mode);
   expect(result).toEqual({ badge: "Unpublished changes", publishHidden: false, shared: false });
 });
+
+test("publication stops if the schema changes while its graph is being prepared", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const result = await page.evaluate(async () => {
+    const { createPublicationController } = await import("/dag_publication.mjs");
+    let schema = { schema_version: "groupings-v3", grouping_set_id: "test", membership_unit: "canonical_variable",
+      groups: [{ group_id: "a", label: "Before", variable_ids: ["v1"] }] };
+    let release, started, published = false;
+    const preparing = new Promise(resolve => { started = resolve; });
+    const elements = { publish: document.createElement("button"), status: document.createElement("div"),
+      badge: document.createElement("span"), menuButton: document.createElement("button"), confirmation: null };
+    const controller = createPublicationController({ elements, getWorkingSchema: () => structuredClone(schema),
+      getPublicationState: () => null, setPublicationState: () => {}, getPermalinkState: () => window.__dagBuilderState,
+      saveWorkingState: () => {}, windowApi: { location, confirm: () => true },
+      getCompileInput: () => { started(); return new Promise(resolve => { release = () => resolve({}); }); },
+      publishSchema: async () => { published = true; throw new Error("unexpected publication"); } });
+    controller.initialize();
+    const pending = controller.publish();
+    await preparing;
+    schema.groups[0].label = "Changed during preparation";
+    controller.workingCopyChanged();
+    release();
+    await pending;
+    return { published, status: elements.status.textContent };
+  });
+  expect(result.published).toBe(false);
+  expect(result.status).toMatch(/changed.*prepar/i);
+});
