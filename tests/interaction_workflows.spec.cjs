@@ -186,6 +186,8 @@ test("evidence keeps available fields visible while concept labels load", async 
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
     await whenDagRendered();
+    // Published evidence-panel bundles carry labels with the links; the engine path loads them separately.
+    dagDataSource.loadPanelEvidence = async () => null;
     const original = dagDataSource.loadVariableProvenance.bind(dagDataSource);
     dagDataSource.loadVariableProvenance = ids => new Promise(resolve => {
       window.__releaseConceptLabels = async () => resolve(await original(ids));
