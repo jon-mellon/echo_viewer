@@ -2106,6 +2106,7 @@ const setupGroupController = createDagSetupGroupController({
   onCancelIdentify: () => taskViews.cancelIdentify(),
   canChangeCustom: group => Boolean(projectOps.customVariableContext(state.project, group.group_id)),
   previousSplits: savedSplitOptions, loadPreviousSplits, reusePreviousSplit,
+  splitsLoading: () => previousSplitsLoading || !previousSplitsLoaded, splitsError: () => previousSplitsError,
   browsePreviousForSource: (role, id) => definitionWorkflowController.browsePreviousForSource(role, id),
   deleteCustom: deleteCustomVariable,
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),

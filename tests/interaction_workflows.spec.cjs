@@ -816,3 +816,23 @@ for (const width of [390, 1440]) test(`failed evidence loading is reported at ${
   await page.getByRole("button", { name: "Retry evidence loading" }).click();
   await expect(page.getByRole("button", { name: /^Exclude finding / }).first()).toBeVisible();
 });
+
+for (const width of [390, 1440]) test(`the picker reports when saved variables could not be searched at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => {
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+    localStorage.setItem("echo-owner-token", `00000000-0000-4000-8000-000000000001.${"a".repeat(64)}`);
+  });
+  await page.route("**/v1/owners/publications", route => route.fulfill({ status: 500,
+    headers: { "access-control-allow-origin": "*" }, body: "unavailable" }));
+  await page.goto(viewer);
+  await ready(page);
+  await page.locator("#identify-iv-input").fill("unmatched saved name");
+  const warning = page.getByText("Some saved variables could not be searched.", { exact: true });
+  await expect(warning).toBeVisible();
+  await page.unroute("**/v1/owners/publications");
+  await page.route("**/v1/owners/publications", route => route.fulfill({ status: 200,
+    headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: "[]" }));
+  await page.getByRole("button", { name: "Retry saved variables" }).click();
+  await expect(warning).toBeHidden();
+});
