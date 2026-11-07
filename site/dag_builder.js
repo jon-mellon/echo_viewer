@@ -191,6 +191,15 @@ function initElements() {
   ]) {
     els[id] = $(id);
   }
+  // Reserve space below the mobile header for the full, potentially wrapped status.
+  // Observe the border box so padding and the divider are included in the offset.
+  if (els.localSaveStatus) {
+    new ResizeObserver(entries => {
+      const height = entries[0].target.getBoundingClientRect().height;
+      document.body.style.setProperty("--mobile-status-height", `${height}px`);
+    }).observe(els.localSaveStatus);
+  }
+
   els.confounderDisclosure.addEventListener("toggle", renderConfounderStatuses);
   els.exportLocalDraft?.addEventListener("click", exportLocalDraft);
   // History (previous sessions) is a top-bar menu; its list is rebuilt each time it opens.

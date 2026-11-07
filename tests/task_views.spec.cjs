@@ -927,5 +927,20 @@ test("mobile save status wraps instead of truncating", async ({ browser }) => {
     expect(dimensions.whiteSpace).toBe("normal");
     expect(dimensions.height).toBeGreaterThan(dimensions.lineHeight);
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
+    await chooseTask(page, "causes");
+    await pick(page, "category-sleep").tap();
+    await page.locator("#editVariableSchema").tap();
+    await status.evaluate(el => { el.textContent = "Previous view not saved — Could not save this view because the browser storage is unavailable."; });
+    const back = page.locator("#customVariablesClose");
+    await expect(back).toBeVisible();
+    await expect.poll(async () => {
+      const banner = await status.boundingBox();
+      const button = await back.boundingBox();
+      return button.y >= banner.y + banner.height;
+    }).toBe(true);
+    await back.tap();
+    await expect(page.locator("#customVariablesView")).toBeHidden();
+    await status.evaluate(el => { el.textContent = ""; });
+    await expect.poll(() => page.evaluate(() => document.body.style.getPropertyValue("--mobile-status-height"))).toBe("0px");
   } finally { await context.close(); }
 });
