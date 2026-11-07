@@ -178,6 +178,8 @@ function installHandlers() {
     if (key !== "z" && key !== "y") return;
     const target = /** @type {HTMLElement | null} */ (event.target instanceof HTMLElement ? event.target : null);
     if (target?.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']")) return;
+    // A modal dialog owns the keyboard: do not edit the project behind it.
+    if (document.querySelector("dialog[open]")) return;
     event.preventDefault();
     if (key === "y" || event.shiftKey) { if (!els.redoBtn.disabled) redo(); }
     else if (!els.undoBtn.disabled) undo();

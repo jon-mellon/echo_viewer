@@ -838,6 +838,7 @@ h2 {
   grid-row: 1;
   background: var(--border);
   cursor: col-resize;
+  touch-action: none;
   transition: background 0.15s;
   z-index: 20;
 }

@@ -493,7 +493,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       persistProjectLocally();
     });
     const nextOnEnter = event => {
-      if (event.key === "Enter" && !event.shiftKey && state.definitionDraft?.step === "describe") {
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing && state.definitionDraft?.step === "describe") {
         event.preventDefault();
         goToStep("partition");
       }
