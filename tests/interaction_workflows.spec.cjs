@@ -204,7 +204,13 @@ test("evidence keeps available fields visible while concept labels load", async 
     const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__"
       && window.__dagBuilderState.project.links.some(link => link.edge_id === value
         && (link.a_to_b_raw_link_ids?.length || link.b_to_a_raw_link_ids?.length)));
-    if (id) inspectDagEdge(id);
+    if (id) {
+      const link = window.__dagBuilderState.project.links.find(item => item.edge_id === id);
+      for (const rawId of [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])]) {
+        window.__dagBuilderState.rawLinksById.delete(rawId);
+      }
+      inspectDagEdge(id);
+    }
     return id;
   });
   expect(edgeId).toBeTruthy();
