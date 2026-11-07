@@ -186,21 +186,34 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
 
 test("evidence keeps available fields visible while concept labels load", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(viewer);
+  await page.goto(`${viewer}&schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
   await ready(page);
   await completeSetup(page);
   const edgeId = await page.evaluate(async () => {
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
     await whenDagRendered();
-    const original = dagDataSource.loadVariableProvenance.bind(dagDataSource);
+    // Seed evidence but not its endpoint labels: newer precomputed panels may
+    // otherwise deliver both together and never enter the loading state.
     dagDataSource.loadVariableProvenance = ids => new Promise(resolve => {
-      window.__releaseConceptLabels = async () => resolve(await original(ids));
+      window.__releaseConceptLabels = () => resolve(ids.map(variable_id => ({ variable_id, concept_label: `Concept ${variable_id}` })));
     });
     const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__"
       && window.__dagBuilderState.project.links.some(link => link.edge_id === value
         && (link.a_to_b_raw_link_ids?.length || link.b_to_a_raw_link_ids?.length)));
-    if (id) inspectDagEdge(id);
+    if (id) {
+      const state = window.__dagBuilderState;
+      const link = state.project.links.find(item => item.edge_id === id);
+      const source = state.project.groups.find(group => group.group_id === link.group_a).variable_ids[0];
+      const target = state.project.groups.find(group => group.group_id === link.group_b).variable_ids[0];
+      state.variableById.delete(source);
+      state.variableById.delete(target);
+      for (const [rawIds, from, to] of [[link.a_to_b_raw_link_ids || [], source, target], [link.b_to_a_raw_link_ids || [], target, source]]) {
+        for (const rawId of rawIds) state.rawLinksById.set(rawId, { raw_causal_link_id: rawId,
+          paper_id: "10.1234/test", paper_title: "Example paper", source_variable_id: from, target_variable_id: to });
+      }
+      inspectDagEdge(id);
+    }
     return id;
   });
   expect(edgeId).toBeTruthy();
