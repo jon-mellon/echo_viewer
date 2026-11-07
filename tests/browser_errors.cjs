@@ -1,14 +1,20 @@
 const { expect } = require("playwright/test");
 
+/**
+ * A snapshot whose viewer assets are not published answers the viewer's probe for them with a 404, which the browser logs
+ * as a console error although the viewer handles it (and warns about the missing assets itself). Only that URL is excused.
+ */
+function isViewerAssetsProbe404(message) {
+  return /status of 404/.test(message.text()) && /\/viewer-assets\/manifest\.json$/.test(message.location?.().url || "");
+}
+
 function watchBrowserErrors(page, { warnings = false } = {}) {
   const errors = [];
   const statusesByUrl = new Map();
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => {
     if (message.type() === "error" || (warnings && message.type() === "warning")) {
-      // A snapshot whose viewer assets are not published answers the viewer's probe for them with a 404, which the browser
-      // logs although the viewer handles it. The viewer warns about the missing assets itself.
-      if (/status of 404/.test(message.text()) && /\/viewer-assets\/manifest\.json$/.test(message.location?.().url || "")) return;
+      if (isViewerAssetsProbe404(message)) return;
       errors.push(message.text());
     }
   });
@@ -33,4 +39,4 @@ function watchBrowserErrors(page, { warnings = false } = {}) {
   return { errors, check };
 }
 
-module.exports = { watchBrowserErrors };
+module.exports = { watchBrowserErrors, isViewerAssetsProbe404 };
