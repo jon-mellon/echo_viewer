@@ -510,9 +510,11 @@ export function createDagSetupGroupController({
     const row = ({ group, variableMatch }) => {
       const label = group.label || group.group_id;
       const count = group.variable_ids?.length || Number(group.member_count) || 0;
+      const unavailable = pick?.requiresMembership && (state.publishedSchemaHydrating || state.publishedSchemaLoadFailed);
       const custom = group.source === "user_split";
       return h("li", { className: "explore-row picker-variable-row" },
         h("button", { type: "button", className: "explore-row-open", dataset: { groupId: group.group_id },
+          disabled: unavailable,
           title: group.description || "", attrs: { "aria-label": `${pick ? `${pick.action}: ` : ""}${label}, ${count} underlying concepts${variableMatch ? `, matches ${variableMatch}` : ""}` } },
         h("span", { className: "explore-row-text" },
           h("span", { className: "explore-row-label", textContent: label }),
@@ -528,7 +530,9 @@ export function createDagSetupGroupController({
     };
     // Under "Primary variable": Custom variables, then Built-in variables. The
     // search box above filters both.
-    const status = query && state.variableSearchStatus === "loading" ? "Concept search is loading; matching variable names only for now."
+    const status = pick?.requiresMembership && state.publishedSchemaLoadFailed ? "Variable data could not be loaded. Reload to try again."
+      : pick?.requiresMembership && state.publishedSchemaHydrating ? "Loading variable data before selection…"
+      : query && state.variableSearchStatus === "loading" ? "Concept search is loading; matching variable names only for now."
       : query && state.publishedSchemaHydrating ? "Loading group memberships…"
         : query && state.variableSearchStatus === "error" ? "Concept search is unavailable; matching variable names only." : "";
     const clearButton = () => h("button", { className: "btn btn--sm", type: "button", dataset: { clearFocusSearch: "true" }, textContent: "Clear search" });
@@ -589,7 +593,7 @@ export function createDagSetupGroupController({
       .map(other => state.project?.[`${other}_group_id`]).filter(Boolean));
     const role = { iv: "cause", dv: "outcome", instrument: "instrument" }[side];
     renderPickerList(container, { query: normalized(input?.value || ""), input, exclude,
-      pick: { title: `Choose ${role}`, action: `Use as ${role}`, role: side },
+      pick: { title: `Choose ${role}`, action: `Use as ${role}`, role: side, requiresMembership: true },
       onCancel: onCancelIdentify,
       onChoose: groupId => onChooseIdentify(side, groupId), onCreate: () => startDefinition?.(side) });
     container.dataset.pickerSide = side;

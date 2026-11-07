@@ -549,3 +549,28 @@ test("bibliography, Markdown, and LaTeX export controls produce downloads", asyn
     expect(await download.failure()).toBeNull();
   }
 });
+
+for (const width of [390, 1440]) test(`Identify waits for membership loading before accepting a variable at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  // Reproduce the interval between the compiled graph appearing and the full
+  // published memberships arriving, without relying on network timing.
+  await page.evaluate(() => { window.__dagBuilderState.publishedSchemaHydrating = true; });
+  const input = page.locator("#identify-iv-input");
+  await input.click();
+  await input.fill("sleep");
+  const picker = page.locator("#identifyGroupPicker");
+  const choice = picker.locator('button[data-group-id="category-sleep"]');
+  await expect(choice).toBeDisabled();
+  await expect(picker).toContainText("Loading variable data before selection");
+  await page.evaluate(() => { window.__dagBuilderState.publishedSchemaHydrating = false; });
+  // Hydration normally rerenders the controls; an input event does the same here.
+  await input.fill("slee");
+  await input.fill("sleep");
+  await expect(choice).toBeEnabled();
+  await choice.click();
+  await expect(input).toHaveValue("sleep");
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.project.iv_group_id)).toBe("category-sleep");
+});
