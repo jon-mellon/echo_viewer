@@ -727,3 +727,37 @@ test("an old source loading failure cannot replace the new draft's in-flight loa
   expect(await page.evaluate(() => window.__sourceLoads.length)).toBe(2);
   await page.evaluate(() => window.__sourceLoads[1].resolve([]));
 });
+
+for (const mode of ["publish", "share"]) test(`a ${mode} finishing after another edit remains unpublished`, async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const result = await page.evaluate(async mode => {
+    const { createPublicationController } = await import("/dag_publication.mjs");
+    const { workingSchemaHashes } = await import("/dag_publication_core.mjs");
+    let schema = { schema_version: "groupings-v3", grouping_set_id: "test", membership_unit: "canonical_variable",
+      groups: [{ group_id: "a", label: "Before", variable_ids: ["v1"] }] };
+    const originalHash = (await workingSchemaHashes(schema, crypto))[0];
+    let publication = null, release, started;
+    const publishing = new Promise(resolve => { started = resolve; });
+    const elements = { publish: document.createElement("button"), status: document.createElement("div"),
+      badge: document.createElement("span"), menuButton: document.createElement("button"), confirmation: null };
+    const controller = createPublicationController({ elements, getWorkingSchema: () => structuredClone(schema),
+      getPublicationState: () => publication, setPublicationState: value => { publication = value; },
+      getPermalinkState: () => window.__dagBuilderState, saveWorkingState: () => {},
+      windowApi: { location, confirm: () => true },
+      publishSchema: () => { started(); return new Promise(resolve => { release = () => resolve({
+        publicationId: "11111111-1111-4111-8111-111111111111", contentHash: originalHash, reused: false, fileCount: 1 }); }); } });
+    controller.initialize();
+    const pending = mode === "share" ? controller.publicPermalink() : controller.publish();
+    await publishing;
+    schema.groups[0].label = "Edited during upload";
+    controller.workingCopyChanged();
+    await new Promise(resolve => setTimeout(resolve, 400));
+    release();
+    const value = await pending;
+    await new Promise(resolve => setTimeout(resolve, 400));
+    return { badge: elements.badge.textContent, publishHidden: elements.publish.hidden, shared: mode === "share" && Boolean(value) };
+  }, mode);
+  expect(result).toEqual({ badge: "Unpublished changes", publishHidden: false, shared: false });
+});
