@@ -28,7 +28,7 @@ async function world(parentPrefix = "old", service = null) {
     return service.fetchImpl(url, init);
   };
   const store = new Map();
-  const storage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value) };
+  const storage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key) };
   let solved = 0;
   const cloudflare = { apiUrl: API, fetchImpl: apiFetch, storage, solve: async () => { solved++; return "good-token"; } };
   return { service, original, readFetch: service.readFetch, cloudflare, calls, store, solved: () => solved, parentPrefix };
@@ -154,4 +154,59 @@ test("a registry row is only accepted for the publication asked for, and with th
   const urls = [];
   await lookupPublishedSchema(PARENT.toUpperCase(), null, { source: "cloudflare", fetchImpl: async url => { urls.push(String(url)); return new Response(JSON.stringify(good)); } });
   assert.deepEqual(urls, [`${FILES}_registry/${PARENT}.json`], "lower-cased, under published-schemas/_registry/");
+});
+
+test("a stalled upload times out, aborts the request, and does not finish the publication", async () => {
+  const { publishFiles } = await import("../site/cloudflare_api.mjs");
+  let uploadSignal;
+  let finished = false;
+  const fetchImpl = async (url, init) => {
+    if (init.method === "PUT") {
+      uploadSignal = init.signal;
+      return new Promise(() => {});
+    }
+    if (new URL(url).pathname.endsWith("/finish")) finished = true;
+    return new Response(JSON.stringify({ reused: false }), { status: 200 });
+  };
+  await assert.rejects(publishFiles({ owner: { token: "token" }, publicationId: "id", contentHash: "hash",
+    compilerVersion: "1", row: {}, files: new Map([["compiled/dag.json", new Uint8Array([1])]]),
+    apiUrl: API, fetchImpl, uploadTimeoutMs: 10 }), /timed out.*try publishing again/i);
+  assert.equal(uploadSignal.aborted, true);
+  assert.equal(finished, false);
+});
+
+test("a retry resumes an interrupted publication, including a lost upload response", async () => {
+  const w = await world();
+  const changed = schema([group("verbal", ["a"]), group("health", ["c"])]);
+  const baseFetch = w.cloudflare.fetchImpl;
+  let interrupted = false;
+  w.cloudflare.fetchImpl = async (url, init = {}) => {
+    const response = await baseFetch(url, init);
+    if (!interrupted && init.method === "PUT") {
+      interrupted = true;
+      throw new Error("Connection lost after upload");
+    }
+    return response;
+  };
+  await assert.rejects(publish(w, changed), /Connection lost/);
+  const [pendingId] = w.service.uploads.keys();
+  const result = await publish(w, changed);
+  assert.equal(result.publicationId, pendingId);
+  assert.equal(w.service.rows.has(pendingId), true);
+  assert.equal([...w.store.keys()].some(key => key.startsWith("echo-publish-pending:")), false);
+});
+
+test("a retry starts a new reservation if the compiled files have changed", async () => {
+  const w = await world();
+  const changed = schema([group("verbal", ["a"]), group("health", ["c"])]);
+  const baseFetch = w.cloudflare.fetchImpl;
+  let interrupted = false;
+  w.cloudflare.fetchImpl = async (url, init = {}) => {
+    if (!interrupted && init.method === "PUT") { interrupted = true; throw new Error("offline"); }
+    return baseFetch(url, init);
+  };
+  await assert.rejects(publish(w, changed), /offline/);
+  const [oldId] = w.service.uploads.keys();
+  const result = await publish(w, changed, { compiledDag: { nodes: [{ id: "changed" }], edges: [] } });
+  assert.notEqual(result.publicationId, oldId);
 });
