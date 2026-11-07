@@ -676,7 +676,12 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
               attrs: { "aria-pressed": String(state.selectedEvidenceGroupId === item.groupId), "aria-label": label },
               title: `See the definition and concepts of ${label}${item.between.length ? ` (via ${item.between.map(labelFor).join(", ")})` : ""}`,
               onclick: () => onOpenIdentifyVariable(item.groupId),
-              onmouseenter: () => onIdentifyRowHover(item.rejected ? null : item.groupId), onmouseleave: () => onIdentifyRowHover(null),
+              // A picker can disappear under a stationary mouse, producing a
+              // mouseenter and an expensive graph redraw unrelated to intent.
+              // Pointer movement still highlights real mouse hovers; keyboard
+              // focus keeps the same path highlighting.
+              onpointermove: event => { if (event.pointerType === "mouse") onIdentifyRowHover(item.rejected ? null : item.groupId); },
+              onpointerleave: () => onIdentifyRowHover(null),
               onfocus: () => onIdentifyRowHover(item.rejected ? null : item.groupId), onblur: () => onIdentifyRowHover(null) },
               h("span", { className: "explore-row-text" }, h("span", { className: "explore-row-label", textContent: label }))),
             // On touch screens the info button opens the definition beside the status menu.

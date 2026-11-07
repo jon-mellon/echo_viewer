@@ -860,3 +860,25 @@ for (const viewport of [{ width: 320, height: 568 }, { width: 568, height: 320 }
     } finally { await context.close(); }
   });
 }
+
+test("collider paths highlight on mouse movement and keyboard focus", async ({ page }) => {
+  const source = await readFile("site/dag_builder.js", "utf8");
+  await page.route("**/dag_builder.js*", route => route.fulfill({ contentType: "text/javascript",
+    body: `${source}\nwindow.__testPathLanes = () => dagNetworkController.getPathLaneSegments();` }));
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  await page.locator("#toggleCollidersOnly").click();
+  const row = page.locator(".variable-review-row .explore-row-open").first();
+  await row.dispatchEvent("mouseenter");
+  expect(await page.evaluate(() => window.__testPathLanes().length)).toBe(0);
+  await row.hover();
+  await expect.poll(() => page.evaluate(() => window.__testPathLanes().length)).toBeGreaterThan(0);
+  await page.mouse.move(0, 0);
+  await expect.poll(() => page.evaluate(() => window.__testPathLanes().length)).toBe(0);
+  await row.focus();
+  await expect.poll(() => page.evaluate(() => window.__testPathLanes().length)).toBeGreaterThan(0);
+});

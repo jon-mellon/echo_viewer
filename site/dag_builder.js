@@ -958,7 +958,10 @@ function chooseIdentifyVariable(side, groupId) {
     return;
   }
   if (groupId === state.project?.[`${side}_group_id`] && groupById(groupId)?.variable_ids?.length) {
-    renderAll({ rebuild: false });
+    // Nothing in the project or graph changed; just dismiss the picker and
+    // restore the field label instead of rebuilding every control.
+    setupGroupController.renderIdentifyPicker();
+    taskViews.render();
     return;
   }
   // Replacing a role, rather than stepping through setup, goes straight to the map.
