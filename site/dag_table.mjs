@@ -139,7 +139,7 @@ export function dagTableModel({ view, groups, links, pathsByGroup = new Map(), e
       const lines = Array.from({ length: count }, (_, index) => sides.map(list => list[index] ? chain(list[index]) : none));
       rows.push({ id: groupId, label: label(groupId), lines, papers: null });
     }
-    rows.sort((a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")));
+    rows.sort((a, b) => a.label.localeCompare(b.label));
   }
   const linkCounts = new Map();
   for (const link of links) for (const id of [link.group_a, link.group_b]) linkCounts.set(id, (linkCounts.get(id) || 0) + 1);
@@ -209,9 +209,9 @@ export function dagTableModel({ view, groups, links, pathsByGroup = new Map(), e
 }
 
 const VARIABLE_SORTS = {
-  label: (a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")),
-  links: (a, b) => b.links - a.links || String(a.label ?? "").localeCompare(String(b.label ?? "")),
-  variables: (a, b) => b.variables - a.variables || String(a.label ?? "").localeCompare(String(b.label ?? "")),
+  label: (a, b) => a.label.localeCompare(b.label),
+  links: (a, b) => b.links - a.links || a.label.localeCompare(b.label),
+  variables: (a, b) => b.variables - a.variables || a.label.localeCompare(b.label),
 };
 
 export function sortedPathRows(rows, sortByPapers) {
@@ -342,9 +342,9 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
       el("strong", { text: `${causes ? "Causes" : "Consequences"} of ${focusLabel || "the chosen variable"}` }),
       el("span", { class: "dag-table-caption-note",
         text: " · Click a variable for its definition, a link for its evidence." }));
-    const order = { label: (a, b) => String(a.label ?? "").localeCompare(String(b.label ?? "")),
-      papers: (a, b) => (b.papers ?? -1) - (a.papers ?? -1) || String(a.label ?? "").localeCompare(String(b.label ?? "")),
-      concepts: (a, b) => b.concepts - a.concepts || String(a.label ?? "").localeCompare(String(b.label ?? "")) }[exploreSort];
+    const order = { label: (a, b) => a.label.localeCompare(b.label),
+      papers: (a, b) => (b.papers ?? -1) - (a.papers ?? -1) || a.label.localeCompare(b.label),
+      concepts: (a, b) => b.concepts - a.concepts || a.label.localeCompare(b.label) }[exploreSort];
     // Sorting applies within each section; clicking the active column again restores causal order.
     const sortHeader = (text, key, numeric) => {
       const active = exploreSort === key;
@@ -489,8 +489,8 @@ export function createDagTable({ container, onOpenVariable, onOpenEvidence, onSe
     const total = sections.reduce((sum, section) => sum + section.rows.length, 0);
     const caption = el("caption", {}, el("strong", { text: title }),
       el("span", { class: "dag-table-caption-note", text: " · Click a variable for its definition, a link for its evidence." }));
-    const order = { papers: (a, b) => (b.papers ?? -1) - (a.papers ?? -1) || String(a.label ?? "").localeCompare(String(b.label ?? "")),
-      concepts: (a, b) => b.concepts - a.concepts || String(a.label ?? "").localeCompare(String(b.label ?? "")) }[diagnosticSort];
+    const order = { papers: (a, b) => (b.papers ?? -1) - (a.papers ?? -1) || a.label.localeCompare(b.label),
+      concepts: (a, b) => b.concepts - a.concepts || a.label.localeCompare(b.label) }[diagnosticSort];
     // Rows start in name order; Papers and Concepts sort within each section, and a second click restores it.
     const sortHeader = (text, key, numeric) => {
       const active = diagnosticSort === key;
