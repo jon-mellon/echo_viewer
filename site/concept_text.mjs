@@ -14,7 +14,11 @@ function uoaHint(word) {
   // One outside-dismiss handler per hint, detached whenever it closes. Closing from the button used to leave
   // the document listeners behind, so each reopen stacked another pair and kept this hint's DOM alive.
   const close = event => {
-    if (event.type === "keydown" ? event.key !== "Escape" : wrap.contains(event.target)) return;
+    if (event.type === "keydown") {
+      if (event.key !== "Escape") return;
+      // Escape closes the hint only, not the screen behind it.
+      event.preventDefault();
+    } else if (wrap.contains(event.target)) return;
     setOpen(false);
   };
   const setOpen = open => {

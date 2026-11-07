@@ -37,7 +37,7 @@ import { createGroupingSetController } from "/grouping_set_controller.mjs";
 import { createProjectBootstrap } from "/project_bootstrap.mjs?v=compiled-first-v2";
 import { dagDataSource } from "/dag_data_source.mjs?v=browser-v2";
 import { incrementCompiledDag } from "/compiled_dag.mjs";
-import { createPersistentViewer } from "/persistent_viewer.mjs";
+import { createPersistentViewer, hasUnsavedWork } from "/persistent_viewer.mjs";
 import { importDraftFile, makeDraftExport } from "/draft_exchange.mjs";
 import { listPreviousSessions, listLocalSchemas } from "/local_schema_store.mjs";
 import { escapeHtml } from "/text_utils.mjs";
@@ -2378,15 +2378,13 @@ const eventController = createDagEventController({
   showExcludedLinks, showExcludedFindings,
 });
 
-// A variable definition is kept in memory until it is saved. Protect work in
-// progress from an accidental reload; OAuth has its own draft handoff.
+// Definitions and schema-editor changes are kept in memory until saved. Protect
+// them from an accidental reload or closed tab; OAuth has its own draft handoff.
 window.addEventListener("beforeunload", event => {
   // A schema write that is still running (or has failed) would be lost with the page.
   if (persistentViewer.saving) { event.preventDefault(); event.returnValue = ""; return; }
-  const draft = state.definitionDraft;
-  if (!draft || sessionStorage.getItem("echo-openrouter-definition-draft-v1")) return;
-  if (!draft.source_group_ids?.length && !draft.new_label && !draft.new_description
-      && !draft.replaces_group_id && !draft.new_variable_ids?.length) return;
+  if (state.definitionDraft && sessionStorage.getItem("echo-openrouter-definition-draft-v1")) return;
+  if (!hasUnsavedWork({ definitionDraft: state.definitionDraft, editorDirty: persistentViewer.editorDirty })) return;
   event.preventDefault();
   event.returnValue = "";
 });
