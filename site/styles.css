@@ -468,6 +468,12 @@ h2 {
 
 /* The save actions (retry, independent copy) take no space unless one is shown. */
 #saveStatusSection:not(:has(button:not([hidden]))) { display: none; }
+/* Outside the left panel so it is visible on every screen, including the home page. */
+.app-notice { position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%); z-index: 1000;
+  max-width: min(36rem, calc(100vw - 2rem)); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4); background: var(--surface); color: var(--danger);
+  border: 1px solid var(--danger); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.app-notice[hidden] { display: none; }
 
 .panel-section[hidden],
 .search-block[hidden],

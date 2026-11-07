@@ -1,6 +1,18 @@
 // Render synchronously so controls reflect each edit before its event returns.
 // Project persistence is coalesced separately by the project controller.
-export function createRenderCoordinator(view) {
+// One renderer that throws must not stop the panels after it, or the save that follows. Each call is
+// guarded; the failure is reported through view.onRenderError and the remaining renderers still run.
+export function createRenderCoordinator(rawView) {
+  const view = new Proxy({}, {
+    get(_, name) {
+      const member = rawView[name];
+      if (typeof member !== "function" || name === "onRenderError") return member;
+      return (...args) => {
+        try { return member.apply(rawView, args); }
+        catch (error) { rawView.onRenderError?.(String(name), error); return undefined; }
+      };
+    },
+  });
   function rebuildProject({ reuseDagGeometry = false, reuseLinks = false } = {}) {
     view.buildCandidateQueue();
     if (!reuseLinks) view.aggregateGroupLinks();

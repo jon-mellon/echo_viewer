@@ -12,7 +12,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
   normalizeProjectDuplicateAssignments, publicationController, renderAll,
   dagNetworkController, buildDuplicateClusters,
   linkKey, pairKey, loadVariableSearchCatalog = async () => {}, onReady = () => {},
-  onLocalSchemaLoaded = () => {}, waitForReadyBeforeShowing = () => false }) {
+  onLocalSchemaLoaded = () => {}, onGraphStale = () => {}, waitForReadyBeforeShowing = () => false }) {
   const presenter = createProjectBootstrapPresenter({});
   const setStartupStage = message => presenter.setStartupStage(message);
   const finishStartupLoading = () => presenter.finishStartupLoading();
@@ -121,6 +121,7 @@ export function createProjectBootstrap({ state, initElements, installHandlers, i
         } catch (error) {
           console.warn("Could not apply the draft's link changes; a full local recomputation is required.", error);
           state.compiledDagValid = false;
+          onGraphStale();
         } finally {
           state.compiledDagUpdating = false;
           if (state.compiledDagUpdatePromise === draftPromise) state.compiledDagUpdatePromise = null;
