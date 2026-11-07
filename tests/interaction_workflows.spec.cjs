@@ -791,3 +791,28 @@ test("publication stops if the schema changes while its graph is being prepared"
   expect(result.published).toBe(false);
   expect(result.status).toMatch(/changed.*prepar/i);
 });
+
+for (const width of [390, 1440]) test(`failed evidence loading is reported at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    window.__loadPanelEvidence = dagDataSource.loadPanelEvidence.bind(dagDataSource);
+    dagDataSource.loadPanelEvidence = async () => { throw new Error("simulated evidence failure"); };
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    api.inspectDagEdge("category-academic-achievement__category-macroeconomic-context");
+  });
+  await expect(page.getByText("Evidence could not be loaded. Try again.")).toBeVisible();
+  await expect(page.locator("#provenancePanel")).not.toContainText("No evidence records for this direction.");
+  await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    dagDataSource.loadPanelEvidence = window.__loadPanelEvidence;
+  });
+  await page.getByRole("button", { name: "Retry evidence loading" }).click();
+  await expect(page.getByRole("button", { name: /^Exclude finding / }).first()).toBeVisible();
+});

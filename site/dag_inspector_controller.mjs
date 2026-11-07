@@ -12,6 +12,7 @@ export function createDagInspectorController({
   applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision,
   renderAll = () => {},
   persistFindingDecision = () => {},
+  evidenceLoadFailed = () => false, retryEvidence = () => {},
   loadConceptLabels = async () => [],
   loadVisibleLinkEndpoints = async () => [],
   excludeConcept = () => {},
@@ -298,6 +299,13 @@ export function createDagInspectorController({
     elements.provenancePanel.hidden = false;
     if (edgeSourcesLoading(link)) {
       replaceChildren(elements.provenancePanel, loadingSources());
+      return;
+    }
+    if (evidenceLoadFailed()) {
+      replaceChildren(elements.provenancePanel, h("div", { role: "alert" },
+        h("p", { textContent: "Evidence could not be loaded. Try again." }),
+        h("button", { type: "button", className: "btn btn--sm", textContent: "Retry evidence loading",
+          onclick: retryEvidence })));
       return;
     }
     const model = inspector.provenanceModel(

@@ -1725,6 +1725,7 @@ function minimumDagScale() { return dagNetworkController.minimumDagScale(); }
 // ─── Edge inspector + provenance ──────────────────────────────────────────────
 
 let pendingEdgeEvidencePromise = null;
+let failedEvidenceEdgeId = null;
 
 function renderSelectedEdgePanels() {
   if (!state.selectedEdgeId && !state.selectedEvidenceGroupId && !els.edgeInspector.hidden
@@ -1797,6 +1798,7 @@ function renderSelectedEdge() {
   const missingVariables = loadedVariableIds().filter(id => !state.variableById.has(id));
   if ((missing.length || missingVariables.length) && !pendingEdgeEvidencePromise) {
     const loadingEdgeId = state.selectedEdgeId;
+    failedEvidenceEdgeId = null;
     state.pendingEdgeEvidence = true;
     const loadSources = async () => {
       if (!missing.length) return [];
@@ -1817,6 +1819,7 @@ function renderSelectedEdge() {
         for (const variable of variables) state.variableById.set(variable.variable_id, variable);
       }
     }).catch(error => {
+      failedEvidenceEdgeId = loadingEdgeId;
       console.warn("Could not lazily load aggregate-edge evidence.", error);
     }).finally(() => {
       if (pendingEdgeEvidencePromise !== load) return;
@@ -2072,6 +2075,8 @@ const inspectorController = createDagInspectorController({
   state, elements: els, truncate, nowIso, takeSnapshot,
   applyProjectOperation, addDecision, addToUndoHistory, rebuildLinkDecision, renderAll,
   persistFindingDecision,
+  evidenceLoadFailed: () => failedEvidenceEdgeId === state.selectedEdgeId,
+  retryEvidence: () => { failedEvidenceEdgeId = null; renderSelectedEdge(); },
   loadConceptLabels: ids => dagDataSource.loadVariableProvenance(ids),
   loadVisibleLinkEndpoints: ids => dagDataSource.loadRawLinkEndpointsByIds(ids),
   excludeConcept: excludeGroupConcept,
