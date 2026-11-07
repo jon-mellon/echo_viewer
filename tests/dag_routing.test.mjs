@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as mapInteractions from '../site/map_interactions.mjs';
 import {
   expandBox,
   pointInsideBox,
@@ -19,7 +18,6 @@ import { routeNodeData, routesToVisData } from '../site/dag_vis_routing.mjs';
 import { computeDagLayout, dagNodeBoxes } from '../site/dag_layout.mjs';
 import { computeDagRender } from '../site/dag_render_compute.mjs';
 import * as pathHighlights from '../site/dag_path_highlights.mjs';
-import { createDagMapViewController } from '../site/dag_map_view_controller.mjs';
 import { createDagNetworkController } from '../site/dag_network_controller.mjs';
 
 test('geometry primitives remain independently testable', () => {
@@ -231,22 +229,19 @@ test('arrow remains visible when the terminal segment is short or inside a wide 
   assert.equal(reversed.angle, Math.PI);
 });
 
-test('variable map zoom floor uses the whole map after a neighborhood fit', () => {
-  const state = { map: { transform: { scale: 5, tx: 0, ty: 0 }, fitScale: 5,
-    canvas: { width: 1108, height: 1108 }, dpr: 1 }, variableById: new Map() };
-  const controller = createDagMapViewController({ state, elements: {}, activeGroup: () => null,
-    visibleVariables: () => [{ map_x: 0, map_y: 0 }, { map_x: 1000, map_y: 1000 }],
-    isRejectedVariable: () => false, drawMap: () => {} });
-  controller.zoom(500, 500, 0.00001);
-  assert.equal(state.map.transform.scale, 0.8);
-  const before = { ...state.map.transform };
-  controller.zoom(500, 500, 0.1);
-  assert.deepEqual(state.map.transform, before);
-});
-
-
 test('a slightly sloping run cannot disappear beneath a longer study arrow', () => {
   const routed = pathHighlights.separateHighlightRuns([{ x: 0, y: 0 }, { x: 200, y: -8 }],
     [[{ x: 0, y: 0 }, { x: 1000, y: 0 }]], 1, -1);
   assert.ok(routed.some(p => p.y < -14));
+});
+
+test("rounded box distance follows the corner curve and matches a sharp box elsewhere", async () => {
+  const { roundedBoxDistance } = await import("../site/dag_routing_geometry.mjs");
+  assert.equal(roundedBoxDistance(100, 40, 8, 0), 50);
+  assert.equal(roundedBoxDistance(100, 40, 8, Math.PI / 2), 20);
+  const corner = Math.atan2(20, 50);
+  const sharp = Math.hypot(50, 20);
+  const rounded = roundedBoxDistance(100, 40, 8, corner);
+  assert.ok(rounded < sharp - 2 && rounded > sharp - 4, `${rounded} vs ${sharp}`);
+  assert.ok(Math.abs(roundedBoxDistance(100, 40, 0, corner) - sharp) < 1e-9);
 });

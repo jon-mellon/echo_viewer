@@ -1,12 +1,24 @@
-import { supabase } from "/supabase_client.mjs";
 import { publicationPermalink } from "/published_schema_loader.mjs";
-import { setSafeUrl } from "/dom_builder.mjs";
-import { canonicalizeWorkingSchema, publishWorkingSchema, formatSupabaseError } from "./dag_publication_core.mjs";
-export { CANONICAL_BASELINE_ID, CANONICAL_BASELINE_HASH, canonicalizeWorkingSchema, publishWorkingSchema, formatSupabaseError } from "./dag_publication_core.mjs";
+import { canonicalizeWorkingSchema, publishWorkingSchema, formatPublicationError, workingSchemaHashes } from "./dag_publication_core.mjs";
+import { confirmPublicPublication } from "./publication_consent.mjs";
+export { CANONICAL_BASELINE_ID, CANONICAL_BASELINE_HASH, canonicalizeWorkingSchema, publishWorkingSchema, formatPublicationError } from "./dag_publication_core.mjs";
 
 function showStatus(element, message, isError = false) {
   element.textContent = message;
   element.classList.toggle("publication-error", isError);
+}
+
+// Publication status shown in the Schema menu's badge. It is derived from the
+// stored publication and a hash comparison, never from fixed text.
+export const PUBLICATION_STATUS = Object.freeze({
+  draft: { label: "Local draft", tone: "muted", title: "This schema has never been published" },
+  changed: { label: "Unpublished changes", tone: "warn", title: "Your local edits differ from the public version" },
+  published: { label: "Published", tone: "", title: "Your working copy matches the public version" },
+});
+
+export function publicationStatus(published, hasLocalChanges = false) {
+  if (!published?.publication_id) return PUBLICATION_STATUS.draft;
+  return hasLocalChanges ? PUBLICATION_STATUS.changed : PUBLICATION_STATUS.published;
 }
 
 async function copyText(text, navigatorApi, windowApi) {
@@ -32,7 +44,9 @@ export function createPublicationController({
   getCompiledDag = () => null,
   getCompileInput = () => null,
   canPublish = () => true,
-  client = supabase,
+  publishSchema = publishWorkingSchema,
+  // Temporary notification for completed operations, which do not belong in the menu.
+  notify = () => {},
   cryptoApi = globalThis.crypto,
   navigatorApi = globalThis.navigator,
   windowApi = globalThis.window,
@@ -44,27 +58,50 @@ export function createPublicationController({
   const initialPublication = getPublicationState();
   let hasPublishableChanges = !(initialPublication?.publication_id && initialPublication?.content_hash);
 
+  function publishTitle() {
+    if (busy) return "Publishing…";
+    if (!canPublish()) return "Publishing is unavailable while the schema is loading or a group edit is unsaved";
+    return "Create an immutable public version";
+  }
+
   function refreshPublishVisibility() {
-    elements.publish.hidden = !client || !hasPublishableChanges;
+    elements.publish.hidden = !hasPublishableChanges;
     elements.publish.disabled = busy || !canPublish();
+    elements.publish.title = publishTitle();
+  }
+
+  function setBadge(status) {
+    elements.badge.textContent = status.label;
+    elements.badge.title = status.title;
+    elements.badge.classList.toggle("muted", status.tone === "muted");
+    elements.badge.classList.toggle("warn", status.tone === "warn");
+    // A dot on the Schema button says there is something to publish without opening the menu.
+    elements.menuButton?.classList.toggle("has-unpublished", status.tone === "warn");
+    if (elements.menuButton) elements.menuButton.title = status.tone === "warn" ? `Schema · ${status.label}` : "Schema";
+  }
+
+  // Errors and progress stay in the menu until replaced; completed operations
+  // are announced once and leave the menu clear.
+  function clearStatus() { showStatus(elements.status, ""); }
+  function reportSuccess(message) {
+    clearStatus();
+    notify(message);
   }
 
   async function currentCanonical() {
     return canonicalizeWorkingSchema(getWorkingSchema(), cryptoApi);
   }
 
-  async function refreshAuthVisibility() {
-    if (!client) {
-      refreshPublishVisibility();
-      showStatus(elements.status, "Supabase publication is not configured.", true);
-      return;
+  // A publication made before the derived view files existed hashes without them.
+  async function matchesPublished(published) {
+    const hash = published?.content_hash;
+    if (!hash) return false;
+    const start = performance.now();
+    try {
+      return (await workingSchemaHashes(getWorkingSchema(), cryptoApi)).includes(hash);
+    } finally {
+      performance.measure("echo:publication:compare", { start, end: performance.now() });
     }
-    const { data, error } = await client.auth.getSession();
-    refreshPublishVisibility();
-    elements.publish.title = data?.session?.user
-      ? "Create an immutable public version"
-      : "Create an immutable public version; publishing will start a private anonymous session";
-    if (error) showStatus(elements.status, formatSupabaseError(error), true);
   }
 
   function stablePermalink(published) {
@@ -74,17 +111,9 @@ export function createPublicationController({
   }
 
   function renderPublicationState(published, hasLocalChanges = false) {
-    const permalink = stablePermalink(published);
     hasPublishableChanges = !published?.publication_id || hasLocalChanges;
     refreshPublishVisibility();
-    elements.badge.textContent = !published?.publication_id
-      ? "Private working copy"
-      : hasLocalChanges ? "Public schema · Unpublished local changes" : "Public schema";
-    elements.badge.classList.toggle("muted", !published?.publication_id);
-    elements.badge.classList.toggle("warn", Boolean(published?.publication_id && hasLocalChanges));
-    elements.permalink.hidden = !permalink || hasLocalChanges;
-    if (permalink && !hasLocalChanges) setSafeUrl(elements.permalink, "href", permalink);
-    else elements.permalink.removeAttribute("href");
+    setBadge(publicationStatus(published, hasLocalChanges));
   }
 
   async function refreshPublicationState() {
@@ -96,9 +125,9 @@ export function createPublicationController({
       return;
     }
     try {
-      const canonical = await currentCanonical();
+      const matches = await matchesPublished(published);
       if (revision !== statusRevision) return;
-      renderPublicationState(published, canonical.contentHash !== published.content_hash);
+      renderPublicationState(published, !matches);
     } catch (error) {
       if (revision === statusRevision) renderPublicationState(published, true);
     }
@@ -118,27 +147,14 @@ export function createPublicationController({
     const button = elements.share;
     if (!button) return;
     clearTimeout(shareFeedbackTimer);
-    button.textContent = "✓ Copied";
     button.classList.add("share-copied");
-    button.setAttribute("aria-label", "View link copied to clipboard");
+    button.setAttribute("aria-label", "Copied");
+    button.title = "Link copied";
     shareFeedbackTimer = setTimeout(() => {
-      button.textContent = "Share";
       button.classList.remove("share-copied");
-      button.removeAttribute("aria-label");
+      button.setAttribute("aria-label", "Share view");
+      button.title = "Copy a link to this view";
     }, 2400);
-  }
-
-  function confirmPublicPublication() {
-    const dialog = elements.confirmation;
-    if (!dialog?.showModal) {
-      return Promise.resolve(windowApi.confirm("Publish this schema publicly?\n\nPublishing creates an immutable public version that anyone with the link can view and download. Your unpublished local edits remain private until you publish them."));
-    }
-    return new Promise(resolve => {
-      const close = () => resolve(dialog.returnValue === "publish");
-      dialog.addEventListener("close", close, { once: true });
-      dialog.returnValue = "cancel";
-      dialog.showModal();
-    });
   }
 
   async function publish() {
@@ -148,23 +164,29 @@ export function createPublicationController({
       return null;
     }
     busy = true;
-    elements.publish.disabled = true;
+    refreshPublishVisibility();
     try {
-      const canonical = await currentCanonical();
       const published = getPublicationState();
-      if (canonical.contentHash === published?.content_hash) {
+      const comparisonRevision = statusRevision;
+      if (await matchesPublished(published) && comparisonRevision === statusRevision) {
         renderPublicationState(published, false);
-        showStatus(elements.status, "This working copy already matches the public version.");
+        reportSuccess("Already published: this working copy matches the public version.");
         return published;
       }
-      if (!await confirmPublicPublication()) return null;
+      if (!await confirmPublicPublication(elements.confirmation, windowApi)) return null;
       showStatus(elements.status, "Canonicalizing current working schema…");
-      const result = await publishWorkingSchema({
-        schema: getWorkingSchema(),
+      const schema = structuredClone(getWorkingSchema());
+      const preparationRevision = statusRevision;
+      const compiledDag = getCompiledDag();
+      const compileInput = await getCompileInput();
+      if (preparationRevision !== statusRevision || JSON.stringify(schema) !== JSON.stringify(getWorkingSchema())) {
+        throw new Error("The working copy changed while preparing publication. Please try again.");
+      }
+      const result = await publishSchema({
+        schema,
         previousPublication: getPublicationState(),
-        compiledDag: getCompiledDag(),
-        compileInput: await getCompileInput(),
-        client,
+        compiledDag,
+        compileInput,
         cryptoApi,
         onProgress: (current, total, path) => showStatus(elements.status, `Uploading ${current}/${total}: ${path}`),
       });
@@ -177,19 +199,22 @@ export function createPublicationController({
       };
       setPublicationState(publication);
       saveWorkingState();
-      renderPublicationState(publication, false);
-      showStatus(elements.status, result.reused
+      // The user may have edited the working copy while the upload ran.
+      // Stay conservative until a fresh comparison of the current copy finishes.
+      renderPublicationState(publication, true);
+      await refreshPublicationState();
+      reportSuccess(result.reused
         ? `Already published as ${result.publicationId}. No files were uploaded.`
         : `Published ${result.fileCount} files as ${result.publicationId}.`);
       return publication;
     } catch (error) {
-      const message = `Publish failed: ${formatSupabaseError(error)}`;
+      const message = `Publish failed: ${formatPublicationError(error)}`;
       showStatus(elements.status, message, true);
       console.error(message, error);
       return null;
     } finally {
       busy = false;
-      elements.publish.disabled = !canPublish();
+      refreshPublishVisibility();
     }
   }
 
@@ -218,38 +243,63 @@ export function createPublicationController({
         try { await pendingCopy; copied = true; } catch { /* Try the fallback. */ }
       }
       if (!copied) copied = await copyText(permalink, navigatorApi, windowApi);
-      if (copied) showShareCopied();
-      showStatus(elements.status, copied ? "Copied a permalink to this view of the public schema."
-        : "Copy the permalink from the dialog.");
+      if (copied) {
+        showShareCopied();
+        reportSuccess("Copied a permalink to this view of the public schema.");
+      } else {
+        clearStatus();
+      }
       return permalink;
     } catch (error) {
-      const message = `Could not share: ${formatSupabaseError(error)}`;
+      const message = `Could not share: ${formatPublicationError(error)}`;
       showStatus(elements.status, message, true);
       console.error(message, error);
       return null;
     }
   }
 
-  async function publicPermalink() {
-    const published = getPublicationState();
-    if (!published?.publication_id || !published?.content_hash) {
-      showStatus(elements.status, "This schema is still private. Choose Publish publicly to create a public permalink.", true);
-      elements.publish.focus();
-      return null;
+  // Warn that the public version lacks the current view and offer to publish it first.
+  function confirmPublishBeforeShare(neverPublished) {
+    const dialog = elements.shareWarning;
+    const detail = neverPublished
+      ? "This schema is unpublished, so there is no public link to share yet."
+      : "This schema has unpublished changes, so a shared link would not show your latest edits.";
+    if (!dialog?.showModal) {
+      return Promise.resolve(windowApi.confirm(`${detail}\n\nPublish it now?`));
     }
+    const message = dialog.querySelector("[data-share-warning-message]");
+    if (message) message.textContent = detail;
+    return new Promise(resolve => {
+      dialog.addEventListener("close", () => resolve(dialog.returnValue === "publish"), { once: true });
+      dialog.returnValue = "cancel";
+      dialog.showModal();
+    });
+  }
+
+  async function publicPermalink() {
+    let published = getPublicationState();
+    const neverPublished = !published?.publication_id || !published?.content_hash;
     try {
-      const canonical = await currentCanonical();
-      const permalink = stablePermalink(published);
-      const hasLocalChanges = canonical.contentHash !== published.content_hash;
-      renderPublicationState(published, hasLocalChanges);
+      let hasLocalChanges = neverPublished;
+      if (!neverPublished) {
+        hasLocalChanges = !await matchesPublished(published);
+        renderPublicationState(published, hasLocalChanges);
+      }
       if (hasLocalChanges) {
-        showStatus(elements.status, "This schema has unpublished changes. Publish them before creating a permalink.", true);
-        elements.publish.focus();
+        if (!await confirmPublishBeforeShare(neverPublished)) return null;
+        published = await publish();
+        if (!published?.publication_id) return null;
+      }
+      // An edit can finish while a publication or hash comparison is in flight.
+      // Never present the older publication as a link to the current working copy.
+      const revision = statusRevision;
+      if (!await matchesPublished(published) || revision !== statusRevision) {
+        showStatus(elements.status, "The working copy changed while sharing. Publish the latest changes and try again.", true);
         return null;
       }
-      return { permalink, hasLocalChanges: false };
+      return { permalink: stablePermalink(published), hasLocalChanges: false };
     } catch (error) {
-      const message = `Could not create a public permalink: ${formatSupabaseError(error)}`;
+      const message = `Could not create a public permalink: ${formatPublicationError(error)}`;
       showStatus(elements.status, message, true);
       console.error(message, error);
       return null;
@@ -258,36 +308,28 @@ export function createPublicationController({
 
   function initialize() {
     elements.publish.addEventListener("click", publish);
-    if (client) client.auth.onAuthStateChange(() => setTimeout(() => void refreshAuthVisibility(), 0));
     const published = getPublicationState();
     hasPublishableChanges = !published?.publication_id;
     refreshPublishVisibility();
     if (published?.publication_id) {
-      elements.badge.textContent = "Public schema";
-      elements.badge.classList.remove("muted", "warn");
-      const currentUrl = new URL(windowApi.location.href);
-      if (currentUrl.searchParams.get("schema") === published.publication_id) {
-        setSafeUrl(elements.permalink, "href", currentUrl.href);
-        elements.permalink.hidden = false;
-      }
-      if (canPublish()) {
-        showStatus(elements.status, "Loaded the public schema. Further edits remain private and local until you publish them.");
-      }
+      // Until the hash comparison finishes, assume the copy matches what was loaded.
+      setBadge(publicationStatus(published, false));
     }
     if (canPublish()) void refreshPublicationState();
-    void refreshAuthVisibility();
   }
 
   function setSchemaReady(ready) {
+    refreshPublishVisibility();
     elements.publish.disabled = !ready || busy;
-    if (!ready) showStatus(elements.status, "Loading group memberships… Editing and publishing will unlock when ready.");
-    else showStatus(elements.status, "Loaded the public schema. Editing and publishing are ready.");
+    if (!ready) showStatus(elements.status, "Loading group memberships…");
+    else clearStatus();
   }
 
   function setSchemaLoadFailed() {
     elements.publish.disabled = true;
+    elements.publish.title = publishTitle();
     showStatus(elements.status, "Group memberships could not be verified. Editing and publishing remain disabled.", true);
   }
 
-  return { initialize, publish, share, publicPermalink, currentCanonical, refreshAuthVisibility, refreshPublicationState, workingCopyChanged, setSchemaReady, setSchemaLoadFailed };
+  return { initialize, publish, share, publicPermalink, currentCanonical, refreshPublicationState, workingCopyChanged, setSchemaReady, setSchemaLoadFailed };
 }

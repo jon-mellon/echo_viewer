@@ -4,8 +4,15 @@ export const VARIABLE_SEARCH_CATALOG_URL = "/variable-search-catalog.json.gz";
 export const SNAPSHOT_SEARCH_CATALOGS = Object.freeze({
   "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0": "/search-catalogs/99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0.json.gz",
   "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b": "/search-catalogs/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b.json.gz",
-  "8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849": "/search-catalogs/8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849.json.gz",
 });
+
+/** Snapshots whose catalog was published beside them, found at run time. They take precedence over the committed table. */
+const boundCatalogs = new Map();
+export const searchCatalogs = {
+  bind(snapshotId, url) { boundCatalogs.set(snapshotId, url); },
+  url(snapshotId) { return boundCatalogs.get(snapshotId) || SNAPSHOT_SEARCH_CATALOGS[snapshotId] || ""; },
+  has(snapshotId) { return Boolean(this.url(snapshotId)); },
+};
 
 export function variableSearchPayload(variables, snapshotId) {
   return { format: "echo-variable-search-v1", evidence_snapshot: snapshotId,
@@ -70,7 +77,7 @@ export class StaticVariableSearchCatalog {
       throw new Error("A search catalog cannot be reused across evidence snapshots.");
     }
     this.snapshotId = snapshotId;
-    const url = SNAPSHOT_SEARCH_CATALOGS[snapshotId];
+    const url = searchCatalogs.url(snapshotId);
     const staticAvailable = url && typeof DecompressionStream === "function";
     const loadPayload = staticAvailable
       ? (typeof Worker === "function" && fetchImpl === globalThis.fetch ? onRecords => loadCatalogInWorker(url, snapshotId, onRecords) : null)

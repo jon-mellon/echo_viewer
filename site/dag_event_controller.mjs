@@ -1,26 +1,20 @@
-import { attachGraphTouchGuard } from "./graph_touch.mjs";
 import * as projectOps from "./dag_project.mjs";
-import * as mapInteractions from "./map_interactions.mjs";
 
 export function createDagEventController({
   state, elements: els, dagNetwork,
-  renderAssignmentCoverage, activeGroup, renderNeighborSuggestions, drawMap, renderAll,
-  renderSearch, fitSearchContext, prefetchVariableSearch, toggleAnchorSearchMode, finishSchemaChoice,
+  activeGroup, renderNeighborSuggestions, renderAll,
+  renderSearch, prefetchVariableSearch, toggleAnchorSearchMode, finishSchemaChoice,
   changeAnchor, renderSetupGroupPicker,
   setWorkflowMode, renderGroupList, closeGroupEditor, discardGroupEditor, selectActiveAnchor,
   addTopNeighborsToActiveGroup, removeTopNeighborsFromActiveGroup, clearActiveGroupVariables,
-  renderGroupSeedSearch, renderRejectedVariablesPanel, fitMap, applyProjectOperation,
+  renderGroupSeedSearch, renderRejectedVariablesPanel, applyProjectOperation,
   saveProjectLocally, applyActiveGroupingSet, rebuildProject, updateDagFilters, exportGroupingFolder,
-  copyPermalink, loadDagData, invalidateMapCaches, zoomMap, canvasWidth,
-  canvasHeight, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber, setMapMode,
+  copyPermalink, toggleFullscreenPanel, renderMapToolbarToggles, clampNumber,
   undo, redo, renderActionHistory, renderDag, setFullscreenPanel,
   createCustomGroup, exportProject, exportWorkingMap, importProject, exportBib, exportMd,
-  exportTex, resizeMap, installDagHandlers, initPanelResizers, hideMapContextMenu,
-  showMapContextMenu, isDrawMode, nearestVariable, repAtPoint, scheduleMapDraw,
-  isSeedSelectionPhase, constrainMapTransform, updateMapHover, applyBrush, takeSnapshot,
-  addToUndoHistory, clusterRep, clearHoverIntent, addVariableToGroup, clean, startEditSplit,
+  exportTex, installDagHandlers, initPanelResizers, takeSnapshot,
+  addToUndoHistory, clusterRep, addVariableToGroup, clean, startEditSplit,
   dismissEvidencePane, showExcludedLinks, showExcludedFindings, startDefinition,
-  toggleDefinitionVariable,
 }) {
 function installHandlers() {
   els.closeEvidencePane.addEventListener("click", dismissEvidencePane);
@@ -30,14 +24,8 @@ function installHandlers() {
   els.ivInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
   els.dvInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
   els.instrumentInput.addEventListener("focus", () => { void prefetchVariableSearch(); });
-  els.ivInput.addEventListener("input", () => {
-    renderSearch("iv");
-    if (state.anchorSearchMode.iv === "new") fitSearchContext("iv");
-  });
-  els.dvInput.addEventListener("input", () => {
-    renderSearch("dv");
-    if (state.anchorSearchMode.dv === "new") fitSearchContext("dv");
-  });
+  els.ivInput.addEventListener("input", () => renderSearch("iv"));
+  els.dvInput.addEventListener("input", () => renderSearch("dv"));
   els.instrumentInput.addEventListener("input", () => renderSetupGroupPicker("instrument"));
   els.ivDefineNew.addEventListener("click", () => toggleAnchorSearchMode("iv"));
   els.dvDefineNew.addEventListener("click", () => toggleAnchorSearchMode("dv"));
@@ -49,6 +37,8 @@ function installHandlers() {
   // Change the selected groups.
   els.changeDv.addEventListener("click", () => changeAnchor("dv"));
   els.changeIv.addEventListener("click", () => changeAnchor("iv"));
+  // In Explore the whole selected-variable control reopens the variable picker.
+  els.exploreFocusSelector?.addEventListener("click", () => changeAnchor("iv"));
   els.changeInstrument.addEventListener("click", () => changeAnchor("instrument"));
   els.instrumentDefineNew.addEventListener("click", () => startDefinition("instrument"));
   els.variableDefineNew?.addEventListener("click", () => startDefinition("candidate"));
@@ -75,10 +65,6 @@ function installHandlers() {
   els.clearGroupSelection.addEventListener("click", clearActiveGroupVariables);
   els.groupSeedInput.addEventListener("input", renderGroupSeedSearch);
   els.rejectedVariableSearch?.addEventListener("input", renderRejectedVariablesPanel);
-  els.zoomGroup.addEventListener("click", () => {
-    const group = activeGroup();
-    if (group) fitMap(group.variable_ids);
-  });
   els.editSplit?.addEventListener("click", startEditSplit);
   els.groupLabelInput.addEventListener("input", () => {
     const group = activeGroup();
@@ -102,40 +88,6 @@ function installHandlers() {
   els.exportGroupingFolder.addEventListener("click", exportGroupingFolder);
   els.copyPermalink.addEventListener("click", copyPermalink);
 
-  // Map toolbar
-  els.variableLayoutSelect.addEventListener("change", async () => {
-    const requestedSource = els.variableLayoutSelect.value;
-    els.variableLayoutSelect.disabled = true;
-    try {
-      await loadDagData(requestedSource);
-      state.selectedVariableId = null;
-      state.hoveredVariableId = null;
-      state.selectedVariableIds.clear();
-      invalidateMapCaches();
-      renderAll();
-      fitMap();
-    } catch (error) {
-      console.error("Could not change variable map layout", error);
-      els.variableLayoutSelect.value = state.variableLayoutSource;
-    } finally {
-      els.variableLayoutSelect.disabled = false;
-    }
-  });
-  els.dagZoomIn.addEventListener("click", () => zoomMap(canvasWidth() / 2, canvasHeight() / 2, 1.12, true));
-  els.dagZoomOut.addEventListener("click", () => zoomMap(canvasWidth() / 2, canvasHeight() / 2, 1 / 1.12, true));
-  els.dagFitView.addEventListener("click", () => fitMap());
-  els.dagFitAll.addEventListener("click", () => fitMap(null, { all: true }));
-  els.fullscreenVariableMap.addEventListener("click", () => toggleFullscreenPanel("variable-map"));
-  els.toggleVariableLabels.addEventListener("click", () => {
-    state.showVariableLabels = !state.showVariableLabels;
-    renderMapToolbarToggles();
-    drawMap();
-  });
-  els.toggleGroupLabels.addEventListener("click", () => {
-    state.showGroupLabels = !state.showGroupLabels;
-    renderMapToolbarToggles();
-    drawMap();
-  });
   els.toggleConfoundersOnly.addEventListener("click", () => {
     state.showExclusionViolations = false;
     state.showExogeneity = false;
@@ -187,11 +139,13 @@ function installHandlers() {
   els.minimumEdgePapers.addEventListener("input", () => {
     const requested = Math.trunc(Number(els.minimumEdgePapers.value));
     if (!Number.isSafeInteger(requested) || requested < 1) return;
-    state.minimumEdgePapers = requested;
+    // Typing a minimum applies it; one paper means no minimum, as in Explore's filters.
+    state.excludeSparseEdges = requested > 1;
+    if (requested > 1) state.minimumEdgePapers = requested;
     updateDagFilters();
   });
   els.minimumEdgePapers.addEventListener("change", () => {
-    els.minimumEdgePapers.value = String(state.minimumEdgePapers);
+    els.minimumEdgePapers.value = String(state.excludeSparseEdges ? state.minimumEdgePapers : 1);
   });
   els.toggleBottleneckedConfounders.addEventListener("click", () => {
     state.excludeBottleneckedConfounders = !state.excludeBottleneckedConfounders;
@@ -207,20 +161,26 @@ function installHandlers() {
     state.showAllExclusionLinks = !state.showAllExclusionLinks;
     updateDagFilters();
   });
-  els.dagSelectMode.addEventListener("click", () => setMapMode("select"));
-  els.dagBrushMode.addEventListener("click", () => setMapMode("draw_add"));
-  els.dagEraseMode.addEventListener("click", () => setMapMode("draw_remove"));
 
   // Undo / redo / history
   els.undoBtn.addEventListener("click", undo);
   els.redoBtn.addEventListener("click", redo);
-  els.dag2UndoBtn?.addEventListener("click", undo);
-  els.dag2RedoBtn?.addEventListener("click", redo);
-  els.historyToggle.addEventListener("click", () => {
-    state.showActionHistory = !state.showActionHistory;
-    els.actionHistory.hidden = !state.showActionHistory;
-    els.historyToggle.classList.toggle("active", state.showActionHistory);
+  // The History menu lists undo steps while it is open.
+  const historyMenu = /** @type {HTMLDetailsElement | null} */ (document.getElementById("historyMenu"));
+  historyMenu?.addEventListener("toggle", () => {
+    state.showActionHistory = historyMenu.open;
     renderActionHistory();
+  });
+  // Ctrl/⌘+Z undoes; Ctrl/⌘+Shift+Z or Ctrl+Y redoes. Typing in a field keeps the browser's own undo.
+  document.addEventListener("keydown", (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (key !== "z" && key !== "y") return;
+    const target = /** @type {HTMLElement | null} */ (event.target instanceof HTMLElement ? event.target : null);
+    if (target?.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']")) return;
+    event.preventDefault();
+    if (key === "y" || event.shiftKey) { if (!els.redoBtn.disabled) redo(); }
+    else if (!els.undoBtn.disabled) undo();
   });
 
   // DAG SVG zoom controls
@@ -234,6 +194,7 @@ function installHandlers() {
     dagNetwork.fit();
   });
   els.fullscreenDag.addEventListener("click", () => toggleFullscreenPanel("dag"));
+  els.dagTableSkip.addEventListener("click", () => dagNetwork.setDagDisplay("table", { focusTable: true }));
   for (const [button, mode] of [[els.dagViewGraph, "graph"], [els.dagViewTable, "table"]]) {
     button.addEventListener("click", () => dagNetwork.setDagDisplay(mode));
   }
@@ -245,13 +206,100 @@ function installHandlers() {
   // Create custom group
   els.createGroupBtn.addEventListener("click", createCustomGroup);
 
-  // Export section toggle (collapsed by default)
-  const exportToggleBtn = document.getElementById("exportToggleBtn");
-  const exportSection = document.getElementById("exportSection");
-  if (exportToggleBtn && exportSection) {
-    exportToggleBtn.addEventListener("click", () => exportSection.classList.toggle("open"));
-    exportToggleBtn.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") exportSection.classList.toggle("open"); });
+  // Top-bar menus behave like ordinary menus: choosing an item closes the menu,
+  // except items that report progress in place (data-keep-open) and file pickers,
+  // which close once a file has been chosen.
+  for (const menu of document.querySelectorAll("#taskBar details.nav-menu")) {
+    menu.addEventListener("click", (event) => {
+      const item = /** @type {Element} */ (event.target).closest?.(".menu-item");
+      if (!item || item.matches("[data-keep-open], .file-button, .edit-history-entry")) return;
+      /** @type {HTMLDetailsElement} */ (menu).open = false;
+    });
+    // Choosing a file, or a schema in the Schema menu's switcher, also closes it.
+    menu.addEventListener("change", (event) => {
+      const target = /** @type {HTMLInputElement} */ (event.target);
+      if (target.type === "file" || target.id === "groupingSetSelect") /** @type {HTMLDetailsElement} */ (menu).open = false;
+    });
   }
+
+  // Narrow screens: the hamburger button shows the task switcher, view switches,
+  // undo and redo and the History, Schema, Import and Export menus as one panel,
+  // each menu expanding in place. Choosing an item closes the panel.
+  const navToggle = document.getElementById("navToggle");
+  const navOverflow = document.getElementById("taskBarOverflow");
+  const setNavOpen = (/** @type {boolean} */ open) => {
+    if (!navToggle || !navOverflow) return;
+    navOverflow.classList.toggle("is-open", open);
+    navToggle.setAttribute("aria-expanded", String(open));
+    if (!open) for (const menu of navOverflow.querySelectorAll("details[open]")) /** @type {HTMLDetailsElement} */ (menu).open = false;
+  };
+  const navIsOpen = () => Boolean(navOverflow?.classList.contains("is-open"));
+  navToggle?.addEventListener("click", () => setNavOpen(!navIsOpen()));
+  navOverflow?.addEventListener("click", (event) => {
+    const target = /** @type {Element} */ (event.target);
+    // Switching view (Causes | Consequences, Graph | Table) shows the result at once.
+    if (target.closest?.(".task-bar-view-controls button")) return setNavOpen(false);
+    const item = target.closest?.(".menu-item, #taskReset");
+    if (!item || item.matches("[data-keep-open], .file-button, .edit-history-entry")) return;
+    setNavOpen(false);
+  });
+  navOverflow?.addEventListener("change", (event) => {
+    const target = /** @type {HTMLInputElement} */ (event.target);
+    if (target.type === "file" || target.id === "groupingSetSelect") setNavOpen(false);
+  });
+  window.matchMedia("(min-width: 841px)").addEventListener("change", () => setNavOpen(false));
+
+  // Dropdown menus (Filters, task bar menus) close on an outside click or Escape.
+  const openMenus = () => document.querySelectorAll("details.filter-dropdown[open], details.nav-menu[open], details.list-filter[open]");
+  document.addEventListener("pointerdown", (event) => {
+    const target = /** @type {Node} */ (event.target);
+    if (navIsOpen() && !navOverflow?.contains(target) && !navToggle?.contains(target)) setNavOpen(false);
+    for (const menu of openMenus()) {
+      if (!menu.contains(target)) menu.open = false;
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const menus = openMenus();
+    for (const menu of menus) {
+      menu.open = false;
+      menu.querySelector("summary")?.focus();
+    }
+    // Escape closes an open menu inside the panel first, then the panel itself.
+    if (!menus.length && navIsOpen()) {
+      setNavOpen(false);
+      navToggle?.focus();
+    }
+  });
+
+  // Escape steps back to the previous screen when one exists: the previous step
+  // of the create-a-variable wizard (Choose concepts → Describe → Start from → out),
+  // or from evidence back to the graph in Explore. It only acts when nothing else
+  // claimed the key: an open menu, dialog, context menu or full-screen panel
+  // closes first (checked before their handlers run), and a component that
+  // handled Escape itself calls preventDefault.
+  const shown = (/** @type {HTMLElement | null} */ el) => Boolean(el && !el.hidden && el.getClientRects().length);
+  const backControls = [
+    () => els.definitionBack,
+    () => els.definitionDescribeBack,
+    // Leaving the wizard from its first step discards nothing typed elsewhere.
+    () => shown(els.definitionSourcesStep) || shown(els.definitionDescribeStep) ? els.definitionCancel : null,
+    () => els.customVariablesClose,
+    () => state.task ? els.closeEvidencePane : null,
+  ];
+  let escapeClaimed = false;
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    escapeClaimed = Boolean(openMenus().length || navIsOpen() || document.querySelector("dialog[open]")
+      || state.fullscreenPanel);
+  }, { capture: true });
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || escapeClaimed || event.defaultPrevented) return;
+    const back = backControls.map(control => control()).find(shown);
+    if (!back) return;
+    event.preventDefault();
+    back.click();
+  });
 
   // Export / import
   els.exportProject.addEventListener("click", exportProject);
@@ -262,273 +310,11 @@ function installHandlers() {
   els.exportTex.addEventListener("click", exportTex);
 
   window.addEventListener("resize", () => {
-    resizeMap();
     if (state.project) renderDag();
   });
-  installMapHandlers();
   installDagHandlers();
   initPanelResizers();
 }
 
-
-function installMapHandlers() {
-  const canvas = state.map.canvas;
-  attachGraphTouchGuard(canvas);
-  const touchPoints = new Map();
-  const pinchedPointers = new Set();
-  let pinch = null;
-
-  function pinchGeometry() {
-    const [first, second] = [...touchPoints.values()];
-    return {
-      x: (first.x + second.x) / 2,
-      y: (first.y + second.y) / 2,
-      distance: Math.hypot(second.x - first.x, second.y - first.y),
-    };
-  }
-
-  // Suppress browser context menu so right-click can be used for draw+
-  canvas.addEventListener("contextmenu", (event) => event.preventDefault());
-  document.addEventListener("pointerdown", (event) => {
-    if (els.dagMapContextMenu?.hidden) return;
-    if (els.dagMapContextMenu.contains(event.target)) return;
-    if (event.target === canvas && event.button === 2) return;
-    hideMapContextMenu();
-  });
-  document.addEventListener("pointerdown", (event) => {
-    for (const dropdown of document.querySelectorAll("details.filter-dropdown[open]")) {
-      if (!dropdown.contains(event.target)) dropdown.open = false;
-    }
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    for (const dropdown of document.querySelectorAll("details.filter-dropdown[open]")) dropdown.open = false;
-  });
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    if (els.dagMapContextMenu?.hidden) return;
-    hideMapContextMenu();
-  });
-
-  canvas.addEventListener("pointerdown", (event) => {
-    if (event.pointerType === "touch") {
-      touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      canvas.setPointerCapture(event.pointerId);
-      if (touchPoints.size >= 2) {
-        for (const id of touchPoints.keys()) pinchedPointers.add(id);
-        pinch = pinchGeometry();
-        state.map.brush = null;
-        state.map.dragging = false;
-        state.map.dragStart = null;
-        state.map.moved = true;
-        canvas.classList.remove("dragging");
-        return;
-      }
-    }
-    const rect = canvas.getBoundingClientRect();
-    const { x, y } = mapInteractions.eventPoint(event, rect);
-
-    if (event.button !== 2) hideMapContextMenu();
-
-    // Right-click opens a node/region menu in inspect mode; draw modes keep the old
-    // add-by-brush behavior so fast editing is still possible.
-    if (event.button === 2) {
-      if (state.selectedVariableIds.size) {
-        event.preventDefault();
-        event.stopPropagation();
-        showMapContextMenu(null, event.clientX, event.clientY, [...state.selectedVariableIds]);
-        drawMap();
-        return;
-      }
-      if (!isDrawMode() && state.map.mode === "select") {
-        const rep = nearestVariable(event.clientX, event.clientY, 22) || repAtPoint(event.clientX, event.clientY);
-        if (rep) {
-          event.preventDefault();
-          event.stopPropagation();
-          state.selectedVariableId = rep.variable_id;
-          showMapContextMenu(rep, event.clientX, event.clientY);
-          drawMap();
-          return;
-        }
-      }
-      if (!activeGroup()) return;
-      canvas.setPointerCapture(event.pointerId);
-      state.map.dragging = true;
-      state.map.moved = false;
-      state.map.brush = { action: "add", points: [{ x, y }] };
-      scheduleMapDraw(false);
-      return;
-    }
-
-    state.map.dragging = true;
-    state.map.moved = false;
-    canvas.setPointerCapture(event.pointerId);
-    if (isDrawMode()) {
-      // Draw is allowed with an active group, or with "Draw +" during seed selection.
-      const action = mapInteractions.brushAction({
-        mode: state.map.mode,
-        hasActiveGroup: Boolean(activeGroup() || state.definitionDraft?.step === "partition"),
-        seedSelectionPhase: isSeedSelectionPhase(),
-      });
-      state.map.brush = { action, points: [{ x, y }] };
-      scheduleMapDraw(false);
-      return;
-    }
-    state.map.dragStart = {
-      x: event.clientX,
-      y: event.clientY,
-      tx: state.map.transform.tx,
-      ty: state.map.transform.ty,
-    };
-    canvas.classList.add("dragging");
-  });
-
-  canvas.addEventListener("pointermove", (event) => {
-    if (touchPoints.has(event.pointerId)) {
-      touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      if (pinch && touchPoints.size >= 2) {
-        const next = pinchGeometry();
-        const rect = canvas.getBoundingClientRect();
-        Object.assign(state.map.transform, constrainMapTransform({
-          ...state.map.transform,
-          tx: state.map.transform.tx + next.x - pinch.x,
-          ty: state.map.transform.ty + next.y - pinch.y,
-        }));
-        if (pinch.distance > 0 && next.distance > 0) {
-          zoomMap(next.x - rect.left, next.y - rect.top, next.distance / pinch.distance, true);
-        }
-        pinch = next;
-        return;
-      }
-      if (pinchedPointers.has(event.pointerId)) return;
-    }
-    if (state.map.brush) {
-      const rect = canvas.getBoundingClientRect();
-      const point = mapInteractions.eventPoint(event, rect);
-      state.map.brush.points = mapInteractions.appendBrushPoint(state.map.brush.points, point);
-      scheduleMapDraw(false);
-      return;
-    }
-    if (state.map.dragging && state.map.dragStart) {
-      const dx = event.clientX - state.map.dragStart.x;
-      const dy = event.clientY - state.map.dragStart.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3) state.map.moved = true;
-      const nextTransform = mapInteractions.panTransform(state.map.dragStart, event.clientX, event.clientY);
-      Object.assign(state.map.transform, constrainMapTransform(nextTransform));
-      scheduleMapDraw(false);
-      return;
-    }
-    updateMapHover(event);
-  });
-
-  canvas.addEventListener("pointerup", (event) => {
-    if (touchPoints.has(event.pointerId)) {
-      touchPoints.delete(event.pointerId);
-      if (pinchedPointers.has(event.pointerId)) {
-        pinchedPointers.delete(event.pointerId);
-        pinch = touchPoints.size >= 2 ? pinchGeometry() : null;
-        drawMap();
-        return;
-      }
-    }
-    if (state.map.brush) {
-      if (state.map.brush.action === "select_vars" || state.definitionDraft?.step === "partition") {
-        applyBrush();
-      } else {
-        const before = takeSnapshot();
-        applyBrush();
-        addToUndoHistory(`Drew boundary on group`, before);
-      }
-      state.map.brush = null;
-      state.map.dragging = false;
-      state.map.dragStart = null;
-      canvas.classList.remove("dragging");
-      drawMap();
-      return;
-    }
-    const moved = state.map.moved;
-    if (!moved) {
-      const point = nearestVariable(event.clientX, event.clientY,
-        event.pointerType === "touch" ? 28 : 16);
-      if (point) {
-        if (state.definitionDraft?.step === "partition") {
-          toggleDefinitionVariable(point.variable_id);
-          state.map.dragging = false;
-          state.map.dragStart = null;
-          canvas.classList.remove("dragging");
-          return;
-        }
-        if (state.fullscreenPanel) setFullscreenPanel(null);
-        const variableId = clusterRep(point.variable_id);
-        const priorId = clusterRep(state.selectedVariableId || "");
-        if (event.shiftKey && priorId && priorId !== variableId) {
-          // Shift-click compares two variables without changing group membership.
-          const selection = mapInteractions.selectionAfterClick({ variableId, priorId, shiftKey: event.shiftKey });
-          state.comparisonVariableIds = selection.comparisonVariableIds;
-          state.selectedVariableIds = new Set(selection.selectedVariableIds);
-        } else {
-          const selection = mapInteractions.selectionAfterClick({ variableId, priorId, shiftKey: false });
-          state.selectedVariableId = variableId;
-          state.selectedVariableIds = new Set(selection.selectedVariableIds);
-          state.comparisonVariableIds = selection.comparisonVariableIds;
-        }
-        renderAll({ rebuild: false, refreshView: true });
-      }
-    }
-    state.map.dragging = false;
-    state.map.dragStart = null;
-    canvas.classList.remove("dragging");
-    // Interactive frames suppress DOM labels. Restore them once panning ends.
-    if (moved) drawMap();
-  });
-
-  canvas.addEventListener("pointercancel", (event) => {
-    touchPoints.delete(event.pointerId);
-    pinchedPointers.delete(event.pointerId);
-    pinch = touchPoints.size >= 2 ? pinchGeometry() : null;
-    state.map.brush = null;
-    state.map.dragging = false;
-    state.map.dragStart = null;
-    canvas.classList.remove("dragging");
-    drawMap();
-  });
-
-  canvas.addEventListener("pointerleave", () => {
-    clearHoverIntent();
-    state.hoveredVariableId = null;
-    els.dagMapTooltip.hidden = true;
-    drawMap();
-  });
-
-  canvas.addEventListener("wheel", (event) => {
-    event.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    zoomMap(event.clientX - rect.left, event.clientY - rect.top, event.deltaY < 0 ? 1.06 : 1 / 1.06, true);
-  }, { passive: false });
-
-  canvas.addEventListener("dblclick", (event) => {
-    if (state.definitionDraft?.step === "partition") return;
-    // With a group open, double-clicking a Voronoi cell adds its node to that group.
-    const group = activeGroup();
-    if (group) {
-      const rep = repAtPoint(event.clientX, event.clientY);
-      if (rep) {
-        const before = takeSnapshot();
-        const had = new Set(group.variable_ids);
-        addVariableToGroup(group, rep.variable_id);
-        if (group.variable_ids.some((id) => !had.has(id))) {
-          addToUndoHistory(`Added "${clean(rep.display_label || rep.concept_label)}" to ${group.label}`, before);
-        }
-        state.selectedVariableId = rep.variable_id;
-        renderAll();
-      }
-      return;
-    }
-    const rect = canvas.getBoundingClientRect();
-    zoomMap(event.clientX - rect.left, event.clientY - rect.top, 1.2);
-  });
-}
-
-
-  return { installHandlers, installMapHandlers };
+  return { installHandlers };
 }

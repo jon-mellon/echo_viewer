@@ -1,4 +1,5 @@
 const { test, expect } = require("./fixtures.cjs");
+const { chooseAnchors } = require("./support/identify.cjs");
 const { EventEmitter } = require("node:events");
 const { watchBrowserErrors } = require("./browser_errors.cjs");
 
@@ -14,6 +15,17 @@ test("browser errors allow only recovered rate limits", () => {
   browserErrors.check();
   page.emit("pageerror", new Error("Unrelated failure"));
   expect(browserErrors.check).toThrow(/Unrelated failure/);
+});
+
+test("browser errors ignore only the viewer-assets probe's 404, not other missing files", () => {
+  const page = new EventEmitter();
+  const browserErrors = watchBrowserErrors(page);
+  const text = "Failed to load resource: the server responded with a status of 404 ()";
+  page.emit("console", { type: () => "error", text: () => text,
+    location: () => ({ url: "https://data.example/evidence/layouts/browser-v2/abc/viewer-assets/manifest.json" }) });
+  browserErrors.check();
+  page.emit("console", { type: () => "error", text: () => text, location: () => ({ url: "https://data.example/compiled/dag.json" }) });
+  expect(browserErrors.check).toThrow(/404/);
 });
 
 test.beforeEach(async ({ page }) => {
@@ -71,13 +83,14 @@ test("browser-v2 supports group detail, auto layout, fullscreen and project expo
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   expect(anchors).toHaveLength(2);
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await expect(page.locator('#dvGroupPicker button[data-group-id]').first()).toBeVisible();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.getByText('Variable schema', { exact: true }).click();
-  await expect.poll(async () => page.getByRole('link', { name: 'Open public version' }).getAttribute('href'))
-    .toContain(`iv=${anchors[0]}`);
-  const publicView = await page.getByRole('link', { name: 'Open public version' }).getAttribute('href');
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  await page.locator('#groupingPanel summary').click();
+  const publicView = await page.evaluate(async () => {
+    const { publicationPermalink } = await import("/published_schema_loader.mjs");
+    const state = window.__dagBuilderState;
+    return publicationPermalink(state.project.publication.publication_id, window.location, state);
+  });
+  expect(publicView).toContain(`iv=${anchors[0]}`);
   expect(new URL(publicView).searchParams.get('dv')).toBe(anchors[1]);
   await page.goto(publicView, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__dagBuilderState?.publishedSchemaHydrated

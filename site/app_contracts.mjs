@@ -47,6 +47,8 @@
  * @property {Record<string, LinkDecision>} link_decisions
  * @property {Record<string, {display_status: string, reason_code?: string, reason_text?: string, timestamp?: string}>} finding_decisions
  * @property {Record<string, {status: string, text?: string}>} confounder_statuses
+ * @property {Record<string, {status: string, text?: string}>} [collider_statuses]
+ * @property {Record<string, {status: string, text?: string}>} [exclusion_statuses]
  * @property {JsonValue[]} rejected_variables
  * @property {string[]} [restored_variable_ids]
  * @property {JsonValue | null} publication
@@ -146,11 +148,9 @@
  * @property {string} phase
  * @property {string} workflowMode
  * @property {Set<string>} selectedVariableIds
- * @property {Set<string> | null} [definitionAiPreviewIds]
- * @property {"jev" | "manual" | null} [definitionMethod]
  * @property {"identify" | "causes" | "consequences" | null} [task]
  * @property {Record<"causes" | "consequences", ExploreView>} [explore]
- * @property {Record<string, unknown>} map
+ * @property {{ variables: unknown[] | null, clusterReps: unknown[] | null }} visibleCache
  */
 
 /**
@@ -158,6 +158,7 @@
  * @property {string | null} focusId
  * @property {number} depth
  * @property {number} minPapers
+ * @property {string[]} [excluded] Variables left off the map (still listed).
  */
 
 export const GROUPING_FORMAT_VERSION = "groupings-v3";

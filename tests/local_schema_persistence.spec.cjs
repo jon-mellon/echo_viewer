@@ -129,7 +129,7 @@ test("the root starts fresh and Previous Sessions restores a committed local sch
   await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.getElementById("startupLoading")?.hidden);
   expect(new URL(page.url()).searchParams.get("local_schema")).toBeNull();
-  await page.getByRole("button", { name: "Previous Sessions" }).click();
+  await page.locator("#historyToggle").click();
   await page.locator(".previous-session-entry").filter({ hasText: "Local draft" }).first().click();
   await page.waitForFunction(() => document.getElementById("startupLoading")?.hidden);
   expect(new URL(page.url()).searchParams.get("local_schema")).toBe(loaded.localId);

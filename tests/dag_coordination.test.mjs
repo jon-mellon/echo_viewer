@@ -33,12 +33,13 @@ test("resizing the DAG refits a fully visible graph and preserves a cropped view
   globalThis.document = {
     querySelector: selector => selector === ".dag-shell" ? shell : null,
     querySelectorAll: () => [],
+    getElementById: () => null,
     addEventListener: (name, handler) => documentHandlers.set(name, handler),
     removeEventListener: name => documentHandlers.delete(name),
   };
   globalThis.window = { matchMedia: () => ({ matches: false, addEventListener() {} }) };
   let fullyVisible = true, fitCalls = 0;
-  const network = { fit: () => fitCalls++ };
+  const network = { fit: () => fitCalls++, getScale: () => 1 };
   try {
     createDagShellController({
       state: { interfaceMode: "dag2" },
@@ -71,7 +72,7 @@ test("connected edge hover updates routed segments in one batch", () => {
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].map(record => record.id), ["a::seg0", "a::seg1"]);
   assert.deepEqual(calls[0].map(record => record.width), [3.4, 6.2]);
-  assert.ok(calls[0].every(record => record.color.color === "#9a5a0a" && record.shadow.enabled));
+  assert.ok(calls[0].every(record => record.color.color === "#000000" && record.shadow.enabled));
   applyLogicalEdgeHover([], dataset);
   assert.equal(calls.length, 1);
 });
@@ -90,7 +91,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   const visibilityChanges = [];
   const dagNetwork = { clientWidth: 630, clientHeight: 700,
     style: { set visibility(value) { visibilityChanges.push(value); } },
-    addEventListener() {}, removeEventListener() {} };
+    setAttribute() {}, addEventListener() {}, removeEventListener() {} };
   class DataSet {
     constructor(items) { this.items = new Map(items.map(item => [item.id, item])); this.updateCalls = []; }
     getIds() { return [...this.items.keys()]; }
@@ -120,7 +121,7 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
     canvasToDOM(point) { return point; }
   }
   const controller = createDagNetworkController({ state,
-    elements: { dagNetwork, dagTable: { hidden: true }, dagViewGraph: switchStub(), dagViewTable: switchStub() },
+    elements: { dagNetwork, dagTable: { hidden: true }, dagTableSkip: { hidden: false }, dagViewGraph: switchStub(), dagViewTable: switchStub() },
     visApi: { DataSet, Network },
     clusterRep: id => id, groupColor: () => "#000", dagGroups: () => groups,
     groupById: id => groups.find(group => group.group_id === id),
@@ -128,6 +129,9 @@ test("DAG rerenders only reconfigure vis when visual options change", async () =
   });
   controller.renderDag();
   await controller.whenRendered();
+  assert.equal(visibilityChanges.at(-1), "hidden", "a new network stays hidden until its first fit");
+  await new Promise(resolve => setTimeout(resolve, 100));
+  assert.equal(visibilityChanges.at(-1), "", "the first fit reveals the network");
   const redraws = networks[0].redrawCalls || 0;
   controller.clearConfounderPathHover();
   controller.clearConfounderPathHover();
@@ -327,7 +331,7 @@ test("a render that a newer one supersedes still releases whoever was waiting on
     componentGroupIds: new Set(["a", "b"]), variableById: new Map(), dagLayoutMode: "auto", selectedEdgeId: null,
     colliderGroupIds: new Set(), colliderPathGroupIds: new Set(), confounderGroupIds: new Set(),
     confounderPathGroupIds: new Set(), visibleLinks: [] };
-  const element = { clientWidth: 630, clientHeight: 700, style: {}, addEventListener() {}, removeEventListener() {} };
+  const element = { clientWidth: 630, clientHeight: 700, style: {}, setAttribute() {}, addEventListener() {}, removeEventListener() {} };
   class DataSet {
     constructor(items = []) { this.items = new Map(items.map(item => [item.id, item])); }
     getIds() { return [...this.items.keys()]; }
@@ -355,7 +359,7 @@ test("a render that a newer one supersedes still releases whoever was waiting on
     }
   };
   try {
-    const controller = createDagNetworkController({ state, elements: { dagNetwork: element, dagTable: { hidden: true },
+    const controller = createDagNetworkController({ state, elements: { dagNetwork: element, dagTable: { hidden: true }, dagTableSkip: { hidden: false },
       dagViewGraph: switchStub(), dagViewTable: switchStub() }, visApi: { DataSet, Network }, clusterRep: id => id,
     groupColor: () => "#000", dagGroups: () => groups, groupById: id => groups.find(group => group.group_id === id),
     drawMap() {}, setMapMode() {}, renderAll() {}, selectEdge() {} });

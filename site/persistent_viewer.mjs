@@ -6,7 +6,7 @@ import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contrac
 const RESET_HANDOFF_KEY = "echo-pending-reset-session";
 
 export function createPersistentViewer({ state, getSchema, getViewport = () => {},
-  status = () => {}, onDiscard = () => {} }) {
+  status = () => {}, onDiscard = () => {}, onSessionSaved = () => {}, saveSchema = commitLocalSchema }) {
   let localRecord = null;
   let committedSchema = null;
   let editorBaseline = null;
@@ -36,13 +36,27 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     const groups = state.project.groups || [];
     const iv = groups.find(group => group.group_id === state.project.iv_group_id);
     const dv = groups.find(group => group.group_id === state.project.dv_group_id);
-    if (!localId && state.workflowMode !== "setup"
+    const exploring = ["causes", "consequences"].includes(state.task)
+      && Boolean(state.explore?.[state.task]?.focusId);
+    if (!localId && state.workflowMode !== "setup" && !exploring
       && (!iv?.variable_ids?.length || !dv?.variable_ids?.length)) return null;
     getViewport();
     return buildPermalink({
       location: window.location, schemaUrl: "", dataVersion: state.data.snapshot?.snapshot_id || "",
       state, publishedSchemaId: baseId(), localSchemaId: localId,
     });
+  }
+
+  // The user can change tasks or selections while IndexedDB is writing.
+  // Keep the completed schema ID, but serialize the current view rather than
+  // restoring the stale URL captured when the write started.
+  function showSavedUrl(savedUrl, id) {
+    const latest = currentUrl(id) || savedUrl;
+    replaceUrl(latest);
+    if (latest !== savedUrl) {
+      void mirrorSessionUrl(sessionId, latest, urlSequence(), sessionTitle())
+        .catch(error => status(`Previous view not saved — ${error.message}`));
+    }
   }
 
   function setLoadedRecord(record) { localRecord = record; }
@@ -122,7 +136,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     if (!url) throw new Error("Cannot construct a recovery URL for this draft.");
     if (urlTimer !== null) { clearTimeout(urlTimer); urlTimer = null; }
     status("Saving locally…");
-    const pending = commitLocalSchema({
+    const pending = saveSchema({
       id, expectedRevision: localRecord?.revision || 0, schema, url,
       sequence: urlSequence(), basePublicationId: baseId(), basePublicationHash: baseHash(),
       sessionId, sessionTitle: sessionTitle(),
@@ -130,8 +144,8 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
       localRecord = record;
       committedSchema = structuredClone(schema);
       unsavedSchema = false;
-      replaceUrl(url);
-      status("Saved locally · Unpublished changes");
+      showSavedUrl(url, id);
+      status("Saved locally");
       return true;
     }).catch(error => {
       unsavedSchema = true;
@@ -178,15 +192,15 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     const url = currentUrl(id);
     if (!url) throw new Error("Cannot construct a URL for this draft.");
     status("Saving independent copy…");
-    const record = await commitLocalSchema({ id, expectedRevision: 0, schema, url,
+    const record = await saveSchema({ id, expectedRevision: 0, schema, url,
       basePublicationId: baseId(), basePublicationHash: baseHash(),
       sessionId, sessionTitle: sessionTitle() });
     localRecord = record;
     committedSchema = structuredClone(schema);
     editorBaseline = null;
     unsavedSchema = false;
-    replaceUrl(url);
-    status("Saved independent local copy · Unpublished changes");
+    showSavedUrl(url, id);
+    status("Saved independent local copy");
     return record;
   }
 
@@ -217,6 +231,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     const sequence = urlSequence();
     if (url !== window.location.href) replaceUrl(url);
     return mirrorSessionUrl(sessionId, url, sequence, sessionTitle())
+      .then(() => onSessionSaved())
       .catch(error => status(`Previous view not saved — ${error.message}`));
   }
 

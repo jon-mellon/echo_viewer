@@ -21,7 +21,7 @@ export function createProject({ projectId, groupingSetId }) {
     project_id: projectId, active_grouping_set_id: groupingSetId,
     iv_group_id: 'g_iv', dv_group_id: 'g_dv', instrument_group_id: null, groups: [], links: [],
     decisions: [], filters: {}, grouping_imports: [],
-    grouping_exports: [], carve_outs: [], link_decisions: {}, finding_decisions: {}, confounder_statuses: {},
+    grouping_exports: [], carve_outs: [], link_decisions: {}, finding_decisions: {}, confounder_statuses: {}, collider_statuses: {}, exclusion_statuses: {},
     rejected_variables: [], publication: null,
   };
 }
@@ -48,6 +48,15 @@ export function promoteAnchor(project, side, groupId, timestamp) {
     if (group.group_id === project[key]) return { ...group, type: null };
     return group;
   }) };
+}
+
+/** Leave the cause (iv) or outcome (dv) unchosen; the group stays, as an ordinary variable. */
+export function clearAnchor(project, side) {
+  if (!['iv', 'dv'].includes(side)) return project;
+  const key = `${side}_group_id`;
+  if (!project[key]) return project;
+  return { ...project, [key]: '',
+    groups: project.groups.map(group => group.group_id === project[key] ? { ...group, type: null } : group) };
 }
 
 export function addMembers(project, groupId, memberIds, timestamp) {
@@ -96,6 +105,8 @@ export function removeMembersEverywhere(project, memberIds) {
 export function snapshotProject(project, phase) {
   return JSON.stringify({ groups: project.groups, link_decisions: project.link_decisions,
     finding_decisions: project.finding_decisions, confounder_statuses: project.confounder_statuses,
+    collider_statuses: project.collider_statuses,
+    exclusion_statuses: project.exclusion_statuses,
     rejected_variables: project.rejected_variables,
     restored_variable_ids: project.restored_variable_ids, decisions: project.decisions,
     iv_group_id: project.iv_group_id, dv_group_id: project.dv_group_id,
@@ -130,6 +141,8 @@ export function restoreSnapshot(project, json) {
     link_decisions: snap.link_decisions,
     finding_decisions: snap.finding_decisions || {},
     confounder_statuses: snap.confounder_statuses || {},
+    collider_statuses: snap.collider_statuses || {},
+    exclusion_statuses: snap.exclusion_statuses || {},
     rejected_variables: snap.rejected_variables || [],
     restored_variable_ids: snap.restored_variable_ids || [],
     decisions: snap.decisions || [],
@@ -280,7 +293,7 @@ export function setFindingDecision(project, rawId, decision) {
 
 export function splitCategories(project, {
   sourceGroupIds, newGroupId, newLabel, newDescription, residualLabels = {}, newVariableIds,
-  timestamp, role, splitId = null,
+  timestamp, role, splitId = null, reusedFrom = null,
 }) {
   splitId ||= `split_${newGroupId}`;
   const sourceIds = [...new Set(sourceGroupIds || [])];
@@ -325,6 +338,7 @@ export function splitCategories(project, {
     created_at: timestamp, updated_at: timestamp,
     provenance: { operation: "split_categories", split_id: splitId, source_group_ids: sourceIds,
       source_group_by_variable: sourceGroupByVariable,
+      ...(reusedFrom ? { reused_from_split_id: reusedFrom.split_id, reused_from_group_id: reusedFrom.group_id } : {}),
       source_group_ids_retained_as_residuals: true, edited_at: timestamp },
   };
   const next = { ...project, groups: [...nextGroups, newGroup],
@@ -410,6 +424,50 @@ export function updateSplitCategories(project, {
       decision_id: `decision_${(project.decisions || []).length + 1}`,
       type: "split_categories_updated", timestamp,
       payload: { split_id: splitId, source_group_ids: sourceIds, new_group_id: newGroupId },
+    }],
+  };
+}
+
+/** The custom variable a user made, when it can still be edited or deleted. */
+export function customVariableContext(project, groupId) {
+  const context = editableSplitContext(project, groupId);
+  return context && context.newGroup.group_id === groupId ? context : null;
+}
+
+/**
+ * Undo a split: the custom variable's concepts go back to the variables they
+ * came from, those variables get their names back, and the custom variable is
+ * removed. Roles that pointed at it are cleared.
+ */
+export function deleteSplitCategories(project, { groupId, timestamp }) {
+  const context = customVariableContext(project, groupId);
+  if (!context) throw new Error("This variable was changed by a later edit and cannot be deleted.");
+  const { splitId, newGroup, residuals } = context;
+  const owners = newGroup.provenance.source_group_by_variable;
+  const returned = new Map(residuals.map(group => [group.group_id, []]));
+  for (const id of newGroup.variable_ids || []) returned.get(owners[id])?.push(id);
+  const removedIds = new Set([newGroup.group_id]);
+  const groups = project.groups.filter(group => !removedIds.has(group.group_id)).map(group => {
+    if (!returned.has(group.group_id)) return group;
+    const priorLabel = String(group.provenance?.prior_label || "").trim();
+    const { provenance, ...rest } = group;
+    return { ...rest, label: priorLabel || group.label,
+      variable_ids: [...group.variable_ids, ...returned.get(group.group_id)],
+      updated_at: timestamp };
+  });
+  // Restoring an old name must not collide with a variable named since.
+  const labels = groups.map(group => String(group.label || "").trim().toLowerCase()).filter(Boolean);
+  if (new Set(labels).size !== labels.length) {
+    throw new Error("A variable now uses one of the original names; rename it before deleting this one.");
+  }
+  const clearRole = key => (project[key] === groupId ? { [key]: null } : {});
+  return { ...project, groups,
+    ...clearRole("iv_group_id"), ...clearRole("dv_group_id"), ...clearRole("instrument_group_id"),
+    decisions: [...(project.decisions || []), {
+      decision_id: `decision_${(project.decisions || []).length + 1}`,
+      type: "split_categories_deleted", timestamp,
+      payload: { split_id: splitId, deleted_group_id: groupId,
+        restored_group_ids: residuals.map(group => group.group_id) },
     }],
   };
 }

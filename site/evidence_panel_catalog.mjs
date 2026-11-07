@@ -17,9 +17,16 @@ async function digest(bytes) {
 
 export class EvidencePanelCatalog {
   constructor({ bindings = EVIDENCE_PANEL_BINDINGS, fetchImpl = (...args) => fetch(...args) } = {}) {
-    this.bindings = bindings;
+    // Copied so a snapshot's published assets can be bound at run time without touching the committed table.
+    this.bindings = { ...bindings };
     this.fetchImpl = fetchImpl;
     this.pending = new Map();
+  }
+
+  /** Use these assets for a snapshot, in place of any committed binding. */
+  bind(snapshot, binding) {
+    this.bindings[snapshot] = binding;
+    for (const key of this.pending.keys()) if (key.startsWith(`${snapshot}:`)) this.pending.delete(key);
   }
 
   async read(url, integrity) {

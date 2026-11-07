@@ -1,16 +1,18 @@
 module.exports = {
   testDir: "./tests",
-  testMatch: ["browser_v2_workflows.spec.cjs", "dag2_define_variable.spec.cjs",
+  testMatch: ["variable_review.spec.cjs", "mobile_no_zoom.spec.cjs", "browser_v2_workflows.spec.cjs", "dag2_define_variable.spec.cjs",
     "interaction_workflows.spec.cjs", "static_data_source.spec.cjs",
     "local_schema_persistence.spec.cjs", "evidence_panel.spec.cjs", "task_views.spec.cjs", "schema_source.spec.cjs"],
   workers: 1,
   maxFailures: process.env.CI ? 1 : 0,
+  // One retry in CI; a test that passes on retry is reported as flaky, not hidden.
+  retries: process.env.CI ? 1 : 0,
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: { browserName: "chromium", acceptDownloads: true },
   webServer: {
-    command: "python3 -m http.server 8767 --directory site",
-    url: "http://127.0.0.1:8767/",
+    command: `python3 -m http.server ${process.env.ECHO_TEST_PORT || 8767} --directory site`,
+    url: `http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
   },

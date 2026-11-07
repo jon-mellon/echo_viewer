@@ -6,6 +6,15 @@ import {
   groupingSchemaUrl, schemaPublicationId,
 } from "../site/dag_data_config.mjs";
 
+test("a record signature published in a schema resolves to its snapshot directory", () => {
+  const signature = "a5acb651371a59c22eb0fa03c4323b001e0fecf832efa2b0bf95704aaec4490f";
+  const directory = "8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849";
+  const href = `https://viewer.example/?data_version=${signature}`;
+  assert.equal(evidenceSnapshotIdFromManifestUrl(evidenceManifestUrl({ href })), directory);
+  assert.equal(evidenceSnapshotIdFromManifestUrl(
+    evidenceManifestUrl({ href: "https://viewer.example/" }, signature)), directory);
+});
+
 test("the grouping schema defaults to the described Supabase publication", () => {
   assert.equal(DEFAULT_SCHEMA_PUBLICATION_ID, "0d7bdf95-3f02-4e72-8629-e6d456434ad5");
   assert.equal(evidenceSnapshotIdFromManifestUrl(evidenceManifestUrl({ href: "https://viewer.example/" })),

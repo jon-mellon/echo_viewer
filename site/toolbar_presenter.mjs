@@ -1,7 +1,7 @@
 import { h, replaceChildren } from "./dom_builder.mjs";
 
 export function diagnosticViewTitle(state, anchorsReady) {
-  if (!anchorsReady) return "Working map";
+  if (!anchorsReady) return "";
   if (state.showExclusionViolations) return "Exclusion restriction";
   if (state.showExogeneity) return "Exogeneity";
   if (state.showConfoundersOnly) return "Confounders";
@@ -9,69 +9,35 @@ export function diagnosticViewTitle(state, anchorsReady) {
   return "Confounders";
 }
 
-export function createToolbarPresenter({ state, elements, groupById, visibleVariables,
-  uoaMatches, clusterRep, rejectedVariableIdSet }) {
-  function assignmentCoverage() {
-    const uoaActive = state.uoaFilterEnabled && state.selectedUoa;
-    const variables = visibleVariables().filter(variable => !uoaActive || uoaMatches(variable.uoa, state.selectedUoa));
-    const variableIds = new Set(variables.map(variable => variable.variable_id));
-    const assignedIds = new Set();
-    // A compiled graph can be used before any variable coordinates are loaded.
-    // In that case there is no coverage to count, so avoid scanning all 98k
-    // group memberships on every graph-filter change.
-    if (variableIds.size) for (const group of state.project?.groups || []) {
-      for (const id of group.variable_ids || []) if (variableIds.has(id)) assignedIds.add(id);
-    }
-    return {
-      assigned: assignedIds.size, unassigned: Math.max(0, variables.length - assignedIds.size),
-      total: variables.length,
-      plottedNodes: new Set(variables.map(variable => clusterRep(variable.variable_id))).size,
-      rejected: rejectedVariableIdSet().size, uoaFiltered: Boolean(uoaActive),
-    };
-  }
-
-  function renderAssignmentCoverage() {
-    const coverage = assignmentCoverage();
-    replaceChildren(elements.variableAssignmentCounts,
-      h("span", { className: "coverage-count assigned", textContent: `${coverage.assigned.toLocaleString()} assigned` }),
-      h("span", { className: "coverage-count unassigned", textContent: `${coverage.unassigned.toLocaleString()} unassigned` }));
-    const scope = coverage.uoaFiltered ? ` for UOA “${state.selectedUoa}”` : "";
-    const rejected = coverage.rejected ? `; ${coverage.rejected.toLocaleString()} rejected variables excluded` : "";
-    elements.variableAssignmentCounts.title = `${coverage.total.toLocaleString()} variables${scope} represented by ${coverage.plottedNodes.toLocaleString()} plotted nodes${rejected}`;
-  }
-
-  function render(anchorsReady, { includeCoverage = true } = {}) {
+export function createToolbarPresenter({ state, elements, groupById }) {
+  function render(anchorsReady) {
     if (elements.dagViewTitle) elements.dagViewTitle.textContent = diagnosticViewTitle(state, anchorsReady);
     if (elements.toggleSparseEdges) {
       elements.toggleSparseEdges.classList.toggle("active", state.excludeSparseEdges);
       elements.toggleSparseEdges.setAttribute("aria-pressed", state.excludeSparseEdges ? "true" : "false");
-      elements.minimumEdgePapers.value = String(state.minimumEdgePapers ?? 2);
-    }
-    const layoutSources = state.data?.layout?.sources || [];
-    replaceChildren(elements.variableLayoutSelect, layoutSources.map(source =>
-      h("option", { value: source.source, textContent: source.label || source.source })));
-    elements.variableLayoutSelect.value = state.variableLayoutSource;
-    elements.variableLayoutSelect.hidden = layoutSources.length < 2;
-    if (includeCoverage) renderAssignmentCoverage();
-    for (const [element, active] of [[elements.toggleVariableLabels, state.showVariableLabels],
-      [elements.toggleGroupLabels, state.showGroupLabels]]) {
-      element.classList.toggle("active", active);
-      element.setAttribute("aria-pressed", active ? "true" : "false");
+      // Off, no minimum applies, so the field reads 1 rather than the minimum the toggle would restore.
+      elements.minimumEdgePapers.value = String(state.excludeSparseEdges ? state.minimumEdgePapers ?? 2 : 1);
     }
     if (elements.diagnosticOverlapKey) {
-      const showKey = anchorsReady && !state.showExogeneity
-        && (state.showConfoundersOnly || state.showCollidersOnly || state.showExclusionViolations);
+      const showKey = anchorsReady
+        && (state.showConfoundersOnly || state.showCollidersOnly || state.showExclusionViolations || state.showExogeneity);
       elements.diagnosticOverlapKey.hidden = !showKey;
       elements.diagnosticOverlapKey.classList.toggle("collider-key", !state.showExclusionViolations && state.showConfoundersOnly);
       elements.diagnosticOverlapKey.classList.toggle("confounder-key", !state.showExclusionViolations && state.showCollidersOnly);
       const keyItem = (swatchClass, label) => h("span", { className: "diagnostic-key-item" },
         h("span", { className: `diagnostic-key-swatch ${swatchClass}`, attrs: { "aria-hidden": "true" } }), label);
-      replaceChildren(elements.diagnosticOverlapKey, state.showExclusionViolations
-        ? [keyItem("diagnostic-key-instrument", "Instrument"),
-          keyItem("diagnostic-key-violation", "Potential violation"),
-          keyItem("diagnostic-key-path", "Path on hover")]
-        : [keyItem("diagnostic-key-fill", state.showConfoundersOnly ? "Confounder" : "Collider"),
-          keyItem("diagnostic-key-outline", state.showConfoundersOnly ? "Also a collider" : "Also a confounder")]);
+      const anchorItems = [keyItem("diagnostic-key-iv", "Cause"),
+        keyItem("diagnostic-key-dv", "Outcome")];
+      replaceChildren(elements.diagnosticOverlapKey, state.showExogeneity
+        ? [...anchorItems, keyItem("diagnostic-key-instrument", "Instrument"),
+          keyItem("diagnostic-key-cause", "Potential common cause")]
+        : state.showExclusionViolations
+          ? [...anchorItems, keyItem("diagnostic-key-instrument", "Instrument"),
+            keyItem("diagnostic-key-violation", "Exclusion violation"),
+            keyItem("diagnostic-key-addressed", "Accounted for")]
+          : [...anchorItems, keyItem("diagnostic-key-fill", state.showConfoundersOnly ? "Confounder" : "Collider"),
+            ...(state.showConfoundersOnly ? [keyItem("diagnostic-key-addressed", "Accounted for")] : []),
+            keyItem("diagnostic-key-outline", state.showConfoundersOnly ? "Also a collider" : "Also a confounder")]);
     }
     const confounderCount = state.confounderGroupIds?.size || 0;
     const instrumentReady = anchorsReady && Boolean(state.project?.instrument_group_id)
@@ -90,6 +56,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     elements.toggleExogeneity.title = `Show groups with directed paths to both the instrument and outcome within ${state.confounderMaxPathLength} links of each. Bidirectional links may run either way.`;
     elements.toggleExclusionViolations.classList.toggle("active", state.showExclusionViolations);
     elements.toggleExclusionViolations.setAttribute("aria-pressed", state.showExclusionViolations ? "true" : "false");
+    elements.toggleExclusionViolations.setAttribute("aria-label", `Exclusion restriction violations (${state.exclusionViolationIds?.size || 0})`);
     elements.toggleExclusionViolations.textContent = `Exclusion (${state.exclusionViolationIds?.size || 0})`;
     elements.toggleExclusionViolations.title = `Show directed paths from the instrument to the Dep var through at least one other group, never through the Ind var, within ${state.exclusionMaxPathLength} links.`;
     elements.toggleConfoundersOnly.disabled = !anchorsReady;
@@ -141,12 +108,7 @@ export function createToolbarPresenter({ state, elements, groupById, visibleVari
     elements.toggleAllExclusionLinks.hidden = !state.showExclusionViolations || !instrumentReady;
     elements.toggleAllExclusionLinks.classList.toggle("active", state.showAllExclusionLinks);
     elements.toggleAllExclusionLinks.setAttribute("aria-pressed", state.showAllExclusionLinks ? "true" : "false");
-    const selectedCount = state.selectedVariableIds?.size || 0;
-    if (elements.selectionCount) {
-      elements.selectionCount.hidden = selectedCount === 0;
-      elements.selectionCount.textContent = `${selectedCount} selected`;
-    }
   }
 
-  return { render, assignmentCoverage, renderAssignmentCoverage };
+  return { render };
 }

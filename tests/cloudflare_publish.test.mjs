@@ -28,7 +28,7 @@ async function world(parentPrefix = "old", service = null) {
     return service.fetchImpl(url, init);
   };
   const store = new Map();
-  const storage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value) };
+  const storage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key) };
   let solved = 0;
   const cloudflare = { apiUrl: API, fetchImpl: apiFetch, storage, solve: async () => { solved++; return "good-token"; } };
   return { service, original, readFetch: service.readFetch, cloudflare, calls, store, solved: () => solved, parentPrefix };
@@ -51,7 +51,7 @@ test("a schema published from a Cloudflare page lands in R2 with its registry ro
   assert.equal(result.fileCount, written.length);
 
   const manifest = JSON.parse(new TextDecoder().decode(w.service.objects.get(`published-schemas/${prefix}manifest.json`).bytes));
-  // References are stored in the one canonical (Supabase) form, even though the parent was read from R2.
+  // References use the R2 address of the immutable parent file.
   assert.equal(manifest.group_membership_references.health,
     canonicalPublishedReference(`${FILES}old/memberships/health.tsv`));
 
@@ -88,15 +88,12 @@ test("the owner is created once and remembered, and publishing the same content 
   assert.notEqual(third.owner_id, first.owner_id);
 });
 
-test("publishing from a Cloudflare page without the worker configured is refused, not sent to Supabase", async () => {
+test("publishing requires the Cloudflare worker", async () => {
   const w = await world();
   const changed = schema([group("verbal", ["a"]), group("health", ["c"])]);
-  const calls = [];
-  const client = new Proxy({}, { get: (_, name) => { calls.push(name); throw new Error("Supabase must not be used"); } });
-  await assert.rejects(publishWorkingSchema({ schema: changed, source: "cloudflare", cloudflare: { apiUrl: "" }, client,
-    previousPublication: { publication_id: PARENT, storage_prefix: "old" }, fetchImpl: w.readFetch, compileInput: { rawLinks: [] } }),
-  /not set up yet/);
-  assert.deepEqual(calls, []);
+  await assert.rejects(publishWorkingSchema({ schema: changed, cloudflare: { apiUrl: "" },
+    previousPublication: { publication_id: PARENT, storage_prefix: "old" }, fetchImpl: w.readFetch,
+    compileInput: { rawLinks: [] } }), /Cloudflare publishing is not configured/);
 });
 
 test("a service failure while writing files surfaces instead of registering a half-written publication", async () => {
@@ -111,17 +108,11 @@ test("a service failure while writing files surfaces instead of registering a ha
   assert.equal(w.service.rows.size, 0, "nothing registered");
 });
 
-test("splits and registry reads use the worker only on a Cloudflare page with the worker configured", async () => {
+test("split browsing uses the worker and requires its address", async () => {
   const w = await world();
-  w.service.addSplit({ publication_id: PARENT, group_id: "g", split_id: "s", source_group_ids: ["a", "b"], name: "n",
-    description: "a long enough description", storage_prefix: "o/p", membership_path: "memberships/g.tsv", owner_id: "o", published_at: "2026-01-01T00:00:00Z" });
-  const rows = await browsePublishedSplits(["a", "b"], null, { source: "cloudflare", apiUrl: API, fetchImpl: w.cloudflare.fetchImpl });
-  assert.deepEqual(rows.map(row => row.group_id), ["g"]);
-  assert.deepEqual(rows[0].source_group_ids, ["a", "b"]);
-  // On the default source, or without the worker's address, the Supabase client is still required.
-  await assert.rejects(browsePublishedSplits(["a"], null, { source: "supabase", apiUrl: API }), /Supabase is not configured/);
-  await assert.rejects(browsePublishedSplits(["a"], null, { source: "cloudflare", apiUrl: "" }), /Supabase is not configured/);
-  await assert.rejects(lookupPublishedSchema(PARENT, null, { source: "supabase", apiUrl: API }), /Supabase is not configured/);
+  const rows = await browsePublishedSplits(["a", "b"], null, { apiUrl: API, fetchImpl: w.cloudflare.fetchImpl, storage: { getItem: () => null } });
+  assert.deepEqual(rows, []);
+  await assert.rejects(browsePublishedSplits(["a"], null, { apiUrl: "" }), /Cloudflare publishing service is not configured/);
 });
 
 test("a published schema that references its parent's files loads and verifies, even when both folder names are the same length", async () => {
@@ -163,4 +154,59 @@ test("a registry row is only accepted for the publication asked for, and with th
   const urls = [];
   await lookupPublishedSchema(PARENT.toUpperCase(), null, { source: "cloudflare", fetchImpl: async url => { urls.push(String(url)); return new Response(JSON.stringify(good)); } });
   assert.deepEqual(urls, [`${FILES}_registry/${PARENT}.json`], "lower-cased, under published-schemas/_registry/");
+});
+
+test("a stalled upload times out, aborts the request, and does not finish the publication", async () => {
+  const { publishFiles } = await import("../site/cloudflare_api.mjs");
+  let uploadSignal;
+  let finished = false;
+  const fetchImpl = async (url, init) => {
+    if (init.method === "PUT") {
+      uploadSignal = init.signal;
+      return new Promise(() => {});
+    }
+    if (new URL(url).pathname.endsWith("/finish")) finished = true;
+    return new Response(JSON.stringify({ reused: false }), { status: 200 });
+  };
+  await assert.rejects(publishFiles({ owner: { token: "token" }, publicationId: "id", contentHash: "hash",
+    compilerVersion: "1", row: {}, files: new Map([["compiled/dag.json", new Uint8Array([1])]]),
+    apiUrl: API, fetchImpl, uploadTimeoutMs: 10 }), /timed out.*try publishing again/i);
+  assert.equal(uploadSignal.aborted, true);
+  assert.equal(finished, false);
+});
+
+test("a retry resumes an interrupted publication, including a lost upload response", async () => {
+  const w = await world();
+  const changed = schema([group("verbal", ["a"]), group("health", ["c"])]);
+  const baseFetch = w.cloudflare.fetchImpl;
+  let interrupted = false;
+  w.cloudflare.fetchImpl = async (url, init = {}) => {
+    const response = await baseFetch(url, init);
+    if (!interrupted && init.method === "PUT") {
+      interrupted = true;
+      throw new Error("Connection lost after upload");
+    }
+    return response;
+  };
+  await assert.rejects(publish(w, changed), /Connection lost/);
+  const [pendingId] = w.service.uploads.keys();
+  const result = await publish(w, changed);
+  assert.equal(result.publicationId, pendingId);
+  assert.equal(w.service.rows.has(pendingId), true);
+  assert.equal([...w.store.keys()].some(key => key.startsWith("echo-publish-pending:")), false);
+});
+
+test("a retry starts a new reservation if the compiled files have changed", async () => {
+  const w = await world();
+  const changed = schema([group("verbal", ["a"]), group("health", ["c"])]);
+  const baseFetch = w.cloudflare.fetchImpl;
+  let interrupted = false;
+  w.cloudflare.fetchImpl = async (url, init = {}) => {
+    if (!interrupted && init.method === "PUT") { interrupted = true; throw new Error("offline"); }
+    return baseFetch(url, init);
+  };
+  await assert.rejects(publish(w, changed), /offline/);
+  const [oldId] = w.service.uploads.keys();
+  const result = await publish(w, changed, { compiledDag: { nodes: [{ id: "changed" }], edges: [] } });
+  assert.notEqual(result.publicationId, oldId);
 });

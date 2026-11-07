@@ -5,6 +5,7 @@ const JEV_RUNS = "jev_runs";
 const JEV_BATCHES = "jev_batches";
 const SESSION_PREFIX = "session:";
 const OPEN_TIMEOUT_MS = 15_000;
+const COMMIT_TIMEOUT_MS = 20_000;
 
 let databasePromise;
 
@@ -43,6 +44,9 @@ export function openLocalDatabase(indexedDb = globalThis.indexedDB, timeoutMs = 
         request.result.close();
         return;
       }
+      request.result.onclose = () => {
+        if (indexedDb === globalThis.indexedDB) databasePromise = null;
+      };
       request.result.onversionchange = () => {
         request.result.close();
         if (indexedDb === globalThis.indexedDB) databasePromise = null;
@@ -83,6 +87,12 @@ export async function loadLocalSchema(id, indexedDb) {
   return requestResult(tx.objectStore(SCHEMAS).get(id), tx);
 }
 
+export async function listLocalSchemas(indexedDb) {
+  const db = await openLocalDatabase(indexedDb);
+  const tx = transaction(db, [SCHEMAS], "readonly");
+  return (await requestResult(tx.objectStore(SCHEMAS).getAll(), tx)) || [];
+}
+
 export async function listPreviousSessions(indexedDb) {
   const db = await openLocalDatabase(indexedDb);
   const tx = transaction(db, [META], "readonly");
@@ -114,17 +124,25 @@ export async function mirrorSessionUrl(sessionId, url, sequence = urlSequence(),
     };
     tx.oncomplete = () => resolve();
     tx.onabort = () => reject(tx.error || new Error("Could not save this view."));
-    tx.onerror = () => reject(tx.error || new Error("Could not save this view."));
+    // Request errors bubble before the transaction has populated tx.error.
+    // Wait for abort so the browser can report the actual storage failure.
+    tx.onerror = () => {};
   });
 }
 
 export async function commitLocalSchema({ id, expectedRevision = 0, schema, url,
   sequence = urlSequence(), basePublicationId = null, basePublicationHash = null,
   lastPublishedId = null, lastPublishedHash = null, sessionId = null,
-  sessionTitle = "" }, indexedDb) {
+  sessionTitle = "", timeoutMs = COMMIT_TIMEOUT_MS }, indexedDb) {
   const db = await openLocalDatabase(indexedDb);
   return new Promise((resolve, reject) => {
     const tx = transaction(db, [SCHEMAS, META], "readwrite", "strict");
+    // A transaction that never reports back (a blocked or suspended browser store) would
+    // leave the save spinner up and queue every later save behind it, so give up and abort.
+    const timer = setTimeout(() => {
+      try { tx.abort(); } catch { /* The transaction may already have ended. */ }
+      reject(new Error("Browser storage did not respond. Close other Echo tabs, then retry."));
+    }, timeoutMs);
     const schemas = tx.objectStore(SCHEMAS);
     const meta = tx.objectStore(META);
     let record;
@@ -155,11 +173,11 @@ export async function commitLocalSchema({ id, expectedRevision = 0, schema, url,
         }
       };
     };
-    tx.oncomplete = () => resolve(record);
-    tx.onabort = () => reject(conflict
+    tx.oncomplete = () => { clearTimeout(timer); resolve(record); };
+    tx.onabort = () => { clearTimeout(timer); reject(conflict
       ? new Error("Schema revision changed in another tab.")
-      : (tx.error || new Error("Local schema save failed.")));
-    tx.onerror = () => reject(tx.error || new Error("Could not save the local schema."));
+      : (tx.error || new Error("Local schema save failed."))); };
+    tx.onerror = () => { clearTimeout(timer); reject(tx.error || new Error("Could not save the local schema.")); };
   });
 }
 

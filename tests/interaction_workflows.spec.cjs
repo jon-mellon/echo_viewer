@@ -1,12 +1,23 @@
 const { test, expect } = require("./fixtures.cjs");
+const { chooseAnchor, chooseAnchors, startCreate } = require("./support/identify.cjs");
+const { describeVariable, includeConcepts } = require("./support/definition.cjs");
+const { chooseTask, openNav, closeNav } = require("./support/navigation.cjs");
 const { readFile } = require("node:fs/promises");
 
-const viewer = "http://127.0.0.1:8767/?task=identify";
+const viewer = `http://127.0.0.1:${process.env.ECHO_TEST_PORT || 8767}/?task=identify`;
 
 async function ready(page) {
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag
     && window.__dagBuilderState?.publishedSchemaHydrated
     && !window.__dagBuilderState?.publishedSchemaHydrating);
+}
+
+async function selectedCatalogUrl(page) {
+  return page.evaluate(async () => {
+    const { searchCatalogs } = await import('/variable_search_catalog.mjs');
+    const url = searchCatalogs.url(new URL(location.href).searchParams.get('data_version'));
+    return url ? new URL(url, location.href).href : "";
+  });
 }
 
 async function completeSetup(page) {
@@ -19,19 +30,16 @@ async function completeSetup(page) {
       .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id);
   });
   expect(anchors).toHaveLength(2);
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await expect(page.locator('#instrumentGroupPicker button[data-select-none]')).toBeVisible();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
-  await expect(page.locator('body')).not.toHaveClass(/initial-setup/);
+  await chooseAnchors(page, anchors[0], anchors[1]);
   return anchors;
 }
 
 test("privacy policy opens without resetting the viewer", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(viewer);
+  await page.goto(new URL("/", viewer).href);
   await ready(page);
-  await completeSetup(page);
+  // The Privacy link is shown on the start page only.
+  await expect(page.locator("#taskLanding")).toBeVisible();
   await page.evaluate(() => { window.__privacyViewerState = window.__dagBuilderState; });
 
   const [policy] = await Promise.all([
@@ -42,7 +50,9 @@ test("privacy policy opens without resetting the viewer", async ({ page }) => {
   await expect(policy.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
   expect(await page.evaluate(() => window.__dagBuilderState === window.__privacyViewerState)).toBe(true);
   await policy.close();
-  await expect(page.locator("#dagWorkspaceSection")).toBeVisible();
+  await expect(page.locator("#taskLanding")).toBeVisible();
+  await chooseTask(page, "identify");
+  await expect(page.locator(".legal-link")).toBeHidden();
 });
 
 test("selecting evidence in full screen returns to the standard layout", async ({ page }) => {
@@ -52,9 +62,7 @@ test("selecting evidence in full screen returns to the standard layout", async (
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
   expect(anchors).toHaveLength(2);
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
 
   await page.locator("#fullscreenDag").click();
   await expect(page.locator("#fullscreenDag")).toHaveAttribute("aria-pressed", "true");
@@ -68,50 +76,6 @@ test("selecting evidence in full screen returns to the standard layout", async (
   expect(edgeId).toBeTruthy();
   await expect(page.locator("#fullscreenDag")).toHaveAttribute("aria-pressed", "false");
   await expect(page.locator("#edgeInspector")).toBeVisible();
-});
-
-test("selecting a definition variable in full screen keeps the editor open", async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(viewer);
-  await ready(page);
-  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
-  await page.locator("#definitionChooseManual").click();
-  await page.locator("#definitionSourceList input[data-source-id]").first().check();
-  await page.locator("#definitionContinue").click();
-  await page.locator("#definitionMethodManual").click();
-  await expect(page.locator("#dagMapCanvas")).toBeVisible();
-  await page.locator("#fullscreenVariableMap").click();
-  await expect(page.locator("#fullscreenVariableMap")).toHaveAttribute("aria-pressed", "true");
-  // The map keeps fitting itself for a moment after full screen starts, and a slow runner can take a click before
-  // its hit-testing is ready. Aim again from the map's current transform until a click lands.
-  const aim = () => page.evaluate(() => {
-    const state = window.__dagBuilderState;
-    const rect = state.map.canvas.getBoundingClientRect();
-    const { scale, tx, ty } = state.map.transform;
-    const eligible = new Set(state.definitionDraft.eligible_variable_ids);
-    for (const variable of state.variableById.values()) {
-      if (!eligible.has(variable.variable_id)) continue;
-      const x = variable.map_x * scale + tx;
-      const y = variable.map_y * scale + ty;
-      if (Number.isFinite(x) && Number.isFinite(y)
-        && x > 30 && y > 100 && x < rect.width - 30 && y < rect.height - 30) {
-        return { id: variable.variable_id, x: rect.left + x, y: rect.top + y };
-      }
-    }
-    return null;
-  });
-  let landed = false;
-  for (let attempt = 0; attempt < 5 && !landed; attempt++) {
-    await page.waitForTimeout(attempt ? 600 : 100);
-    const point = await aim();
-    expect(point).toBeTruthy();
-    await page.mouse.click(point.x, point.y);
-    landed = await expect.poll(() => page.evaluate(id =>
-      window.__dagBuilderState.definitionDraft.new_variable_ids.includes(id), point.id), { timeout: 3000 })
-      .toBe(true).then(() => true, () => false);
-  }
-  expect(landed).toBe(true);
-  await expect(page.locator("#fullscreenVariableMap")).toHaveAttribute("aria-pressed", "true");
 });
 
 test("password gate rejects an incorrect entry and unlocks with the preview password", async ({ page }) => {
@@ -140,120 +104,54 @@ test("definition navigation returns through both Back steps and Cancel", async (
       return loadNeighbors(ids);
     };
   });
-  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
-  await page.locator("#definitionChooseManual").click();
+  await startCreate(page, "iv");
   await page.locator("#definitionSourceSearch").fill("education");
   await expect(page.locator("#definitionSourceList input[data-source-id]").first()).toBeVisible();
   await page.locator("#definitionSourceSearch").fill("");
   await page.locator("#definitionSourceList input[data-source-id]").first().check();
   await page.locator("#definitionContinue").click();
+  await describeVariable(page);
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
-  await page.locator("#definitionMethodManual").click();
-  // Opening a source only needs map records; neighbor suggestions are fetched
-  // for selected variables when the person starts defining the new group.
+  // Defining a variable never needs neighbor suggestions: the AI or an existing split supplies the concepts.
   expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:neighbors").length)).toBe(0);
   expect(await page.evaluate(() => window.__neighborQuerySizes)).toEqual([]);
   await page.locator("#definitionBack").click();
+  await page.locator("#definitionDescribeBack").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("sources");
   await page.locator("#definitionContinue").click();
+  await describeVariable(page);
   const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
-  await page.locator("#definitionVariableSearch").fill(variableId);
-  await page.locator("#definitionVariableResults .result-button").first().click();
-  await expect.poll(() => page.evaluate(() => {
-    const variables = performance.getEntriesByName("echo:evidence:variables").at(-1);
-    const neighbors = performance.getEntriesByName("echo:evidence:neighbors").at(-1);
-    return Boolean(variables && neighbors && neighbors.startTime >= variables.startTime + variables.duration);
-  })).toBe(true);
-  expect(await page.evaluate(() => window.__neighborQuerySizes)).toEqual([1]);
-  await page.locator("#definitionReview").click();
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("review");
-  await page.locator("#definitionReviewBack").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
-  if (await page.locator("#definitionAddNeighbors").isEnabled()) {
-    await page.locator("#definitionAddNeighbors").click();
-  }
-  await page.locator("#definitionCancel").click();
+  await includeConcepts(page, [variableId]);
+  expect(await page.evaluate(() => performance.getEntriesByName("echo:evidence:neighbors").length)).toBe(0);
+  expect(await page.evaluate(() => window.__neighborQuerySizes)).toEqual([]);
+  await page.locator(".definition-cancel:visible").click();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft)).toBeNull();
-  await expect(page.locator("#ivGroupPicker")).toBeVisible();
+  await expect(page.locator("#identify-iv-input")).toBeVisible();
   const iv = await page.evaluate(() => window.__dagBuilderState.project.groups
     .find(group => group.variable_ids?.length)?.group_id);
-  await page.locator(`#ivGroupPicker button[data-group-id="${iv}"]`).click();
-  await page.locator('#dvGroupPicker button[data-define-side="dv"]').click();
+  await chooseAnchor(page, "iv", iv);
+  await startCreate(page, "dv");
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.role)).toBe("dv");
-  await page.locator("#definitionCancel").click();
+  await page.locator(".definition-cancel:visible").click();
 });
 
 test("variable search catalog preloads once and serves anchor search", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   const catalogRequests = [];
   page.on("request", request => {
-    if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
+    if (/\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
   });
   await page.goto(viewer);
   await ready(page);
   // Setup preloads the catalog; focusing search must reuse it, not fetch it again.
   expect(["loading", "ready"]).toContain(await page.evaluate(() => window.__dagBuilderState.variableSearchStatus));
-  await page.locator("#ivInput").focus();
+  await page.locator("#identify-iv-input").focus();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variableSearchStatus)).toBe("ready");
-  const hasStaticCatalog = await page.evaluate(async () => {
-    const { SNAPSHOT_SEARCH_CATALOGS } = await import('/variable_search_catalog.mjs');
-    return Boolean(SNAPSHOT_SEARCH_CATALOGS[new URL(location.href).searchParams.get('data_version')]);
-  });
-  expect(catalogRequests).toHaveLength(hasStaticCatalog ? 1 : 0);
-  await page.locator("#ivInput").fill("education");
-  await expect(page.locator("#ivGroupPicker button[data-group-id]").first()).toBeVisible();
-});
-
-test("map context menu changes a definition selection and closes with Escape", async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(viewer);
-  await ready(page);
-  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
-  await page.locator("#definitionChooseManual").click();
-  await page.locator("#definitionSourceList input[data-source-id]").first().check();
-  await page.locator("#definitionContinue").click();
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft?.step)).toBe("partition");
-  await page.locator("#definitionMethodManual").click();
-  const variableId = await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids[0]);
-  await page.locator("#definitionVariableSearch").fill(variableId);
-  await page.locator("#definitionVariableResults .result-button").first().click();
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedVariableIds.size)).toBeGreaterThan(0);
-  await page.locator("#dagMapCanvas").click({ button: "right", position: { x: 450, y: 360 }, timeout: 5_000 });
-  await expect(page.locator("#dagMapContextMenu")).toBeVisible();
-  await page.locator('#dagMapContextMenu button[data-definition-action="remove"]').click();
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(0);
-  await page.locator("#dagMapCanvas").click({ button: "right", position: { x: 450, y: 360 }, timeout: 5_000 });
-  await page.locator('#dagMapContextMenu button[data-definition-action="add"]').click();
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.definitionDraft.new_variable_ids.length)).toBe(1);
-  await page.locator("#dagMapCanvas").click({ button: "right", position: { x: 450, y: 360 }, timeout: 5_000 });
-  await page.keyboard.press("Escape");
-  await expect(page.locator("#dagMapContextMenu")).toBeHidden();
-});
-
-test("exclusion reason survives an evidence inspector refresh", async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(viewer);
-  await ready(page);
-  await completeSetup(page);
-  const edgeId = await page.evaluate(async () => {
-    const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
-    await whenDagRendered();
-    const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__");
-    inspectDagEdge(id);
-    return id;
-  });
-  expect(edgeId).toBeTruthy();
-  await page.locator('#edgeInspector button[data-edge-action="exclude"]').click();
-  await page.locator("#excludeReasonInput").fill("Check evidence before excluding");
-  await page.evaluate(async id => {
-    const { inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
-    inspectDagEdge(id);
-  }, edgeId);
-  await expect(page.locator("#excludeReasonRow")).toBeVisible();
-  await expect(page.locator("#excludeReasonInput")).toHaveValue("Check evidence before excluding");
-  await page.locator("#excludeConfirmBtn").click();
-  await expect.poll(() => page.evaluate(id =>
-    window.__dagBuilderState.project.link_decisions[id]?.display_status, edgeId)).toBe("excluded");
+  const catalogUrl = await selectedCatalogUrl(page);
+  expect(catalogRequests.filter(url => url === catalogUrl)).toHaveLength(catalogUrl ? 1 : 0);
+  await page.locator("#identify-iv-input").fill("education");
+  await expect(page.locator("#identifyGroupPicker button[data-group-id]").first()).toBeVisible();
 });
 
 test("edge evidence renders provenance without loading map layouts", async ({ page }) => {
@@ -262,7 +160,7 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
   const catalogRequests = [];
   page.on("request", request => {
     if (request.url().endsWith(".parquet")) parquetRequests.push(request.url());
-    if (/\/search-catalogs\/[^/]+\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
+    if (/\.json\.gz(?:\?|$)/.test(request.url())) catalogRequests.push(request.url());
   });
   // This checks the precomputed search-catalog path available for this snapshot.
   await page.goto(`${viewer}&schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
@@ -281,26 +179,41 @@ test("edge evidence renders provenance without loading map layouts", async ({ pa
   await expect(page.locator("#provenancePanel tbody tr").first()).toBeVisible();
   await expect(page.locator("#provenancePanel .concept-loading")).toHaveCount(0);
   expect(parquetRequests.some(url => url.endsWith("/variable_layouts.parquet"))).toBe(false);
-  expect(catalogRequests).toHaveLength(1);
+  const catalogUrl = await selectedCatalogUrl(page);
+  expect(catalogUrl).toBeTruthy();
+  expect(catalogRequests.filter(url => url === catalogUrl)).toHaveLength(1);
 });
 
 test("evidence keeps available fields visible while concept labels load", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.goto(viewer);
+  await page.goto(`${viewer}&schema=f22dab8b-d9a7-4047-a775-0216b31c79fc&data_version=99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0`);
   await ready(page);
   await completeSetup(page);
   const edgeId = await page.evaluate(async () => {
     const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
     await whenDagRendered();
-    const original = dagDataSource.loadVariableProvenance.bind(dagDataSource);
+    // Seed evidence but not its endpoint labels: newer precomputed panels may
+    // otherwise deliver both together and never enter the loading state.
     dagDataSource.loadVariableProvenance = ids => new Promise(resolve => {
-      window.__releaseConceptLabels = async () => resolve(await original(ids));
+      window.__releaseConceptLabels = () => resolve(ids.map(variable_id => ({ variable_id, concept_label: `Concept ${variable_id}` })));
     });
     const id = renderedDagEdgeIds().find(value => value !== "__study_design_iv_to_dv__"
       && window.__dagBuilderState.project.links.some(link => link.edge_id === value
         && (link.a_to_b_raw_link_ids?.length || link.b_to_a_raw_link_ids?.length)));
-    if (id) inspectDagEdge(id);
+    if (id) {
+      const state = window.__dagBuilderState;
+      const link = state.project.links.find(item => item.edge_id === id);
+      const source = state.project.groups.find(group => group.group_id === link.group_a).variable_ids[0];
+      const target = state.project.groups.find(group => group.group_id === link.group_b).variable_ids[0];
+      state.variableById.delete(source);
+      state.variableById.delete(target);
+      for (const [rawIds, from, to] of [[link.a_to_b_raw_link_ids || [], source, target], [link.b_to_a_raw_link_ids || [], target, source]]) {
+        for (const rawId of rawIds) state.rawLinksById.set(rawId, { raw_causal_link_id: rawId,
+          paper_id: "10.1234/test", paper_title: "Example paper", source_variable_id: from, target_variable_id: to });
+      }
+      inspectDagEdge(id);
+    }
     return id;
   });
   expect(edgeId).toBeTruthy();
@@ -315,14 +228,14 @@ test("evidence keeps available fields visible while concept labels load", async 
   await expect(page.locator("#provenancePanel .concept-loading")).toHaveCount(0);
 });
 
-test("evidence replaces the desktop sidebar and closing it restores navigation", async ({ page }) => {
+test("evidence replaces the map, the fields and list stay, and Back to map restores the graph", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(viewer);
   await ready(page);
   await completeSetup(page);
   const pane = page.locator(".dag-ws-footer");
-  await expect(page.locator(".panel-header")).toBeVisible();
+  await expect(page.locator("#identifyFields")).toBeVisible();
   await expect(pane).toBeHidden();
   await page.evaluate(async () => {
     const { whenDagRendered, renderedDagEdgeIds, inspectDagEdge } = await import("/dag_builder.js?v=evidence-pane-v1");
@@ -330,11 +243,12 @@ test("evidence replaces the desktop sidebar and closing it restores navigation",
     inspectDagEdge(renderedDagEdgeIds().find(id => id !== "__study_design_iv_to_dv__"));
   });
   await expect(pane).toBeVisible();
-  await expect(page.locator(".panel-header")).toBeHidden();
-  expect(await pane.evaluate(node => node.parentElement.className)).toContain("dag-left-panel");
-  expect((await page.locator(".dag-network-wrapper").boundingBox()).height).toBeGreaterThan(600);
+  await expect(page.locator("#dagNetwork")).toBeHidden();
+  await expect(page.locator("#identifyFields")).toBeVisible();
+  await expect(page.locator("#closeEvidencePane")).toHaveText("Back to map", { useInnerText: true });
   await page.locator("#closeEvidencePane").click();
-  await expect(page.locator(".panel-header")).toBeVisible();
+  await expect(page.locator("#dagNetwork")).toBeVisible();
+  expect((await page.locator(".dag-network-wrapper").boundingBox()).height).toBeGreaterThan(600);
   await expect(pane).toBeHidden();
 
   await page.setViewportSize({ width: 390, height: 800 });
@@ -407,47 +321,7 @@ test("mobile evidence tables reopen at their left edge", async ({ page }) => {
   expect(await panel.evaluate(node => node.scrollLeft)).toBe(0);
 });
 
-test("pinching the mobile variable map zooms the map without selecting a variable", async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
-  await page.setViewportSize({ width: 390, height: 800 });
-  await page.goto(viewer);
-  await ready(page);
-  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
-  await page.locator("#definitionChooseManual").click();
-  await expect(page.locator('#definitionSourceList input[data-source-id]').first()).toBeVisible();
-  await page.locator('#definitionSourceList input[data-source-id]').first().check();
-  await page.locator('#definitionContinue').click();
-  await page.locator('button[data-mobile-panel="variables"]').click();
-  await expect(page.locator('button[data-mobile-panel="dag"]')).toBeHidden();
-  await expect(page.locator('.mobile-panel-nav .mobile-panel-tab:visible')).toHaveCount(2);
-  const canvas = page.locator('#dagMapCanvas');
-  await expect(canvas).toBeVisible();
-  await expect.poll(() => canvas.evaluate(node => node.width)).toBeGreaterThan(100);
-  expect(await canvas.evaluate(node => getComputedStyle(node).touchAction)).toBe('none');
-
-  const box = await canvas.boundingBox();
-  const centerX = box.x + box.width / 2;
-  const centerY = box.y + box.height / 2;
-  const before = await page.evaluate(() => window.__dagBuilderState.map.transform.scale);
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
-  const point = (x, id) => ({ x, y: centerY, id });
-  await cdp.send('Input.dispatchTouchEvent', {
-    type: 'touchStart', touchPoints: [point(centerX - 30, 1)],
-  });
-  await cdp.send('Input.dispatchTouchEvent', {
-    type: 'touchStart', touchPoints: [point(centerX - 30, 1), point(centerX + 30, 2)],
-  });
-  await cdp.send('Input.dispatchTouchEvent', {
-    type: 'touchMove', touchPoints: [point(centerX - 65, 1), point(centerX + 65, 2)],
-  });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-
-  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.map.transform.scale)).toBeGreaterThan(before);
-  expect(await page.evaluate(() => window.__dagBuilderState.selectedVariableIds.size)).toBe(0);
-});
-
-test("mobile definition waits for variable data before opening the map", async ({ page }) => {
+test("mobile definition waits for variable data before showing the concepts", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto(viewer);
@@ -458,17 +332,14 @@ test("mobile definition waits for variable data before opening the map", async (
     const gate = new Promise(resolve => { window.__releaseVariableLoad = resolve; });
     dagDataSource.loadVariableMetadata = async (...args) => { await gate; return load(...args); };
   });
-  await page.locator('#ivGroupPicker button[data-define-side="iv"]').click();
-  await page.locator("#definitionChooseManual").click();
+  await startCreate(page, "iv");
   await page.locator('#definitionSourceList input[data-source-id]').first().check();
   await page.locator("#definitionContinue").click();
-  await expect(page.locator("#definitionContinue")).toHaveText("Loading selected variables…");
-  await expect(page.locator('button[data-mobile-panel="variables"]')).toBeHidden();
+  await expect(page.locator("#definitionContinue")).toHaveText("Loading concepts…");
+  await expect(page.locator("#definitionDescribeStep")).toBeHidden();
   await page.evaluate(() => window.__releaseVariableLoad());
-  await expect(page.locator('button[data-mobile-panel="variables"]')).toBeVisible();
-  await page.locator('button[data-mobile-panel="variables"]').click();
+  await expect(page.locator("#definitionDescribeStep")).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__dagBuilderState.variables.length)).toBeGreaterThan(0);
-  await expect(page.locator('#variableAssignmentCounts')).not.toHaveText(/0 assigned\s*0 unassigned/);
 });
 
 test("project export can be imported with its anchors intact", async ({ page }) => {
@@ -477,9 +348,7 @@ test("project export can be imported with its anchors intact", async ({ page }) 
   await ready(page);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator("#exportToggleBtn").click();
   const downloadPromise = page.waitForEvent("download");
   await page.locator("#exportProject").click();
@@ -502,11 +371,9 @@ test("Share view copies the selected public permalink", async ({ page, context }
   await ready(page);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator("#copyPermalink").click();
-  await expect(page.locator("#copyPermalink")).toContainText("Copied");
+  await expect(page.locator("#copyPermalink")).toHaveAttribute("aria-label", "Copied");
   const copied = new URL(await page.evaluate(() => navigator.clipboard.readText()));
   expect(copied.searchParams.get("iv")).toBe(anchors[0]);
   expect(copied.searchParams.get("dv")).toBe(anchors[1]);
@@ -523,9 +390,7 @@ test("mobile map controls accept taps and sharing falls back when clipboard acce
   await ready(page);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator('[data-mobile-panel="dag"]').last().tap();
   // Fit does nothing until the graph has been drawn, so wait for it rather than racing the render.
   await page.evaluate(async () => {
@@ -571,13 +436,13 @@ test("mobile map controls accept taps and sharing falls back when clipboard acce
     } });
   });
   await share.tap();
-  await expect(share).toContainText("Copied");
+  await expect(share).toHaveAttribute("aria-label", "Copied");
   expect(await page.evaluate(() => window.__shareGestureActive)).toBe(true);
   expect(await page.evaluate(() => window.__sharedText)).toContain("iv=");
   await context.close();
 });
 
-test("mobile map toolbar and footer stay within their panels", async ({ browser }) => {
+test("mobile top bar, map and menu stay on screen", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   const page = await context.newPage();
   try {
@@ -588,56 +453,38 @@ test("mobile map toolbar and footer stay within their panels", async ({ browser 
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
     await expect(page.locator("#dagNetwork")).toBeVisible();
     const layout = await page.evaluate(() => {
-      const header = document.querySelector(".dag-ws-header").getBoundingClientRect();
-      const controls = document.querySelector(".dag-ws-controls");
-      const buttons = [...controls.children].filter(node => getComputedStyle(node).display !== "none")
-        .map(node => node.getBoundingClientRect());
-      const filter = controls.querySelector(".filter-dropdown > summary");
-      const filterText = document.createRange();
-      filterText.selectNodeContents(filter.firstChild);
-      const filterBox = filter.getBoundingClientRect();
-      const textBox = filterText.getBoundingClientRect();
+      const bar = document.querySelector("#taskBar").getBoundingClientRect();
       const shell = document.querySelector(".dag-shell").getBoundingClientRect();
-      const nav = document.querySelector(".mobile-panel-nav").getBoundingClientRect();
-      const privacy = document.querySelector(".legal-link").getBoundingClientRect();
       return {
-        top: header.top,
-        taskBottom: document.querySelector("#taskBar").getBoundingClientRect().bottom,
-        overflow: getComputedStyle(document.querySelector(".dag-right-panel")).overflowY,
-        rows: new Set(buttons.map(rect => Math.round(rect.top))).size,
-        inside: buttons.every(rect => rect.left >= header.left - 1 && rect.right <= header.right + 1),
-        filterTextOffset: Math.abs((textBox.top + textBox.bottom) / 2 - (filterBox.top + filterBox.bottom) / 2),
-        footerGap: Math.abs(nav.top - shell.bottom),
-        privacyInsideNav: privacy.top >= nav.top && privacy.bottom <= nav.bottom,
-        privacyClearOfMap: privacy.left >= document.querySelector('.mobile-panel-nav [data-mobile-panel="dag"]').getBoundingClientRect().right,
+        page: document.documentElement.scrollWidth,
+        barOverflow: document.querySelector("#taskBar").scrollWidth - document.querySelector("#taskBar").clientWidth,
+        shellTop: shell.top, barBottom: bar.bottom, shellBottom: shell.bottom, viewport: window.innerHeight,
       };
     });
-    expect(layout.top).toBeGreaterThanOrEqual(layout.taskBottom - 1);
-    expect(layout.overflow).toBe("hidden");
-    expect(layout.rows).toBeGreaterThan(1);
-    expect(layout.inside).toBe(true);
-    expect(layout.filterTextOffset).toBeLessThan(2);
-    expect(layout.footerGap).toBeLessThan(2);
-    expect(layout.privacyInsideNav).toBe(true);
-    expect(layout.privacyClearOfMap).toBe(true);
+    expect(layout.page).toBeLessThanOrEqual(390);
+    expect(layout.barOverflow).toBe(0);
+    // The map starts under the top bar and fills the rest of the screen.
+    expect(layout.shellTop).toBeGreaterThanOrEqual(layout.barBottom - 1);
+    expect(layout.shellBottom).toBeGreaterThan(layout.viewport - 2);
+    // The diagnostic switch and the other controls sit behind the menu button.
+    await expect(page.locator(".dag-diagnostic-switch")).toBeHidden();
+    await openNav(page, { tap: true });
     await expect(page.locator(".dag-diagnostic-switch")).toBeVisible();
     await expect(page.locator(".filter-dropdown-panel #toggleConfoundersOnly")).toHaveCount(0);
     await expect(page.locator("#toggleConfoundersOnly")).toHaveAttribute("aria-pressed", "true");
+    await openNav(page, { tap: true });
     await page.locator("#toggleCollidersOnly").tap();
     await expect(page.locator("#toggleCollidersOnly")).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#toggleConfoundersOnly")).toHaveAttribute("aria-pressed", "false");
+    await openNav(page, { tap: true });
     await page.locator("#toggleConfoundersOnly").tap();
     await expect(page.locator("#toggleConfoundersOnly")).toHaveAttribute("aria-pressed", "true");
+    await closeNav(page, { tap: true });
     await page.setViewportSize({ width: 320, height: 700 });
-    const narrowFooter = await page.evaluate(() => {
-      const shell = document.querySelector(".dag-shell").getBoundingClientRect();
-      const nav = document.querySelector(".mobile-panel-nav").getBoundingClientRect();
-      const privacy = document.querySelector(".legal-link").getBoundingClientRect();
-      const map = document.querySelector('.mobile-panel-nav [data-mobile-panel="dag"]').getBoundingClientRect();
-      return { gap: Math.abs(nav.top - shell.bottom), clear: privacy.left >= map.right };
-    });
-    expect(narrowFooter.gap).toBeLessThan(2);
-    expect(narrowFooter.clear).toBe(true);
+    const narrow = await page.evaluate(() => ({ page: document.documentElement.scrollWidth,
+      barOverflow: document.querySelector("#taskBar").scrollWidth - document.querySelector("#taskBar").clientWidth }));
+    expect(narrow.page).toBeLessThanOrEqual(320);
+    expect(narrow.barOverflow).toBe(0);
   } finally {
     await context.close();
   }
@@ -652,19 +499,24 @@ test("instrument diagnostics use the same mobile view switch", async ({ browser 
     await ready(page);
     const [iv, dv, instrument] = await page.evaluate(() => window.__dagBuilderState.project.groups
       .filter(group => group.variable_ids?.length).slice(0, 3).map(group => group.group_id));
-    await page.locator(`#ivGroupPicker button[data-group-id="${iv}"]`).tap();
-    await page.locator(`#dvGroupPicker button[data-group-id="${dv}"]`).tap();
-    await page.locator(`#instrumentGroupPicker button[data-group-id="${instrument}"]`).tap();
+    await chooseAnchor(page, "iv", iv, { tap: true });
+    await chooseAnchor(page, "dv", dv, { tap: true });
+    await chooseAnchor(page, "instrument", instrument, { tap: true });
     await page.locator('.mobile-panel-nav [data-mobile-panel="dag"]').tap();
+    await openNav(page, { tap: true });
     await expect(page.locator("#toggleConfoundersOnly")).toBeHidden();
     await expect(page.locator("#toggleCollidersOnly")).toBeHidden();
     await expect(page.locator("#toggleExclusionViolations")).toBeVisible();
+    await expect(page.locator("#toggleExclusionViolations")).toHaveAccessibleName(/Exclusion restriction violations \(\d+\)/);
     await expect(page.locator("#toggleExogeneity")).toBeVisible();
+    await openNav(page, { tap: true });
     await page.locator("#toggleExogeneity").tap();
     await expect(page.locator("#toggleExogeneity")).toHaveAttribute("aria-pressed", "true");
+    await openNav(page, { tap: true });
     await page.locator("#toggleExclusionViolations").tap();
     await expect(page.locator("#toggleExclusionViolations")).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("#toggleExogeneity")).toHaveAttribute("aria-pressed", "false");
+    await openNav(page, { tap: true });
     const switchBox = await page.locator(".dag-diagnostic-switch").boundingBox();
     expect(switchBox.x).toBeGreaterThanOrEqual(0);
     expect(switchBox.x + switchBox.width).toBeLessThanOrEqual(390);
@@ -683,9 +535,7 @@ test("bibliography, Markdown, and LaTeX export controls produce downloads", asyn
   await ready(page);
   const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
     .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
-  await page.locator(`#ivGroupPicker button[data-group-id="${anchors[0]}"]`).click();
-  await page.locator(`#dvGroupPicker button[data-group-id="${anchors[1]}"]`).click();
-  await page.locator('#instrumentGroupPicker button[data-select-none]').click();
+  await chooseAnchors(page, anchors[0], anchors[1]);
   await page.locator("#exportToggleBtn").click();
   for (const [button, filename] of [
     ["#exportBib", "references.bib"],
@@ -698,4 +548,337 @@ test("bibliography, Markdown, and LaTeX export controls produce downloads", asyn
     expect(download.suggestedFilename()).toBe(filename);
     expect(await download.failure()).toBeNull();
   }
+});
+
+for (const width of [390, 1440]) test(`Identify waits for membership loading before accepting a variable at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  // Reproduce the interval between the compiled graph appearing and the full
+  // published memberships arriving, without relying on network timing.
+  await page.evaluate(() => { window.__dagBuilderState.publishedSchemaHydrating = true; });
+  const input = page.locator("#identify-iv-input");
+  await input.click();
+  await input.fill("sleep");
+  const picker = page.locator("#identifyGroupPicker");
+  const choice = picker.locator('button[data-group-id="category-sleep"]');
+  await expect(choice).toBeDisabled();
+  await expect(picker).toContainText("Loading variable data before selection");
+  await page.evaluate(() => { window.__dagBuilderState.publishedSchemaHydrating = false; });
+  // Hydration normally rerenders the controls; an input event does the same here.
+  await input.fill("slee");
+  await input.fill("sleep");
+  await expect(choice).toBeEnabled();
+  await choice.click();
+  await expect(input).toHaveValue("sleep");
+  await expect.poll(() => page.evaluate(() => window.__dagBuilderState.project.iv_group_id)).toBe("category-sleep");
+});
+
+for (const width of [390, 1440]) test(`unfinished evidence reason survives leaving the panel at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  const openEvidence = () => page.evaluate(async () => {
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    api.inspectDagEdge("category-academic-achievement__category-macroeconomic-context");
+  });
+  await openEvidence();
+  await page.getByRole("button", { name: /^Exclude finding / }).first().click();
+  const reason = page.getByRole("combobox", { name: "Finding exclusion reason" });
+  const detail = page.getByRole("textbox", { name: "Other exclusion reason" });
+  await reason.selectOption("other");
+  await detail.fill("A reason still being written");
+  await page.locator("#closeEvidencePane").click();
+  await openEvidence();
+  await expect(reason).toHaveValue("other");
+  await expect(detail).toHaveValue("A reason still being written");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: /^Exclude finding / }).first().click();
+  await expect(reason).toHaveValue("not_relevant_to_target_population");
+  await reason.selectOption("other");
+  await expect(detail).toHaveValue("");
+});
+
+for (const width of [390, 1440]) test(`a partially selected Identify view survives reload at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  await page.locator("#identify-iv-input").fill("sleep");
+  await page.locator('#identifyGroupPicker button[data-group-id="category-sleep"]').click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("iv")).toBe("category-sleep");
+  await expect.poll(() => new URL(page.url()).searchParams.get("mode")).toBe("setup");
+  await page.reload();
+  await ready(page);
+  await expect(page.locator("#identify-iv-input")).toHaveValue("sleep");
+  await expect(page.locator('#identifyGroupPicker[data-picker-side="dv"]')).toBeVisible();
+});
+
+for (const width of [390, 1440]) test(`schema workspace survives reload at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  if (width < 840) await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').click();
+  await page.locator("#editVariableSchema").click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("workspace")).toBe("schema");
+  await page.reload();
+  await ready(page);
+  await expect(page.locator("#customVariablesView")).toBeVisible();
+  await page.locator("#customVariablesClose").click();
+  await expect.poll(() => new URL(page.url()).searchParams.has("workspace")).toBe(false);
+});
+
+test("mobile reload returns to the open evidence pane", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  const edge = "category-academic-achievement__category-macroeconomic-context";
+  await page.evaluate(async id => {
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    api.inspectDagEdge(id);
+  }, edge);
+  await expect.poll(() => new URL(page.url()).searchParams.get("selected_edge")).toBe(edge);
+  await page.reload();
+  await ready(page);
+  await expect(page.locator("#closeEvidencePane")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Exclude finding / }).first()).toBeVisible();
+});
+
+test("reload warns before discarding an unfinished variable definition", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  await startCreate(page, "iv");
+  await page.locator("#definitionSourceList input[data-source-id]").first().check();
+  const selectedSource = page.locator("#definitionSourceList input[data-source-id]").first();
+  const dialogPromise = page.waitForEvent("dialog");
+  const reloadPromise = page.reload({ timeout: 3000 }).catch(() => {});
+  const dialog = await dialogPromise;
+  expect(dialog.type()).toBe("beforeunload");
+  await dialog.dismiss();
+  await reloadPromise;
+  await expect(selectedSource).toBeChecked();
+});
+
+test("a save finishing after navigation keeps the newer view in the address", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const result = await page.evaluate(async () => {
+    const { createPersistentViewer } = await import("/persistent_viewer.mjs");
+    const live = window.__dagBuilderState;
+    const schema = { schema_version: "groupings-v3", grouping_set_id: "test", membership_unit: "canonical_variable",
+      groups: [{ group_id: "a", label: "A", variable_ids: ["v1"] }] };
+    const state = { project: { groups: schema.groups, iv_group_id: "", dv_group_id: "" },
+      data: live.data, task: "causes", explore: { causes: { focusId: "a", depth: 1, minPapers: 2 },
+        consequences: { focusId: "a", depth: 1, minPapers: 2 } }, workflowMode: "setup", definitionDraft: null };
+    let release;
+    const controller = createPersistentViewer({ state, getSchema: () => structuredClone(schema),
+      saveSchema: ({ id }) => new Promise(resolve => { release = () => resolve({ id, revision: 1 }); }) });
+    controller.start();
+    schema.groups[0].label = "Edited";
+    const saving = controller.commitDecision();
+    state.task = "consequences";
+    controller.viewerChanged();
+    release();
+    await saving;
+    await new Promise(resolve => setTimeout(resolve, 20));
+    return { task: new URL(location.href).searchParams.get("task"), local: new URL(location.href).searchParams.has("local_schema") };
+  });
+  expect(result).toEqual({ task: "consequences", local: true });
+});
+
+test("an old source loading failure cannot replace the new draft's in-flight load", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const sourceId = await page.evaluate(async () => {
+    const state = window.__dagBuilderState;
+    const group = state.project.groups.find(g => g.variable_ids?.some(id => !state.variableById.has(id)));
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    window.__sourceLoads = [];
+    dagDataSource.loadVariableMetadata = () => new Promise((resolve, reject) => window.__sourceLoads.push({ resolve, reject }));
+    return group.group_id;
+  });
+  await startCreate(page, "iv");
+  const source = page.locator(`#definitionSourceList input[data-source-id="${sourceId}"]`);
+  await source.check();
+  await expect.poll(() => page.evaluate(() => window.__sourceLoads.length)).toBe(1);
+  await page.locator(".definition-cancel:visible").first().click();
+  await startCreate(page, "iv");
+  await source.check();
+  await expect.poll(() => page.evaluate(() => window.__sourceLoads.length)).toBe(2);
+  await page.evaluate(() => window.__sourceLoads[0].reject(new Error("old load failed")));
+  await page.locator("#definitionContinue").click();
+  await page.waitForTimeout(100);
+  expect(await page.evaluate(() => window.__sourceLoads.length)).toBe(2);
+  await page.evaluate(() => window.__sourceLoads[1].resolve([]));
+});
+
+for (const mode of ["publish", "share"]) test(`a ${mode} finishing after another edit remains unpublished`, async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const result = await page.evaluate(async mode => {
+    const { createPublicationController } = await import("/dag_publication.mjs");
+    const { workingSchemaHashes } = await import("/dag_publication_core.mjs");
+    let schema = { schema_version: "groupings-v3", grouping_set_id: "test", membership_unit: "canonical_variable",
+      groups: [{ group_id: "a", label: "Before", variable_ids: ["v1"] }] };
+    const originalHash = (await workingSchemaHashes(schema, crypto))[0];
+    let publication = null, release, started;
+    const publishing = new Promise(resolve => { started = resolve; });
+    const elements = { publish: document.createElement("button"), status: document.createElement("div"),
+      badge: document.createElement("span"), menuButton: document.createElement("button"), confirmation: null };
+    const controller = createPublicationController({ elements, getWorkingSchema: () => structuredClone(schema),
+      getPublicationState: () => publication, setPublicationState: value => { publication = value; },
+      getPermalinkState: () => window.__dagBuilderState, saveWorkingState: () => {},
+      windowApi: { location, confirm: () => true },
+      publishSchema: () => { started(); return new Promise(resolve => { release = () => resolve({
+        publicationId: "11111111-1111-4111-8111-111111111111", contentHash: originalHash, reused: false, fileCount: 1 }); }); } });
+    controller.initialize();
+    const pending = mode === "share" ? controller.publicPermalink() : controller.publish();
+    await publishing;
+    schema.groups[0].label = "Edited during upload";
+    controller.workingCopyChanged();
+    await new Promise(resolve => setTimeout(resolve, 400));
+    release();
+    const value = await pending;
+    await new Promise(resolve => setTimeout(resolve, 400));
+    return { badge: elements.badge.textContent, publishHidden: elements.publish.hidden, shared: mode === "share" && Boolean(value) };
+  }, mode);
+  expect(result).toEqual({ badge: "Unpublished changes", publishHidden: false, shared: false });
+});
+
+test("publication stops if the schema changes while its graph is being prepared", async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const result = await page.evaluate(async () => {
+    const { createPublicationController } = await import("/dag_publication.mjs");
+    let schema = { schema_version: "groupings-v3", grouping_set_id: "test", membership_unit: "canonical_variable",
+      groups: [{ group_id: "a", label: "Before", variable_ids: ["v1"] }] };
+    let release, started, published = false;
+    const preparing = new Promise(resolve => { started = resolve; });
+    const elements = { publish: document.createElement("button"), status: document.createElement("div"),
+      badge: document.createElement("span"), menuButton: document.createElement("button"), confirmation: null };
+    const controller = createPublicationController({ elements, getWorkingSchema: () => structuredClone(schema),
+      getPublicationState: () => null, setPublicationState: () => {}, getPermalinkState: () => window.__dagBuilderState,
+      saveWorkingState: () => {}, windowApi: { location, confirm: () => true },
+      getCompileInput: () => { started(); return new Promise(resolve => { release = () => resolve({}); }); },
+      publishSchema: async () => { published = true; throw new Error("unexpected publication"); } });
+    controller.initialize();
+    const pending = controller.publish();
+    await preparing;
+    schema.groups[0].label = "Changed during preparation";
+    controller.workingCopyChanged();
+    release();
+    await pending;
+    return { published, status: elements.status.textContent };
+  });
+  expect(result.published).toBe(false);
+  expect(result.status).toMatch(/changed.*prepar/i);
+});
+
+for (const width of [390, 1440]) test(`failed evidence loading is reported at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    window.__loadPanelEvidence = dagDataSource.loadPanelEvidence.bind(dagDataSource);
+    dagDataSource.loadPanelEvidence = async () => { throw new Error("simulated evidence failure"); };
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    api.inspectDagEdge("category-academic-achievement__category-macroeconomic-context");
+  });
+  await expect(page.getByText("Evidence could not be loaded. Try again.")).toBeVisible();
+  await expect(page.locator("#provenancePanel")).not.toContainText("No evidence records for this direction.");
+  await page.evaluate(async () => {
+    const { dagDataSource } = await import("/dag_data_source.mjs?v=browser-v2");
+    dagDataSource.loadPanelEvidence = window.__loadPanelEvidence;
+  });
+  await page.getByRole("button", { name: "Retry evidence loading" }).click();
+  await expect(page.getByRole("button", { name: /^Exclude finding / }).first()).toBeVisible();
+});
+
+for (const width of [390, 1440]) test(`the picker reports when saved variables could not be searched at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => {
+    sessionStorage.setItem("echo-viewer-password-accepted", "yes");
+    localStorage.setItem("echo-owner-token", `00000000-0000-4000-8000-000000000001.${"a".repeat(64)}`);
+  });
+  await page.route("**/v1/owners/publications", route => route.fulfill({ status: 500,
+    headers: { "access-control-allow-origin": "*" }, body: "unavailable" }));
+  await page.goto(viewer);
+  await ready(page);
+  await page.locator("#identify-iv-input").fill("unmatched saved name");
+  const warning = page.getByText("Some saved variables could not be searched.", { exact: true });
+  await expect(warning).toBeVisible();
+  await page.unroute("**/v1/owners/publications");
+  await page.route("**/v1/owners/publications", route => route.fulfill({ status: 200,
+    headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: "[]" }));
+  await page.getByRole("button", { name: "Retry saved variables" }).click();
+  await expect(warning).toBeHidden();
+});
+
+for (const viewport of [{ width: 320, height: 568 }, { width: 568, height: 320 }]) {
+  test(`mobile collider rows open their definitions at ${viewport.width}x${viewport.height}`, async ({ browser }) => {
+    const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
+    const page = await context.newPage();
+    try {
+      await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+      await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+      await ready(page);
+      const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+        .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+      await chooseAnchors(page, anchors[0], anchors[1], { tap: true });
+      await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').tap();
+      await openNav(page, { tap: true });
+      await page.locator("#toggleCollidersOnly").tap();
+      await closeNav(page, { tap: true });
+      const row = page.locator(".variable-review-row").first();
+      const groupId = await row.getAttribute("data-group-id");
+      await row.locator(".explore-row-open").tap({ timeout: 3000 });
+      await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBe(groupId);
+      await expect(page.locator("#edgeInspector")).toBeVisible();
+    } finally { await context.close(); }
+  });
+}
+
+test("collider paths highlight on mouse movement and keyboard focus", async ({ page }) => {
+  const source = await readFile("site/dag_builder.js", "utf8");
+  await page.route("**/dag_builder.js*", route => route.fulfill({ contentType: "text/javascript",
+    body: `${source}\nwindow.__testPathLanes = () => dagNetworkController.getPathLaneSegments();` }));
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  await page.locator("#toggleCollidersOnly").click();
+  const row = page.locator(".variable-review-row .explore-row-open").first();
+  await row.dispatchEvent("mouseenter");
+  expect(await page.evaluate(() => window.__testPathLanes().length)).toBe(0);
+  await row.hover();
+  await expect.poll(() => page.evaluate(() => window.__testPathLanes().length)).toBeGreaterThan(0);
+  await page.mouse.move(0, 0);
+  await expect.poll(() => page.evaluate(() => window.__testPathLanes().length)).toBe(0);
+  await row.focus();
+  await expect.poll(() => page.evaluate(() => window.__testPathLanes().length)).toBeGreaterThan(0);
 });

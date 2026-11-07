@@ -24,6 +24,14 @@ export function isLocalDevelopment(location = globalThis.location) {
   return Boolean(location && ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname));
 }
 
+// Logical record signature -> physical snapshot directory. Schemas and permalinks
+// record the signature, which is not itself a directory on the data host.
+const EVIDENCE_SIGNATURE_ALIASES = Object.freeze({
+  "5887939bf4e5d3619070a522f3ae11eee3f377c584bb8b2b3f77593c2b2248d4": "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0",
+  "11a8ec4f4868185d15dceae798d7617387eb9216c51a8f5acff4e84282b09acd": "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b",
+  "a5acb651371a59c22eb0fa03c4323b001e0fecf832efa2b0bf95704aaec4490f": "8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849",
+});
+
 /** Resolve immutable evidence snapshots on R2; local development may use an explicit manifest. */
 export function evidenceManifestUrl(location = globalThis.location, evidenceSnapshot = "") {
   if (isLocalDevelopment(location)) {
@@ -37,12 +45,7 @@ export function evidenceManifestUrl(location = globalThis.location, evidenceSnap
     || "";
   // Historical permalinks used the logical record signature instead of the
   // immutable directory ID. Resolve that alias independently of the default.
-  if (requested === "5887939bf4e5d3619070a522f3ae11eee3f377c584bb8b2b3f77593c2b2248d4") {
-    requested = "99a8fd29ae81a1852ed181a62df01b989b99b536848bbf59f65a0ce8ea6871c0";
-  }
-  if (requested === "11a8ec4f4868185d15dceae798d7617387eb9216c51a8f5acff4e84282b09acd") {
-    requested = "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b";
-  }
+  requested = EVIDENCE_SIGNATURE_ALIASES[requested.toLowerCase()] || requested;
   if (/^[0-9a-f]{64}$/i.test(requested)) {
     return `${PRODUCTION_EVIDENCE_SNAPSHOT_BASE}${requested.toLowerCase()}/manifest.json`;
   }

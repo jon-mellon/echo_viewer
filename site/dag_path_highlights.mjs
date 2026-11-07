@@ -51,6 +51,7 @@ export function buildPathHighlightModel({
   showExogeneity = false,
   showExclusionViolations = false,
   confounderGroupIds = new Set(),
+  studyAnchorIds = [],
 }) {
   const ivPairKeys = pathPairKeys(paths.toIv);
   const dvPairKeys = pathPairKeys(paths.toDv);
@@ -109,10 +110,12 @@ export function buildPathHighlightModel({
   }
 
   const nodeUpdates = [];
+  const studyAnchors = new Set(studyAnchorIds);
   for (const node of nodes) {
     if (String(node.id).startsWith("__route__")) continue;
     if (!highlightedNodeIds.has(node.id)) {
-      nodeUpdates.push({ id: node.id, opacity: 0.16 });
+      // The study arrows stay opaque, so a faded anchor would show them running through its body.
+      nodeUpdates.push({ id: node.id, opacity: studyAnchors.has(node.id) ? 1 : 0.16 });
       continue;
     }
     const toIv = ivNodeIds.has(node.id);
@@ -280,7 +283,7 @@ export function drawPathLanes(context, { segments = [], positions = {}, boxes = 
     if (points.some(point => !point) || points.length < 2) continue;
     const routed = separateHighlightRuns(points, occupied, scale, first.role === "iv" ? -1 : 1);
     occupied.push(...routed.slice(0, -1).map((point, index) => [point, routed[index + 1]]));
-    rendered.push({ points: routed, color: first.color,
+    rendered.push({ points: routed, color: first.color, dashes: first.dashes,
       to: edgeSegments.some(item => item.arrows?.to?.enabled),
       from: edgeSegments.some(item => item.arrows?.from?.enabled) });
   }
@@ -294,6 +297,7 @@ export function drawPathLanes(context, { segments = [], positions = {}, boxes = 
       for (const point of edge.points.slice(1)) context.lineTo(point.x, point.y);
       context.strokeStyle = casing ? "rgba(255,255,255,0.94)" : edge.color;
       context.lineWidth = (casing ? 8.5 : 4.4) / scale;
+      context.setLineDash?.(casing ? [] : (edge.dashes || []).map(value => value / scale));
       context.stroke();
     }
   }

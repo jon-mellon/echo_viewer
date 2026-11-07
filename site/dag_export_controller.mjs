@@ -36,6 +36,7 @@ export function createDagExportController({
     return structuredClone({
       project: state.project, visibleLinks: state.visibleLinks,
       confounderGroupIds: [...(state.confounderGroupIds || [])],
+      colliderGroupIds: [...(state.colliderGroupIds || [])],
       rawLinksById: state.rawLinksById, cacheCompatibility: state.data.cache_compatibility,
       variableLabelsById: new Map(excludedVariableIds.map(id => {
         const variable = state.variableById?.get(id);

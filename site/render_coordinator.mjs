@@ -14,10 +14,8 @@ export function createRenderCoordinator(view) {
       view.renderSelectedEdge();
     }
     view.renderExportStatus();
-    view.renderMapModeControls();
     view.renderMapToolbarToggles();
     view.renderUndoRedo();
-    view.drawMap();
     view.saveProjectLocally();
   }
   function rebuildLinkDecision() {
@@ -32,14 +30,15 @@ export function createRenderCoordinator(view) {
     view.renderUndoRedo();
     view.saveProjectLocally();
   }
-  function updateDagFilters() {
+  // allowRemovedGroups: a review decision that drops a variable keeps everyone else where they were.
+  function updateDagFilters({ allowRemovedGroups = false } = {}) {
     view.computeVisibleLinks();
     view.renderVariablePanel?.();
     view.renderConfounderStatuses?.();
     view.renderGroupList();
     // Graph filters do not change variable assignments, membership or UOA.
-    view.renderMapToolbarToggles({ includeCoverage: false });
-    view.renderDag({ reuseGeometry: true });
+    view.renderMapToolbarToggles();
+    view.renderDag({ reuseGeometry: true, ...(allowRemovedGroups ? { allowRemovedGroups } : {}) });
     view.renderSelectedEdge();
     view.renderExportStatus();
   }
@@ -64,10 +63,8 @@ export function createRenderCoordinator(view) {
       view.renderGroupList();
       view.renderDag({ reuseGeometry: true });
       if (!view.renderVariableComparison()) view.renderSelectedEdge();
-      view.renderMapModeControls();
-      view.renderMapToolbarToggles({ includeCoverage: false });
-      view.drawMap();
-    } else view.renderVariablePanel?.();
+        view.renderMapToolbarToggles();
+      } else view.renderVariablePanel?.();
   }
   function selectEdge({ redraw = true } = {}) {
     view.refreshDagEdgeSelection({ redraw });

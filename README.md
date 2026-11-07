@@ -48,15 +48,12 @@ current source assignments. If none fits, repeat the Jev estimate or test with
 the lookup directly. An unavailable index is reported when Jev runs.
 
 Use `echo_diff` to review the complete local revision and `echo_ready` to
-validate and freeze it. `echo_publish` is the only publication tool. It invokes
-the same immutable Supabase Storage uploads and registry insert as the site's
-Publish action and cannot be called a second time in that session. This is one
-final publication action, though Echo's publication format consists of multiple
-Storage writes followed by one registry write. An agent session never publishes
-automatically. By default, Supabase creates a private anonymous session, as
-the browser does. To reuse an existing Supabase identity, supply both
-`ECHO_SUPABASE_ACCESS_TOKEN` and `ECHO_SUPABASE_REFRESH_TOKEN` through the
-process environment. Do not put credentials in this repository.
+validate and freeze it. `echo_publish` is the only publication tool. It uses
+the Cloudflare publishing service to upload immutable files and register the
+publication. It cannot be called a second time in that session and never runs
+automatically. Supply `ECHO_OWNER_TOKEN` through the process environment to
+publish from the agent. The token has the form `<owner uuid>.<64 hex>` and is
+created by publishing once in the browser; keep it private.
 
 The agent's finding decisions operate on individual raw causal links, matching
 Echo's finding-level Exclude/Restore controls. There is no article-wide
@@ -72,24 +69,12 @@ python3 -m http.server --directory site
 
 ### Browse published user splits
 
-The **Browse user splits** choice lists approved splits for the selected source
-category or categories. The index stores a name, description, source IDs, and
-an immutable Storage pointer; it does not copy variable assignments. Choosing
-a split loads its one membership file and opens an editable draft. Source
-assignments must still match the current schema. New and edited split
-descriptions must contain at least 20 characters.
-
-To enable browsing in Supabase, apply
-`supabase/migrations/202610150001_public_split_index.sql`. The scan and Jev
-quality checker live in `harvest_abstracts/analysis/10k/echo_viewer_bundle/`
-on the `junk_causal` branch. Run its `index_published_splits.py` with
-`SUPABASE_SERVICE_ROLE_KEY` and `OPENROUTER_API_KEY` set outside the repository.
-It scans public schema metadata and upserts approved or rejected metadata;
-unchanged rows are skipped. `--scan` uses Echo's public publishable key and does
-not write or call Jev. The harvest_abstracts GitHub workflow runs only when
-manually dispatched; local runs can load credentials from its encrypted
-`keys.yaml` with `sops exec-env`.
-
+The **Browse user splits** choice lists splits from the current owner's finished
+publications for the selected source category or categories. Choosing a split
+loads its membership file and opens an editable draft. Source assignments must
+still match the current schema. New and edited split descriptions must contain
+at least 20 characters. The owner token saved in this browser provides access
+to the owner's list; retain the token to recover it in another browser.
 
 In the variable definition partition step, describe the new side of the split
 and choose **Connect OpenRouter**. The browser uses OpenRouter's PKCE flow and
@@ -121,23 +106,12 @@ app memory.
 
 ## Published schema source
 
-Published schema files are read from Supabase Storage by default. Add
-`?schema_source=cloudflare` to read the same files (same keys, byte for byte) from the
-R2 bucket behind `data.epistemicinfra.org/published-schemas/`; links and fresh projects
-made from that page keep the parameter. On a Cloudflare page a publication's registry row is the static file
-`published-schemas/_registry/<id>.json` beside its files (no Worker request), and publishing goes through the Worker
-(its contract is `docs/publishing-api.md`; the Worker itself, its database and its setup live in `harvest_abstracts`,
-`analysis/10k/echo_viewer_bundle/publish_worker`). On the default source, publishing and the registry stay on Supabase. Copy the files to R2 with `mirror_published_schemas_r2.py` in
-harvest_abstracts (`analysis/10k/echo_viewer_bundle`), and rerun it after publishing a
-schema. The default (Cloudflare) is `DEFAULT_SCHEMA_SOURCE` in
-`site/schema_source.mjs`. Browser tests and the profile scripts run the viewer as staging ships it, on the Cloudflare source
-(`tests/support/default_source.cjs` rewrites the one default line as the page loads; the repo's default stays
-Supabase, and `ECHO_TEST_DEFAULT_SOURCE=supabase` runs the tests on it). They keep published schema files on disk
-(`tests/support/supabase_cache.cjs`), keyed by file so either address shares an entry, and a missing file is fetched from the
-Cloudflare mirror, so CI sends no schema traffic to Supabase; set `ECHO_FETCH_SCHEMAS_FROM=supabase` to fetch from Supabase
-instead. Only the one test that asks for `?schema_source=supabase` reads Supabase's registry row, and that is cached on
-disk too. `ECHO_LOG_SUPABASE_CALLS=<file>` records what a run still asks Supabase for. Publications that are not in the mirror yet
-need `mirror_published_schemas_r2.py` (in harvest_abstracts) before CI can load them.
+Published schema files and registry rows are read from Cloudflare R2 at
+`data.epistemicinfra.org/published-schemas/`. Registry rows are static files at
+`published-schemas/_registry/<id>.json`; publishing and split browsing use the
+Cloudflare Worker described in `docs/publishing-api.md`. Browser tests cache
+immutable R2 files on disk in `.cache/published-schemas` to avoid repeated
+large downloads. Publication references must use Cloudflare R2 URLs.
 
 ## Performance profiling
 

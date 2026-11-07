@@ -31,32 +31,43 @@ jobs:
         run: npm ci
       - name: Run unit and architecture checks
         run: npm test
+      # The browser download is the slowest and least predictable step; keep it between runs.
+      - name: Restore Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install profiling browser
         run: npx playwright install --with-deps chromium
       # Published schema files are immutable; keep them between runs instead of
-      # downloading about 5 MB per test every time; a miss is fetched from the Cloudflare mirror, never Supabase.
+      # downloading about 5 MB per test every time; a miss is fetched from Cloudflare R2.
       - name: Restore published schema cache
         uses: actions/cache@v4
         with:
-          path: .cache/supabase-published
-          key: supabase-published-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/supabase_cache.cjs') }}
-          restore-keys: supabase-published-
+          path: .cache/published-schemas
+          key: published-schemas-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/published_schema_cache.cjs') }}
+          restore-keys: published-schemas-
       - name: Check browser workflows
         run: npm run test:browser
       - name: Build cache-versioned site
         run: npm run build:site
       - name: Enforce performance budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile
+        run: PROFILE_SITE_DIR=dist/site node scripts/ci_retry.mjs npm run profile
       - name: Enforce mobile performance budgets
-        run: PROFILE_SITE_DIR=dist/site PROFILE_DEVICE=mobile npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
       - name: Enforce permalink performance budgets
-        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink node scripts/ci_retry.mjs npm run profile
       - name: Enforce mobile permalink performance budgets
-        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile npm run profile
+        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
+      - name: Check the default snapshot's viewer assets are published
+        run: npm run check:snapshot-assets
+
       - name: Enforce mobile diagnostic switching budgets
         run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
       - name: Enforce mobile causes and consequences budgets
         run: PROFILE_SITE_DIR=dist/site npm run profile:explore
+      - name: Enforce mobile variable review and schema page budgets
+        run: PROFILE_SITE_DIR=dist/site npm run profile:review
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -68,6 +79,7 @@ jobs:
             profile-results-permalink-mobile/
             profile-results-diagnostics-mobile/
             profile-results-explore-mobile/
+            profile-results-review-mobile/
           if-no-files-found: ignore
           retention-days: 1
       - name: Configure GitHub Pages

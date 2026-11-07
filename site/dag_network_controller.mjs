@@ -1,13 +1,17 @@
 import { routeEdges, studyArrowCorridor } from "./dag_router.mjs";
 import { computeDagRender, reuseDagGeometry } from "./dag_render_compute.mjs";
 import { routesToVisData } from "./dag_vis_routing.mjs";
+import { roundedBoxDistance } from "./dag_routing_geometry.mjs";
 import { attachDagInteractions } from "./dag_interactions.mjs";
+import { createStatusMenu } from "./dag_status_menu.mjs";
 import * as dagDisplay from "./dag_display.mjs";
+import { EDGE_HIGHLIGHT_COLOR, PLAIN_EDGE_COLOR, PLAIN_EDGE_OPACITY, mixHex } from "./dag_display.mjs";
 import * as workflow from "./dag_workflow.mjs";
 import * as dagPathHighlights from "./dag_path_highlights.mjs";
 import { STUDY_DESIGN_EDGE_ID, STUDY_INSTRUMENT_EDGE_ID } from "./dag_inspector_controller.mjs";
 import { studyDesignEdgeData } from "./dag_study_edges.mjs";
 import { createDagTable, dagTableModel, pathView } from "./dag_table.mjs";
+import { DIAGNOSTIC_STATUSES, STATUS_MENU_LABELS, diagnosticReviewRows, diagnosticKey } from "./confounder_status.mjs";
 
 export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId, links, visualData) {
   if (previousId === selectedId) return [];
@@ -24,7 +28,7 @@ export function selectionUpdatesForSegments(edgeSegments, previousId, selectedId
 
 export function applyLogicalEdgeHover(edges, visEdges) {
   if (!edges.length) return;
-  const hoverColor = "#9a5a0a";
+  const hoverColor = EDGE_HIGHLIGHT_COLOR;
   visEdges.update(edges.map(edge => ({
     id: edge.id,
     color: {
@@ -35,7 +39,7 @@ export function applyLogicalEdgeHover(edges, visEdges) {
       opacity: 1,
     },
     width: Math.max(3.4, Number(edge.width || 1) + 2.2),
-    shadow: { enabled: true, color: "rgba(154,90,10,0.32)", size: 7, x: 0, y: 0 },
+    shadow: { enabled: true, color: "rgba(0,0,0,0.25)", size: 7, x: 0, y: 0 },
   })));
 }
 
@@ -46,9 +50,36 @@ function visOptionSignature(params = {}) {
   ]);
 }
 
-// vis-network's fit() defaults to maxZoomLevel: 1, leaving small DAGs surrounded
-// by empty canvas even when there is room to display them larger.
-export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: Number.MAX_VALUE };
+// Allow small DAGs to grow beyond vis-network's default scale of 1, but avoid
+// enlarging a lone node until it fills the entire viewport when filters remove links.
+export const DAG_FIT_OPTIONS = { animation: false, maxZoomLevel: 2.5 };
+
+// Fitting a large DAG into the viewport can shrink labels to a few pixels, which is
+// unreadable (vis-network stops drawing text entirely below ~3px). Never fit tighter
+// than this on-screen label size; the user pans to the parts that overflow.
+const MIN_READABLE_FONT_PX = 9;
+let _dagFontSize = 14;
+
+// A new network paints at vis-network's default scale until the first fit, so a
+// node reads as an enormous blob on reload. Keep the canvas hidden until then.
+let _dagAwaitingInitialFit = false;
+
+export function fitDagNetwork(network) {
+  if (!network) return;
+  network.fit(DAG_FIT_OPTIONS);
+  const minScale = MIN_READABLE_FONT_PX / _dagFontSize;
+  // The key floats over the top of the graph: fit into the space below it so it covers no node.
+  const key = globalThis.document?.getElementById?.("diagnosticOverlapKey");
+  const viewport = network.body?.container;
+  const reserved = key && viewport && key.offsetParent ? key.offsetTop + key.offsetHeight : 0;
+  const height = viewport?.clientHeight || 0;
+  let scale = network.getScale();
+  if (reserved && height > reserved * 2) scale *= (height - reserved) / height;
+  scale = Math.max(scale, minScale);
+  if (scale === network.getScale() && !reserved) return;
+  const center = network.getViewPosition();
+  network.moveTo({ position: { x: center.x, y: center.y - reserved / (2 * scale) }, scale, animation: false });
+}
 
 export function isDagDisplayGroup(group) {
   return group?.type !== "other"
@@ -74,11 +105,15 @@ export function isDagFullyVisible(network, boxes, viewport) {
 
 export function createDagNetworkController({
   state, elements: els, visApi, clusterRep, groupColor, dagGroups, groupById,
-  drawMap, setMapMode, renderAll, selectEdge, selectGroup, onViewportChange = () => {}, exploreRows = () => [],
+  renderAll, selectEdge, selectGroup, onViewportChange = () => {}, exploreRows = () => [],
+  onNodeHover = () => {}, onSetStatus = () => {},
 }) {
   // The causes and consequences views draw a neighborhood of one variable, not
   // a study design, so there are no IV, DV or instrument anchors to pin or style.
   const exploring = () => state.task === "causes" || state.task === "consequences";
+  const revealDagNetwork = () => {
+    if (!_dagAwaitingInitialFit) els.dagNetwork.style.visibility = "";
+  };
   const studyAnchors = () => exploring() ? { ivId: null, dvId: null, instrumentId: null }
     : { ivId: state.project?.iv_group_id, dvId: state.project?.dv_group_id, instrumentId: state.project?.instrument_group_id };
   const exploreFocusId = () => exploring() ? state.explore?.[state.task]?.focusId || null : null;
@@ -90,6 +125,8 @@ let _visEdges = null;
 let _dagLayoutSignature = "";
 let _visOptionSignature = "";
 const DAG_INSTALL_SLICE = 1000;
+// Exploration views show one fixed pastel per task instead of the per-group palette.
+const EXPLORATION_NODE_COLORS = { causes: dagDisplay.OKABE_ITO.sky, consequences: dagDisplay.OKABE_ITO.purple };
 let _dagGeometry = null;
 let _dagBoundsCache = null;
 let _dagEdgeSegments = new Map();
@@ -100,9 +137,25 @@ let _dagHoveredConfounderId = null;
 let _dagPathLaneSegments = [];
 let _dagEdgeHoverBaseline = null;
 let _dagHoveredLogicalEdgeIds = new Set();
+let _exploreRowHoverNode = null;
 
 function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+// vis ends an edge at a box's sharp-cornered rectangle, plus a full border width although the
+// border is drawn half outside the edge. Follow the drawn rounded outline instead so arrowheads
+// touch the node. (endPointOffset can't do this: vis ignores it when arrowStrikethrough is off.)
+function patchBoxBorderDistance(network) {
+  const sample = Object.values(network.body?.nodes ?? {}).find(node => node.options?.shape === "box");
+  const proto = sample && Object.getPrototypeOf(sample.shape);
+  if (!proto || proto.__roundedBorderDistance) return;
+  proto.__roundedBorderDistance = true;
+  proto.distanceToBorder = function (ctx, angle) {
+    if (ctx) this.resize(ctx);
+    const radius = this.options.shapeProperties?.borderRadius ?? 0;
+    return roundedBoxDistance(this.width, this.height, radius, angle) + this.options.borderWidth / 2;
+  };
 }
 
 function visNetworkOptions(p = {}) {
@@ -132,14 +185,15 @@ function visNetworkOptions(p = {}) {
       borderWidthSelected: 3,
       margin: { top: vMargin, right: hMargin, bottom: vMargin, left: hMargin },
       widthConstraint: { minimum: 92, maximum: p.nodeMaxWidth || 190 },
-      shapeProperties: { borderRadius: 12 },
+      shapeProperties: { borderRadius: 8 },
     },
     edges: {
       smooth: { type: "cubicBezier", forceDirection: "horizontal", roundness: 0.32 },
       width: edgeWidth,
       selectionWidth: 3.5,
+      arrowStrikethrough: false,
       arrows: { to: { enabled: true, scaleFactor: Math.max(0.45, 0.7 * (fontSize / 14)) } },
-      color: { color: "#7ba096", highlight: "#b83b5e", hover: "#805214", inherit: false, opacity: 0.48 },
+      color: { color: PLAIN_EDGE_COLOR, highlight: EDGE_HIGHLIGHT_COLOR, hover: EDGE_HIGHLIGHT_COLOR, inherit: false, opacity: PLAIN_EDGE_OPACITY },
     },
   };
 }
@@ -170,7 +224,10 @@ function visNodeData(group, layoutPoint, layoutParams = {}) {
     colliderGroupIds: state.colliderGroupIds, colliderPathGroupIds: state.colliderPathGroupIds,
     confounderGroupIds: state.confounderGroupIds, confounderPathGroupIds: state.confounderPathGroupIds,
     ivId: studyAnchors().ivId, dvId: studyAnchors().dvId,
-    activeGroupId: state.activeGroupId, groupColor: groupColor(group),
+    confounderStatus: exploring() ? null : state.project?.[state.showExclusionViolations ? "exclusion_statuses" : "confounder_statuses"]?.[
+      diagnosticKey(state.project, state.showExclusionViolations ? "exclusion" : "confounders", group.group_id)]?.status,
+    activeGroupId: state.activeGroupId,
+    groupColor: exploring() && group.type === "candidate" ? EXPLORATION_NODE_COLORS[state.task] || groupColor(group) : groupColor(group),
   });
 }
 
@@ -186,7 +243,6 @@ const tableShown = () => state.dagDisplay === "table";
 
 function openVariable(id) {
   Object.assign(state, workflow.transition(state, { type: "focus-group", groupId: id }));
-  drawMap();
   selectGroup(id);
 }
 
@@ -209,8 +265,20 @@ function tableRole(group) {
   return "";
 }
 
+/** Confounders and colliders carry a status the table can set, as the side panel does. */
+function tableStatuses(view) {
+  const spec = DIAGNOSTIC_STATUSES[view];
+  if (!spec || view === "colliders") return null;
+  const ids = view === "confounders" ? state.confounderGroupIds : state.exclusionViolationIds;
+  const rows = diagnosticReviewRows(state.project, ids, view);
+  return { kind: view, noun: spec.noun,
+    options: Object.entries(spec.statuses).map(([value, label]) => ({ value, label: STATUS_MENU_LABELS[value] || label, title: label })),
+    byId: Object.fromEntries(rows.map(row => [row.groupId, { status: row.status, text: row.text }])),
+    rejected: rows.filter(row => row.rejected).map(row => ({ ...row, group: groupById(row.groupId) })) };
+}
+
 async function renderDagTable(groups, links) {
-  _dagTable ||= createDagTable({ container: els.dagTable, onOpenVariable: openVariable, onOpenEvidence: openEvidence });
+  _dagTable ||= createDagTable({ container: els.dagTable, onOpenVariable: openVariable, onOpenEvidence: openEvidence, onSetStatus });
   const studyLinks = studyDesignEdgeData(groups, state.project, state.task).map(edge => ({
     edgeId: edge.id, sourceId: edge.from, targetId: edge.to,
     note: edge.id === STUDY_DESIGN_EDGE_ID ? "Study relationship" : "Study instrument",
@@ -218,17 +286,29 @@ async function renderDagTable(groups, links) {
   const view = pathView({ ...state, exploring: exploring() });
   const pathsByGroup = { exogeneity: state.exogeneityPathsByGroup, exclusion: state.exclusionPathsByGroup,
     colliders: state.colliderPathsByGroup, confounders: state.confounderPathsByGroup }[view];
-  const built = _dagTable.update(dagTableModel({ view, groups, links, pathsByGroup, exploreRows: view === "explore" ? exploreRows() : [],
+  const statuses = tableStatuses(view);
+  const withRejected = [...groups, ...(statuses?.rejected || []).map(row => row.group).filter(group => group && !groups.some(current => current.group_id === group.group_id))];
+  const built = _dagTable.update(dagTableModel({ view, groups: withRejected, links, pathsByGroup, exploreRows: view === "explore" ? exploreRows() : [],
+    exploreDirection: state.task, exploreFocusId: view === "explore" ? state.explore?.[state.task]?.focusId || null : null,
     anchors: studyAnchors(), maxPathLength: view === "exclusion" ? state.exclusionMaxPathLength : state.confounderMaxPathLength,
-    roleFor: tableRole, studyLinks }));
+    roleFor: tableRole, studyLinks, statuses }));
   _dagTable.select({ edgeId: state.selectedEdgeId, groupId: state.selectedEvidenceGroupId });
   // The table builds in chunks; the render is done when every row is in.
   await built;
 }
 
+/** The canvas is a picture to assistive technology; say what it holds and where the same facts are navigable. */
+function describeDagImage(groupCount, linkCount) {
+  const noun = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+  els.dagNetwork.setAttribute("role", "img");
+  els.dagNetwork.setAttribute("aria-label",
+    `Diagram of ${noun(groupCount, "variable")} and ${noun(linkCount, "link")}. The Table view lists the same variables, links, definitions and evidence.`);
+}
+
 function showDagDisplay() {
   const table = tableShown();
   els.dagTable.hidden = !table;
+  els.dagTableSkip.hidden = table;
   els.dagNetwork.hidden = table;
   for (const [button, active] of [[els.dagViewGraph, !table], [els.dagViewTable, table]]) {
     button.classList.toggle("active", active);
@@ -236,14 +316,15 @@ function showDagDisplay() {
   }
 }
 
-async function setDagDisplay(mode) {
+async function setDagDisplay(mode, { focusTable = false } = {}) {
   const next = mode === "table" ? "table" : "graph";
-  if (state.dagDisplay === next) return;
+  if (state.dagDisplay === next) { if (focusTable && next === "table") els.dagTable.focus(); return; }
   state.dagDisplay = next;
   showDagDisplay();
   onViewportChange(false);
   await renderDag();
   if (next === "graph") _visNetwork?.redraw();
+  else if (focusTable) els.dagTable.focus();
 }
 
 function refreshEdgeSelection({ redraw = true } = {}) {
@@ -254,7 +335,7 @@ function refreshEdgeSelection({ redraw = true } = {}) {
   // the click event, especially for routed edges with synthetic bend nodes.
   clearLogicalDagEdgeHover();
   const updates = selectionUpdatesForSegments(_dagEdgeSegments, _renderedSelectedEdgeId,
-    state.selectedEdgeId, (exploring() ? state.visibleLinks : state.project?.links) || [], edgeVisualData);
+    state.selectedEdgeId, (exploring() ? state.visibleLinks : state.studyGraph?.links || state.project?.links) || [], edgeVisualData);
   _renderedSelectedEdgeId = state.selectedEdgeId;
   if (updates.length) _visEdges.update(updates);
   // DataSet updates already request a frame from vis. A synchronous redraw here
@@ -288,6 +369,8 @@ function routedDagDataFromRoutes(groups, routes, layout) {
       },
       ...edgeVisualData(link),
       smooth: { enabled: false },
+      // End the line at the arrowhead's base so a translucent edge never shows its line through the head.
+      arrowStrikethrough: false,
     }),
     edgeTitle: edgeHoverText,
   });
@@ -298,6 +381,84 @@ function dagVisibleGroups() {
   const groups = dagGroups();
   return groups.filter((group) => state.componentGroupIds.has(group.group_id)
     && isDagDisplayGroup(group));
+}
+
+const CANVAS_COLOR = "#f8f8f8";
+
+// vis draws each routed segment with butt caps, leaving a notch at every bend;
+// a round dab of the segment's own colour closes it.
+function drawRouteJoins(context) {
+  if (!_visEdges || !_visNodes || !_visNetwork) return;
+  context.save();
+  for (const [segmentId] of _dagEdgeSegments) {
+    const match = /::seg(\d+)$/.exec(segmentId);
+    if (!match || match[1] === "0") continue;
+    const edge = _visEdges.get(segmentId);
+    if (!edge || edge.dashes || !String(edge.from).startsWith("__route__")) continue;
+    // vis rounds node positions, so read the live one rather than the dataset's.
+    const bend = _visNetwork.getPosition(edge.from);
+    const opacity = edge.color?.opacity ?? 1;
+    if (opacity <= 0) continue;
+    // Fill with the colour a lone segment shows (colour over canvas) so the join
+    // isn't darker than the line, however translucent the edge is.
+    const base = edge.color?.color || "#999999";
+    if (/^#[0-9a-f]{6}$/i.test(base)) {
+      context.globalAlpha = 1;
+      context.fillStyle = mixHex(CANVAS_COLOR, base, opacity);
+    } else {
+      context.globalAlpha = opacity;
+      context.fillStyle = base;
+    }
+    context.beginPath();
+    context.arc(bend.x, bend.y, Math.max(0.5, Number(edge.width || 1) / 2), 0, Math.PI * 2);
+    context.fill();
+  }
+  context.restore();
+  drawEmphasizedRoutes(context);
+}
+
+// Edges are opaque, so a hovered or selected route would be painted over by any
+// edge vis draws after it. Redraw those routes on top as one polyline, kept out
+// of the node boxes so they never cover a node or its arrowhead.
+function drawEmphasizedRoutes(context) {
+  if (!_visNetwork) return;
+  const emphasized = new Set(_dagHoveredLogicalEdgeIds);
+  if (_renderedSelectedEdgeId) emphasized.add(_renderedSelectedEdgeId);
+  if (!emphasized.size) return;
+  const routes = new Map();
+  for (const [segmentId, logicalId] of _dagEdgeSegments) {
+    const match = /::seg(\d+)$/.exec(segmentId);
+    if (!match || !emphasized.has(logicalId)) continue;
+    if (!routes.has(logicalId)) routes.set(logicalId, []);
+    routes.get(logicalId).push({ index: Number(match[1]), segmentId });
+  }
+  if (!routes.size) return;
+  const boxes = (_visNodes?.getIds() || []).filter(id => !String(id).startsWith("__route__")).map(id => {
+    const b = _visNetwork.getBoundingBox(id);
+    return [b.left, b.top, b.right - b.left, b.bottom - b.top];
+  });
+  context.save();
+  context.beginPath();
+  context.rect(-1e6, -1e6, 2e6, 2e6);
+  for (const [x, y, w, h] of boxes) context.rect(x, y, w, h);
+  context.clip("evenodd");
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  for (const segments of routes.values()) {
+    segments.sort((a, b) => a.index - b.index);
+    const edges = segments.map(({ segmentId }) => _visEdges.get(segmentId)).filter(Boolean);
+    if (!edges.length) continue;
+    const ids = [edges[0].from, ...edges.map(edge => edge.to)];
+    const points = _visNetwork.getPositions(ids);
+    context.globalAlpha = edges[0].color?.opacity ?? 1;
+    context.strokeStyle = edges[0].color?.color || "#999999";
+    context.lineWidth = Number(edges[0].width || 1);
+    context.setLineDash?.(Array.isArray(edges[0].dashes) ? edges[0].dashes : []);
+    context.beginPath();
+    ids.forEach((id, i) => (i ? context.lineTo(points[id].x, points[id].y) : context.moveTo(points[id].x, points[id].y)));
+    context.stroke();
+  }
+  context.restore();
 }
 
 function drawConfounderPathLanes(context) {
@@ -369,8 +530,26 @@ function highlightLogicalDagEdge(segmentId) {
   highlightLogicalDagEdges([_dagEdgeSegments.get(segmentId) || segmentId]);
 }
 
+/**
+ * A row in the Explore list was hovered: light its link and halo its node with
+ * the same amber the graph uses for its own hover (null clears both).
+ */
+function hoverExploreRow(row) {
+  if (_exploreRowHoverNode && _visNodes?.get(_exploreRowHoverNode.id)) _visNodes.update(_exploreRowHoverNode);
+  _exploreRowHoverNode = null;
+  if (!row) { clearLogicalDagEdgeHover(); return; }
+  highlightLogicalDagEdges(row.pathEdgeIds?.length ? row.pathEdgeIds : [row.edgeId]);
+  const node = _visNodes?.get(row.groupId);
+  if (!node) return;
+  _exploreRowHoverNode = { id: node.id, shadow: node.shadow || false };
+  _visNodes.update({ id: node.id, shadow: { enabled: true, color: "rgba(230,159,0,0.5)", size: 12, x: 0, y: 0 } });
+}
+
 function highlightConnectedDagEdges(nodeId) {
   if (!_visNetwork) return;
+  // In Explore a variable beyond the first hop lights its whole route to the focus.
+  const route = exploring() ? exploreRows().find(item => item.groupId === nodeId)?.pathEdgeIds : null;
+  if (route?.length > 1) { highlightLogicalDagEdges(route); return; }
   const logicalIds = _visNetwork.getConnectedEdges(nodeId)
     .map(edgeId => _dagEdgeSegments.get(edgeId) || edgeId);
   highlightLogicalDagEdges(logicalIds);
@@ -414,6 +593,7 @@ function highlightConfounderPaths(groupId) {
     groupId,
     ivId: state.showExogeneity ? studyAnchors().instrumentId : studyAnchors().ivId,
     dvId: studyAnchors().dvId,
+    studyAnchorIds: Object.values(studyAnchors()).filter(Boolean),
     showConfoundersOnly: state.showConfoundersOnly,
     showExogeneity: state.showExogeneity,
     showExclusionViolations: state.showExclusionViolations,
@@ -448,7 +628,7 @@ async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } =
   };
   if (state.interfaceMode === "dag2" && !exploring()
     && (!hasAnchor(state.project?.iv_group_id) || !hasAnchor(state.project?.dv_group_id)
-      || (state.phase === "select_instrument" && !state.changingAnchorSide))) return;
+      || (state.task !== "identify" && state.phase === "select_instrument" && !state.changingAnchorSide))) return;
   // A render that a newer one supersedes never finishes, so anyone already waiting on it is released when the newer one does.
   let resolveRendered;
   let supersededResolve = _resolveRendered;
@@ -472,6 +652,7 @@ async function renderDag({ reuseGeometry = false, allowRemovedGroups = false } =
 
   const links = state.visibleLinks.filter((link) => !link.is_target_relation
     && nextGroupIds.has(link.group_a) && nextGroupIds.has(link.group_b));
+  describeDagImage(groups.length, links.length);
   if (els.dagTable.hidden === tableShown()) showDagDisplay();
   if (tableShown()) {
     // No layout: the graph is rebuilt from the same groups and links when it is shown again.
@@ -611,9 +792,17 @@ async function applyDagRender(groups, layout, routes) {
       visNetworkOptions(layout.params)
     );
     _dagLayoutSignature = layout.signature;
+    _dagFontSize = layout.params.fontSize ?? 14;
     _visOptionSignature = visOptionSignature(layout.params);
+    patchBoxBorderDistance(_visNetwork);
     attachDagNetworkHandlers(_visNetwork);
-    setTimeout(() => _visNetwork?.fit(DAG_FIT_OPTIONS), 80);
+    _dagAwaitingInitialFit = true;
+    els.dagNetwork.style.visibility = "hidden";
+    setTimeout(() => {
+      fitDagNetwork(_visNetwork);
+      _dagAwaitingInitialFit = false;
+      els.dagNetwork.style.visibility = "";
+    }, 80);
   } else {
     // Update the existing network in place. Destroying/recreating the network
     // synchronously here is unsafe when renderDag() is called from inside a visApi.js
@@ -681,6 +870,7 @@ async function applyDagRender(groups, layout, routes) {
     const optionSignature = visOptionSignature(layout.params);
     if (optionSignature !== _visOptionSignature) {
       _visNetwork.setOptions(visNetworkOptions(layout.params));
+      _dagFontSize = layout.params.fontSize ?? 14;
       _visOptionSignature = optionSignature;
     }
     // Only refit when the node set changed; refitting on every edge selection
@@ -688,10 +878,10 @@ async function applyDagRender(groups, layout, routes) {
     const layoutChanged = layout.signature !== _dagLayoutSignature;
     _dagLayoutSignature = layout.signature;
     if (nodeSetChanged || layoutChanged) {
-      setTimeout(() => _visNetwork?.fit(DAG_FIT_OPTIONS), 120);
+      setTimeout(() => fitDagNetwork(_visNetwork), 120);
     }
   }
-  els.dagNetwork.style.visibility = "";
+  revealDagNetwork();
 }
 
 function applyReusedDagRender(groups, layout, routes) {
@@ -746,7 +936,7 @@ function applyReusedDagRender(groups, layout, routes) {
   }
   if (changedNodes.length) _visNodes.update(changedNodes);
   _renderedSelectedEdgeId = state.selectedEdgeId;
-  els.dagNetwork.style.visibility = "";
+  revealDagNetwork();
   // DataSet additions/removals/updates schedule their own coalesced paint.
 }
 
@@ -798,6 +988,22 @@ function fitDag() {
 }
 
 let detachDagInteractions = null;
+let _statusMenu = null;
+let _statusMenuTarget = null;
+
+/** Right-click on a confounder (or exclusion violation) sets its status, as the list and table do. */
+function showStatusMenu(id, event) {
+  const view = pathView({ ...state, exploring: exploring() });
+  const statuses = tableStatuses(view);
+  if (!statuses || !event) return false;
+  const ids = view === "confounders" ? state.confounderGroupIds : state.exclusionViolationIds;
+  if (!ids?.has(id)) return false;
+  _statusMenu ||= createStatusMenu({ onChoose: value => _statusMenuTarget && onSetStatus(_statusMenuTarget.kind, _statusMenuTarget.id, value) });
+  _statusMenuTarget = { kind: statuses.kind, id };
+  _statusMenu.show({ title: `${groupById(id)?.label || id}: ${statuses.noun} status`, options: statuses.options,
+    current: statuses.byId[id]?.status, clientX: event.clientX, clientY: event.clientY });
+  return true;
+}
 
 function attachDagNetworkHandlers(network) {
   detachDagInteractions?.();
@@ -806,8 +1012,10 @@ function attachDagNetworkHandlers(network) {
     minimumScale: minimumDagScale,
     contentBounds: () => dagBounds()?.contentBounds || null,
     drawPathLanes: drawConfounderPathLanes,
+    drawRouteJoins,
     highlightEdge: highlightLogicalDagEdge,
     highlightNodeEdges: highlightConnectedDagEdges,
+    onNodeHover: id => { if (exploring()) onNodeHover(id); },
     clearEdgeHover: clearLogicalDagEdgeHover,
     clearPathHover: clearConfounderPathHover,
     highlightPaths: highlightConfounderPaths,
@@ -818,10 +1026,17 @@ function attachDagNetworkHandlers(network) {
       return (state.showConfoundersOnly || state.showCollidersOnly || state.showExclusionViolations || state.showExogeneity) && ids.has(id);
     },
     hasGroup: id => Boolean(groupById(id)),
+    onNodeContext: showStatusMenu,
     logicalEdgeId: id => _dagEdgeSegments.get(id) || id,
     focusGroup(id) {
+      // In Explore a variable on the graph is a row in the list: open that row's link.
+      const row = exploring() ? exploreRows().find(item => item.groupId === id) : null;
+      if (row?.edgeId) {
+        state.selectedEdgeId = row.edgeId;
+        selectEdge();
+        return;
+      }
       Object.assign(state, workflow.transition(state, { type: "focus-group", groupId: id }));
-      drawMap();
       selectGroup(id);
     },
     openGroup(id) {
@@ -830,7 +1045,6 @@ function attachDagNetworkHandlers(network) {
         return;
       }
       Object.assign(state, workflow.transition(state, { type: "review-group", groupId: id }));
-      setMapMode("select");
       renderAll({ rebuild: false, refreshView: true });
     },
     zoomToPoint(position) {
@@ -854,7 +1068,7 @@ function edgeHoverText(link) {
     refreshEdgeSelection, setDagDisplay,
     dagDisplay: () => state.dagDisplay,
     highlightConfounderPaths, clearConfounderPathHover, clearLogicalDagEdgeHover,
-    highlightConnectedDagEdges,
+    highlightConnectedDagEdges, hoverExploreRow,
     whenRendered: () => _dagRenderedPromise,
     renderedEdgeIds: () => [...new Set((_visEdges?.getIds() || []).map(id => _dagEdgeSegments.get(id) || id))],
     isEdgeRendered: edgeId => Boolean(_visEdges?.getIds().some(id => (_dagEdgeSegments.get(id) || id) === edgeId)),
