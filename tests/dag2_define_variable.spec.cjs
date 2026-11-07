@@ -833,10 +833,13 @@ test("add a saved variable to the schema without selecting an analysis role", as
 });
 
 test("definition source search matches constituent variables, not only category names", async ({ page }) => {
-  const fs = require("node:fs"), zlib = require("node:zlib");
+  const zlib = require("node:zlib");
   const { PRODUCTION_EVIDENCE_MANIFEST } = await import("../site/dag_data_config.mjs");
   const snapshot = PRODUCTION_EVIDENCE_MANIFEST.match(/browser-v2\/([0-9a-f]{64})\//)[1];
-  const catalog = JSON.parse(zlib.gunzipSync(fs.readFileSync(`site/search-catalogs/${snapshot}.json.gz`)));
+  // The default snapshot's catalog is published beside its evidence, not committed.
+  const published = await fetch(`https://data.epistemicinfra.org/evidence/layouts/browser-v2/${snapshot}/viewer-assets/search-catalog.json.gz`);
+  expect(published.ok).toBe(true);
+  const catalog = JSON.parse(zlib.gunzipSync(Buffer.from(await published.arrayBuffer())));
   const labelOf = new Map(catalog.records.map(row => [row[0], row[1] || row[2]]));
   await page.addInitScript(() => {
     localStorage.clear();
