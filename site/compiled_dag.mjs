@@ -105,14 +105,14 @@ export async function validateCompiledArtifact({ publication, manifest, dag, cry
     compiler_version: DAG_COMPILER_VERSION,
   };
   for (const [key, value] of Object.entries(expected)) {
-    if (manifest?.[key] !== value || dag?.[key] !== value) throw new Error(`Compiled DAG ${key} mismatch.`);
+    if (manifest?.[key] !== value || dag?.[key] !== value) throw new Error(`Compiled graph ${key} mismatch.`);
   }
-  if (manifest.format !== COMPILED_DAG_FORMAT || dag.format !== COMPILED_DAG_FORMAT) throw new Error("Unsupported compiled DAG format.");
+  if (manifest.format !== COMPILED_DAG_FORMAT || dag.format !== COMPILED_DAG_FORMAT) throw new Error("Unsupported compiled graph format.");
   if (manifest.row_counts?.group_nodes !== dag.nodes?.length || manifest.row_counts?.group_edges !== dag.edges?.length) {
-    throw new Error("Compiled DAG row count mismatch.");
+    throw new Error("Compiled graph row count mismatch.");
   }
   const hash = await sha256Hex(stableJsonBytes(dag), cryptoApi);
-  if (hash !== manifest.artifacts?.dag?.sha256) throw new Error("Compiled DAG artifact hash mismatch.");
+  if (hash !== manifest.artifacts?.dag?.sha256) throw new Error("Compiled graph artifact hash mismatch.");
   return dag;
 }
 

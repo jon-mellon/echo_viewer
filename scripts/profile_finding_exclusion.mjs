@@ -88,17 +88,17 @@ try {
       const e = window.__dagBuilderState.compiledDag.edges.find(e => e.edge_id === id);
       return [...e.a_to_b_present_raw_link_ids, ...e.b_to_a_present_raw_link_ids][0];
     }, edgeId) : null;
-    const exclude = supportingId ? page.getByRole('button', { name: `Exclude finding ${supportingId}`, exact: true }) : page.getByRole('button', { name: /^Exclude finding / }).first();
+    const exclude = supportingId ? page.getByRole('button', { name: `Exclude claim ${supportingId}`, exact: true }) : page.getByRole('button', { name: /^Exclude claim / }).first();
     console.log(`Run ${run + 1}: loading evidence for ${edgeId}`);
     try { await exclude.waitFor({ timeout: 30000 }); } catch (error) {
       console.error(await page.evaluate(() => ({ pending: window.__dagBuilderState.pendingEdgeEvidence, inspector: document.getElementById('edgeInspector')?.innerText, provenance: document.getElementById('provenancePanel')?.innerText })));
       throw error;
     }
     result.edgeId = edgeId;
-    result.findingId = (await exclude.getAttribute('aria-label')).slice('Exclude finding '.length);
+    result.findingId = (await exclude.getAttribute('aria-label')).slice('Exclude claim '.length);
     await cdp.send('Profiler.start');
     await measure('open finding exclusion', () => exclude.click());
-    await page.getByRole('combobox', { name: 'Finding exclusion reason', exact: true }).selectOption('other');
+    await page.getByRole('combobox', { name: 'Claim exclusion reason', exact: true }).selectOption('other');
     await page.getByRole('textbox', { name: 'Other exclusion reason', exact: true }).fill('Profiling individual evidence exclusion');
     await measure(finalSupport ? 'exclude final support to edge removal' : 'exclude finding to visible feedback', async () => {
       await page.getByRole('button', { name: 'Confirm exclusion', exact: true }).evaluate(button => button.click());

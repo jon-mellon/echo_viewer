@@ -11,27 +11,25 @@ function uoaHint(word) {
   const button = h("button", { className: "uoa-hint", type: "button", textContent: word,
     attrs: { "aria-expanded": "false", "aria-label": `${word}: what is this?` } });
   const wrap = h("span", { className: "uoa-hint-wrap" }, button, popover);
-  let stopListening = null;
+  // One outside-dismiss handler per hint, detached whenever it closes. Closing from the button used to leave
+  // the document listeners behind, so each reopen stacked another pair and kept this hint's DOM alive.
+  const close = event => {
+    if (event.type === "keydown") {
+      if (event.key !== "Escape") return;
+      // Escape closes the hint only, not the screen behind it.
+      event.preventDefault();
+    } else if (wrap.contains(event.target)) return;
+    setOpen(false);
+  };
   const setOpen = open => {
     popover.hidden = !open;
     button.setAttribute("aria-expanded", String(open));
-    stopListening?.();
-    stopListening = null;
-    if (!open) return;
-    const close = event => {
-      if (event.type === "keydown") {
-        if (event.key !== "Escape") return;
-        // Escape closes the hint only, not the screen behind it.
-        event.preventDefault();
-      } else if (wrap.contains(event.target)) return;
-      setOpen(false);
-    };
-    document.addEventListener("click", close);
-    document.addEventListener("keydown", close);
-    stopListening = () => {
-      document.removeEventListener("click", close);
-      document.removeEventListener("keydown", close);
-    };
+    document.removeEventListener("click", close);
+    document.removeEventListener("keydown", close);
+    if (open) {
+      document.addEventListener("click", close);
+      document.addEventListener("keydown", close);
+    }
   };
   button.addEventListener("click", () => setOpen(popover.hidden));
   return wrap;

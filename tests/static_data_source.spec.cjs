@@ -57,7 +57,7 @@ for (const corrupt of ["none", "map", "neighbors", "incidents"]) {
 }
 
 for (const rejectBuffer of [false, true]) {
-  test(`cold findings prefetch preserves evidence with rejected buffer=${rejectBuffer}`, async ({ page }) => {
+  test(`cold claims prefetch preserves evidence with rejected buffer=${rejectBuffer}`, async ({ page }) => {
     test.setTimeout(90000);
     await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
     await page.goto(`${base}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
@@ -154,7 +154,7 @@ for (const route of ["/"]) {
     expect(state.snapshotId).toBe(snapshotId);
     expect(state.groupingCount).toBe(103);
     expect(state.startupStages).toEqual(expect.arrayContaining([
-      "Loading published schema and compiled DAG…",
+      "Loading published schema and compiled graph…",
       "Preparing workspace…",
       "Rendering graph…",
     ]));

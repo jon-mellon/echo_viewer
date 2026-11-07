@@ -468,6 +468,12 @@ h2 {
 
 /* The save actions (retry, independent copy) take no space unless one is shown. */
 #saveStatusSection:not(:has(button:not([hidden]))) { display: none; }
+/* Outside the left panel so it is visible on every screen, including the home page. */
+.app-notice { position: fixed; left: 50%; bottom: var(--space-4); transform: translateX(-50%); z-index: 1000;
+  max-width: min(36rem, calc(100vw - 2rem)); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  padding: var(--space-3) var(--space-4); background: var(--surface); color: var(--danger);
+  border: 1px solid var(--danger); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.app-notice[hidden] { display: none; }
 
 .panel-section[hidden],
 .search-block[hidden],
@@ -3257,9 +3263,20 @@ h2 {
 .reset-dialog-actions button { width: 100%; }
 .reset-here { border-color: var(--danger); color: var(--danger); }
 
+/* Above the hamburger breakpoint, a laptop at 125% zoom is too narrow for the labelled bar
+   (~1030px, clipping Import, Export and Reset): collapse the right-hand menus to icons. */
+@media (min-width: 961px) and (max-width: 1120px) {
+  .task-bar-menus .nav-icon { display: block; }
+  .task-bar-menus .nav-label, .task-bar-sep, .task-selector-label { display: none; }
+  .task-bar-menus .menu > summary.btn, .task-bar-menus .task-reset:not([hidden]) { padding: 0 var(--space-2); }
+}
 @media (max-width: 840px) {
   .dag-body { --app-top: calc(52px + var(--mobile-status-height, 0px)); }
   .task-bar { height: 52px; gap: var(--space-2); padding: 0 var(--space-2); }
+}
+/* The bar collapses behind the hamburger a little before the single-column layout:
+   with a cause and an outcome chosen it needs ~920px even with icon-only menus. */
+@media (max-width: 960px) {
   .schema-menu-title, .schema-menu-panel .menu-item > span,
   .edit-history-entry > span, .previous-session-title {
     overflow: visible; white-space: normal; overflow-wrap: anywhere;

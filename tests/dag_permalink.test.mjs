@@ -166,3 +166,20 @@ test("the task and each explore view round-trip, and pre-task links open identif
   assert.equal(legacy.task, "identify");
   assert.deepEqual(legacy.explore.causes, { focusId: null, depth: 1, minPapers: 2 });
 });
+
+test("an unknown workflow mode opens the graph instead of being stored", () => {
+  const state = { project: structuredClone(project), seeds: { iv: new Set(), dv: new Set() } };
+  applyPermalink(new URLSearchParams("p=1&iv=cause&dv=outcome&mode=bogus"), state);
+  assert.equal(state.workflowMode, "dag");
+  for (const mode of ["setup", "dag", "group_review"]) {
+    applyPermalink(new URLSearchParams(`p=1&iv=cause&dv=outcome&mode=${mode}`), state);
+    assert.equal(state.workflowMode, mode);
+  }
+});
+
+test("a link to a task or focus that cannot open says what is wrong", () => {
+  const open = query => applyPermalink(new URLSearchParams(`p=1&${query}`), { project: structuredClone(project), seeds: {} });
+  assert.throws(() => open("task=causes&causes_of=missing"), /focus variable is not in the referenced schema/);
+  assert.throws(() => open("task=nonsense"), /task that Echo does not recognise/);
+  assert.throws(() => open("task=identify"), /cause or outcome is absent/);
+});

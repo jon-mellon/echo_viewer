@@ -132,7 +132,7 @@ export async function publishWorkingSchema({
   try { storage?.setItem(pendingKey, JSON.stringify({ id: publicationId, fingerprint })); } catch { /* retry is limited to this attempt */ }
   const saved = await publishFiles({
     owner: user, publicationId, contentHash: canonical.contentHash, compilerVersion: compiled.manifest.compiler_version,
-    row: { title: schema.label || "Published grouping schema", description: schema.description || null,
+    row: { title: schema.label || "Published variable schema", description: schema.description || null,
       evidence_snapshot: evidenceSnapshot, parent_schema_id: parentSchemaId, compiled_manifest_path: COMPILED_MANIFEST_PATH,
       compiled_manifest_hash: compiledManifestHash },
     files: new Map(entries), onProgress, resume: Boolean(pending), apiUrl: cloudflare.apiUrl ?? CLOUDFLARE_API_URL,

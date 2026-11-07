@@ -2,6 +2,7 @@ import { MAX_NEIGHBORHOOD_DEPTH } from "./causal_neighborhood.mjs";
 
 export const PERMALINK_VERSION = "1";
 export const TASKS = ["identify", "causes", "consequences"];
+export const WORKFLOW_MODES = ["setup", "dag", "group_review"];
 // Each explore view's URL keys: focus group, depth and minimum papers per link.
 const exploreKeys = { causes: ["causes_of", "causes_depth", "causes_min_papers"],
   consequences: ["effects_of", "effects_depth", "effects_min_papers"] };
@@ -113,7 +114,10 @@ export function applyPermalink(params, state) {
   // Explore views are keyed by their focus variable, not a cause/outcome pair.
   const exploring = Boolean(state.task !== "identify" && state.task && state.explore?.[state.task]?.focusId);
   if ((!iv || !dv || iv === dv) && !partialSetup && !exploring) {
-    throw new Error("Permalink Ind var or Dep var is absent from the referenced schema.");
+    const task = params.get("task");
+    if (task === "causes" || task === "consequences") throw new Error("This link's focus variable is not in the referenced schema.");
+    if (params.has("task") && !TASKS.includes(task)) throw new Error("This link names a task that Echo does not recognise.");
+    throw new Error("Permalink cause or outcome is absent from the referenced schema.");
   }
   state.project.iv_group_id = iv || "";
   state.project.dv_group_id = dv || "";
@@ -135,7 +139,8 @@ export function applyPermalink(params, state) {
     dv: new Set(dvGroup?.variable_ids || []),
   };
   if (partialSetup) state.phase = iv ? "select_dv" : "select_iv";
-  state.workflowMode = params.get("mode") || "dag";
+  // Only modes the app has; anything else would be stored, written back into every later link, and never exit.
+  state.workflowMode = WORKFLOW_MODES.includes(params.get("mode")) ? params.get("mode") : "dag";
   state.dagLayoutMode = "auto";
   state.variableLayoutSource = params.get("vlayout") || state.variableLayoutSource;
   state.selectedUoa = null;

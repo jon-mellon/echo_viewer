@@ -98,7 +98,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       const eligible = new Set(sources.flatMap(group => group.variable_ids));
       if (!ids.length || ids.some(id => !eligible.has(id))
         || sources.some(group => group.variable_ids.every(id => ids.includes(id)))) {
-        throw new Error("This split does not fit the current source category assignments.");
+        throw new Error("This split does not fit the current source variable assignments.");
       }
       await continueDefinition({ saved: true });
       performance.measure("echo:saved-split:details", { start, end: performance.now() });
@@ -410,7 +410,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
       for (const snap of draft.source_snapshot) {
         const current = base.groups.find(group => group.group_id === snap.group_id);
         if (!current || JSON.stringify(current.variable_ids) !== JSON.stringify(snap.variable_ids)) {
-          throw new Error(`Source category ${snap.label} changed while this definition was open.`);
+          throw new Error(`Source variable ${snap.label} changed while this definition was open.`);
         }
       }
       const before = takeSnapshot();
@@ -563,7 +563,7 @@ export function createDefinitionWorkflowController({ state, elements: els, activ
         return {
           title: truncate(run.draft.ai_description || "Untitled split", 90),
           detail: `${sources || "Unknown sources"} · ${run.draft.eligible_variable_ids.length} variables · ${batchCount} batches saved · ${new Date(run.createdAt).toLocaleString()}`,
-          note: usable ? "" : loading ? "Loading group memberships…" : "The source categories have changed since this was saved.",
+          note: usable ? "" : loading ? "Loading variable memberships…" : "The source variables have changed since this was saved.",
           usable,
           onResume: () => {
             if (state.definitionDraft !== draft) return;

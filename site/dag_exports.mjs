@@ -143,7 +143,7 @@ export function buildLinksTable(fmt, { visibleLinks, project, rawLinksById }, ke
 
   if (fmt === "md") {
     return [
-      "| Source | Target | Direction | Papers |",
+      "| Source | Target | Direction | Studies |",
       "|--------|--------|:---------:|--------|",
       ...rows,
     ].join("\n") + "\n";
@@ -151,7 +151,7 @@ export function buildLinksTable(fmt, { visibleLinks, project, rawLinksById }, ke
     return [
       "\\begin{longtable}{@{}p{0.22\\textwidth}p{0.22\\textwidth}cp{0.38\\textwidth}@{}}",
       "\\toprule",
-      "Source & Target & Dir & Papers \\\\",
+      "Source & Target & Dir & Studies \\\\",
       "\\midrule",
       "\\endhead",
       ...rows,
@@ -257,7 +257,7 @@ export function buildExcludedFindingsList(fmt, { project, rawLinksById, variable
   const variableLabel = id => variableLabelsById?.get(id) || groupLabels.get(id) || id || "Unknown variable";
   const rows = excluded.map(([id, decision]) => {
     const finding = rawLinksById?.get(id);
-    const paper = finding?.paper_title || finding?.paper_id || "Paper unavailable";
+    const paper = finding?.paper_title || finding?.paper_id || "Study unavailable";
     const relation = finding
       ? `${variableLabel(finding.source_variable_id)} → ${variableLabel(finding.target_variable_id)}`
       : "Link unavailable";
@@ -266,8 +266,8 @@ export function buildExcludedFindingsList(fmt, { project, rawLinksById, variable
       decision.reason_text?.trim() || "",
     ].filter(Boolean).join(": ") || "(no reason recorded)";
     return fmt === "md"
-      ? `**Paper:** ${escapeMarkdownProse(paper)}  \n**Link:** ${escapeMarkdownProse(relation)}  \n**Reason:** ${escapeMarkdownProse(reason)}`
-      : `\\noindent\\textbf{Paper:} ${texEscape(paper)}\\par\n`
+      ? `**Study:** ${escapeMarkdownProse(paper)}  \n**Link:** ${escapeMarkdownProse(relation)}  \n**Reason:** ${escapeMarkdownProse(reason)}`
+      : `\\noindent\\textbf{Study:} ${texEscape(paper)}\\par\n`
         + `\\noindent\\textbf{Link:} ${texEscape(relation)}\\par\n`
         + `\\noindent\\textbf{Reason:} ${texEscape(reason)}\\par`;
   });
@@ -298,20 +298,20 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, gr
   const { project, visibleLinks } = input;
   const groupById = id => project.groups.find(group => group.group_id === id);
   const hasGraph = (visibleLinks || []).length > 0;
-  const ivLabel = groupById(project?.iv_group_id)?.label || "Independent variable";
-  const dvLabel = groupById(project?.dv_group_id)?.label || "Dependent variable";
+  const ivLabel = groupById(project?.iv_group_id)?.label || "Cause";
+  const dvLabel = groupById(project?.dv_group_id)?.label || "Outcome";
   const instrumentLabel = project?.instrument_group_id
     ? groupById(project.instrument_group_id)?.label || project.instrument_group_id : null;
 
   const md = [
     `---`,
-    `title: "Working Causal Map"`,
+    `title: "Working Map"`,
     `bibliography: references.bib`,
     `link-citations: true`,
     `---`,
     ``,
-    `**Ind var:** ${ivLabel}  `,
-    `**Dep var:** ${dvLabel}`,
+    `**Cause:** ${ivLabel}  `,
+    `**Outcome:** ${dvLabel}`,
     ...(instrumentLabel ? [`**Instrument:** ${instrumentLabel}`] : []),
     ``,
     `*Constructed with DAG Builder [@${METHOD_BIB_KEY}].*`,
@@ -319,10 +319,10 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, gr
     ``,
     `## Causal Graph`,
     ``,
-    graphImageBytes ? `![Causal DAG](dag-graph.png)`
-      : svgStr ? `![Causal DAG](dag.svg)`
+    graphImageBytes ? `![Causal graph](dag-graph.png)`
+      : svgStr ? `![Causal graph](dag.svg)`
       : hasGraph ? `*(Graph figure export is not yet available — the causal structure is listed in the Causal Links table below.)*`
-        : `*(No DAG to display — choose groups with evidence links first.)*`,
+        : `*(No graph to display — choose variables with evidence links first.)*`,
     ``,
     `## Causal Links`,
     ``,
@@ -336,14 +336,14 @@ export function buildMarkdownFiles(input, { bibText, keyMap }, svgStr = null, gr
     ...(buildExcludedLinksTable("md", project, input.relevantExcludedLinkIds ?? null) ? [
       `## Excluded Links`,
       ``,
-      `These excluded edges would otherwise appear in this view of the working causal map.`,
+      `These excluded links would otherwise appear in this view of the working map.`,
       ``,
       buildExcludedLinksTable("md", project, input.relevantExcludedLinkIds ?? null),
     ] : []),
     ...(buildExcludedFindingsList("md", input) ? [
-      `## Excluded Findings`,
+      `## Excluded Claims`,
       ``,
-      `These excluded evidence findings would otherwise appear in this view.`,
+      `These excluded claims would otherwise appear in this view.`,
       ``,
       buildExcludedFindingsList("md", input),
     ] : []),
@@ -361,8 +361,8 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
   const { project, visibleLinks } = input;
   const groupById = id => project.groups.find(group => group.group_id === id);
   const hasGraph = (visibleLinks || []).length > 0;
-  const ivLabel = groupById(project?.iv_group_id)?.label || "Independent variable";
-  const dvLabel = groupById(project?.dv_group_id)?.label || "Dependent variable";
+  const ivLabel = groupById(project?.iv_group_id)?.label || "Cause";
+  const dvLabel = groupById(project?.dv_group_id)?.label || "Outcome";
   const instrumentLabel = project?.instrument_group_id
     ? groupById(project.instrument_group_id)?.label || project.instrument_group_id : null;
 
@@ -380,19 +380,19 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     `\\setlength{\\emergencystretch}{3em}`,
     `% To compile: pdflatex dag.tex && bibtex dag && pdflatex dag.tex && pdflatex dag.tex`,
     ``,
-    `\\title{Working Causal Map}`,
+    `\\title{Working Map}`,
     `\\author{}`,
     `\\date{\\today}`,
     ``,
     `\\begin{document}`,
     `\\maketitle`,
     ``,
-    `\\noindent\\textbf{Ind var:} ${texEscape(ivLabel)}\\\\`,
-    `\\textbf{Dep var:} ${texEscape(dvLabel)}`,
+    `\\noindent\\textbf{Cause:} ${texEscape(ivLabel)}\\\\`,
+    `\\textbf{Outcome:} ${texEscape(dvLabel)}`,
     ...(instrumentLabel ? [`\\textbf{Instrument:} ${texEscape(instrumentLabel)}`] : []),
     ``,
-    `This causal map was constructed using the DAG Builder method \\citep{${METHOD_BIB_KEY}}.`,
-    ...(input.permalink ? [``, `\\noindent Public causal map: \\url{${String(input.permalink).replace(/[\r\n]/g, "")}}`] : []),
+    `This map was constructed using the DAG Builder method \\citep{${METHOD_BIB_KEY}}.`,
+    ...(input.permalink ? [``, `\\noindent Public map: \\url{${String(input.permalink).replace(/[\r\n]/g, "")}}`] : []),
     ``,
     graphImageBytes ? `` : `\\section{Causal Graph}`,
     ``,
@@ -402,7 +402,7 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
         ? `\\textit{The causal graph image could not be rendered; the causal structure is listed below.}`
       : ((visibleLinks || []).length
         ? `\\textit{Graph figure export is not yet available; the causal structure is listed in the Causal Links table below.}`
-        : `\\textit{No DAG to display --- choose groups with evidence links first.}`),
+        : `\\textit{No graph to display --- choose variables with evidence links first.}`),
     ``,
     `\\section{Causal Links}`,
     ``,
@@ -417,15 +417,15 @@ export function buildLatexFiles(input, { bibText, keyMap }, svgStr = null, graph
     ...(buildExcludedLinksTable("tex", project, input.relevantExcludedLinkIds ?? null) ? [
       `\\section{Excluded Links}`,
       ``,
-      `These excluded edges would otherwise appear in this view of the working causal map.`,
+      `These excluded links would otherwise appear in this view of the working map.`,
       ``,
       buildExcludedLinksTable("tex", project, input.relevantExcludedLinkIds ?? null),
       ``,
     ] : []),
     ...(buildExcludedFindingsList("tex", input) ? [
-      `\\section{Excluded Findings}`,
+      `\\section{Excluded Claims}`,
       ``,
-      `These excluded evidence findings would otherwise appear in this view.`,
+      `These excluded claims would otherwise appear in this view.`,
       ``,
       buildExcludedFindingsList("tex", input),
       ``,

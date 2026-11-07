@@ -13,7 +13,7 @@ export function createGroupingSetPresenter({ elements, alertImpl = message => wi
   }
 
   function showExportError(error) {
-    alertImpl(error?.message || "Could not export the grouping schema folder.");
+    alertImpl(error?.message || "Could not export the variable schema folder.");
   }
 
   return { beginExport, endExport, showExportError };

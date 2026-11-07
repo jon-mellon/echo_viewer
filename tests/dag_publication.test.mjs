@@ -107,7 +107,7 @@ test("published state distinguishes private working-copy changes", () => {
 
 test("completed schema hydration clears the loading status instead of logging success", () => {
   const ready = source.slice(source.indexOf("function setSchemaReady"), source.indexOf("function setSchemaLoadFailed"));
-  assert.match(ready, /Loading group memberships…/);
+  assert.match(ready, /Loading variable memberships…/);
   assert.match(ready, /else clearStatus\(\)/);
   assert.doesNotMatch(source, /Loaded the public schema/);
 });

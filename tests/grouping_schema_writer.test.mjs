@@ -50,7 +50,7 @@ test("folder manifest lists every reconstruction artifact and emits normalized T
 test("folder writer rejects conflicting canonical memberships", async () => {
   const invalid = structuredClone(schema);
   invalid.groups[1].variable_ids.push("v001001");
-  await assert.rejects(() => writeGroupingSchemaFolder(invalid, webcrypto), /conflicting group ownership/);
+  await assert.rejects(() => writeGroupingSchemaFolder(invalid, webcrypto), /conflicting variable ownership/);
 });
 
 test("derived view files can be omitted to match publications made without them", async () => {
