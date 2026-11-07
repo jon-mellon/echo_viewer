@@ -17,6 +17,17 @@ test("browser errors allow only recovered rate limits", () => {
   expect(browserErrors.check).toThrow(/Unrelated failure/);
 });
 
+test("browser errors ignore only the viewer-assets probe's 404, not other missing files", () => {
+  const page = new EventEmitter();
+  const browserErrors = watchBrowserErrors(page);
+  const text = "Failed to load resource: the server responded with a status of 404 ()";
+  page.emit("console", { type: () => "error", text: () => text,
+    location: () => ({ url: "https://data.example/evidence/layouts/browser-v2/abc/viewer-assets/manifest.json" }) });
+  browserErrors.check();
+  page.emit("console", { type: () => "error", text: () => text, location: () => ({ url: "https://data.example/compiled/dag.json" }) });
+  expect(browserErrors.check).toThrow(/404/);
+});
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
 });

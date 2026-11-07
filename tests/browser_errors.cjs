@@ -6,6 +6,9 @@ function watchBrowserErrors(page, { warnings = false } = {}) {
   page.on("pageerror", error => errors.push(error.message));
   page.on("console", message => {
     if (message.type() === "error" || (warnings && message.type() === "warning")) {
+      // A snapshot whose viewer assets are not published answers the viewer's probe for them with a 404, which the browser
+      // logs although the viewer handles it. The viewer warns about the missing assets itself.
+      if (/status of 404/.test(message.text()) && /\/viewer-assets\/manifest\.json$/.test(message.location?.().url || "")) return;
       errors.push(message.text());
     }
   });
