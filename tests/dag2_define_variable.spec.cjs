@@ -513,6 +513,16 @@ test("Jev test and full split resume saved batches after failure and reload", as
     await expect(page.locator("#definitionAiFullRun")).toBeVisible();
     expect(requestedBatches[2]).toEqual(failedTestBatch);
     expect(decisions).toBe(5);
+    // A corrected sample suggestion survives leaving and resuming the draft.
+    const firstChoice = page.locator('#definitionAiRows button[data-ai-side="leftover"]').first();
+    const reviewedId = await firstChoice.getAttribute("data-variable-id");
+    await firstChoice.click();
+    await expect(page.locator(`#definitionAiRows button[data-variable-id="${reviewedId}"][data-ai-side="leftover"]`)).toBeFocused();
+    await page.locator("#definitionPartitionStep .definition-cancel").click();
+    await startCreate(page, "iv");
+    await page.locator("#definitionResumeList button", { hasText: "Resume" }).click();
+    await expect(page.locator(`#definitionAiRows button[data-variable-id="${reviewedId}"][data-ai-side="leftover"]`)).toHaveAttribute("aria-pressed", "true");
+    expect(decisions).toBe(5);
     await page.locator("#definitionAiFullRun").click();
     await expect(page.locator("#definitionAiStatus")).toContainText("Full run paused");
     await expect(page.locator("#definitionAiFullRun")).toContainText("16 of");
@@ -616,6 +626,50 @@ test("a stalled Jev batch can be stopped and retried", async ({ browser }) => {
   } finally {
     await context.close();
   }
+});
+
+test("a source smaller than the sample can be reviewed and applied without a zero-item run", async ({ page }) => {
+  await page.route("https://openrouter.ai/auth?**", async route => {
+    const address = new URL(route.request().url());
+    const callback = new URL(address.searchParams.get("callback_url"));
+    callback.searchParams.set("code", "test-code");
+    callback.searchParams.set("state", address.searchParams.get("state"));
+    await route.fulfill({ status: 302, headers: { location: callback.href } });
+  });
+  await page.route("https://openrouter.ai/api/**", async route => {
+    const request = route.request();
+    const headers = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS",
+      "access-control-allow-headers": "authorization, content-type" };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    let body;
+    if (request.url().endsWith("/auth/keys")) body = { key: "sk-or-test" };
+    else if (request.url().endsWith("/v1/key")) body = { data: { limit: 5, limit_reset: null, limit_remaining: 5 } };
+    else if (request.url().includes("/v1/model/")) body = { data: { pricing: { prompt: "0", completion: "0", request: "0" } } };
+    else if (request.url().endsWith("/alpha/decisions")) {
+      const questions = request.postDataJSON().questions;
+      body = { answers: Object.fromEntries(Object.keys(questions).map((id, index) => [id,
+        { type: "choice", choice: index % 2 ? "leftover" : "new", probabilities: { new: 0.9, leftover: 0.9 } }])) };
+    } else throw new Error(`Unexpected OpenRouter request: ${request.url()}`);
+    return route.fulfill({ headers, contentType: "application/json", body: JSON.stringify(body) });
+  });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.__dagBuilderState?.project?.groups?.length > 20
+    && window.__dagBuilderState?.publishedSchemaHydrated);
+  await startCreate(page, "iv");
+  await startAiSplit(page, { source: "gender", label: "Gender subset", description: "A subset of the gender concepts for this test." });
+  expect(await page.evaluate(() => window.__dagBuilderState.definitionDraft.eligible_variable_ids.length)).toBeLessThanOrEqual(50);
+  await page.locator("#definitionAiConnect").click();
+  await expect(page.locator("#definitionAiRun")).toBeEnabled();
+  await page.locator("#definitionAiRun").click();
+  await expect(page.locator("#definitionAiApply")).toBeVisible();
+  await expect(page.locator("#definitionAiFullRun")).toBeHidden();
+  await page.locator("#definitionPartitionStep .definition-cancel").click();
+  await startCreate(page, "iv");
+  await page.locator("#definitionResumeList button", { hasText: "Resume" }).click();
+  await expect(page.locator("#definitionAiApply")).toBeVisible();
+  await page.locator("#definitionAiApply").click();
+  await expect(page.locator("#definitionSave")).toBeEnabled();
 });
 
 test("a published split appears after source selection and opens for review", async ({ page }) => {

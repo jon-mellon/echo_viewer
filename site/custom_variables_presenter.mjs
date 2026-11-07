@@ -66,6 +66,10 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
     els.openCustomVariables?.setAttribute("aria-pressed", String(Boolean(state.customVariablesOpen)));
     els.customVariablesView.hidden = !showing;
     if (!showing) return;
+    const active = document.activeElement;
+    const focusedInspectId = els.customVariablesTable.contains(active)
+      ? active?.dataset?.action === "inspect" ? active.dataset.groupId : active?.dataset?.conceptMore
+      : null;
     const all = schemaVariables();
     const query = normalized(els.customVariablesFilter.value);
     const previous = previousSplits().filter(item => !all.some(group => group.group_id === item.group_id)
@@ -115,6 +119,10 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
         h("p", { textContent: "No variable in this schema matches this filter." }),
         h("button", { className: "btn btn--sm", type: "button", dataset: { action: "clear-filter" }, textContent: "Clear filter" })));
     replaceChildren(els.customVariablesTable, ...sections);
+    if (focusedInspectId) {
+      [...els.customVariablesTable.querySelectorAll("button[data-action=inspect]")]
+        .find(button => button.dataset.groupId === focusedInspectId)?.focus({ preventScroll: true });
+    }
     els.customVariablesTable.querySelector("button[data-action=clear-filter]")?.addEventListener("click", () => {
       els.customVariablesFilter.value = "";
       render();
@@ -150,13 +158,13 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
       h("td", { className: "num", textContent: String(group.variable_ids?.length || Number(group.member_count) || 0) }),
       h("td", { className: "actions" },
         h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "inspect", groupId: group.group_id },
-          textContent: "Inspect", attrs: { "aria-expanded": String(expandedId === group.group_id) } }),
+          textContent: "Inspect", attrs: { "aria-label": `Inspect ${label}`, "aria-expanded": String(expandedId === group.group_id) } }),
         !custom ? h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "split", groupId: group.group_id }, disabled: busy,
-          textContent: "Create split" }) : null,
+          textContent: "Create split", attrs: { "aria-label": `Create split from ${label}` } }) : null,
         custom ? h("button", { className: "btn btn--ghost", type: "button", dataset: { action: "edit", groupId: group.group_id },
-          disabled: busy || !changeable, title: changeable ? `Edit ${label}` : lockedTitle, textContent: "Edit" }) : null,
+          disabled: busy || !changeable, title: changeable ? `Edit ${label}` : lockedTitle, textContent: "Edit", attrs: { "aria-label": `Edit ${label}` } }) : null,
         custom ? h("button", { className: "btn btn--ghost custom-variables-delete", type: "button", dataset: { action: "delete", groupId: group.group_id },
-          disabled: busy || !changeable, title: changeable ? `Remove ${label} from schema` : lockedTitle, textContent: "Remove from schema" }) : null));
+          disabled: busy || !changeable, title: changeable ? `Remove ${label} from schema` : lockedTitle, textContent: "Remove from schema", attrs: { "aria-label": `Remove ${label} from schema` } }) : null));
   }
 
   function detailsRow(group) {
@@ -168,6 +176,7 @@ export function createCustomVariablesPresenter({ state, elements: els, truncate,
         h("span", { className: "inline-spinner", ariaHidden: "true" }), "Loading concepts…")
         : h("ul", {}, ids.slice(0, conceptLimit).map(id => h("li", { textContent: conceptLabel(id) }))),
       !detailsLoading && ids.length > conceptLimit ? h("button", { type: "button", className: "btn btn--sm", textContent: "Show more concepts",
+        dataset: { conceptMore: group.group_id },
         onclick: () => { conceptLimit += 100; void loadVisibleDetails(group); } }) : null));
   }
 

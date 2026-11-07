@@ -487,6 +487,7 @@ test("instrument diagnostics use the same mobile view switch", async ({ browser 
     await expect(page.locator("#toggleConfoundersOnly")).toBeHidden();
     await expect(page.locator("#toggleCollidersOnly")).toBeHidden();
     await expect(page.locator("#toggleExclusionViolations")).toBeVisible();
+    await expect(page.locator("#toggleExclusionViolations")).toHaveAccessibleName(/Exclusion restriction violations \(\d+\)/);
     await expect(page.locator("#toggleExogeneity")).toBeVisible();
     await openNav(page, { tap: true });
     await page.locator("#toggleExogeneity").tap();
