@@ -13,7 +13,7 @@ export function createCustomVariablesPresenter({ state, elements: els, normalize
   customVariables, sourceLabels, canChange, onCreate, onEdit, onDelete,
   previousSplits = () => [],
   loadPreviousSplits = () => {}, reusePreviousSplit = () => {}, splitsLoading = () => false, splitsError = () => false, schemaVariables = customVariables,
-  onSplitSource = () => {}, getSchema = () => ({}), loadDetails = async () => {}, conceptLabel = id => id }) {
+  onSplitSource = () => {}, onVisibilityChange = () => {}, getSchema = () => ({}), loadDetails = async () => {}, conceptLabel = id => id }) {
   let confirmingId = null;
   let deleting = false;
   let status = "";
@@ -38,6 +38,7 @@ export function createCustomVariablesPresenter({ state, elements: els, normalize
   function open() {
     els.openCustomVariables?.closest("details")?.removeAttribute("open");
     state.customVariablesOpen = true;
+    onVisibilityChange();
     confirmingId = null;
     status = "";
     loadPreviousSplits(true);
@@ -47,6 +48,7 @@ export function createCustomVariablesPresenter({ state, elements: els, normalize
 
   function close() {
     state.customVariablesOpen = false;
+    onVisibilityChange();
     state.customVariablesHighlight = null;
     confirmingId = null;
     render();

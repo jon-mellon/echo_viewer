@@ -2049,6 +2049,7 @@ const customVariablesPresenter = createCustomVariablesPresenter({
     Number(b.source === "user_split") - Number(a.source === "user_split")
       || String(a.label || "").localeCompare(String(b.label || ""))),
   getSchema: currentWorkingGroupingSchema,
+  onVisibilityChange: () => persistentViewer.viewerChanged(),
   loadDetails: ids => hydrateVariableDetails(ids, { skipNeighbors: true }),
   conceptLabel: id => state.variableById.get(id)?.display_label || state.variableById.get(id)?.concept_label || id,
   onSplitSource: id => definitionWorkflowController.browsePreviousForSource("candidate", id),
@@ -2270,6 +2271,11 @@ const projectBootstrap = createProjectBootstrap({
     && Boolean(sessionStorage.getItem("echo-openrouter-definition-draft-v1")),
   onReady: async () => {
     persistentViewer.start();
+    if (state.customVariablesOpen) customVariablesPresenter.open();
+    else if (state.selectedEdgeId && !els.closeEvidencePane.hidden) {
+      markEvidenceOrigin();
+      shellController.showMobilePanel("dag");
+    }
     await definitionWorkflowController.resumeAfterOAuth();
     void publicationController.refreshPublicationState();
     // Compiled-DAG browsing and catalog search need no raw evidence engine.

@@ -61,6 +61,7 @@ export function buildPermalink({ location, schemaUrl, dataVersion, state,
   values.task = state.task || "home";
   // A page that named its schema source keeps naming it in the links it makes.
   if (state.dagDisplay === "table") values.dag_view = "table";
+  if (state.customVariablesOpen) values.workspace = "schema";
   for (const [view, [focusKey, depthKey, papersKey]] of Object.entries(exploreKeys)) {
     const explore = state.explore?.[view];
     if (!explore?.focusId) continue;
@@ -162,6 +163,7 @@ export function applyPermalink(params, state) {
   if (!state.showConfoundersOnly && !state.showCollidersOnly && !state.showExclusionViolations && !state.showExogeneity) {
     state.showConfoundersOnly = true;
   }
+  state.customVariablesOpen = params.get("workspace") === "schema";
   state.activeGroupId = resolveGroup(params.get("selected_group")) || null;
   state.selectedVariableId = params.get("selected_variable") || null;
   state.selectedEdgeId = params.get("selected_edge") || null;

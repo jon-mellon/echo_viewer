@@ -618,3 +618,41 @@ for (const width of [390, 1440]) test(`a partially selected Identify view surviv
   await expect(page.locator("#identify-iv-input")).toHaveValue("sleep");
   await expect(page.locator('#identifyGroupPicker[data-picker-side="dv"]')).toBeVisible();
 });
+
+for (const width of [390, 1440]) test(`schema workspace survives reload at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(viewer);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  if (width < 840) await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').click();
+  await page.locator("#editVariableSchema").click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("workspace")).toBe("schema");
+  await page.reload();
+  await ready(page);
+  await expect(page.locator("#customVariablesView")).toBeVisible();
+  await page.locator("#customVariablesClose").click();
+  await expect.poll(() => new URL(page.url()).searchParams.has("workspace")).toBe(false);
+});
+
+test("mobile reload returns to the open evidence pane", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+  await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+  await ready(page);
+  const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+    .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+  await chooseAnchors(page, anchors[0], anchors[1]);
+  const edge = "category-academic-achievement__category-macroeconomic-context";
+  await page.evaluate(async id => {
+    const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
+    api.inspectDagEdge(id);
+  }, edge);
+  await expect.poll(() => new URL(page.url()).searchParams.get("selected_edge")).toBe(edge);
+  await page.reload();
+  await ready(page);
+  await expect(page.locator("#closeEvidencePane")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Exclude finding / }).first()).toBeVisible();
+});
