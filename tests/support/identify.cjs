@@ -44,6 +44,6 @@ async function createVariableFromSchema(page) {
 }
 
 /** A custom variable's Edit and Delete icon buttons in a list row. */
-const editVariableButton = (page, label) => page.getByRole("button", { name: `Edit ${label}`, exact: true });
+const editVariableButton = (page, label) => page.locator("#identifyGroupPicker").getByRole("button", { name: `Edit ${label}`, exact: true });
 
 module.exports = { closeSchemaWorkspace, editSchemaButton, createVariableFromSchema, editVariableButton, openIdentifyField, chooseAnchor, chooseAnchors, startCreate };

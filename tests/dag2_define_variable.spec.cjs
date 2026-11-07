@@ -179,6 +179,7 @@ test("Variables list definition and split editing are reachable on desktop and m
   await includeConcepts(page, [variableId]);
   await page.locator("#definitionResidualLabels input").fill("Browser list residual");
   await page.locator("#definitionSave").click();
+  await expect(page.locator("#definitionBlock")).toBeHidden();
   await expect(editSchemaButton(page)).toBeVisible();
   const splitId = await page.evaluate(() => window.__dagBuilderState.project.groups
     .find(group => group.label === "Browser list variable")?.group_id);
