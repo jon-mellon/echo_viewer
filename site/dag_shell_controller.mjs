@@ -59,9 +59,9 @@ export function createDagShellController({ state, elements, renderDag, getNetwor
     elements.fullscreenDag.classList.toggle("active", panel === "dag");
     elements.fullscreenDag.setAttribute("aria-pressed", panel === "dag" ? "true" : "false");
     // An icon button: swap its label, while CSS swaps the maximize/minimize icon on aria-pressed.
-    const dagLabel = panel === "dag" ? "Exit full screen" : "Full screen DAG";
+    const dagLabel = panel === "dag" ? "Exit full screen" : "Full screen graph";
     elements.fullscreenDag.setAttribute("aria-label", dagLabel);
-    elements.fullscreenDag.title = panel === "dag" ? "Exit full screen (Escape)" : "Expand the DAG to fill the window; press Escape to exit";
+    elements.fullscreenDag.title = panel === "dag" ? "Exit full screen (Escape)" : "Expand the graph to fill the window; press Escape to exit";
     requestAnimationFrame(() => {
       const network = getNetwork();
       if (network) network.setSize("100%", "100%");
@@ -115,8 +115,11 @@ export function createDagShellController({ state, elements, renderDag, getNetwor
     window._dagPanelGetRight = () => rightWidth;
 
     function makeResizer(element, side) {
-      element.addEventListener("mousedown", event => {
+      element.addEventListener("pointerdown", event => {
+        if (event.button !== 0) return;
         event.preventDefault();
+        // Capture the pointer so a drag that leaves the divider (or the window) still ends cleanly.
+        element.setPointerCapture?.(event.pointerId);
         const resizeDag = state.interfaceMode === "dag2" || side === "right";
         const refitDag = resizeDag && isDagFullyVisible();
         const startX = event.clientX;
@@ -132,12 +135,16 @@ export function createDagShellController({ state, elements, renderDag, getNetwor
         }
         function onUp() {
           element.classList.remove("dragging");
-          document.removeEventListener("mousemove", onMove);
-          document.removeEventListener("mouseup", onUp);
+          element.removeEventListener("pointermove", onMove);
+          element.removeEventListener("pointerup", onUp);
+          element.removeEventListener("pointercancel", onUp);
+          element.removeEventListener("lostpointercapture", onUp);
           if (moved && refitDag) setTimeout(() => fitDagNetwork(getNetwork()), 50);
         }
-        document.addEventListener("mousemove", onMove);
-        document.addEventListener("mouseup", onUp);
+        element.addEventListener("pointermove", onMove);
+        element.addEventListener("pointerup", onUp);
+        element.addEventListener("pointercancel", onUp);
+        element.addEventListener("lostpointercapture", onUp);
       });
     }
 

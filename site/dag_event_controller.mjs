@@ -178,6 +178,8 @@ function installHandlers() {
     if (key !== "z" && key !== "y") return;
     const target = /** @type {HTMLElement | null} */ (event.target instanceof HTMLElement ? event.target : null);
     if (target?.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']")) return;
+    // A modal dialog owns the keyboard: do not edit the project behind it.
+    if (document.querySelector("dialog[open]")) return;
     event.preventDefault();
     if (key === "y" || event.shiftKey) { if (!els.redoBtn.disabled) redo(); }
     else if (!els.undoBtn.disabled) undo();
@@ -247,7 +249,7 @@ function installHandlers() {
     const target = /** @type {HTMLInputElement} */ (event.target);
     if (target.type === "file" || target.id === "groupingSetSelect") setNavOpen(false);
   });
-  window.matchMedia("(min-width: 841px)").addEventListener("change", () => setNavOpen(false));
+  window.matchMedia("(min-width: 961px)").addEventListener("change", () => setNavOpen(false));
 
   // Dropdown menus (Filters, task bar menus) close on an outside click or Escape.
   const openMenus = () => document.querySelectorAll("details.filter-dropdown[open], details.nav-menu[open], details.list-filter[open]");
@@ -309,8 +311,15 @@ function installHandlers() {
   els.exportMd.addEventListener("click", exportMd);
   els.exportTex.addEventListener("click", exportTex);
 
+  // A window drag fires resize continuously and each renderDag() restarts layout. Render once the resizing
+  // settles, so the final size is always the one drawn.
+  let resizeTimer = null;
   window.addEventListener("resize", () => {
-    if (state.project) renderDag();
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      resizeTimer = null;
+      if (state.project) renderDag();
+    }, 120);
   });
   installDagHandlers();
   initPanelResizers();

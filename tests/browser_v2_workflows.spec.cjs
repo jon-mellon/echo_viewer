@@ -72,7 +72,7 @@ test("incident links use the canonical snapshot and retain both edge directions"
   expect(fallbackMatches).toBe(true);
 });
 
-test("browser-v2 supports group detail, auto layout, fullscreen and project export", async ({ page }) => {
+test("browser-v2 supports variable detail, auto layout, fullscreen and project export", async ({ page }) => {
   const browserErrors = watchBrowserErrors(page);
   await page.goto("http://127.0.0.1:8767/?task=identify", { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => window.__dagBuilderState?.compiledDag

@@ -65,7 +65,7 @@ function parseTsv(text, source) {
 
 async function fetchText(url, fetchImpl) {
   const response = await fetchImpl(url, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Could not load grouping schema file ${url}: ${response.status}`);
+  if (!response.ok) throw new Error(`Could not load variable schema file ${url}: ${response.status}`);
   return response.text();
 }
 
@@ -98,7 +98,7 @@ export async function loadGroupingSchemaStructure(baseUrl, fetchImpl = fetch) {
   const manifestUrl = new URL("manifest.json", base);
   const manifest = JSON.parse(await fetchText(manifestUrl, fetchImpl));
   if (manifest.format_version !== GROUPING_FORMAT_VERSION) {
-    throw new Error(`Unsupported grouping schema format: ${manifest.format_version}.`);
+    throw new Error(`Unsupported variable schema format: ${manifest.format_version}.`);
   }
   const schema = parseYamlMapping(
     await fetchText(new URL(manifest.schema_file, base), fetchImpl), manifest.schema_file,
@@ -112,7 +112,7 @@ export async function loadGroupingSchemaStructure(baseUrl, fetchImpl = fetch) {
   if (present.has("migration_provenance")) schema.migration_provenance = manifest.provenance || {};
 
   if (!manifest.groups_file || !manifest.group_membership_files) {
-    throw new Error("Grouping schema manifest is missing per-group membership files.");
+    throw new Error("Variable schema manifest is missing per-group membership files.");
   }
   const groups = new Map();
   const groupRows = parseTsv(await fetchText(new URL(manifest.groups_file, base), fetchImpl), manifest.groups_file);
@@ -122,16 +122,16 @@ export async function loadGroupingSchemaStructure(baseUrl, fetchImpl = fetch) {
     try {
       metadata = JSON.parse(row.metadata || "{}");
     } catch {
-      throw new Error(`Invalid group metadata for ${row.group_id} in ${manifest.groups_file}.`);
+      throw new Error(`Invalid variable metadata for ${row.group_id} in ${manifest.groups_file}.`);
     }
     if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-      throw new Error(`Invalid group metadata for ${row.group_id} in ${manifest.groups_file}.`);
+      throw new Error(`Invalid variable metadata for ${row.group_id} in ${manifest.groups_file}.`);
     }
     groups.set(row.group_id, { group_id: row.group_id, ...metadata, variable_ids: [] });
   }
   const membershipEntries = Object.entries(manifest.group_membership_files);
   if (membershipEntries.length !== groups.size || membershipEntries.some(([groupId]) => !groups.has(groupId))) {
-    throw new Error("Grouping schema membership file map does not match groups.tsv.");
+    throw new Error("Variable schema membership file map does not match groups.tsv.");
   }
   const owners = new Map(), loadedGroups = new Set();
   async function loadMemberships(groupIds) {
@@ -190,7 +190,7 @@ export async function loadGroupingSchema(source, fetchImpl = fetch) {
   const url = new URL(source, globalThis.location?.href || "http://localhost/");
   if (url.pathname.endsWith(".json")) {
     const response = await fetchImpl(url, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Could not load grouping schema: ${response.status}`);
+    if (!response.ok) throw new Error(`Could not load variable schema: ${response.status}`);
     return validateGroupingSchema(await response.json());
   }
   return loadGroupingSchemaFolder(url, fetchImpl);

@@ -193,7 +193,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     return value;
   }
 
-  const focusMeta = () => state.task === "causes" ? { side: "dv", tag: "Dep var" } : { side: "iv", tag: "Ind var" };
+  const focusMeta = () => state.task === "causes" ? { side: "dv", tag: "Outcome" } : { side: "iv", tag: "Cause" };
 
   /** What the shared anchor bar and picker need to show for the one variable. */
   function focus() {
@@ -397,7 +397,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       title: "Clear the search", attrs: { "aria-label": "Clear the search" },
       onclick: () => { search.value = ""; listFilter.query = ""; clear.hidden = true; applyListSearch(); search.focus(); } });
     const papers = h("input", { type: "number", className: "path-length-input list-filter-papers", min: 1, step: 1,
-      value: String(minPapers), attrs: { inputmode: "numeric", "aria-label": "Minimum papers per link" },
+      value: String(minPapers), attrs: { inputmode: "numeric", "aria-label": "Minimum studies per link" },
       oninput: event => {
         const requested = Math.trunc(Number(event.target.value));
         if (!Number.isSafeInteger(requested) || requested < 1) return;
@@ -435,12 +435,12 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
         listFilter.open = event.target.open;
         if (opened) event.target.querySelector(".list-filter-search")?.focus();
       } },
-    h("summary", { className: "btn btn--icon", title: "Search the list, or filter the map by distance and number of papers",
+    h("summary", { className: "btn btn--icon", title: "Search the list, or filter the map by distance and number of studies",
       attrs: { "aria-label": "Filters" } }, filterIcon()),
     h("div", { className: "list-filter-panel menu-panel", attrs: { role: "group", "aria-label": "Filters" } },
       h("div", { className: "list-filter-search-wrap" }, search, clear),
       h("label", { className: "list-filter-field" }, h("span", { textContent: "Distance" }), distance),
-      h("label", { className: "list-filter-field" }, h("span", { textContent: "Min papers per link" }), papers),
+      h("label", { className: "list-filter-field" }, h("span", { textContent: "Min studies per link" }), papers),
       ...excludedActions));
   }
 
@@ -452,12 +452,12 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     if (status === "loading") {
       // Only after a local edit: links it touched are counted from their findings.
       loadPaperSupport();
-      notice("Counting the papers behind your edits…");
+      notice("Counting the studies behind your edits…");
       replaceChildren(els.results);
       return;
     }
-    notice(status === "failed" ? "Some paper details could not load, so links changed by your edits may be missing."
-      : !rows.length ? `No ${causes ? "causes" : "consequences"} of ${labelFor(focus)} were found at this distance and paper count. Try a greater distance or fewer papers.` : "");
+    notice(status === "failed" ? "Some study details could not load, so links changed by your edits may be missing."
+      : !rows.length ? `No ${causes ? "causes" : "consequences"} of ${labelFor(focus)} were found at this distance and study count. Try a greater distance or fewer studies.` : "");
     // Schema origin does not affect exploration; put every variable in causal order.
     const ordered = rows.slice().sort((a, b) => a.distance - b.distance);
     const hover = item => onRowHover(item ? { edgeId: item.edgeId, groupId: item.groupId, pathEdgeIds: item.pathEdgeIds } : null);
@@ -465,7 +465,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
       h("div", { className: "explore-group-header" },
         h("h3", { textContent: causes ? "Causes" : "Consequences" }),
         h("span", { className: "explore-papers-header", textContent: "Papers",
-          title: "Distinct papers supporting the link; for a variable further away, its weakest link" })),
+          title: "Distinct studies supporting the link; for a variable further away, its weakest link" })),
       h("ol", { className: "explore-list" }, ordered.map(item => {
         const distance = item.distance;
         const between = item.path.slice(1, -1).map(labelFor);
@@ -638,7 +638,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
     if (filter && toolbar && filter.parentElement !== toolbar) toolbar.append(filter);
     if (key === identifyListKey) return;
     identifyListKey = key;
-    els.summary.textContent = !rows.length ? `No ${noun} were found with the current path length and paper count.` : "";
+    els.summary.textContent = !rows.length ? `No ${noun} were found with the current path length and study count.` : "";
     els.summary.hidden = Boolean(rows.length);
     const sections = [
       // Where a variable came from is a schema question; review treats every variable alike.
@@ -657,7 +657,7 @@ export function createTaskViews({ state, searchGroups, searchStatus = () => "rea
               onReviewVariable(view, item.groupId, chosen);
             } },
             Object.entries(DIAGNOSTIC_STATUSES[view].statuses).map(([value, textContent]) => h("option", { value, textContent })),
-            item.status === "other" ? h("option", { value: "other", textContent: "Other (previous decision)" }) : null) : null;
+            item.status === "other" ? h("option", { value: "other", textContent: "Other (previous status)" }) : null) : null;
           if (select) select.value = item.status;
           // A tooltip needs a hover, so on a touch screen the warning is a button that shows its text under the row.
           const warned = view === "exclusion" && item.status === "explicitly_controlled";

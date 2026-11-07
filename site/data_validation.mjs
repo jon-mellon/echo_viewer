@@ -83,10 +83,10 @@ export function validateProjectPayload(payload) {
 }
 
 export function validateGroupingSchema(schema) {
-  if (!isRecord(schema)) throw new Error("Grouping schema must be an object.");
-  assertSafeJson(schema, "Grouping schema");
+  if (!isRecord(schema)) throw new Error("Variable schema must be an object.");
+  assertSafeJson(schema, "Variable schema");
   if (!Array.isArray(schema.groups)) throw new Error("Grouping schema.groups must be an array.");
-  validateGroups(schema.groups, "Grouping schema");
+  validateGroups(schema.groups, "Variable schema");
   const owners = new Map();
   for (const group of schema.groups) for (const variableId of group.variable_ids) {
     const prior = owners.get(variableId);
@@ -115,17 +115,17 @@ export function validateGroupingSchema(schema) {
     if (!isRecord(schema.finding_decisions)) throw new Error("Grouping schema.finding_decisions must be an object.");
     for (const [rawId, decision] of Object.entries(schema.finding_decisions)) {
       if (!rawId || !isRecord(decision) || decision.display_status !== "excluded") {
-        throw new Error(`Invalid finding decision for ${rawId}.`);
+        throw new Error(`Invalid claim decision for ${rawId}.`);
       }
       if (Object.hasOwn(decision, "reason_code")
         && !["not_relevant_to_target_population", "concept_miscategorized", "other"].includes(decision.reason_code)) {
-        throw new Error(`Invalid finding exclusion reason for ${rawId}.`);
+        throw new Error(`Invalid claim exclusion reason for ${rawId}.`);
       }
       if (Object.hasOwn(decision, "reason_text") && typeof decision.reason_text !== "string") {
-        throw new Error(`Invalid finding exclusion text for ${rawId}.`);
+        throw new Error(`Invalid claim exclusion text for ${rawId}.`);
       }
       if (Object.hasOwn(decision, "reason_text") && !decision.reason_text.trim()) {
-        throw new Error(`Finding exclusion text must not be blank for ${rawId}.`);
+        throw new Error(`Claim exclusion text must not be blank for ${rawId}.`);
       }
     }
   }
@@ -135,7 +135,7 @@ export function validateGroupingSchema(schema) {
       if (!rawId || !isRecord(review) || review.status !== "retained"
         || typeof review.reason_text !== "string" || !review.reason_text.trim()
         || schema.finding_decisions?.[rawId]?.display_status === "excluded") {
-        throw new Error(`Invalid retained finding review for ${rawId}.`);
+        throw new Error(`Invalid retained claim review for ${rawId}.`);
       }
     }
   }

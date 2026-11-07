@@ -5,8 +5,20 @@ import { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } from "./app_contrac
 
 const RESET_HANDOFF_KEY = "echo-pending-reset-session";
 
+/**
+ * Whether leaving the page now would lose work that exists only in memory: a
+ * definition being written or schema-editor changes. Writes that are running or
+ * failed are reported separately by `saving`.
+ */
+export function hasUnsavedWork({ definitionDraft, editorDirty = false }) {
+  const draft = definitionDraft;
+  const draftStarted = Boolean(draft && (draft.source_group_ids?.length || draft.new_label
+    || draft.new_description || draft.replaces_group_id || draft.new_variable_ids?.length));
+  return draftStarted || Boolean(editorDirty);
+}
+
 export function createPersistentViewer({ state, getSchema, getViewport = () => {},
-  status = () => {}, onDiscard = () => {}, onSessionSaved = () => {}, saveSchema = commitLocalSchema }) {
+  status = () => {}, onDiscard = () => {}, onSessionSaved = () => {}, onSaveStateChange = () => {}, saveSchema = commitLocalSchema }) {
   let localRecord = null;
   let committedSchema = null;
   let editorBaseline = null;
@@ -19,6 +31,8 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
   let sessionId = null;
 
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // Whether publishing is allowed depends on this machine, so tell the owner of that control every time it moves.
+  const changed = () => { try { onSaveStateChange(); } catch (error) { console.error(error); } };
   const baseId = () => state.data?.publication_source?.publication_id || "";
   const baseHash = () => state.data?.publication_source?.content_hash || "";
   const sessionTitle = () => {
@@ -102,6 +116,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
       phase: state.phase, workflowMode: state.workflowMode,
     };
     status("Editing — changes are not saved");
+    changed();
   }
 
   function discardEditor() {
@@ -114,6 +129,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     unsavedSchema = false;
     onDiscard();
     status("Editor changes discarded");
+    changed();
   }
 
   async function commitCurrentSchema() {
@@ -129,7 +145,7 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     validateGroupingSchema(schema);
     if (schema.schema_version !== GROUPING_FORMAT_VERSION
       || schema.membership_unit !== GROUPING_MEMBERSHIP_UNIT) {
-      throw new Error("Unsupported grouping schema format.");
+      throw new Error("Unsupported variable schema format.");
     }
     const id = localRecord?.id || crypto.randomUUID();
     const url = currentUrl(id);
@@ -151,8 +167,9 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
       unsavedSchema = true;
       status(`Not saved — ${error.message}`);
       throw error;
-    }).finally(() => { commitPending = null; });
+    }).finally(() => { commitPending = null; changed(); });
     commitPending = pending;
+    changed();
     return pending;
   }
 
@@ -167,10 +184,12 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
       unsavedSchema = false;
       onDiscard();
       status(localRecord ? "Saved locally" : "Published schema");
+      changed();
       return true;
     }
     await commitCurrentSchema();
     editorBaseline = null;
+    changed();
     return true;
   }
 
@@ -186,22 +205,28 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
   }
 
   async function saveIndependentCopy() {
+    // An outstanding commit would write into the draft this copy is leaving, and finish after it.
+    while (commitPending) { try { await commitPending; } catch { /* Its failure is reported by its own caller. */ } }
     const schema = getSchema();
     validateGroupingSchema(schema);
     const id = crypto.randomUUID();
     const url = currentUrl(id);
     if (!url) throw new Error("Cannot construct a URL for this draft.");
     status("Saving independent copy…");
-    const record = await saveSchema({ id, expectedRevision: 0, schema, url,
+    const pending = saveSchema({ id, expectedRevision: 0, schema, url,
       basePublicationId: baseId(), basePublicationHash: baseHash(),
-      sessionId, sessionTitle: sessionTitle() });
-    localRecord = record;
-    committedSchema = structuredClone(schema);
-    editorBaseline = null;
-    unsavedSchema = false;
-    showSavedUrl(url, id);
-    status("Saved independent local copy");
-    return record;
+      sessionId, sessionTitle: sessionTitle() }).then(record => {
+      localRecord = record;
+      committedSchema = structuredClone(schema);
+      editorBaseline = null;
+      unsavedSchema = false;
+      showSavedUrl(url, id);
+      status("Saved independent local copy");
+      return record;
+    }).finally(() => { commitPending = null; changed(); });
+    commitPending = pending;
+    changed();
+    return pending;
   }
 
   function viewerChanged(continuous = false) {
@@ -260,6 +285,10 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     get sessionId() { return sessionId; },
     get localRecord() { return localRecord; },
     get editorOpen() { return Boolean(editorBaseline); },
+    // A write is outstanding or failed: leaving now would lose the change.
+    // The last write failed and the change exists only in memory.
+    get saveFailed() { return unsavedSchema; },
+    get saving() { return Boolean(commitPending || unsavedSchema); },
     get editorDirty() { return Boolean(editorBaseline && !same(getSchema(), editorBaseline.schema)); },
     get canPublish() { return ready && !editorBaseline && !commitPending && !unsavedSchema
       && Boolean(committedSchema && same(getSchema(), committedSchema)); },

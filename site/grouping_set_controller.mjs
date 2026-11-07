@@ -87,7 +87,7 @@ export function createGroupingSetController({ state, elements, publicationContro
       schema_version: GROUPING_FORMAT_VERSION,
       grouping_set_id: source.grouping_set_id || state.project.active_grouping_set_id,
       label: source.label || "Published working schema",
-      description: source.description || "Published working grouping schema.",
+      description: source.description || "Published working variable schema.",
       cache_compatibility: structuredClone(source.cache_compatibility || state.data.cache_compatibility || {}),
       built_against: structuredClone(source.built_against || source.cache_compatibility || state.data.cache_compatibility || {}),
       membership_unit: GROUPING_MEMBERSHIP_UNIT,
@@ -140,7 +140,7 @@ export function createGroupingSetController({ state, elements, publicationContro
         exported_at: timestamp, format: `${GROUPING_FORMAT_VERSION}-folder` });
       exportController.downloadBlob(new Blob([archive], { type: "application/zip" }), "grouping_schema.zip");
     } catch (error) {
-      console.error("Could not export grouping schema folder", error);
+      console.error("Could not export variable schema folder", error);
       presenter.showExportError(error);
     } finally {
       presenter.endExport(originalLabel);

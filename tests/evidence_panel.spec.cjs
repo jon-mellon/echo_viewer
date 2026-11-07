@@ -40,7 +40,7 @@ for (const corrupt of [false, true]) {
       const api = await import(document.querySelector('script[type="module"][src*="dag_builder.js"]').src);
       api.inspectDagEdge("category-academic-achievement__category-macroeconomic-context");
     });
-    await page.getByRole("button", { name: /^Exclude finding / }).first().waitFor();
+    await page.getByRole("button", { name: /^Exclude claim / }).first().waitFor();
     await page.waitForFunction(() => !window.__dagBuilderState.pendingEdgeEvidence);
     const firstMs = Date.now() - started;
     expect(await page.getByText("Loading sources…", { exact: true }).count()).toBe(0);

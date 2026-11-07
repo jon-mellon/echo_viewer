@@ -37,7 +37,7 @@ import { createGroupingSetController } from "/grouping_set_controller.mjs";
 import { createProjectBootstrap } from "/project_bootstrap.mjs?v=compiled-first-v2";
 import { dagDataSource } from "/dag_data_source.mjs?v=browser-v2";
 import { incrementCompiledDag } from "/compiled_dag.mjs";
-import { createPersistentViewer } from "/persistent_viewer.mjs";
+import { createPersistentViewer, hasUnsavedWork } from "/persistent_viewer.mjs";
 import { importDraftFile, makeDraftExport } from "/draft_exchange.mjs";
 import { listPreviousSessions, listLocalSchemas } from "/local_schema_store.mjs";
 import { escapeHtml } from "/text_utils.mjs";
@@ -55,8 +55,8 @@ const ROLE_LABELS = {
   possible_confounder: "Confounder candidate",
   possible_mediator: "Mediator candidate",
   possible_common_consequence_or_collider: "Common consequence",
-  other_possible_cause_of_dv: "Other cause of Dep var",
-  other_possible_cause_of_iv: "Other cause of Ind var",
+  other_possible_cause_of_dv: "Other cause of the outcome",
+  other_possible_cause_of_iv: "Other cause of the cause",
 };
 
 const GROUP_COLORS = {
@@ -509,6 +509,10 @@ function installDagHandlers() {
 // ─── Render orchestration ──────────────────────────────────────────────────────
 
 const renderCoordinator = createRenderCoordinator({
+  onRenderError: (name, error) => {
+    console.error(`Render step ${name} failed`, error);
+    showAppNotice("Part of the screen could not be drawn. Your work is kept; reload the view to redraw it.");
+  },
   buildCandidateQueue, aggregateGroupLinks, computeVisibleLinks, renderConfounderStatuses, renderGroupList,
   renderRejectedVariablesPanel, renderDag, refreshDagEdgeSelection,
   renderVariableComparison,
@@ -699,7 +703,7 @@ async function deleteCustomVariable(groupId) {
   for (const key of ["focusedGroupId", "activeGroupId", "selectedEvidenceGroupId"]) {
     if (state[key] === groupId) state[key] = null;
   }
-  addToUndoHistory(`Deleted variable "${group?.label || groupId}"`, before);
+  addToUndoHistory(`Excluded variable "${group?.label || groupId}"`, before);
   invalidateVisibleCaches();
   renderAll();
   await persistentViewer.commitDecision();
@@ -733,7 +737,7 @@ function renderSearch(side, { renderPicker = true } = {}) {
   replaceChildren(container, matches.map(v => h("button", { className: "result-button", type: "button", dataset: { side, variableId: v.variable_id } },
     h("strong", { textContent: v.display_label || v.concept_label }),
     h("span", { textContent: truncate(v.raw_variable_text || v.concept_label, 110) }),
-    h("span", { textContent: `${v.paper_id || "unknown paper"} ${selected.has(v.variable_id) ? "(selected)" : ""}` }))));
+    h("span", { textContent: `${v.paper_id || "unknown study"} ${selected.has(v.variable_id) ? "(selected)" : ""}` }))));
   container.querySelectorAll(".result-button").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const variableId = btn.dataset.variableId;
@@ -953,7 +957,7 @@ function chooseIdentifyVariable(side, groupId) {
     state.phase = state.project.iv_group_id ? "select_dv" : "select_iv";
     state.selectedEdgeId = null;
     state.selectedEvidenceGroupId = null;
-    addToUndoHistory(`Remove "${label || side}" as ${side === "iv" ? "cause" : "outcome"}`, before, "anchors");
+    addToUndoHistory(`Exclude "${label || side}" as ${side === "iv" ? "cause" : "outcome"}`, before, "anchors");
     renderAll({ reuseLinks: true });
     return;
   }
@@ -987,7 +991,7 @@ function seedLabel(side) { return groupEditorController.seedLabel(side); }
 function applyProjectOperation(next) {
   if (state.publishedSchemaHydrating || state.publishedSchemaLoadFailed) {
     if (els.publicationStatus) {
-      els.publicationStatus.textContent = "Group memberships are still loading. Editing will unlock when they are ready.";
+      els.publicationStatus.textContent = "Variable memberships are still loading. Editing will unlock when they are ready.";
       els.publicationStatus.classList.add("publication-error");
     }
     return false;
@@ -1106,7 +1110,8 @@ function applyProjectOperation(next) {
         state.compiledUpdateTargetSchema = null;
         state.compiledUpdateChangedIds = null;
         state.compiledUpdateChangedRawIds = null;
-        console.warn("Incremental DAG update failed; a full local recomputation is required.", error);
+        console.warn("Incremental graph update failed; a full local recomputation is required.", error);
+        showAppNotice("Graph links may be out of date after your last change. Reload the view to recalculate them.");
       }).finally(() => {
         if (state.compiledDagUpdatePromise === updatePromise) state.compiledDagUpdatePromise = null;
       });
@@ -1215,7 +1220,7 @@ function renderGroupEditor() {
       renderAll();
     }).catch(error => {
       state.pendingVariableMetadata = false;
-      console.warn("Could not lazily load group variable metadata.", error);
+      console.warn("Could not lazily load variable metadata.", error);
     });
   }
   const result = groupEditorController.renderGroupEditor();
@@ -1253,6 +1258,28 @@ function finishSchemaChoice(loadSchema) { return groupEditorController.finishSch
 function activeGroupingSet() { return groupingSetController.active(); }
 
 function copyPermalink() { return groupingSetController.copyPermalink(); }
+
+// A persistent, visible notice for failures that would otherwise only reach the console.
+function showAppNotice(message) {
+  const notice = document.getElementById("appNotice");
+  const text = document.getElementById("appNoticeText");
+  if (!notice || !text) return;
+  text.textContent = message;
+  notice.hidden = false;
+}
+document.getElementById("appNoticeReload")?.addEventListener("click", () => window.location.reload());
+document.getElementById("appNoticeDismiss")?.addEventListener("click", () => { document.getElementById("appNotice").hidden = true; });
+// Errors raised outside any handler of ours (a throwing event listener, a forgotten promise).
+// Browser noise with no error object (ResizeObserver loops, cross-origin scripts) is ignored.
+window.addEventListener("error", event => {
+  if (!event.error) return;
+  console.error("Unhandled error", event.error);
+  showAppNotice("Something went wrong. Reload the view if anything looks wrong.");
+});
+window.addEventListener("unhandledrejection", event => {
+  console.error("Unhandled rejection", event.reason);
+  showAppNotice("Something went wrong. Reload the view if anything looks wrong.");
+});
 
 // A temporary note beside the brand for completed operations. It clears itself
 // unless something else has written to the status in the meantime.
@@ -1292,11 +1319,18 @@ const persistentViewer = createPersistentViewer({
       indicator.title = label;
       indicator.setAttribute("aria-label", label);
     }
-    if (els.localSaveStatus) els.localSaveStatus.textContent = saving || saved || message === "Published schema" ? "" : message;
-    if (els.retryLocalSave) els.retryLocalSave.hidden = !message.startsWith("Not saved");
-    if (els.saveIndependentCopy) els.saveIndependentCopy.hidden =
-      !message.includes("Schema revision changed");
+    // Storage that cannot be opened fails every save the same way, so say what still works.
+    const storageUnavailable = message.includes("IndexedDB is unavailable");
+    if (els.localSaveStatus) els.localSaveStatus.textContent = saving || saved || message === "Published schema" ? ""
+      : storageUnavailable ? "Not saved — this browser is blocking local storage. Use Export → Private schema draft to keep your work."
+        : message;
+    const conflict = message.includes("Schema revision changed");
+    // Retry follows the save machine, not the wording of whatever status was written last.
+    if (els.retryLocalSave) els.retryLocalSave.hidden = saving || saved || conflict || storageUnavailable
+      || !(message.startsWith("Not saved") || persistentViewer.saveFailed);
+    if (els.saveIndependentCopy) els.saveIndependentCopy.hidden = !conflict;
   },
+  onSaveStateChange: () => publicationController?.canPublishChanged?.(),
   onSessionSaved: () => {
     if (els.localSaveStatus?.textContent.startsWith("Previous view not saved —")) {
       els.localSaveStatus.textContent = "";
@@ -1462,7 +1496,7 @@ function renderVariableComparison() {
 
   replaceChildren(els.edgeInspector, h("strong", { textContent: "Evidence between variables" }),
     h("div", { textContent: `${sourceLabel} ↔ ${targetLabel}` }),
-    h("div", { className: "small-note", textContent: `${rows.length} extracted evidence record${rows.length === 1 ? "" : "s"}; only “present” claims create DAG edges; “absent” and “uncertain” are shown for reference.` }));
+    h("div", { className: "small-note", textContent: `${rows.length} extracted claim${rows.length === 1 ? "" : "s"}; only “present” claims create graph links; “absent” and “uncertain” are shown for reference.` }));
   const evidenceRows = rows.map((link) => {
     const doi = isDoi(link.paper_id) ? link.paper_id.trim() : null;
     const paper = truncate(link.paper_title || link.paper_id, 44);
@@ -1501,7 +1535,7 @@ function loadLinkSupport(links) {
     if (state.edgeSupportById !== supportCache) return false;
     const returned = new Set(rows.map(row => row.raw_causal_link_id));
     if (missing.some(id => !returned.has(id))) {
-      throw new Error("Some sparse edge evidence is unavailable in this snapshot");
+      throw new Error("Some sparse link evidence is unavailable in this snapshot");
     }
     for (const row of rows) state.edgeSupportById.set(row.raw_causal_link_id, row);
     linkSupportFailed = false;
@@ -1509,7 +1543,7 @@ function loadLinkSupport(links) {
   }).catch(error => {
     if (state.edgeSupportById === supportCache) {
       linkSupportFailed = true;
-      console.error("Could not load sparse edge evidence", error);
+      console.error("Could not load sparse link evidence", error);
     }
     return false;
   }).finally(() => {
@@ -1582,7 +1616,7 @@ function computeVisibleLinks() {
   els.showExcludedLinks.textContent = `Excluded links (${excludedCount})`;
   const excludedFindingCount = Object.keys(state.project.finding_decisions || {}).length;
   els.showExcludedFindings.hidden = excludedFindingCount === 0;
-  els.showExcludedFindings.textContent = `Excluded findings (${excludedFindingCount})`;
+  els.showExcludedFindings.textContent = `Excluded claims (${excludedFindingCount})`;
   const studyGraph = effectiveStudyGraph({ ...state.project, groups: dagGroups() });
   state.studyGraph = studyGraph;
   const view = deriveDagView({
@@ -1654,7 +1688,7 @@ function persistFindingDecision() {
   if (state.activeGroupId && !persistentViewer.editorOpen) {
     void persistentViewer.commitDecision().then(() =>
       publicationController.workingCopyChanged()).catch(error =>
-      console.error("Could not save finding exclusion", error));
+      console.error("Could not save claim exclusion", error));
   }
 }
 
@@ -1667,8 +1701,8 @@ async function showExcludedFindings() {
   els.edgeInspector.hidden = false;
   els.provenancePanel.hidden = true;
   els.closeEvidencePane.hidden = false;
-  replaceChildren(els.edgeInspector, h("strong", { textContent: "Excluded findings" }),
-    h("div", { className: "small-note", textContent: "Loading findings…" }));
+  replaceChildren(els.edgeInspector, h("strong", { textContent: "Excluded claims" }),
+    h("div", { className: "small-note", textContent: "Loading claims…" }));
   refreshDagEdgeSelection();
   try {
     const missing = ids.filter(id => !state.rawLinksById.has(id));
@@ -1676,10 +1710,10 @@ async function showExcludedFindings() {
       state.rawLinksById.set(raw.raw_causal_link_id, raw);
     }
   } catch (error) {
-    console.warn("Could not load excluded findings.", error);
+    console.warn("Could not load excluded claims.", error);
   }
   if (state.selectedEdgeId || state.selectedEvidenceGroupId || els.edgeInspector.hidden) return;
-  replaceChildren(els.edgeInspector, h("strong", { textContent: "Excluded findings" }),
+  replaceChildren(els.edgeInspector, h("strong", { textContent: "Excluded claims" }),
     ...ids.filter(id => state.project.finding_decisions?.[id]).map(id => {
       const raw = state.rawLinksById.get(id);
       const source = state.variableById.get(raw?.source_variable_id)?.concept_label || raw?.source_variable_id || "";
@@ -1694,7 +1728,7 @@ async function showExcludedFindings() {
         const before = takeSnapshot();
         if (applyProjectOperation(projectOps.setFindingDecision(state.project, id, null)) === false) return;
         addDecision("finding_restored", { raw_causal_link_id: id });
-        addToUndoHistory("Restored finding", before, "finding-decision");
+        addToUndoHistory("Restored claim", before, "finding-decision");
         rebuildLinkDecision();
         persistFindingDecision();
         if (Object.keys(state.project.finding_decisions || {}).length) void showExcludedFindings();
@@ -1824,7 +1858,7 @@ function renderSelectedEdge() {
       }
     }).catch(error => {
       failedEvidenceEdgeId = loadingEdgeId;
-      console.warn("Could not lazily load aggregate-edge evidence.", error);
+      console.warn("Could not lazily load aggregate-link evidence.", error);
     }).finally(() => {
       if (pendingEdgeEvidencePromise !== load) return;
       pendingEdgeEvidencePromise = null;
@@ -1902,8 +1936,8 @@ function renderExportStatus() {
   const bidirectional = state.project.links.some((l) => l.direction_type === "BIDIRECTIONAL" && l.display_status !== "excluded");
   // Shown as the Causal diagram export's tooltip.
   els.exportWorkingMap.title = cycle || bidirectional
-    ? "Not a strict DAG: has cycles or two-way links"
-    : "Valid strict DAG";
+    ? "Not an acyclic graph: has cycles or two-way links"
+    : "Valid acyclic graph";
 }
 
 // ─── Decision log ──────────────────────────────────────────────────────────────
@@ -2224,7 +2258,7 @@ const exportController = createDagExportController({
     try {
       await loadMissing(Object.keys(state.project.finding_decisions || {}));
     } catch (error) {
-      console.warn("Could not load some excluded finding details for export.", error);
+      console.warn("Could not load some excluded claim details for export.", error);
     }
   },
 });
@@ -2277,6 +2311,7 @@ const projectBootstrap = createProjectBootstrap({
   renderAll, dagNetworkController,
   buildDuplicateClusters, linkKey, pairKey, loadVariableSearchCatalog,
   onLocalSchemaLoaded: record => persistentViewer.setLoadedRecord(record),
+  onGraphStale: () => showAppNotice("This draft's link changes could not be applied, so the graph may show the published links. Reload the view to try again."),
   waitForReadyBeforeShowing: () => new URL(location.href).searchParams.has("code")
     && Boolean(sessionStorage.getItem("echo-openrouter-definition-draft-v1")),
   onReady: async () => {
@@ -2333,13 +2368,13 @@ const eventController = createDagEventController({
   showExcludedLinks, showExcludedFindings,
 });
 
-// A variable definition is kept in memory until it is saved. Protect work in
-// progress from an accidental reload; OAuth has its own draft handoff.
+// Definitions and schema-editor changes are kept in memory until saved. Protect
+// them from an accidental reload or closed tab; OAuth has its own draft handoff.
 window.addEventListener("beforeunload", event => {
-  const draft = state.definitionDraft;
-  if (!draft || sessionStorage.getItem("echo-openrouter-definition-draft-v1")) return;
-  if (!draft.source_group_ids?.length && !draft.new_label && !draft.new_description
-      && !draft.replaces_group_id && !draft.new_variable_ids?.length) return;
+  // A schema write that is still running (or has failed) would be lost with the page.
+  if (persistentViewer.saving) { event.preventDefault(); event.returnValue = ""; return; }
+  if (state.definitionDraft && sessionStorage.getItem("echo-openrouter-definition-draft-v1")) return;
+  if (!hasUnsavedWork({ definitionDraft: state.definitionDraft, editorDirty: persistentViewer.editorDirty })) return;
   event.preventDefault();
   event.returnValue = "";
 });
@@ -2357,5 +2392,7 @@ init().catch((error) => {
     h("main", { className: "panel-section" }, h("h1", { textContent: missing ? "Local schema unavailable" : "Echo could not open this view" }),
       h("p", { textContent: error?.message || error }),
       missing ? h("label", { textContent: "Import draft" }, input) : null,
-      missing ? h("a", { href: "?new=1", textContent: "Start new view" }) : null));
+      // Whatever went wrong, leave a way out: the failure may be a dropped connection or a stale link.
+      missing ? null : h("p", {}, h("button", { type: "button", className: "btn", textContent: "Try again", onclick: () => window.location.reload() })),
+      h("a", { href: "?new=1", textContent: "Start new view" })));
 });

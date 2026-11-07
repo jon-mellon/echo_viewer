@@ -14,15 +14,15 @@ export function buildGroupListModel(project, { candidateQueue, sort, activeGroup
     return a.label.localeCompare(b.label);
   });
   return {
-    countText: groups.length + (groups.length === 1 ? " group" : " groups"),
+    countText: groups.length + (groups.length === 1 ? " variable" : " variables"),
     rows: groups.map(group => ({
       groupId: group.group_id,
       label: group.label || group.group_id,
       variableCount: group.variable_ids.length,
       isActive: group.group_id === activeGroupId,
       roleLabels: (queueMap.get(group.group_id)?.roles || []).slice(0, 2).map(role => roleLabels[role] || role),
-      anchorLabel: group.group_id === project.iv_group_id ? "Ind var"
-        : group.group_id === project.dv_group_id ? "Dep var"
+      anchorLabel: group.group_id === project.iv_group_id ? "Cause"
+        : group.group_id === project.dv_group_id ? "Outcome"
           : group.group_id === project.instrument_group_id ? "Instrument" : "",
     })),
   };

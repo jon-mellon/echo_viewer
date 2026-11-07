@@ -200,7 +200,7 @@ function applyActiveGroupingSet() {
     const importedGroupId = `schema_${sourceGroup.group_id}`;
     state.project.groups.push({
       group_id: importedGroupId,
-      label: sourceGroup.label || "Imported group",
+      label: sourceGroup.label || "Imported variable",
       variable_ids: remaining,
       seed_variable_ids: remaining.slice(),
       excluded_nearby_variable_ids: [],

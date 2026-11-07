@@ -28,6 +28,8 @@ test("resizing the DAG refits a fully visible graph and preserves a cropped view
   const makeElement = () => ({
     style: {}, classList: { add() {}, remove() {} },
     addEventListener(name, handler) { this.handlers ??= new Map(); this.handlers.set(name, handler); },
+    removeEventListener(name) { this.handlers?.delete(name); },
+    setPointerCapture() {},
   });
   const shell = makeElement(), leftResizer = makeElement(), rightResizer = makeElement();
   globalThis.document = {
@@ -48,10 +50,10 @@ test("resizing the DAG refits a fully visible graph and preserves a cropped view
       isDagFullyVisible: () => fullyVisible, dismissEvidencePane() {},
     }).installResizers();
     const drag = (visibleAfterMove) => {
-      leftResizer.handlers.get("mousedown")({ clientX: 400, preventDefault() {} });
-      documentHandlers.get("mousemove")({ clientX: 500 });
+      leftResizer.handlers.get("pointerdown")({ button: 0, pointerId: 1, clientX: 400, preventDefault() {} });
+      leftResizer.handlers.get("pointermove")({ clientX: 500 });
       fullyVisible = visibleAfterMove;
-      documentHandlers.get("mouseup")();
+      leftResizer.handlers.get("pointerup")();
     };
     drag(false);
     await new Promise(resolve => setTimeout(resolve, 60));
@@ -373,4 +375,17 @@ test("a render that a newer one supersedes still releases whoever was waiting on
   } finally {
     globalThis.Worker = savedWorker;
   }
+});
+
+test("a renderer that throws is reported and the remaining renderers still run", () => {
+  const calls = [];
+  const errors = [];
+  const coordinator = createRenderCoordinator(new Proxy({
+    onRenderError: (name, error) => errors.push([name, error.message]),
+    renderGroupList() { throw new Error("boom"); },
+    renderVariableComparison() { calls.push("comparison"); return true; },
+  }, { get: (target, name) => target[name] ?? (() => { calls.push(String(name)); }) }));
+  coordinator.rebuildProject();
+  assert.deepEqual(errors, [["renderGroupList", "boom"]]);
+  assert.ok(calls.includes("renderDag") && calls.includes("saveProjectLocally"));
 });

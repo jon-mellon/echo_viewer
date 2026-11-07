@@ -9,7 +9,7 @@ export const CONFOUNDER_STATUSES = {
 
 export const EXCLUSION_STATUSES = {
   unaddressed: "Unaddressed",
-  explicitly_controlled: "Explicitly controlled for",
+  explicitly_controlled: "Explicitly controlled",
   instrument_only_via_x: "Instrument affects variable only via cause",
   variable_only_via_x: "Affects outcome only via cause",
   removed_other: "Other reason",

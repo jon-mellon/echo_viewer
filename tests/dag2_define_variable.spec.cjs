@@ -727,7 +727,7 @@ test("a published split appears after source selection and opens for review", as
     const { GROUPING_FORMAT_VERSION, GROUPING_MEMBERSHIP_UNIT } = await import("./app_contracts.mjs");
     const source = window.__dagBuilderState.project.groups.find(group => group.group_id === sourceId);
     const group = { group_id: "published_new", label: "Published fixture split",
-      description: "A published fixture split taken from one source category.", source: "user_split",
+      description: "A published fixture split taken from one source variable.", source: "user_split",
       provenance: { operation: "split_categories", source_group_ids: [source.group_id],
         source_group_by_variable: Object.fromEntries(source.variable_ids.map(id => [id, source.group_id])) },
       variable_ids: source.variable_ids.slice(0, 1) };
@@ -774,7 +774,7 @@ test("a published split appears after source selection and opens for review", as
   await expect(page.locator("#definitionBrowseStatus")).not.toContainText("Could not");
   // The saved split opens directly for review, without the AI workflow.
   await expect(page.locator("#definitionNewLabel")).toHaveValue("Published fixture split");
-  await expect(page.locator("#definitionNewDescription")).toHaveValue("A published fixture split taken from one source category.");
+  await expect(page.locator("#definitionNewDescription")).toHaveValue("A published fixture split taken from one source variable.");
   await expect(page.locator("#definitionJevPanel")).toBeHidden();
   await expect(page.locator("body")).toHaveClass(/defining-variable/);
   await expect(page.locator("#definitionPartitionStep")).toBeVisible();
@@ -786,7 +786,7 @@ test("a published split appears after source selection and opens for review", as
   const groups = await page.evaluate(() => window.__dagBuilderState.project.groups
     .map(group => ({ group_id: group.group_id, label: group.label, description: group.description })));
   expect(groups.find(group => group.label === "Published fixture split")?.description)
-    .toBe("A published fixture split taken from one source category.");
+    .toBe("A published fixture split taken from one source variable.");
   expect(groups.find(group => group.group_id === fixture.sourceId)?.label).toBe(fixture.sourceLabel);
 });
 
@@ -909,7 +909,7 @@ test("add a saved variable to the schema without selecting an analysis role", as
   expect(new Set(replaced.memberships).size).toBe(replaced.memberships.length);
 });
 
-test("definition source search matches constituent variables, not only category names", async ({ page }) => {
+test("definition source search matches constituent variables, not only variable names", async ({ page }) => {
   const zlib = require("node:zlib");
   const { PRODUCTION_EVIDENCE_MANIFEST } = await import("../site/dag_data_config.mjs");
   const snapshot = PRODUCTION_EVIDENCE_MANIFEST.match(/browser-v2\/([0-9a-f]{64})\//)[1];
