@@ -836,3 +836,27 @@ for (const width of [390, 1440]) test(`the picker reports when saved variables c
   await page.getByRole("button", { name: "Retry saved variables" }).click();
   await expect(warning).toBeHidden();
 });
+
+for (const viewport of [{ width: 320, height: 568 }, { width: 568, height: 320 }]) {
+  test(`mobile collider rows open their definitions at ${viewport.width}x${viewport.height}`, async ({ browser }) => {
+    const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true });
+    const page = await context.newPage();
+    try {
+      await page.addInitScript(() => sessionStorage.setItem("echo-viewer-password-accepted", "yes"));
+      await page.goto(`${new URL(viewer).origin}/?schema=c221423a-9470-4c82-8a3d-8bcf4a01ef7c&data_version=f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b&task=identify`);
+      await ready(page);
+      const anchors = await page.evaluate(() => window.__dagBuilderState.project.groups
+        .filter(group => group.variable_ids?.length).slice(0, 2).map(group => group.group_id));
+      await chooseAnchors(page, anchors[0], anchors[1], { tap: true });
+      await page.locator('.mobile-panel-nav [data-mobile-panel="controls"]').tap();
+      await openNav(page, { tap: true });
+      await page.locator("#toggleCollidersOnly").tap();
+      await closeNav(page, { tap: true });
+      const row = page.locator(".variable-review-row").first();
+      const groupId = await row.getAttribute("data-group-id");
+      await row.locator(".explore-row-open").tap({ timeout: 3000 });
+      await expect.poll(() => page.evaluate(() => window.__dagBuilderState.selectedEvidenceGroupId)).toBe(groupId);
+      await expect(page.locator("#edgeInspector")).toBeVisible();
+    } finally { await context.close(); }
+  });
+}
