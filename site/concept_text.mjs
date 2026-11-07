@@ -11,19 +11,27 @@ function uoaHint(word) {
   const button = h("button", { className: "uoa-hint", type: "button", textContent: word,
     attrs: { "aria-expanded": "false", "aria-label": `${word}: what is this?` } });
   const wrap = h("span", { className: "uoa-hint-wrap" }, button, popover);
+  let stopListening = null;
   const setOpen = open => {
     popover.hidden = !open;
     button.setAttribute("aria-expanded", String(open));
-    if (open) {
-      const close = event => {
-        if (event.type === "keydown" ? event.key !== "Escape" : wrap.contains(event.target)) return;
-        setOpen(false);
-        document.removeEventListener("click", close);
-        document.removeEventListener("keydown", close);
-      };
-      document.addEventListener("click", close);
-      document.addEventListener("keydown", close);
-    }
+    stopListening?.();
+    stopListening = null;
+    if (!open) return;
+    const close = event => {
+      if (event.type === "keydown") {
+        if (event.key !== "Escape") return;
+        // Escape closes the hint only, not the screen behind it.
+        event.preventDefault();
+      } else if (wrap.contains(event.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", close);
+    stopListening = () => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", close);
+    };
   };
   button.addEventListener("click", () => setOpen(popover.hidden));
   return wrap;
