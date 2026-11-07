@@ -44,6 +44,9 @@ export function openLocalDatabase(indexedDb = globalThis.indexedDB, timeoutMs = 
         request.result.close();
         return;
       }
+      request.result.onclose = () => {
+        if (indexedDb === globalThis.indexedDB) databasePromise = null;
+      };
       request.result.onversionchange = () => {
         request.result.close();
         if (indexedDb === globalThis.indexedDB) databasePromise = null;
@@ -121,7 +124,9 @@ export async function mirrorSessionUrl(sessionId, url, sequence = urlSequence(),
     };
     tx.oncomplete = () => resolve();
     tx.onabort = () => reject(tx.error || new Error("Could not save this view."));
-    tx.onerror = () => reject(tx.error || new Error("Could not save this view."));
+    // Request errors bubble before the transaction has populated tx.error.
+    // Wait for abort so the browser can report the actual storage failure.
+    tx.onerror = () => {};
   });
 }
 

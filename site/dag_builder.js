@@ -1284,6 +1284,11 @@ const persistentViewer = createPersistentViewer({
     if (els.saveIndependentCopy) els.saveIndependentCopy.hidden =
       !message.includes("Schema revision changed");
   },
+  onSessionSaved: () => {
+    if (els.localSaveStatus?.textContent.startsWith("Previous view not saved —")) {
+      els.localSaveStatus.textContent = "";
+    }
+  },
   onDiscard: invalidateVisibleCaches,
 });
 
@@ -1351,7 +1356,11 @@ function exportLocalDraft() {
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") persistentViewer.flushUrl();
+  // Mobile browsers may abort storage transactions while suspending a page.
+  // Retry the current view when it returns to the foreground.
+  if (document.visibilityState === "hidden" || document.visibilityState === "visible") {
+    void persistentViewer.flushUrl();
+  }
 });
 
 function renderGroupingSetControls() {
