@@ -49,6 +49,9 @@ jobs:
         run: npm run profile:edge-evidence
       - name: Enforce mobile causes and consequences budgets
         run: npm run profile:explore
+      # The deploy gate runs this too; running it on the PR catches a regression before it reaches staging.
+      - name: Enforce mobile variable review and schema page budgets
+        run: PROFILE_SITE_DIR=site npm run profile:review
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -61,4 +64,5 @@ jobs:
             profile-results-diagnostics-mobile/
             profile-results-edge-evidence/
             profile-results-explore-mobile/
+            profile-results-review-mobile/
           retention-days: 1

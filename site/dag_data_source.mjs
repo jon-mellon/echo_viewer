@@ -96,7 +96,7 @@ export class ParquetManifestDagDataSource {
     // its binding when the same instance later opens the lazy evidence engine.
     if (publicationId && !(this.skipCompiledOnce && this.loadedPublication?.id === publicationId)) {
       const publicationStart = performance.now();
-      this.onStatus("Loading published schema and compiled DAG…");
+      this.onStatus("Loading published schema and compiled graph…");
       const loaded = await loadPublishedSchema(publicationId);
       performance.measure("echo:evidence:publication", { start: publicationStart, end: performance.now() });
       this.groupingSet = loaded.schema;
@@ -107,19 +107,19 @@ export class ParquetManifestDagDataSource {
         return;
       }
       this.skipCompiledOnce = false;
-      this.onStatus(`Compiled DAG unavailable (${loaded.compiledFallbackReason}); checking browser-v2 evidence…`);
+      this.onStatus(`Compiled graph unavailable (${loaded.compiledFallbackReason}); checking browser-v2 evidence…`);
     }
     const manifestUrl = new URL(this.manifestUrl, window.location.href);
     const manifestStart = performance.now();
     this.onStatus("Loading evidence manifest…");
     const response = await fetch(manifestUrl, { cache: "no-store" });
-    if (!response.ok) throw new Error(`Could not load DAG snapshot manifest ${manifestUrl.href}: HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`Could not load graph snapshot manifest ${manifestUrl.href}: HTTP ${response.status}`);
     this.manifest = await response.json();
     performance.measure("echo:evidence:manifest", { start: manifestStart, end: performance.now() });
     this.manifestBaseUrl = manifestUrl;
     this.browserLayout = browserV2ManifestLayout(this.manifest);
     const evidenceDownloads = this.downloadEvidenceFiles();
-    this.onStatus("Loading grouping schema…");
+    this.onStatus("Loading variable schema…");
     if (!publicationId) {
       this.groupingSet = await loadGroupingSchema(this.schemaUrl);
       this.loadedPublication = null;
@@ -180,7 +180,7 @@ export class ParquetManifestDagDataSource {
         load_metrics: { raw_r2_bytes_before_render: 0, raw_r2_rows_before_render: 0 },
       };
     }
-    throw new Error("Browser-v2 requires a compiled published DAG for startup; full-snapshot reconstruction is not part of the retrieval layout.");
+    throw new Error("Browser-v2 requires a compiled graph for startup; full-snapshot reconstruction is not part of the retrieval layout.");
   }
 
   async loadVariableSearchRecords() {

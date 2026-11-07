@@ -10,9 +10,9 @@ test("editor display preserves member order, fallbacks and setup-only anchor act
     workflowMode: "setup", phase: "define_dv" };
   const before = structuredClone(group);
   const model = buildGroupEditorModel(group, context);
-  assert.equal(model.title, "Dependent variable group");
+  assert.equal(model.title, "Outcome variable");
   assert.equal(model.choosingAnchor, true);
-  assert.equal(model.anchorButtonLabel, "Use as Dep var");
+  assert.equal(model.anchorButtonLabel, "Use as outcome");
   assert.equal(model.notes, "");
   assert.equal(model.description, "Measured outcome.");
   assert.deepEqual(model.members, [

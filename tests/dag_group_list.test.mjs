@@ -15,11 +15,11 @@ test("anchors stay pinned; relevance, alphabetical order and ties remain stable"
   const before = structuredClone({ project, options });
   const model = buildGroupListModel(project, options);
   assert.deepEqual(model.rows.map(r => r.groupId), ["dv", "iv", "z", "tie1", "tie2"]);
-  assert.equal(model.countText, "5 groups");
+  assert.equal(model.countText, "5 variables");
   assert.deepEqual(model.rows[2], { groupId: "z", label: "Zulu", variableCount: 2,
     isActive: true, roleLabels: ["Known role", "unknown"], anchorLabel: "" });
-  assert.equal(model.rows[0].anchorLabel, "Dep var");
-  assert.equal(model.rows[1].anchorLabel, "Ind var");
+  assert.equal(model.rows[0].anchorLabel, "Outcome");
+  assert.equal(model.rows[1].anchorLabel, "Cause");
   assert.equal(model.rows[3].variableCount, 0);
   assert.deepEqual(buildGroupListModel(project, { ...options, sort: "alpha" }).rows.map(r => r.groupId),
     ["dv", "iv", "tie1", "tie2", "z"]);
@@ -28,9 +28,9 @@ test("anchors stay pinned; relevance, alphabetical order and ties remain stable"
 
 test("empty, single and unranked lists retain counts and label fallbacks", () => {
   const options = { candidateQueue: [], sort: "relevance", roleLabels: {} };
-  assert.deepEqual(buildGroupListModel({ groups: [] }, options), { countText: "0 groups", rows: [] });
+  assert.deepEqual(buildGroupListModel({ groups: [] }, options), { countText: "0 variables", rows: [] });
   const model = buildGroupListModel({ groups: [{ group_id: "g", label: "", variable_ids: [] }] }, options);
-  assert.equal(model.countText, "1 group");
+  assert.equal(model.countText, "1 variable");
   assert.equal(model.rows[0].label, "g");
   assert.deepEqual(model.rows[0].roleLabels, []);
 });

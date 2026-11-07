@@ -102,10 +102,10 @@ export function buildPathHighlightModel({
         from: { ...(arrows?.from || {}), enabled: false },
       },
       shadow: false,
-      title: `${edge.title || ""}\n${role === "exclusion" ? "Instrument-to-Dep var exclusion path"
-        : role === "iv" ? `Path to ${showExogeneity ? "instrument" : "Ind var"}`
-          : role === "dv" ? "Path to Dep var"
-            : `Shared segment of ${showExogeneity ? "instrument" : "Ind var"} and Dep var paths`}`.trim(),
+      title: `${edge.title || ""}\n${role === "exclusion" ? "Instrument-to-outcome exclusion path"
+        : role === "iv" ? `Path to ${showExogeneity ? "instrument" : "cause"}`
+          : role === "dv" ? "Path to outcome"
+            : `Shared segment of ${showExogeneity ? "instrument" : "Cause"} and outcome paths`}`.trim(),
     });
   }
 

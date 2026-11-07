@@ -98,7 +98,7 @@ try {
         }
         // Optional: simulate time spent choosing, during which paper support loads.
         if (Number(process.env.PROFILE_PICK_DELAY_MS) > 0) await page.waitForTimeout(Number(process.env.PROFILE_PICK_DELAY_MS));
-        await measure('choose Dep var (first results)', async () => {
+        await measure('choose outcome (first results)', async () => {
           await page.locator('#focusGroupPicker button[data-group-id="category-mental-health"]').click();
           await page.locator('.explore-row').first().waitFor({ timeout: 90000 });
         }, { budget: budgets.firstResultsMs });
@@ -130,7 +130,7 @@ try {
         await measure('min papers 5', () => page.locator('.list-filter-papers').fill('5'));
         await showPanel('controls');
         await measure('open evidence for a variable (cold)', () => page.locator('.explore-row-open').first().click(),
-          { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude finding "]' });
+          { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude claim "]' });
         await measure('close evidence', () => page.locator('#closeEvidencePane').click());
         // Flipping to Consequences keeps the variable and the list settings, so there is no second pick.
         await openNav();
@@ -154,7 +154,7 @@ try {
         await showPanel('dag');
         await measure('table sort by papers', () => page.locator('#dagPathsTable thead button').last().click(), { table: true });
         await measure('open evidence from the table (cold)', () => page.locator('#dagPathsTable .dag-table-link').first().click(),
-          { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude finding "]', table: true });
+          { budget: budgets.firstEvidenceMs, ready: 'button[aria-label^="Exclude claim "]', table: true });
         await measure('close evidence in the table', () => page.locator('#closeEvidencePane').click(), { table: true });
         await openNav();
         await measure('switch back to graph', () => page.locator('#dagViewGraph').click());

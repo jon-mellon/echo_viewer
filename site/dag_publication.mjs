@@ -60,7 +60,7 @@ export function createPublicationController({
 
   function publishTitle() {
     if (busy) return "Publishing…";
-    if (!canPublish()) return "Publishing is unavailable while the schema is loading or a group edit is unsaved";
+    if (!canPublish()) return "Publishing is unavailable while the schema is loading or a variable edit is unsaved";
     return "Create an immutable public version";
   }
 
@@ -143,6 +143,15 @@ export function createPublicationController({
     statusTimer = setTimeout(() => void refreshPublicationState(), 150);
   }
 
+  // The save machine moved (saving, saved, failed, editor opened or closed): re-derive what the controls allow.
+  // The visibility is cheap; the hash comparison is not, and a save starts and ends within one user action, so
+  // it runs once the interaction has settled, as it does after an edit.
+  function canPublishChanged() {
+    refreshPublishVisibility();
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => void refreshPublicationState(), 150);
+  }
+
   function showShareCopied() {
     const button = elements.share;
     if (!button) return;
@@ -160,7 +169,7 @@ export function createPublicationController({
   async function publish() {
     if (busy) return null;
     if (!canPublish()) {
-      showStatus(elements.status, "Please wait for group memberships to finish loading before publishing.", true);
+      showStatus(elements.status, "Please wait for variable memberships to finish loading before publishing.", true);
       return null;
     }
     busy = true;
@@ -321,15 +330,15 @@ export function createPublicationController({
   function setSchemaReady(ready) {
     refreshPublishVisibility();
     elements.publish.disabled = !ready || busy;
-    if (!ready) showStatus(elements.status, "Loading group memberships…");
+    if (!ready) showStatus(elements.status, "Loading variable memberships…");
     else clearStatus();
   }
 
   function setSchemaLoadFailed() {
     elements.publish.disabled = true;
     elements.publish.title = publishTitle();
-    showStatus(elements.status, "Group memberships could not be verified. Editing and publishing remain disabled.", true);
+    showStatus(elements.status, "Variable memberships could not be verified. Editing and publishing remain disabled.", true);
   }
 
-  return { initialize, publish, share, publicPermalink, currentCanonical, refreshPublicationState, workingCopyChanged, setSchemaReady, setSchemaLoadFailed };
+  return { initialize, publish, share, publicPermalink, currentCanonical, refreshPublicationState, workingCopyChanged, canPublishChanged, setSchemaReady, setSchemaLoadFailed };
 }

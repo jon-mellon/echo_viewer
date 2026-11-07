@@ -374,3 +374,16 @@ test("a render that a newer one supersedes still releases whoever was waiting on
     globalThis.Worker = savedWorker;
   }
 });
+
+test("a renderer that throws is reported and the remaining renderers still run", () => {
+  const calls = [];
+  const errors = [];
+  const coordinator = createRenderCoordinator(new Proxy({
+    onRenderError: (name, error) => errors.push([name, error.message]),
+    renderGroupList() { throw new Error("boom"); },
+    renderVariableComparison() { calls.push("comparison"); return true; },
+  }, { get: (target, name) => target[name] ?? (() => { calls.push(String(name)); }) }));
+  coordinator.rebuildProject();
+  assert.deepEqual(errors, [["renderGroupList", "boom"]]);
+  assert.ok(calls.includes("renderDag") && calls.includes("saveProjectLocally"));
+});

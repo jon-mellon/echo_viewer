@@ -59,9 +59,9 @@ export function createDagShellController({ state, elements, renderDag, getNetwor
     elements.fullscreenDag.classList.toggle("active", panel === "dag");
     elements.fullscreenDag.setAttribute("aria-pressed", panel === "dag" ? "true" : "false");
     // An icon button: swap its label, while CSS swaps the maximize/minimize icon on aria-pressed.
-    const dagLabel = panel === "dag" ? "Exit full screen" : "Full screen DAG";
+    const dagLabel = panel === "dag" ? "Exit full screen" : "Full screen graph";
     elements.fullscreenDag.setAttribute("aria-label", dagLabel);
-    elements.fullscreenDag.title = panel === "dag" ? "Exit full screen (Escape)" : "Expand the DAG to fill the window; press Escape to exit";
+    elements.fullscreenDag.title = panel === "dag" ? "Exit full screen (Escape)" : "Expand the graph to fill the window; press Escape to exit";
     requestAnimationFrame(() => {
       const network = getNetwork();
       if (network) network.setSize("100%", "100%");
