@@ -7,6 +7,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { routeProfileSite } from './profile_site_route.mjs';
 import { noteRetry, runRetries } from './profile_run_retry.mjs';
 import { resolve } from 'node:path';
+import { DEFAULT_SCHEMA_PUBLICATION_ID } from '../site/dag_data_config.mjs';
 
 const url = new URL(process.env.PROFILE_URL || 'https://www.jonathanmellon.com/echo_viewer_staging/');
 if (url.searchParams.has('local_schema')) throw new Error('Use a published schema URL: local_schema drafts belong to another browser.');
@@ -14,8 +15,8 @@ if (url.searchParams.has('local_schema')) throw new Error('Use a published schem
 // exists to catch a default snapshot that lacks its precomputed evidence assets.
 const defaults = {
   p: '1', data_version: '8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849',
-  schema: '0970c9ac-0b1c-4cc9-bcb5-12a88cc0e3b9', iv: 'category-academic-achievement',
-  dv: 'g_split_1793312497689', mode: 'group_review', path: '1', exclusion_path: '2',
+  schema: DEFAULT_SCHEMA_PUBLICATION_ID, iv: 'category-academic-achievement',
+  dv: 'category-income-earnings', mode: 'group_review', path: '1', exclusion_path: '2',
   conf: '1', coll: '0', excl: '0', exog: '0', sparse: '0', bottle: '1', paths: '1', excl_links: '0',
 };
 for (const [key, value] of Object.entries(defaults)) if (!url.searchParams.has(key)) url.searchParams.set(key, value);
@@ -54,7 +55,7 @@ try {
           return s?.compiledDag && !s.compiledDagUpdating && !s.publishedSchemaHydrating && document.getElementById('startupLoading')?.hidden;
         }, null, { timeout: 120000 });
         const hydrated = await page.evaluate(() => Boolean(window.__dagBuilderState.publishedSchemaHydrated));
-        if (!hydrated) console.warn('Published schema did not hydrate (see console errors); timing evidence anyway.');
+        if (!hydrated) throw new Error('Published schema did not hydrate; evidence timings would not represent the selected schema.');
         // Users take a moment before opening evidence; let idle-time engine prewarm run.
         await page.waitForTimeout(Number(process.env.PROFILE_SETTLE_MS || 4000));
         const apiUrl = await page.locator('script[src*="dag_builder.js"]').getAttribute('src');
