@@ -509,6 +509,10 @@ function installDagHandlers() {
 // ─── Render orchestration ──────────────────────────────────────────────────────
 
 const renderCoordinator = createRenderCoordinator({
+  onRenderError: (name, error) => {
+    console.error(`Render step ${name} failed`, error);
+    showAppNotice("Part of the screen could not be drawn. Your work is kept; reload the view to redraw it.");
+  },
   buildCandidateQueue, aggregateGroupLinks, computeVisibleLinks, renderConfounderStatuses, renderGroupList,
   renderRejectedVariablesPanel, renderDag, refreshDagEdgeSelection,
   renderVariableComparison,
@@ -1107,6 +1111,7 @@ function applyProjectOperation(next) {
         state.compiledUpdateChangedIds = null;
         state.compiledUpdateChangedRawIds = null;
         console.warn("Incremental graph update failed; a full local recomputation is required.", error);
+        showAppNotice("Graph links may be out of date after your last change. Reload the view to recalculate them.");
       }).finally(() => {
         if (state.compiledDagUpdatePromise === updatePromise) state.compiledDagUpdatePromise = null;
       });
@@ -1254,6 +1259,28 @@ function activeGroupingSet() { return groupingSetController.active(); }
 
 function copyPermalink() { return groupingSetController.copyPermalink(); }
 
+// A persistent, visible notice for failures that would otherwise only reach the console.
+function showAppNotice(message) {
+  const notice = document.getElementById("appNotice");
+  const text = document.getElementById("appNoticeText");
+  if (!notice || !text) return;
+  text.textContent = message;
+  notice.hidden = false;
+}
+document.getElementById("appNoticeReload")?.addEventListener("click", () => window.location.reload());
+document.getElementById("appNoticeDismiss")?.addEventListener("click", () => { document.getElementById("appNotice").hidden = true; });
+// Errors raised outside any handler of ours (a throwing event listener, a forgotten promise).
+// Browser noise with no error object (ResizeObserver loops, cross-origin scripts) is ignored.
+window.addEventListener("error", event => {
+  if (!event.error) return;
+  console.error("Unhandled error", event.error);
+  showAppNotice("Something went wrong. Reload the view if anything looks wrong.");
+});
+window.addEventListener("unhandledrejection", event => {
+  console.error("Unhandled rejection", event.reason);
+  showAppNotice("Something went wrong. Reload the view if anything looks wrong.");
+});
+
 // A temporary note beside the brand for completed operations. It clears itself
 // unless something else has written to the status in the meantime.
 let briefNoticeTimer = null;
@@ -1292,11 +1319,16 @@ const persistentViewer = createPersistentViewer({
       indicator.title = label;
       indicator.setAttribute("aria-label", label);
     }
-    if (els.localSaveStatus) els.localSaveStatus.textContent = saving || saved || message === "Published schema" ? "" : message;
-    // A stale revision fails the same way every time; only an independent copy resolves it.
-    if (els.retryLocalSave) els.retryLocalSave.hidden = !message.startsWith("Not saved") || message.includes("Schema revision changed");
-    if (els.saveIndependentCopy) els.saveIndependentCopy.hidden =
-      !message.includes("Schema revision changed");
+    // Storage that cannot be opened fails every save the same way, so say what still works.
+    const storageUnavailable = message.includes("IndexedDB is unavailable");
+    if (els.localSaveStatus) els.localSaveStatus.textContent = saving || saved || message === "Published schema" ? ""
+      : storageUnavailable ? "Not saved — this browser is blocking local storage. Use Export → Private schema draft to keep your work."
+        : message;
+    const conflict = message.includes("Schema revision changed");
+    // Retry follows the save machine, not the wording of whatever status was written last.
+    if (els.retryLocalSave) els.retryLocalSave.hidden = saving || saved || conflict || storageUnavailable
+      || !(message.startsWith("Not saved") || persistentViewer.saveFailed);
+    if (els.saveIndependentCopy) els.saveIndependentCopy.hidden = !conflict;
   },
   onSaveStateChange: () => publicationController?.canPublishChanged?.(),
   onSessionSaved: () => {
@@ -2279,6 +2311,7 @@ const projectBootstrap = createProjectBootstrap({
   renderAll, dagNetworkController,
   buildDuplicateClusters, linkKey, pairKey, loadVariableSearchCatalog,
   onLocalSchemaLoaded: record => persistentViewer.setLoadedRecord(record),
+  onGraphStale: () => showAppNotice("This draft's link changes could not be applied, so the graph may show the published links. Reload the view to try again."),
   waitForReadyBeforeShowing: () => new URL(location.href).searchParams.has("code")
     && Boolean(sessionStorage.getItem("echo-openrouter-definition-draft-v1")),
   onReady: async () => {

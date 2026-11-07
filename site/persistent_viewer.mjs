@@ -274,6 +274,8 @@ export function createPersistentViewer({ state, getSchema, getViewport = () => {
     get localRecord() { return localRecord; },
     get editorOpen() { return Boolean(editorBaseline); },
     // A write is outstanding or failed: leaving now would lose the change.
+    // The last write failed and the change exists only in memory.
+    get saveFailed() { return unsavedSchema; },
     get saving() { return Boolean(commitPending || unsavedSchema); },
     get editorDirty() { return Boolean(editorBaseline && !same(getSchema(), editorBaseline.schema)); },
     get canPublish() { return ready && !editorBaseline && !commitPending && !unsavedSchema
