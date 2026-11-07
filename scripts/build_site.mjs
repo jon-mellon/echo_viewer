@@ -37,17 +37,10 @@ function stagingDataConfig(source) {
   return config;
 }
 
-// A default snapshot without its search catalog loads every evidence panel from
-// remote Parquet (10-70 s). Refuse to build such a site; see
-// scripts/register_snapshot_assets.mjs.
-export async function assertDefaultSnapshotAssets(source, config) {
-  const snapshot = config?.match(/PRODUCTION_EVIDENCE_MANIFEST =\s*"[^"]*\/layouts\/browser-v2\/([0-9a-f]{64})\/manifest\.json"/)?.[1];
-  if (!snapshot) return;
-  const catalog = join(source, "search-catalogs", `${snapshot}.json.gz`);
-  if (!(await stat(catalog).catch(() => null))?.isFile()) {
-    throw new Error(`Default evidence snapshot ${snapshot} has no search catalog. Run: node scripts/register_snapshot_assets.mjs ${snapshot}`);
-  }
-}
+// A default snapshot without its viewer assets loads evidence by querying the snapshot in the browser (minutes on a
+// phone). They are published beside the snapshot, which a build cannot see offline: `npm run check:snapshot-assets`
+// checks them against the data host in the deploy and profile workflows, so the build itself asserts nothing.
+export async function assertDefaultSnapshotAssets() {}
 
 export async function buildSite(source, destination) {
   const files = await filesIn(source);

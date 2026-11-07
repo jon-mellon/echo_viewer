@@ -1,11 +1,6 @@
 import { EvidencePanelCatalog, evidencePanelKey } from "./evidence_panel_catalog.mjs";
 
 export const VARIABLE_MAP_BINDINGS = Object.freeze({
-  "8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849": {
-    root: "/variable-maps/8bf2706808428e59109baa285690135cdbe066e26d97a7d820c9935fc3881849/",
-    layoutSource: "qwen3-embed-pca-v1", bytes: 8715,
-    sha256: "53b088a9ca9b52da275838449b2f3b68d99a073ae91d5b5d9fbed96e5cf00a33",
-  },
   "f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b": {
     root: "/variable-maps/f7666b4f9c4537c3ecfef0e9dc096f00650040e4bd1b2360eea64c1d5fba3f7b/",
     layoutSource: "qwen3-embed-pca-v1", bytes: 8703,
