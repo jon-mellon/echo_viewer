@@ -272,7 +272,7 @@ export function createDagInspectorController({
       state.project.finding_decisions?.[raw.raw_causal_link_id]?.display_status === "excluded").length;
     const records = `${model.rawCount} evidence record${model.rawCount === 1 ? "" : "s"}${rejectedCount ? ` · ${rejectedCount} rejected` : ""}`;
     const meta = [link.is_target_relation ? "Target relationship" : null,
-      sourcesLoading ? null : model.rawCount || rejectedCount ? records : "No evidence records"].filter(Boolean).join(" · ");
+      sourcesLoading || evidenceLoadFailed() ? null : model.rawCount || rejectedCount ? records : "No evidence records"].filter(Boolean).join(" · ");
     replaceChildren(elements.edgeInspector,
       h("header", { className: "evidence-header" },
         h("h2", { className: "evidence-title", textContent: `${model.sourceLabel} ${model.arrow} ${model.targetLabel}` }),
