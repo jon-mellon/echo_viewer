@@ -48,6 +48,7 @@ export async function publishWorkingSchema({
   fetchImpl = globalThis.fetch,
   // The Cloudflare service settings can be supplied for tests or local agents.
   cloudflare = {},
+  freshAttempt = false,
 }) {
   if (!cloudflareApiConfigured(cloudflare.apiUrl ?? CLOUDFLARE_API_URL)) {
     throw new Error("Cloudflare publishing is not configured.");
@@ -56,7 +57,13 @@ export async function publishWorkingSchema({
   const publicSchema = publicSchemaProjection(schema);
   const canonical = await canonicalizeWorkingSchema(publicSchema, cryptoApi);
 
-  const publicationId = cryptoApi.randomUUID();
+  // Keep the reservation identity across reloads, but only reuse it if the
+  // complete regenerated upload is byte-for-byte identical.
+  const storage = cloudflare.storage ?? globalThis.localStorage;
+  const pendingKey = `echo-publish-pending:${user.id}:${canonical.contentHash}:${previousPublication?.publication_id || CANONICAL_BASELINE_ID}`;
+  let pending = null;
+  try { if (!freshAttempt) pending = JSON.parse(storage?.getItem(pendingKey) || "null"); } catch { /* storage unavailable */ }
+  const publicationId = pending?.id || cryptoApi.randomUUID();
   const storagePrefix = `${user.id}/${publicationId}`;
   const evidenceSnapshot = evidenceSnapshotForSchema(publicSchema);
   const publicProject = { ...(compileInput?.project || {}),
@@ -117,13 +124,20 @@ export async function publishWorkingSchema({
     return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
   })();
   const parentSchemaId = previousPublication?.publication_id || CANONICAL_BASELINE_ID;
+  const fingerprint = await canonicalFolderHash(new Map(entries), cryptoApi);
+  if (pending && pending.fingerprint !== fingerprint) {
+    try { storage?.removeItem(pendingKey); } catch { /* storage unavailable */ }
+    return publishWorkingSchema({ schema, previousPublication, compiledDag, compileInput, cryptoApi, onProgress, fetchImpl, cloudflare, freshAttempt: true });
+  }
+  try { storage?.setItem(pendingKey, JSON.stringify({ id: publicationId, fingerprint })); } catch { /* retry is limited to this attempt */ }
   const saved = await publishFiles({
     owner: user, publicationId, contentHash: canonical.contentHash, compilerVersion: compiled.manifest.compiler_version,
     row: { title: schema.label || "Published grouping schema", description: schema.description || null,
       evidence_snapshot: evidenceSnapshot, parent_schema_id: parentSchemaId, compiled_manifest_path: COMPILED_MANIFEST_PATH,
       compiled_manifest_hash: compiledManifestHash },
-    files: new Map(entries), onProgress, apiUrl: cloudflare.apiUrl ?? CLOUDFLARE_API_URL,
+    files: new Map(entries), onProgress, resume: Boolean(pending), apiUrl: cloudflare.apiUrl ?? CLOUDFLARE_API_URL,
     ...(cloudflare.fetchImpl ? { fetchImpl: cloudflare.fetchImpl } : {}),
   });
+  try { storage?.removeItem(pendingKey); } catch { /* storage unavailable */ }
   return { ...saved.row, publicationId: saved.row.id, contentHash: saved.row.content_hash, fileCount: entries.length, reused: saved.reused };
 }

@@ -9,8 +9,21 @@ class CloudflareApiError extends Error {
   constructor(status, code, message) { super(message); this.name = "CloudflareApiError"; this.status = status; this.code = code; }
 }
 
-async function request(apiUrl, fetchImpl, path, init = {}) {
-  const response = await fetchImpl(new URL(path, apiUrl), init);
+async function request(apiUrl, fetchImpl, path, init = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  let timer;
+  let response;
+  try {
+    response = await Promise.race([
+      fetchImpl(new URL(path, apiUrl), { ...init, signal: controller.signal }),
+      new Promise((_, reject) => { timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error("The publishing service timed out. Try publishing again to resume."));
+      }, timeoutMs); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
   if (response.ok) return response;
   const body = await response.json().catch(() => ({}));
   throw new CloudflareApiError(response.status, body.error || "http_error", body.message || `The publishing service answered ${response.status}.`);
@@ -77,19 +90,29 @@ export async function getOwnPublications({ apiUrl = CLOUDFLARE_API_URL,
  * `files` is a Map of path to bytes. Returns the registry row, and whether it already existed.
  */
 export async function publishFiles({ owner, publicationId, contentHash, compilerVersion, row, files, onProgress = () => {},
-  apiUrl = CLOUDFLARE_API_URL, fetchImpl = globalThis.fetch.bind(globalThis) }) {
+  apiUrl = CLOUDFLARE_API_URL, fetchImpl = globalThis.fetch.bind(globalThis), requestTimeoutMs = 15000, uploadTimeoutMs = 60000, resume = false }) {
   const entries = [...files.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const headers = { "x-owner-token": owner.token };
-  const started = await (await request(apiUrl, fetchImpl, "/v1/publications", { method: "POST",
+  let started;
+  try {
+    started = await (await request(apiUrl, fetchImpl, "/v1/publications", { method: "POST",
     headers: { ...headers, "content-type": "application/json" },
     body: JSON.stringify({ publication_id: publicationId, content_hash: contentHash, compiler_version: compilerVersion, row,
-      files: entries.map(([path, bytes]) => ({ path, size: bytes.length })) }) })).json();
+      files: entries.map(([path, bytes]) => ({ path, size: bytes.length })) }) }, requestTimeoutMs)).json();
+  } catch (error) {
+    if (!resume || error.status !== 409 || error.code !== "publication_exists") throw error;
+    started = { reused: false };
+  }
   if (started.reused) return { row: started.row, reused: true };
   for (const [index, [path, bytes]] of entries.entries()) {
     onProgress(index + 1, entries.length, path);
-    await request(apiUrl, fetchImpl, `/v1/publications/${publicationId}/files/${path.split("/").map(encodeURIComponent).join("/")}`,
-      { method: "PUT", headers, body: bytes });
+    try {
+      await request(apiUrl, fetchImpl, `/v1/publications/${publicationId}/files/${path.split("/").map(encodeURIComponent).join("/")}`,
+        { method: "PUT", headers, body: bytes }, uploadTimeoutMs);
+    } catch (error) {
+      if (!resume || error.status !== 409 || error.code !== "exists") throw error;
+    }
   }
-  const finished = await (await request(apiUrl, fetchImpl, `/v1/publications/${publicationId}/finish`, { method: "POST", headers })).json();
+  const finished = await (await request(apiUrl, fetchImpl, `/v1/publications/${publicationId}/finish`, { method: "POST", headers }, requestTimeoutMs)).json();
   return { row: finished.row, reused: false };
 }

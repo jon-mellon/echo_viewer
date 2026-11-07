@@ -3385,6 +3385,9 @@ h2 {
 
 .dag-overlay-controls .fullscreen-toggle.active { background: var(--accent-subtle); color: var(--accent); }
 .dag-overlay-controls .share-toggle.share-copied { background: var(--accent-subtle); color: var(--accent); }
+.share-toggle .share-copied-label { display: none; }
+.dag-overlay-controls .share-toggle.share-copied { width: auto; padding-inline: var(--space-2); gap: var(--space-1); display: flex; }
+.share-toggle.share-copied .share-copied-label { display: inline; font-size: var(--text-sm); }
 .share-toggle .icon-copied,
 .share-toggle.share-copied .icon-copy { display: none; }
 .share-toggle.share-copied .icon-copied { display: block; }
