@@ -1349,13 +1349,13 @@ const persistentViewer = createPersistentViewer({
   onDiscard: invalidateVisibleCaches,
 });
 
-/** Variables m with confounder → m → outcome on the map's graph, other than the cause the user says the effect runs through. */
+/** Variables m with confounder → m → outcome in the study's links (drawn on the map or not), other than the cause the user says the effect runs through. */
 function mediatorsOutsideCause(groupId) {
   const support = linkPaperSupport();
   const shown = new Set(dagGroups().filter(isDagDisplayGroup).map(group => group.group_id));
   return checkOnlyViaClaim({ links: state.studyGraph?.links || [], confounderId: groupId,
     mediatorId: state.project.iv_group_id, outcomeId: state.project.dv_group_id,
-    // The map counts every shown link unless sparse links are excluded, so the dialog does the same.
+    // Every link counts unless sparse links are excluded, as in the map's diagnostics.
     minPapers: state.excludeSparseEdges ? state.minimumEdgePapers : 0,
     ...(support.status === "ready" ? { papersFor: support.papersFor } : {}), isNode: id => shown.has(id) })
     .otherPaths.map(route => route.viaId);

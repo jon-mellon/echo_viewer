@@ -4,7 +4,7 @@ import { CONTROL_WARNING, diagnosticKey, DIAGNOSTIC_STATUSES } from "./confounde
 /**
  * One review editor shared by the list and table. Every disposition saves at once and only changes how the
  * variable is drawn, except "Other reason", which asks for a private reason first, and "Affects outcome only via cause"
- * on a confounder, which first lists the other variables the map already shows between it and the outcome and asks
+ * on a confounder, which first lists the other variables the data places between it and the outcome (the map may not draw them) and asks
  * the user to agree they do not apply. Nothing is saved until that is confirmed.
  * `mediatorsFor(groupId)` returns the group IDs m with confounder → m → outcome, leaving out the claimed cause.
  */
@@ -44,7 +44,7 @@ export function createVariableReviewController({ state, onCommit, onCancel = () 
       error.hidden = true;
       confirm.disabled = false;
       replaceChildren(content,
-        h("p", { textContent: `This status says ${label(groupId)} affects ${outcome} only via ${cause}. The map already shows other routes from ${label(groupId)} to ${outcome}:` }),
+        h("p", { textContent: `This status says ${label(groupId)} affects ${outcome} only via ${cause}. The data also contains other routes from ${label(groupId)} to ${outcome}, which the map may not show:` }),
         h("ul", { className: "only-via-mediators" }, mediators.map(id => h("li", { textContent: `${label(groupId)} → ${label(id)} → ${outcome}` }))),
         h("label", { className: "review-note-label", htmlFor: "variableReviewAgree" }, agree,
           ` I have checked these routes and they do not apply.`));
