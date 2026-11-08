@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { causalNeighborhood, directedHops, directionalPaperCounter, linksNeedingExactCounts } from "../site/causal_neighborhood.mjs";
+import { causalNeighborhood, checkOnlyViaClaim, directedHops, directionalPaperCounter, linksNeedingExactCounts } from "../site/causal_neighborhood.mjs";
 import { computeFocusLayout } from "../site/dag_layout.mjs";
 
 const keys = n => Array.from({ length: n }, (_, i) => `p${i}`);
@@ -141,4 +141,22 @@ test("the focus layout follows the screen's shape and keeps its columns balanced
   assert.ok(phone.columns < desktop.columns);
   // No runt column: every column holds at least half as many as the fullest.
   for (const result of [phone, desktop]) assert.ok(Math.min(...result.sizes) * 2 >= Math.max(...result.sizes), JSON.stringify(result.sizes));
+});
+
+test("only-via claims are checked for other distance-2 routes to the outcome", () => {
+  const graph = [
+    link("k", "x", "A_TO_B", 3), link("x", "y", "A_TO_B", 3),
+    link("k", "z", "A_TO_B", 2), link("z", "y", "A_TO_B", 4),
+    link("k", "q", "A_TO_B", 1), link("q", "y", "A_TO_B", 1),
+    link("k", "r", "A_TO_B", 2), link("y", "r", "A_TO_B", 2),
+  ];
+  const claim = { links: graph, confounderId: "k", mediatorId: "x", outcomeId: "y" };
+  const result = checkOnlyViaClaim(claim);
+  assert.equal(result.claimHolds, false);
+  assert.equal(result.direct, null);
+  assert.deepEqual(result.otherPaths.map(r => [r.viaId, r.weakestPapers]), [["z", 2], ["q", 1]]);
+  assert.deepEqual(result.otherPaths[0].path, ["k", "z", "y"]);
+  assert.deepEqual(checkOnlyViaClaim({ ...claim, minPapers: 2 }).otherPaths.map(r => r.viaId), ["z"]);
+  assert.equal(checkOnlyViaClaim({ ...claim, isNode: id => id !== "z" && id !== "q" }).claimHolds, true);
+  assert.equal(checkOnlyViaClaim({ ...claim, links: [...graph, link("k", "y", "A_TO_B", 2)], isNode: id => id !== "z" && id !== "q" }).direct.papers, 2);
 });

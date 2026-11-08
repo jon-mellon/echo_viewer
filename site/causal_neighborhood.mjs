@@ -95,3 +95,37 @@ export function causalNeighborhood({ links = [], focusId, direction = "causes", 
   return results.sort((a, b) => a.distance - b.distance || b.weakestPapers - a.weakestPapers
     || b.papers - a.papers || String(a.groupId).localeCompare(String(b.groupId)));
 }
+
+/**
+ * Checks a claim that `confounderId` affects `outcomeId` only via `mediatorId`
+ * against the graph, up to distance 2. Returns the other routes already in the
+ * data that contradict it: a direct `confounder → outcome` link, and every
+ * `confounder → z → outcome` path where z is neither the claimed mediator, the
+ * confounder nor the outcome. `claimHolds` is false when any are found; it only
+ * speaks for these short routes, since longer ones are not searched.
+ * `isNode` and `minPapers` work as in `causalNeighborhood`.
+ */
+export function checkOnlyViaClaim({ links = [], confounderId, mediatorId, outcomeId, minPapers = 1,
+  papersFor = directionalPaperCounter(), isNode = () => true } = {}) {
+  const hops = directedHops(links, Math.max(1, Math.trunc(minPapers) || 1), papersFor)
+    .filter(hop => isNode(hop.from) && isNode(hop.to));
+  const strongest = (from, to) => hops.filter(hop => hop.from === from && hop.to === to)
+    .reduce((best, hop) => (!best || hop.papers > best.papers ? hop : best), null);
+  const toOutcome = new Map();
+  for (const hop of hops) if (hop.to === outcomeId) toOutcome.set(hop.from, hop);
+  const direct = toOutcome.get(confounderId) || null;
+  const viaOthers = [];
+  for (const first of hops) {
+    if (first.from !== confounderId) continue;
+    const z = first.to;
+    if (z === mediatorId || z === outcomeId || z === confounderId) continue;
+    const second = toOutcome.get(z);
+    if (!second) continue;
+    const firstBest = strongest(confounderId, z);
+    viaOthers.push({ viaId: z, path: [confounderId, z, outcomeId], pathEdgeIds: [firstBest.edgeId, second.edgeId],
+      weakestPapers: Math.min(firstBest.papers, second.papers) });
+  }
+  const unique = [...new Map(viaOthers.map(route => [route.viaId, route])).values()]
+    .sort((a, b) => b.weakestPapers - a.weakestPapers || String(a.viaId).localeCompare(String(b.viaId)));
+  return { claimHolds: !direct && !unique.length, direct, otherPaths: unique };
+}

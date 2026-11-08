@@ -175,3 +175,33 @@ test("the catch-all category is never returned as a confounder or graph node", a
   assert.ok(graph.dag.nodes.every(node => node.group_id !== "category-other"));
   assert.ok(graph.dag.edges.every(edge => edge.group_a !== "category-other" && edge.group_b !== "category-other"));
 });
+
+test("ECHO_CHECK_ONLY_VIA requires rejecting other routes before causes_y_only_via_x", async () => {
+  const session = await fixture();
+  session.schema.groups.push({ group_id: "mid", label: "Mid", variable_ids: ["m"] });
+  const variables = ["i", "d", "s1", "m"].map(variable_id => ({ variable_id, canonical_variable_id: variable_id }));
+  const link = (id, source, target) => ({ raw_causal_link_id: id, source_variable_id: source, target_variable_id: target,
+    paper_id: `paper-${id}`, table_id: "table" });
+  const links = [link("r1", "s1", "i"), link("r2", "s1", "m"), link("r3", "m", "d"), link("r4", "i", "d")];
+  session.evidence = {
+    variables: async ids => variables.filter(row => ids.includes(row.variable_id)),
+    rawLinks: async ids => ids ? links.filter(row => ids.includes(row.raw_causal_link_id)) : links,
+  };
+  await session.setAnchors({ ivId: "iv", dvId: "dv" });
+  const claim = { groupId: "source", status: "causes_y_only_via_x" };
+  const previous = process.env.ECHO_CHECK_ONLY_VIA;
+  try {
+    delete process.env.ECHO_CHECK_ONLY_VIA;
+    await session.setConfounderStatus(claim);
+    session.schema.confounder_statuses = {};
+    process.env.ECHO_CHECK_ONLY_VIA = "1";
+    await assert.rejects(session.setConfounderStatus(claim), /source → mid → dv/);
+    await assert.rejects(session.setConfounderStatus({ ...claim, rejectedPaths: ["other"] }), /"mid"/);
+    await session.setConfounderStatus({ ...claim, rejectedPaths: ["mid"] });
+    assert.equal(Object.values(session.schema.confounder_statuses)[0].status, "causes_y_only_via_x");
+    // Other statuses are never checked.
+    await session.setConfounderStatus({ groupId: "source", status: "explicitly_controlled" });
+  } finally {
+    if (previous === undefined) delete process.env.ECHO_CHECK_ONLY_VIA; else process.env.ECHO_CHECK_ONLY_VIA = previous;
+  }
+});

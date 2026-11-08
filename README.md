@@ -55,6 +55,14 @@ automatically. Supply `ECHO_OWNER_TOKEN` through the process environment to
 publish from the agent. The token has the form `<owner uuid>.<64 hex>` and is
 created by publishing once in the browser; keep it private.
 
+Set `ECHO_CHECK_ONLY_VIA=1` in the MCP server's environment to check
+"affects outcome only via cause" claims. `echo_set_confounder_status` then
+refuses `causes_y_only_via_x` while the graph holds a direct link from the
+confounder to the outcome, or a confounder → z → outcome path through any other
+group. The agent must repeat the call with `rejectedPaths` naming each such
+group (or `"direct"`), which states that it rejects those routes. Without the
+setting, nothing is checked.
+
 The agent's finding decisions operate on individual raw causal links, matching
 Echo's finding-level Exclude/Restore controls. There is no article-wide
 exclusion operation.
