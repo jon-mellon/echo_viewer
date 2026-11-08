@@ -107,7 +107,7 @@ export function causalNeighborhood({ links = [], focusId, direction = "causes", 
  */
 export function checkOnlyViaClaim({ links = [], confounderId, mediatorId, outcomeId, minPapers = 1,
   papersFor = directionalPaperCounter(), isNode = () => true } = {}) {
-  const hops = directedHops(links, Math.max(1, Math.trunc(minPapers) || 1), papersFor)
+  const hops = directedHops(links, Number.isFinite(minPapers) ? Math.max(0, Math.trunc(minPapers)) : 1, papersFor)
     .filter(hop => isNode(hop.from) && isNode(hop.to));
   const strongest = (from, to) => hops.filter(hop => hop.from === from && hop.to === to)
     .reduce((best, hop) => (!best || hop.papers > best.papers ? hop : best), null);

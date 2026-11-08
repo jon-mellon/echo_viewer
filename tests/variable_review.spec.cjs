@@ -77,6 +77,28 @@ test("'Affects outcome only via cause' fades the variable and leaves the graph a
   await expect(page.locator('.variable-review-row[data-group-id="c"]')).not.toHaveClass(/is-accounted/);
 });
 
+test("'Affects outcome only via cause' lists other routes to the outcome and needs agreement", async ({ page }) => {
+  await setup(page, { indirect: true });
+  const menu = page.locator('.variable-disposition[data-group-id="c"]');
+  const dialog = page.locator("#variableReviewDialog");
+  await menu.selectOption("causes_y_only_via_x");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("listitem")).toHaveText(["Candidate → Mediator → Outcome"]);
+  // Confirming without agreeing saves nothing.
+  await dialog.getByRole("button", { name: "Confirm status" }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("alert")).toContainText("Tick the box");
+  // Cancelling leaves the status as it was.
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(menu).toHaveValue("unaddressed");
+  await menu.selectOption("causes_y_only_via_x");
+  await dialog.getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Confirm status" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(menu).toHaveValue("causes_y_only_via_x");
+});
+
 test("other decisions require a private reason and keep the variable in place", async ({ page }) => {
   await setup(page, { indirect: true });
   const menu = page.locator('.variable-disposition[data-group-id="c"]');

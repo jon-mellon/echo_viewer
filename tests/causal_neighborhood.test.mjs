@@ -183,3 +183,10 @@ test("adjustment claims find disjoint, unblocked arms to the IV and the outcome"
   assert.equal(checkAdjustmentClaim({ ...base, maxRoutes: 2 }).totalRoutes, open.totalRoutes);
   assert.equal(checkAdjustmentClaim({ ...base, confounderId: "x" }).claimHolds, true);
 });
+
+test("only-via claims can count links drawn without paper counts", () => {
+  const bare = [link("k", "x", "A_TO_B"), link("x", "y", "A_TO_B"), link("k", "m", "A_TO_B"), link("m", "y", "A_TO_B")];
+  const claim = { links: bare, confounderId: "k", mediatorId: "x", outcomeId: "y" };
+  assert.equal(checkOnlyViaClaim(claim).claimHolds, true);
+  assert.deepEqual(checkOnlyViaClaim({ ...claim, minPapers: 0 }).otherPaths.map(r => r.viaId), ["m"]);
+});
