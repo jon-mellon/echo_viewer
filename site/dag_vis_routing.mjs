@@ -12,7 +12,20 @@ export function routeNodeData(id, point) {
   };
 }
 
-export function routesToVisData(routes, { edgeStyle, edgeTitle }) {
+// The router ends a route on the target's side, on the line through its centre, but vis aims the
+// last segment at the centre itself. When the previous bend sits off that line the arrowhead
+// lands slanted, so the side point stays as a bend and the final segment runs straight in.
+function approachPoints(points, target) {
+  const bends = points.slice(1, -1);
+  const entry = points[points.length - 1];
+  if (!target || bends.length === 0) return bends;
+  const prev = bends[bends.length - 1];
+  const cross = (entry.x - prev.x) * (target.y - entry.y) - (entry.y - prev.y) * (target.x - entry.x);
+  if (Math.abs(cross) < 1e-6 || Math.hypot(entry.x - prev.x, entry.y - prev.y) < 1) return bends;
+  return [...bends, entry];
+}
+
+export function routesToVisData(routes, { edgeStyle, edgeTitle, positions = null }) {
   const nodeData = [];
   const edgeData = [];
   const edgeSegments = new Map();
@@ -24,7 +37,7 @@ export function routesToVisData(routes, { edgeStyle, edgeTitle }) {
       edgeData.push({ id: link.edge_id, from: sourceId, to: targetId, ...style, title });
       continue;
     }
-    const bendIds = points.slice(1, -1).map((point, index) => {
+    const bendIds = approachPoints(points, positions?.get(targetId)).map((point, index) => {
       const id = `__route__${link.edge_id}__${index}`;
       nodeData.push(routeNodeData(id, point));
       return id;
