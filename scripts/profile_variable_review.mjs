@@ -26,8 +26,7 @@ const runs = Number(process.env.PROFILE_RUNS || 3);
 if (!Number.isSafeInteger(runs) || runs < 1) throw new Error('PROFILE_RUNS must be a positive integer');
 // Wall time is from the user's action to the settled screen; the mark is the app's own span.
 const budgets = {
-  // Wall time includes the harness's own round-trips and two throttled frames; about 250 ms locally, 640 ms on the CI runner.
-  disposition: { wallMs: mobile ? 900 : 300 },
+  disposition: { wallMs: mobile ? 800 : 300 },
   removal: { wallMs: mobile ? 800 : 400 },
   restore: { wallMs: mobile ? 1500 : 800 },
   publicationCompare: { markMs: mobile ? 1500 : 600 },
