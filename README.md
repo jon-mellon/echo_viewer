@@ -55,13 +55,28 @@ automatically. Supply `ECHO_OWNER_TOKEN` through the process environment to
 publish from the agent. The token has the form `<owner uuid>.<64 hex>` and is
 created by publishing once in the browser; keep it private.
 
-Set `ECHO_CHECK_ONLY_VIA=1` in the MCP server's environment to check
-"affects outcome only via cause" claims. `echo_set_confounder_status` then
-refuses `causes_y_only_via_x` while the graph holds a direct link from the
-confounder to the outcome, or a confounder → z → outcome path through any other
-group. The agent must repeat the call with `rejectedPaths` naming each such
-group (or `"direct"`), which states that it rejects those routes. Without the
-setting, nothing is checked.
+Two optional checks challenge confounder statuses against the graph. Each is
+off unless its variable is set to `1` in the MCP server's environment, and each
+applies only to its own status. Both read the working graph's current links
+(any link with at least one supporting paper), search only short routes, and so
+cannot prove a claim, only find counter-evidence. When either is on, the rules
+are also sent to the client in the MCP `initialize` instructions.
+
+- `ECHO_CHECK_ONLY_VIA` checks `causes_y_only_via_x`. The call is refused while
+  the graph holds a direct confounder → DV link, or confounder → z → DV through
+  any group other than the IV. The agent repeats it with `rejectedPaths` naming
+  every listed route (z's group ID, or `"direct"`; naming a route that was not
+  listed is an error) and `text` explaining which link is not a real effect.
+- `ECHO_CHECK_ADJUSTMENT` checks `not_in_minimal_adjustment_set`. Groups with
+  status `explicitly_controlled` or `accounted_for_by_design` count as adjusted
+  for. The call is refused while the confounder has a directed arm to the IV and
+  a directed arm to the DV, each at most three links, sharing no group, through
+  no adjusted-for group and not through the IV or DV (IV ← … ← K → … → DV).
+  The agent repeats it with `text` saying which group blocks each listed route
+  or why it is not a real causal path. The check only requires non-empty text.
+
+The wording shown to agents is in `agent/diagnostic_checks.mjs`. Nothing in
+the browser UI uses these checks.
 
 The agent's finding decisions operate on individual raw causal links, matching
 Echo's finding-level Exclude/Restore controls. There is no article-wide

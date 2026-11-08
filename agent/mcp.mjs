@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
+import { checkInstructions } from "./diagnostic_checks.mjs";
 import { createEchoTools } from "./tools.mjs";
 
 let current = null;
@@ -14,6 +15,7 @@ async function dispatch(request) {
   try {
     if (request.method === "initialize") return result(request.id, {
       protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "echo-local-agent", version: "0.1.0" },
+      ...(checkInstructions() ? { instructions: checkInstructions() } : {}),
     });
     if (request.method === "ping") return result(request.id, {});
     if (request.method === "tools/list") return result(request.id, {

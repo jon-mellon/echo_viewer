@@ -129,3 +129,55 @@ export function checkOnlyViaClaim({ links = [], confounderId, mediatorId, outcom
     .sort((a, b) => b.weakestPapers - a.weakestPapers || String(a.viaId).localeCompare(String(b.viaId)));
   return { claimHolds: !direct && !unique.length, direct, otherPaths: unique };
 }
+
+/**
+ * Checks a claim that `confounderId` is not needed in the adjustment set by
+ * looking for open backdoor routes through it: a directed arm to the IV and a
+ * directed arm to the outcome, each at most `maxArmLength` links, that share no
+ * group except the confounder, contain no group in `controlledIds` and do not
+ * pass through the IV or the outcome (iv ← … ← k → … → dv). Arms are searched
+ * only up to that length, so `claimHolds` speaks for those routes alone.
+ * Each route lists the arms (confounder first), the link behind each hop and
+ * a display string; routes come shortest first and at most `maxRoutes` are
+ * returned, with `totalRoutes` giving the full count.
+ */
+export function checkAdjustmentClaim({ links = [], confounderId, ivId, dvId, controlledIds = [], maxArmLength = 3,
+  maxRoutes = 5, minPapers = 1, papersFor = directionalPaperCounter(), isNode = () => true } = {}) {
+  const none = { claimHolds: true, openRoutes: [], totalRoutes: 0 };
+  if (!confounderId || !ivId || !dvId || [ivId, dvId].includes(confounderId)) return none;
+  const out = new Map();
+  for (const hop of directedHops(links, Math.max(1, Math.trunc(minPapers) || 1), papersFor)) {
+    if (!isNode(hop.from) || !isNode(hop.to)) continue;
+    if (!out.has(hop.from)) out.set(hop.from, new Map());
+    const known = out.get(hop.from).get(hop.to);
+    if (!known || hop.papers > known.papers) out.get(hop.from).set(hop.to, hop);
+  }
+  const blocked = new Set(controlledIds);
+  const arms = (target, other) => {
+    const found = [];
+    const walk = (path, edgeIds) => {
+      const last = path.at(-1);
+      if (last === target) { found.push({ path: [...path], edgeIds: [...edgeIds] }); return; }
+      if (path.length > maxArmLength) return;
+      for (const [next, hop] of out.get(last) || []) {
+        if (path.includes(next) || next === other || blocked.has(next)) continue;
+        walk([...path, next], [...edgeIds, hop.edgeId]);
+      }
+    };
+    walk([confounderId], []);
+    return found;
+  };
+  const toIv = arms(ivId, dvId), toDv = arms(dvId, ivId);
+  const routes = [];
+  for (const x of toIv) {
+    const used = new Set(x.path.slice(1));
+    for (const y of toDv) {
+      if (y.path.slice(1).some(id => used.has(id))) continue;
+      routes.push({ ivArm: x.path, dvArm: y.path, ivArmEdgeIds: x.edgeIds, dvArmEdgeIds: y.edgeIds,
+        display: `${[...x.path].reverse().join(" ← ")} → ${y.path.slice(1).join(" → ")}` });
+    }
+  }
+  routes.sort((a, b) => a.ivArm.length + a.dvArm.length - b.ivArm.length - b.dvArm.length
+    || a.display.localeCompare(b.display));
+  return { claimHolds: !routes.length, openRoutes: routes.slice(0, maxRoutes), totalRoutes: routes.length };
+}
