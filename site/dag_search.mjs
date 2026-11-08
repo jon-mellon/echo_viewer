@@ -85,9 +85,9 @@ export function groupNeighborSuggestions(group, {
   variableById, blockedIds, clusterMemberIds, rejectedIds = new Set(),
   selectedUoa, uoaFilterEnabled = false, uoaMatches,
 }, limit) {
-  const seen = new Set(group.variable_ids);
+  const seen = new Set(group.variable_ids || []);
   const suggestions = [];
-  for (const variableId of group.variable_ids) {
+  for (const variableId of group.variable_ids || []) {
     const v = variableById.get(variableId);
     for (const neighbor of v?.similarity_neighbors || []) {
       if (seen.has(neighbor.variable_id)) continue;
@@ -100,7 +100,7 @@ export function groupNeighborSuggestions(group, {
     }
   }
   return suggestions
-    .sort((a, b) => (Number(a.llm_rank || 99) - Number(b.llm_rank || 99)) || (b.cosine_similarity - a.cosine_similarity))
+    .sort((a, b) => (Number(a.llm_rank || 99) - Number(b.llm_rank || 99)) || ((Number(b.cosine_similarity) || 0) - (Number(a.cosine_similarity) || 0)))
     .slice(0, limit);
 }
 
