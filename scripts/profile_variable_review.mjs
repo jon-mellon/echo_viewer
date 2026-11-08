@@ -127,7 +127,14 @@ try {
         await measure('disposition: explicitly controlled', budgets.disposition,
           () => menu(0).selectOption('explicitly_controlled'), settled);
         await measure('disposition: affects outcome only via cause', budgets.disposition,
-          () => menu(1).selectOption('causes_y_only_via_x'), settled);
+          async () => {
+            await menu(1).selectOption('causes_y_only_via_x');
+            // With other mediators in the data the status asks the user to agree first; the decision is saved on confirm.
+            if (await dialog.isVisible()) {
+              await dialog.getByRole('checkbox').check();
+              await dialog.getByRole('button', { name: 'Confirm status' }).click();
+            }
+          }, settled);
         const removedId = await menu(2).getAttribute('data-group-id');
         await menu(2).selectOption('removed_other');
         await dialog.locator('textarea').fill('Outside the study population.');
