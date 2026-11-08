@@ -257,3 +257,16 @@ test('routesToVisData keeps the entry point so the arrowhead enters the target s
   assert.deepEqual({ x: last.x, y: last.y }, { x: 350, y: 0 });
   assert.equal(last.y, positions.get('b').y);
 });
+
+test('routesToVisData lengthens a short final segment so the arrowhead sits on the node', () => {
+  const positions = new Map([['a', { x: 0, y: 0 }], ['b', { x: 400, y: 0 }]]);
+  const boxes = new Map([['b', { cx: 400, cy: 0, w: 100, h: 40 }]]);
+  const route = {
+    link: { edge_id: 'e', direction_type: 'A_TO_B' }, sourceId: 'a', targetId: 'b',
+    points: [{ x: 50, y: 0 }, { x: 50, y: 40 }, { x: 400, y: 40 }, { x: 400, y: 27 }],
+  };
+  const result = routesToVisData([route], { edgeStyle: () => ({}), edgeTitle: () => '', positions, boxes });
+  const last = result.nodeData[result.nodeData.length - 1];
+  assert.equal(last.x, 400);
+  assert.ok(last.y - 20 >= 24);
+});

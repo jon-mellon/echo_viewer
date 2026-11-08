@@ -357,6 +357,7 @@ function routedDagDataFromRoutes(groups, routes, layout) {
     }),
     edgeTitle: edgeHoverText,
     positions: layout.positions,
+    boxes: layout.boxes,
   });
   return { ...routed, nodeData: [...nodeData, ...routed.nodeData] };
 }
