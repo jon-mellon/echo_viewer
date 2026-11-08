@@ -250,7 +250,7 @@ test('routesToVisData keeps the entry point so the arrowhead enters the target s
   const positions = new Map([['a', { x: 0, y: 0 }], ['b', { x: 400, y: 0 }]]);
   const route = {
     link: { edge_id: 'e', direction_type: 'A_TO_B' }, sourceId: 'a', targetId: 'b',
-    points: [{ x: 50, y: 0 }, { x: 50, y: 100 }, { x: 300, y: 100 }, { x: 300, y: 0 }, { x: 350, y: 0 }],
+    points: [{ x: 50, y: 0 }, { x: 50, y: 100 }, { x: 350, y: 100 }, { x: 350, y: 0 }],
   };
   const result = routesToVisData([route], { edgeStyle: () => ({}), edgeTitle: () => '', positions });
   const last = result.nodeData[result.nodeData.length - 1];
