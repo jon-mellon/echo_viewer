@@ -69,7 +69,7 @@ function makeBibEntry(data, doi, key) {
 export function collectAllDagDois({ visibleLinks, rawLinksById }) {
   const dois = new Set();
   for (const link of (visibleLinks || [])) {
-    const rawIds = [...link.a_to_b_raw_link_ids, ...link.b_to_a_raw_link_ids];
+    const rawIds = [...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])];
     for (const id of rawIds) {
       const lr = rawLinksById.get(id);
       if (lr && isDoi(lr.paper_id)) dois.add(lr.paper_id.trim());
@@ -127,12 +127,12 @@ export function buildLinksTable(fmt, { visibleLinks, project, rawLinksById }, ke
 
   const rows = links.map(link => {
     const { sourceLabel, targetLabel, arrow } = directedGroupLabels(link, project.groups, "↔");
-    const rawIds = [...new Set([...link.a_to_b_raw_link_ids, ...link.b_to_a_raw_link_ids])];
+    const rawIds = [...new Set([...(link.a_to_b_raw_link_ids || []), ...(link.b_to_a_raw_link_ids || [])])];
     const dois = [...new Set(rawIds.map(id => rawLinksById.get(id)?.paper_id).filter(isDoi))];
     if (fmt === "md") {
       const cites = dois.map(d => `[@${keyMap?.get(d.trim()) || d.trim()}]`);
       const src = cites.join("; ") || "—";
-      return `| ${escapeHtml(sourceLabel)} | ${escapeHtml(targetLabel)} | ${arrow} | ${src} |`;
+      return `| ${escapeMarkdownCell(sourceLabel)} | ${escapeMarkdownCell(targetLabel)} | ${arrow} | ${src} |`;
     } else {
       const cites = dois.map(d => `\\citep{${keyMap?.get(d.trim()) || d.trim().replace(/[^a-zA-Z0-9_.\-]/g, "_")}}`);
       const src = cites.join("; ") || "---";
@@ -168,8 +168,9 @@ export function buildExcludedLinksTable(fmt, project, relevantIds = null) {
       && (decision?.display_status === "excluded" || decision?.display_status === "hidden"));
   if (!excluded.length) return null;
 
+  const linkById = new Map((project.links || []).map(candidate => [candidate.edge_id, candidate]));
   const rows = excluded.map(([edgeId, decision]) => {
-    const link = (project.links || []).find(candidate => candidate.edge_id === edgeId);
+    const link = linkById.get(edgeId);
     const [firstId, secondId] = edgeId.includes("__") ? edgeId.split("__") : edgeId.split("->");
     const label = id => project.groups.find(group => group.group_id === id)?.label || id || "";
     const { sourceLabel, targetLabel } = link ? directedGroupLabels(link, project.groups)
