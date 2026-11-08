@@ -245,3 +245,16 @@ test("rounded box distance follows the corner curve and matches a sharp box else
   assert.ok(rounded < sharp - 2 && rounded > sharp - 4, `${rounded} vs ${sharp}`);
   assert.ok(Math.abs(roundedBoxDistance(100, 40, 0, corner) - sharp) < 1e-9);
 });
+
+test('routesToVisData lengthens a short final segment so the arrowhead sits on the node', () => {
+  const positions = new Map([['a', { x: 0, y: 0 }], ['b', { x: 400, y: 0 }]]);
+  const boxes = new Map([['b', { cx: 400, cy: 0, w: 100, h: 40 }]]);
+  const route = {
+    link: { edge_id: 'e', direction_type: 'A_TO_B' }, sourceId: 'a', targetId: 'b',
+    points: [{ x: 50, y: 0 }, { x: 50, y: 40 }, { x: 400, y: 40 }, { x: 400, y: 27 }],
+  };
+  const result = routesToVisData([route], { edgeStyle: () => ({}), edgeTitle: () => '', positions, boxes });
+  const last = result.nodeData[result.nodeData.length - 1];
+  assert.equal(last.x, 400);
+  assert.ok(last.y - 20 >= 24);
+});
