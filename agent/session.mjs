@@ -4,6 +4,7 @@ import { join } from "node:path";
 import * as projectOps from "../site/dag_project.mjs";
 import * as visibility from "../site/variable_visibility.mjs";
 import { CONFOUNDER_STATUSES, EXCLUSION_STATUSES, confounderKey, diagnosticKey } from "../site/confounder_status.mjs";
+import { checkOnlyViaClaim } from "../site/causal_neighborhood.mjs";
 import { fullCompileDag } from "../site/compiled_dag.mjs";
 import { deriveDagView } from "../site/dag_view.mjs";
 import { effectiveStudyGraph } from "../site/study_graph.mjs";
@@ -39,6 +40,11 @@ function projectFromSchema(schema, anchors = {}) {
 
 /** The catch-all group is not a concept, so it can never be a confounder or lie on a path. */
 export const CATCH_ALL_GROUP_IDS = new Set(["category-other"]);
+
+/** Setting for the agent MCP: ECHO_CHECK_ONLY_VIA=1 makes "affects outcome only via cause" check the graph. */
+export const checkOnlyViaEnabled = () => ["1", "true"].includes(String(process.env.ECHO_CHECK_ONLY_VIA || "").toLowerCase());
+/** Name used in `rejectedPaths` for a direct confounder → outcome link. */
+export const DIRECT_PATH = "direct";
 
 export class EchoAgentSession {
   constructor(record, home = agentHome()) {
@@ -243,17 +249,30 @@ export class EchoAgentSession {
       else schema.finding_reviews[rawLinkId] = { status: "retained", reason_text: reasonText };
     });
   }
-  async setConfounderStatus({ groupId, status, text = "" }) {
+  async setConfounderStatus({ groupId, status, text = "", rejectedPaths = [] }) {
     const { ivId, dvId } = this.record.anchors;
     if (!ivId || !dvId || !ownGroup(this.schema, groupId)) throw new Error("Choose anchors and an existing group first.");
     // "other" is still accepted: older confounder decisions use it and the schema validator allows it.
     if (!Object.hasOwn(CONFOUNDER_STATUSES, status) && status !== "other") {
       throw new Error(`Unknown confounder status "${status}". Use one of: ${[...Object.keys(CONFOUNDER_STATUSES), "other"].join(", ")}.`);
     }
-    return this.mutate("set_confounder_status", { groupId, status, text }, schema => {
+    if (status === "causes_y_only_via_x" && checkOnlyViaEnabled()) await this.requireOnlyViaRejections(groupId, rejectedPaths);
+    return this.mutate("set_confounder_status", { groupId, status, text, ...(rejectedPaths.length ? { rejectedPaths } : {}) }, schema => {
       schema.confounder_statuses ||= {};
       schema.confounder_statuses[confounderKey(ivId, dvId, groupId)] = { status, ...(text ? { text } : {}) };
     });
+  }
+  /** With the setting on, the agent must name every other route to the outcome the graph already holds. */
+  async requireOnlyViaRejections(groupId, rejectedPaths) {
+    const { ivId, dvId } = this.record.anchors;
+    const { dag } = await this.graph();
+    const { direct, otherPaths } = checkOnlyViaClaim({ links: dag.edges, confounderId: groupId, mediatorId: ivId, outcomeId: dvId });
+    const found = [...(direct ? [DIRECT_PATH] : []), ...otherPaths.map(route => route.viaId)];
+    const missing = found.filter(id => !rejectedPaths.includes(id));
+    if (!missing.length) return;
+    const describe = id => id === DIRECT_PATH ? `${groupId} → ${dvId} (direct)` : `${groupId} → ${id} → ${dvId}`;
+    throw new Error(`The graph already has other routes from "${groupId}" to the outcome, so "causes_y_only_via_x" needs an explicit rejection of each: ${missing.map(describe).join("; ")}. `
+      + `If you reject them, repeat the call with rejectedPaths including: ${missing.map(id => JSON.stringify(id)).join(", ")}.`);
   }
   async setExclusionStatus({ groupId, status, text = "" }) {
     const { iv_group_id: ivId, dv_group_id: dvId, instrument_group_id: instrumentId } = this.project;
