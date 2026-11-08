@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { join } from "node:path";
 import * as projectOps from "../site/dag_project.mjs";
 import * as visibility from "../site/variable_visibility.mjs";
-import { confounderKey } from "../site/confounder_status.mjs";
+import { CONFOUNDER_STATUSES, EXCLUSION_STATUSES, confounderKey, diagnosticKey } from "../site/confounder_status.mjs";
 import { fullCompileDag } from "../site/compiled_dag.mjs";
 import { deriveDagView } from "../site/dag_view.mjs";
 import { effectiveStudyGraph } from "../site/study_graph.mjs";
@@ -246,9 +246,27 @@ export class EchoAgentSession {
   async setConfounderStatus({ groupId, status, text = "" }) {
     const { ivId, dvId } = this.record.anchors;
     if (!ivId || !dvId || !ownGroup(this.schema, groupId)) throw new Error("Choose anchors and an existing group first.");
+    // "other" is still accepted: older confounder decisions use it and the schema validator allows it.
+    if (!Object.hasOwn(CONFOUNDER_STATUSES, status) && status !== "other") {
+      throw new Error(`Unknown confounder status "${status}". Use one of: ${[...Object.keys(CONFOUNDER_STATUSES), "other"].join(", ")}.`);
+    }
     return this.mutate("set_confounder_status", { groupId, status, text }, schema => {
       schema.confounder_statuses ||= {};
       schema.confounder_statuses[confounderKey(ivId, dvId, groupId)] = { status, ...(text ? { text } : {}) };
+    });
+  }
+  async setExclusionStatus({ groupId, status, text = "" }) {
+    const { iv_group_id: ivId, dv_group_id: dvId, instrument_group_id: instrumentId } = this.project;
+    if (!ivId || !dvId || !instrumentId || !ownGroup(this.schema, groupId)) {
+      throw new Error("Choose an IV, DV and instrument and an existing group first.");
+    }
+    if (!Object.hasOwn(EXCLUSION_STATUSES, status)) {
+      throw new Error(`Unknown exclusion status "${status}". Use one of: ${Object.keys(EXCLUSION_STATUSES).join(", ")}.`);
+    }
+    return this.mutate("set_exclusion_status", { groupId, status, text }, schema => {
+      schema.exclusion_statuses ||= {};
+      schema.exclusion_statuses[diagnosticKey(projectFromSchema(schema, this.record.anchors), "exclusion", groupId)] =
+        { status, ...(text ? { text } : {}) };
     });
   }
   async jevClassify(phase, { sourceGroupIds, description, useAIWhenPublishedAvailable = false }) {
