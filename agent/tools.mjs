@@ -1,5 +1,6 @@
 import { EchoAgentSession } from "./session.mjs";
 import { clonePublication } from "./local_data.mjs";
+import { CHECK_TOOL_NOTE } from "./diagnostic_checks.mjs";
 import { CONFOUNDER_STATUSES, EXCLUSION_STATUSES } from "../site/confounder_status.mjs";
 
 const obj = (properties, required = []) => ({ type: "object", properties, required, additionalProperties: false });
@@ -89,7 +90,7 @@ export function createEchoTools({ getSession, setSession }) {
     define("echo_set_finding_decision", "Exclude a finding with a reason, or retain it with a private open review reason.",
       obj({ rawLinkId: str, excluded: bool, reasonCode: str, reasonText: str }, ["rawLinkId", "excluded"]),
       a => session().setFindingDecision(a)),
-    define("echo_set_confounder_status", `Set Echo's status for a potential confounder and a private open reason under the selected IV and DV. Statuses: ${Object.entries(CONFOUNDER_STATUSES).map(([id, label]) => `${id} (${label})`).join("; ")}. When ECHO_CHECK_ONLY_VIA is set, causes_y_only_via_x is refused while the graph holds other routes from the confounder to the outcome (a direct link or confounder → z → outcome) unless rejectedPaths lists each one: the intermediate group ID, or "direct".`,
+    define("echo_set_confounder_status", `Set Echo's status for a potential confounder and a private open reason under the selected IV and DV. Statuses: ${Object.entries(CONFOUNDER_STATUSES).map(([id, label]) => `${id} (${label})`).join("; ")}.` + " " + CHECK_TOOL_NOTE + ` rejectedPaths applies to causes_y_only_via_x; text is the private explanation.`,
       obj({ groupId: str, status: { type: "string", enum: [...Object.keys(CONFOUNDER_STATUSES), "other"] }, text: str, rejectedPaths: strings }, ["groupId", "status"]),
       a => session().setConfounderStatus(a)),
     define("echo_set_exclusion_status", `Set Echo's status for an exclusion restriction violation under the selected instrument, IV and DV (anchors must include an instrument). Statuses: ${Object.entries(EXCLUSION_STATUSES).map(([id, label]) => `${id} (${label})`).join("; ")}.`,

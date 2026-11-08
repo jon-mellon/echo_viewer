@@ -31,7 +31,7 @@ import { createToolbarController } from "/toolbar_controller.mjs";
 import { createDefinitionWorkflowController } from "/definition_workflow_controller.mjs";
 import { createCustomVariablesPresenter } from "/custom_variables_presenter.mjs";
 import { createTaskViews } from "/task_views.mjs";
-import { directionalPaperCounter, linksNeedingExactCounts } from "/causal_neighborhood.mjs";
+import { checkOnlyViaClaim, directionalPaperCounter, linksNeedingExactCounts } from "/causal_neighborhood.mjs";
 import { createPublicationController } from "/dag_publication.mjs";
 import { createGroupingSetController } from "/grouping_set_controller.mjs";
 import { createProjectBootstrap } from "/project_bootstrap.mjs?v=compiled-first-v2";
@@ -1349,7 +1349,19 @@ const persistentViewer = createPersistentViewer({
   onDiscard: invalidateVisibleCaches,
 });
 
-const variableReviewController = createVariableReviewController({ state, onCommit: commitDiagnosticReview,
+/** Variables m with confounder → m → outcome in the study's links (drawn on the map or not), other than the cause the user says the effect runs through. */
+function mediatorsOutsideCause(groupId) {
+  const support = linkPaperSupport();
+  const shown = new Set(dagGroups().filter(isDagDisplayGroup).map(group => group.group_id));
+  return checkOnlyViaClaim({ links: state.studyGraph?.links || [], confounderId: groupId,
+    mediatorId: state.project.iv_group_id, outcomeId: state.project.dv_group_id,
+    // Every link counts unless sparse links are excluded, as in the map's diagnostics.
+    minPapers: state.excludeSparseEdges ? state.minimumEdgePapers : 0,
+    ...(support.status === "ready" ? { papersFor: support.papersFor } : {}), isNode: id => shown.has(id) })
+    .otherPaths.map(route => route.viaId);
+}
+
+const variableReviewController = createVariableReviewController({ state, onCommit: commitDiagnosticReview, mediatorsFor: mediatorsOutsideCause,
   onCancel: () => { taskViews.render(); if (dagNetworkController.dagDisplay() === "table") void dagNetworkController.renderDag({ reuseGeometry: true }); } });
 
 const taskViews = createTaskViews({

@@ -3,8 +3,8 @@ import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { join } from "node:path";
 import * as projectOps from "../site/dag_project.mjs";
 import * as visibility from "../site/variable_visibility.mjs";
-import { CONFOUNDER_STATUSES, EXCLUSION_STATUSES, confounderKey, diagnosticKey } from "../site/confounder_status.mjs";
-import { checkOnlyViaClaim } from "../site/causal_neighborhood.mjs";
+import { CONFOUNDER_STATUSES, EXCLUSION_STATUSES, confounderKey, diagnosticKey, scopedDecisions } from "../site/confounder_status.mjs";
+import { checkAdjustmentClaim, checkOnlyViaClaim } from "../site/causal_neighborhood.mjs";
 import { fullCompileDag } from "../site/compiled_dag.mjs";
 import { deriveDagView } from "../site/dag_view.mjs";
 import { effectiveStudyGraph } from "../site/study_graph.mjs";
@@ -18,6 +18,7 @@ import { browsePublishedSplits, loadPublishedSplitMembership } from "../site/pub
 import { JEV_BATCH_SIZE, JEV_TEST_SIZE, cappedKeyStatus, randomSampleIds,
   jevRecords, jevRequest, jevResults, openRouterJson, parseJevPricing,
   jevRequestSizes, estimatedJevCharge } from "../site/definition_jev_core.mjs";
+import { DIRECT_PATH, MAX_ARM_LENGTH, checkAdjustmentEnabled, checkOnlyViaEnabled } from "./diagnostic_checks.mjs";
 import { agentHome, clonePublication, openLocalPublication, localEvidence } from "./local_data.mjs";
 
 function jsonSafe(value) {
@@ -40,11 +41,6 @@ function projectFromSchema(schema, anchors = {}) {
 
 /** The catch-all group is not a concept, so it can never be a confounder or lie on a path. */
 export const CATCH_ALL_GROUP_IDS = new Set(["category-other"]);
-
-/** Setting for the agent MCP: ECHO_CHECK_ONLY_VIA=1 makes "affects outcome only via cause" check the graph. */
-export const checkOnlyViaEnabled = () => ["1", "true"].includes(String(process.env.ECHO_CHECK_ONLY_VIA || "").toLowerCase());
-/** Name used in `rejectedPaths` for a direct confounder → outcome link. */
-export const DIRECT_PATH = "direct";
 
 export class EchoAgentSession {
   constructor(record, home = agentHome()) {
@@ -256,23 +252,48 @@ export class EchoAgentSession {
     if (!Object.hasOwn(CONFOUNDER_STATUSES, status) && status !== "other") {
       throw new Error(`Unknown confounder status "${status}". Use one of: ${[...Object.keys(CONFOUNDER_STATUSES), "other"].join(", ")}.`);
     }
-    if (status === "causes_y_only_via_x" && checkOnlyViaEnabled()) await this.requireOnlyViaRejections(groupId, rejectedPaths);
+    if (status === "causes_y_only_via_x" && checkOnlyViaEnabled()) await this.requireOnlyViaRejections(groupId, rejectedPaths, text);
+    if (status === "not_in_minimal_adjustment_set" && checkAdjustmentEnabled()) await this.requireAdjustmentExplanation(groupId, text);
     return this.mutate("set_confounder_status", { groupId, status, text, ...(rejectedPaths.length ? { rejectedPaths } : {}) }, schema => {
       schema.confounder_statuses ||= {};
       schema.confounder_statuses[confounderKey(ivId, dvId, groupId)] = { status, ...(text ? { text } : {}) };
     });
   }
-  /** With the setting on, the agent must name every other route to the outcome the graph already holds. */
-  async requireOnlyViaRejections(groupId, rejectedPaths) {
+  /** With ECHO_CHECK_ONLY_VIA on, the agent must reject each other route to the outcome and say why. */
+  async requireOnlyViaRejections(groupId, rejectedPaths, text) {
     const { ivId, dvId } = this.record.anchors;
     const { dag } = await this.graph();
     const { direct, otherPaths } = checkOnlyViaClaim({ links: dag.edges, confounderId: groupId, mediatorId: ivId, outcomeId: dvId });
     const found = [...(direct ? [DIRECT_PATH] : []), ...otherPaths.map(route => route.viaId)];
-    const missing = found.filter(id => !rejectedPaths.includes(id));
-    if (!missing.length) return;
+    if (!found.length) {
+      if (rejectedPaths.length) throw new Error(`rejectedPaths lists routes the graph does not hold: ${rejectedPaths.map(id => JSON.stringify(id)).join(", ")}. No other route from "${groupId}" to "${dvId}" up to two links was found, so leave rejectedPaths out.`);
+      return;
+    }
     const describe = id => id === DIRECT_PATH ? `${groupId} → ${dvId} (direct)` : `${groupId} → ${id} → ${dvId}`;
-    throw new Error(`The graph already has other routes from "${groupId}" to the outcome, so "causes_y_only_via_x" needs an explicit rejection of each: ${missing.map(describe).join("; ")}. `
-      + `If you reject them, repeat the call with rejectedPaths including: ${missing.map(id => JSON.stringify(id)).join(", ")}.`);
+    const unknown = rejectedPaths.filter(id => !found.includes(id));
+    if (unknown.length) throw new Error(`rejectedPaths lists routes the graph does not hold: ${unknown.map(id => JSON.stringify(id)).join(", ")}. The routes found are: ${found.map(describe).join("; ")}.`);
+    const missing = found.filter(id => !rejectedPaths.includes(id));
+    if (missing.length) {
+      throw new Error(`"causes_y_only_via_x" claims "${groupId}" reaches "${dvId}" only through "${ivId}", but the graph has other routes: ${missing.map(describe).join("; ")}. `
+        + `Repeat the call with rejectedPaths including ${missing.map(id => JSON.stringify(id)).join(", ")} and with text explaining, for each, which link is not a real causal effect and why; or choose another status.`);
+    }
+    if (!text.trim()) throw new Error(`rejectedPaths covers every route, but text is empty. Explain, for each of ${found.map(describe).join("; ")}, which link is not a real causal effect and why.`);
+  }
+  /** With ECHO_CHECK_ADJUSTMENT on, the agent must say what blocks each open backdoor route through the confounder. */
+  async requireAdjustmentExplanation(groupId, text) {
+    const { ivId, dvId } = this.record.anchors;
+    const { dag } = await this.graph();
+    const controlledIds = scopedDecisions(this.project, "confounders")
+      .filter(row => ["explicitly_controlled", "accounted_for_by_design"].includes(row.status) && row.groupId !== groupId)
+      .map(row => row.groupId);
+    const { openRoutes, totalRoutes } = checkAdjustmentClaim({ links: dag.edges, confounderId: groupId, ivId, dvId,
+      controlledIds, maxArmLength: MAX_ARM_LENGTH });
+    if (!totalRoutes || text.trim()) return;
+    const shown = openRoutes.map(route => route.display).join("; ");
+    throw new Error(`"not_in_minimal_adjustment_set" claims adjusting for "${groupId}" is unnecessary, but ${totalRoutes} open backdoor route${totalRoutes === 1 ? "" : "s"} run through it that no adjusted-for group blocks`
+      + `${totalRoutes > openRoutes.length ? ` (showing ${openRoutes.length})` : ""}: ${shown}. `
+      + `Adjusted for now: ${controlledIds.length ? controlledIds.join(", ") : "none"}. `
+      + `Repeat the call with text saying, for each route, which group blocks it (and set that group to explicitly_controlled or accounted_for_by_design) or which link is not a real causal effect and why; or choose another status.`);
   }
   async setExclusionStatus({ groupId, status, text = "" }) {
     const { iv_group_id: ivId, dv_group_id: dvId, instrument_group_id: instrumentId } = this.project;

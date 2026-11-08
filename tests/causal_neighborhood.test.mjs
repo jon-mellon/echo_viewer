@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { causalNeighborhood, checkOnlyViaClaim, directedHops, directionalPaperCounter, linksNeedingExactCounts } from "../site/causal_neighborhood.mjs";
+import { causalNeighborhood, checkAdjustmentClaim, checkOnlyViaClaim, directedHops, directionalPaperCounter, linksNeedingExactCounts } from "../site/causal_neighborhood.mjs";
 import { computeFocusLayout } from "../site/dag_layout.mjs";
 
 const keys = n => Array.from({ length: n }, (_, i) => `p${i}`);
@@ -159,4 +159,34 @@ test("only-via claims are checked for other distance-2 routes to the outcome", (
   assert.deepEqual(checkOnlyViaClaim({ ...claim, minPapers: 2 }).otherPaths.map(r => r.viaId), ["z"]);
   assert.equal(checkOnlyViaClaim({ ...claim, isNode: id => id !== "z" && id !== "q" }).claimHolds, true);
   assert.equal(checkOnlyViaClaim({ ...claim, links: [...graph, link("k", "y", "A_TO_B", 2)], isNode: id => id !== "z" && id !== "q" }).direct.papers, 2);
+});
+
+test("adjustment claims find disjoint, unblocked arms to the IV and the outcome", () => {
+  const graph = [
+    link("k", "x", "A_TO_B", 1), link("k", "y", "A_TO_B", 1),
+    link("k", "m", "A_TO_B", 1), link("m", "x", "A_TO_B", 1), link("m", "y", "A_TO_B", 1),
+    link("k", "a", "A_TO_B", 1), link("a", "x", "A_TO_B", 1),
+    link("x", "y", "A_TO_B", 1),
+  ];
+  const base = { links: graph, confounderId: "k", ivId: "x", dvId: "y" };
+  const open = checkAdjustmentClaim(base);
+  assert.equal(open.claimHolds, false);
+  assert.equal(open.openRoutes[0].display, "x ← k → y");
+  // Arms through the shared node m are not disjoint, so only the separate arms count.
+  assert.ok(!open.openRoutes.some(route => route.display.includes("m ← k → m")));
+  assert.deepEqual(open.openRoutes.map(r => r.display), ["x ← k → y", "x ← a ← k → y", "x ← k → m → y", "x ← m ← k → y", "x ← a ← k → m → y"]);
+  // A direct k → y link can never be blocked by adjusting for others; without it, controlling m closes the remaining routes.
+  assert.equal(checkAdjustmentClaim({ ...base, links: graph.filter(l => l.edge_id !== "k__y"), controlledIds: ["m", "a"] }).claimHolds, true);
+  assert.equal(checkAdjustmentClaim({ ...base, links: graph.filter(l => l.edge_id !== "k__y"), controlledIds: ["m"] }).claimHolds, true);
+  assert.equal(checkAdjustmentClaim({ ...base, controlledIds: ["m", "a"] }).claimHolds, false);
+  assert.equal(checkAdjustmentClaim({ ...base, maxRoutes: 2 }).openRoutes.length, 2);
+  assert.equal(checkAdjustmentClaim({ ...base, maxRoutes: 2 }).totalRoutes, open.totalRoutes);
+  assert.equal(checkAdjustmentClaim({ ...base, confounderId: "x" }).claimHolds, true);
+});
+
+test("only-via claims can count links drawn without paper counts", () => {
+  const bare = [link("k", "x", "A_TO_B"), link("x", "y", "A_TO_B"), link("k", "m", "A_TO_B"), link("m", "y", "A_TO_B")];
+  const claim = { links: bare, confounderId: "k", mediatorId: "x", outcomeId: "y" };
+  assert.equal(checkOnlyViaClaim(claim).claimHolds, true);
+  assert.deepEqual(checkOnlyViaClaim({ ...claim, minPapers: 0 }).otherPaths.map(r => r.viaId), ["m"]);
 });

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { EchoAgentSession } from "../agent/session.mjs";
+import { confounderKey } from "../site/confounder_status.mjs";
 import { createEchoTools } from "../agent/tools.mjs";
 import { jevRequest, jevResults } from "../site/definition_jev_core.mjs";
 import { publicationPermalink } from "../site/published_schema_loader.mjs";
@@ -176,32 +177,61 @@ test("the catch-all category is never returned as a confounder or graph node", a
   assert.ok(graph.dag.edges.every(edge => edge.group_a !== "category-other" && edge.group_b !== "category-other"));
 });
 
-test("ECHO_CHECK_ONLY_VIA requires rejecting other routes before causes_y_only_via_x", async () => {
+async function routedFixture() {
   const session = await fixture();
-  session.schema.groups.push({ group_id: "mid", label: "Mid", variable_ids: ["m"] });
-  const variables = ["i", "d", "s1", "m"].map(variable_id => ({ variable_id, canonical_variable_id: variable_id }));
+  session.schema.groups.push({ group_id: "mid", label: "Mid", variable_ids: ["m"] }, { group_id: "ctl", label: "Ctl", variable_ids: ["c"] });
+  const variables = ["i", "d", "s1", "m", "c"].map(variable_id => ({ variable_id, canonical_variable_id: variable_id }));
   const link = (id, source, target) => ({ raw_causal_link_id: id, source_variable_id: source, target_variable_id: target,
     paper_id: `paper-${id}`, table_id: "table" });
-  const links = [link("r1", "s1", "i"), link("r2", "s1", "m"), link("r3", "m", "d"), link("r4", "i", "d")];
+  // source → iv, source → mid → dv, iv → dv, and source → ctl → iv with ctl → dv.
+  const links = [link("r1", "s1", "i"), link("r2", "s1", "m"), link("r3", "m", "d"), link("r4", "i", "d"),
+    link("r5", "s1", "c"), link("r6", "c", "i"), link("r7", "c", "d")];
   session.evidence = {
     variables: async ids => variables.filter(row => ids.includes(row.variable_id)),
     rawLinks: async ids => ids ? links.filter(row => ids.includes(row.raw_causal_link_id)) : links,
   };
   await session.setAnchors({ ivId: "iv", dvId: "dv" });
+  return session;
+}
+async function withEnv(name, value, run) {
+  const previous = process.env[name];
+  process.env[name] = value;
+  try { await run(); } finally { if (previous === undefined) delete process.env[name]; else process.env[name] = previous; }
+}
+
+test("ECHO_CHECK_ONLY_VIA requires rejecting each other route and explaining", async () => {
+  const session = await routedFixture();
   const claim = { groupId: "source", status: "causes_y_only_via_x" };
-  const previous = process.env.ECHO_CHECK_ONLY_VIA;
-  try {
-    delete process.env.ECHO_CHECK_ONLY_VIA;
-    await session.setConfounderStatus(claim);
-    session.schema.confounder_statuses = {};
-    process.env.ECHO_CHECK_ONLY_VIA = "1";
+  await session.setConfounderStatus(claim);
+  session.schema.confounder_statuses = {};
+  await withEnv("ECHO_CHECK_ONLY_VIA", "1", async () => {
     await assert.rejects(session.setConfounderStatus(claim), /source → mid → dv/);
-    await assert.rejects(session.setConfounderStatus({ ...claim, rejectedPaths: ["other"] }), /"mid"/);
-    await session.setConfounderStatus({ ...claim, rejectedPaths: ["mid"] });
+    await assert.rejects(session.setConfounderStatus({ ...claim, rejectedPaths: ["mid"], text: "x" }), /ctl/);
+    await assert.rejects(session.setConfounderStatus({ ...claim, rejectedPaths: ["mid", "ctl", "ghost"], text: "x" }), /does not hold: "ghost"/);
+    await assert.rejects(session.setConfounderStatus({ ...claim, rejectedPaths: ["mid", "ctl"] }), /text is empty/);
+    await session.setConfounderStatus({ ...claim, rejectedPaths: ["mid", "ctl"], text: "Both links are mis-grouped." });
     assert.equal(Object.values(session.schema.confounder_statuses)[0].status, "causes_y_only_via_x");
-    // Other statuses are never checked.
     await session.setConfounderStatus({ groupId: "source", status: "explicitly_controlled" });
-  } finally {
-    if (previous === undefined) delete process.env.ECHO_CHECK_ONLY_VIA; else process.env.ECHO_CHECK_ONLY_VIA = previous;
-  }
+    await assert.rejects(session.setConfounderStatus({ groupId: "mid", status: "causes_y_only_via_x", rejectedPaths: ["x"] }), /does not hold|only through/);
+  });
+});
+
+test("ECHO_CHECK_ADJUSTMENT requires an explanation while open backdoor routes exist", async () => {
+  const session = await routedFixture();
+  const claim = { groupId: "source", status: "not_in_minimal_adjustment_set" };
+  await session.setConfounderStatus(claim);
+  await withEnv("ECHO_CHECK_ADJUSTMENT", "1", async () => {
+    await assert.rejects(session.setConfounderStatus(claim), /open backdoor route.*iv ← source → mid → dv.*Adjusted for now: none/s);
+    // Controlling ctl and mid closes every route through source, so no explanation is needed.
+    await session.setConfounderStatus({ groupId: "ctl", status: "explicitly_controlled" });
+    await assert.rejects(session.setConfounderStatus(claim), /iv ← source → mid → dv/);
+    await session.setConfounderStatus({ groupId: "mid", status: "accounted_for_by_design" });
+    await session.setConfounderStatus(claim);
+    // An explanation clears an open route.
+    await session.setConfounderStatus({ groupId: "mid", status: "unaddressed" });
+    await session.setConfounderStatus({ ...claim, text: "mid is blocked by the study design." });
+    assert.equal(session.schema.confounder_statuses[confounderKey("iv", "dv", "source")].text, "mid is blocked by the study design.");
+  });
+  // Off by default and for other statuses.
+  await session.setConfounderStatus(claim);
 });
