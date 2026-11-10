@@ -20,7 +20,7 @@ function record(p, kind, id, decision) {
 }
 
 test("every disposition keeps the variable and its links in the study graph", () => {
-  for (const status of ["explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set", "causes_y_only_via_x", "removed_other"]) {
+  for (const status of ["subsumed_into_iv_definition", "subsumed_into_dv_definition", "explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set", "causes_y_only_via_x", "removed_other"]) {
     const p = record(project(), "confounders", "c", { status });
     const graph = effectiveStudyGraph(p);
     assert.equal(graph.removed.size, 0);
@@ -34,7 +34,7 @@ test("every disposition keeps the variable and its links in the study graph", ()
 });
 
 test("the via-cause dispositions are drawn faded, like the other accounted-for ones", () => {
-  for (const status of ["explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set",
+  for (const status of ["subsumed_into_iv_definition", "subsumed_into_dv_definition", "explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set",
     "causes_y_only_via_x", "instrument_only_via_x", "variable_only_via_x", "removed_other"]) assert.ok(LIGHT_STATUSES.has(status), status);
   assert.ok(!LIGHT_STATUSES.has("unaddressed"));
 });

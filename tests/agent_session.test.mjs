@@ -235,3 +235,16 @@ test("ECHO_CHECK_ADJUSTMENT requires an explanation while open backdoor routes e
   // Off by default and for other statuses.
   await session.setConfounderStatus(claim);
 });
+
+
+test("definition-overlap dispositions survive agent status recording and schema validation", async () => {
+  const { validateGroupingSchema } = await import("../site/data_validation.mjs");
+  const session = await fixture();
+  await session.setAnchors({ ivId: "iv", dvId: "dv" });
+  for (const status of ["subsumed_into_iv_definition", "subsumed_into_dv_definition"]) {
+    await session.setConfounderStatus({ groupId: "source", status,
+      text: "The candidate and measured endpoint represent the same construct as duplicate nodes; no distinct external path is supported." });
+    assert.equal(Object.values(session.schema.confounder_statuses)[0].status, status);
+    validateGroupingSchema(session.schema);
+  }
+});

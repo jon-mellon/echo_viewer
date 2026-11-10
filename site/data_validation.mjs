@@ -140,7 +140,7 @@ export function validateGroupingSchema(schema) {
     }
   }
   for (const [field, noun, allowed] of [
-    ["confounder_statuses", "confounder", ["unaddressed", "explicitly_controlled", "accounted_for_by_design", "other", "causes_y_only_via_x", "not_in_minimal_adjustment_set", "removed_other"]],
+    ["confounder_statuses", "confounder", ["subsumed_into_iv_definition", "subsumed_into_dv_definition", "unaddressed", "explicitly_controlled", "accounted_for_by_design", "other", "causes_y_only_via_x", "not_in_minimal_adjustment_set", "removed_other"]],
     ["collider_statuses", "collider", ["unaddressed", "not_conditioned_on", "conditioned_by_design", "other"]],
     ["exclusion_statuses", "exclusion restriction", ["unaddressed", "explicitly_controlled", "instrument_only_via_x", "variable_only_via_x", "removed_other"]],
   ]) {

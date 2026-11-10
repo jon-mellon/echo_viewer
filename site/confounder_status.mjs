@@ -1,4 +1,6 @@
 export const CONFOUNDER_STATUSES = {
+  subsumed_into_iv_definition: "Subsumed into IV definition",
+  subsumed_into_dv_definition: "Subsumed into DV definition",
   unaddressed: "Unaddressed",
   explicitly_controlled: "Explicitly controlled",
   accounted_for_by_design: "Accounted for by design",
@@ -16,7 +18,7 @@ export const EXCLUSION_STATUSES = {
 };
 export const CONTROL_WARNING = "Controlling for exclusion restriction violations can induce post treatment bias.";
 // These dispositions keep the variable on the map and draw it faded.
-export const LIGHT_STATUSES = new Set(["explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set",
+export const LIGHT_STATUSES = new Set(["subsumed_into_iv_definition", "subsumed_into_dv_definition", "explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set",
   "causes_y_only_via_x", "instrument_only_via_x", "variable_only_via_x", "removed_other", "other"]);
 
 // A collider biases the estimate only when the analysis conditions on it, so its
