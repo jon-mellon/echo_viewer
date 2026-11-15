@@ -1,5 +1,5 @@
 export const CONFOUNDER_STATUSES = {
-  unaddressed: "Unaddressed",
+  unaddressed: "May be unaddressed",
   explicitly_controlled: "Explicitly controlled",
   accounted_for_by_design: "Accounted for by design",
   causes_y_only_via_x: "Affects outcome only via cause",
@@ -8,13 +8,14 @@ export const CONFOUNDER_STATUSES = {
 };
 
 export const EXCLUSION_STATUSES = {
-  unaddressed: "Unaddressed",
+  unaddressed: "May be unaddressed",
   explicitly_controlled: "Explicitly controlled",
   instrument_only_via_x: "Instrument affects variable only via cause",
   variable_only_via_x: "Affects outcome only via cause",
   removed_other: "Other reason",
 };
 export const CONTROL_WARNING = "Controlling for exclusion restriction violations can induce post treatment bias.";
+export const MANUAL_REVIEW_NOTICE = "These results may be incorrect or incomplete. Manually review the original paper, its controls, and the supporting evidence before relying on or sharing them.";
 // These dispositions keep the variable on the map and draw it faded.
 export const LIGHT_STATUSES = new Set(["explicitly_controlled", "accounted_for_by_design", "not_in_minimal_adjustment_set",
   "causes_y_only_via_x", "instrument_only_via_x", "variable_only_via_x", "removed_other", "other"]);
@@ -22,7 +23,7 @@ export const LIGHT_STATUSES = new Set(["explicitly_controlled", "accounted_for_b
 // A collider biases the estimate only when the analysis conditions on it, so its
 // status records whether it was left out of the model and sample, or was not.
 export const COLLIDER_STATUSES = {
-  unaddressed: "Unaddressed",
+  unaddressed: "May be unaddressed",
   not_conditioned_on: "Not conditioned on",
   conditioned_by_design: "Conditioned on by design or sample selection",
   other: "Other",

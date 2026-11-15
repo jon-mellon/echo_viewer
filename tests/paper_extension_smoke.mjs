@@ -102,7 +102,9 @@ try {
   await frame.locator("#extract").click(); await frame.locator('input[name="claim"]').waitFor();
   await frame.locator('input[name="claim"]').check(); await frame.locator("#qualify").click();
   await frame.getByText("Claim qualifies", { exact: false }).waitFor();
-  await frame.locator("#evaluate").click(); await frame.getByText("Private review complete", { exact: false }).first().waitFor();
+  await frame.locator("#evaluate").click(); await frame.getByText("Automated review complete", { exact: false }).first().waitFor();
+  assert.equal(await frame.getByText("Age · May be unaddressed", { exact: true }).count(), 1);
+  assert.ok(await frame.getByText("These results may be incorrect or incomplete.", { exact: false }).count());
   assert.equal(completions, 6);
   const records = await frame.evaluate(async () => { const { paperStore } = await import("./paper_store.mjs"); return paperStore.list(); });
   assert.equal(records.length, 1); assert.equal(records[0].phase, "complete");
@@ -116,7 +118,7 @@ try {
   const reloaded = await (await page.waitForSelector("#echo")).contentFrame(); await reloaded.getByText("Not connected", { exact: true }).waitFor();
   assert.equal(completions, before);
   await reloaded.getByRole("button", { name: "Resume", exact: true }).click();
-  await reloaded.getByText("Private review complete", { exact: false }).first().waitFor();
+  await reloaded.getByText("Automated review complete", { exact: false }).first().waitFor();
   assert.equal(completions, before);
   await page.setViewportSize({ width: 390, height: 850 });
   await reloaded.evaluate(() => window.scrollTo(0, 0));

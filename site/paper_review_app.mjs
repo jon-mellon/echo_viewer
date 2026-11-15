@@ -7,6 +7,7 @@ import { PaperModel, validateShape } from "./paper_model.mjs";
 import { BrowserEchoSession } from "./paper_browser_session.mjs";
 import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit, claimSchema } from "./paper_workflow.mjs";
 import { publicSchemaProjection } from "./public_schema_projection.mjs";
+import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
 
 const $ = id => document.getElementById(id);
 let run = null, session = null, key = null, busy = false, controller = null, authWindow = null, authNonce = null;
@@ -39,11 +40,12 @@ function render() {
     h("blockquote", { textContent: claim.sourceSentences.join("\n") }))));
   $("result").replaceChildren();
   if (run?.outcome) {
-    $("result").append(h("h3", { textContent: "Private review complete" }),
+    $("result").append(h("h3", { textContent: "Automated review complete" }),
+      h("p", { className: "notice", textContent: MANUAL_REVIEW_NOTICE }),
       h("p", { textContent: run.selectedClaim.text }));
     for (const [id, row] of Object.entries(run.outcome.review.confounders)) {
       const group = (session?.schema || run.session?.schema)?.groups.find(group => group.group_id === id);
-      $("result").append(h("div", { className: "status-row" }, h("strong", { textContent: `${group?.label || id} · ${row.status}` }), h("p", { textContent: row.reason })));
+      $("result").append(h("div", { className: "status-row" }, h("strong", { textContent: `${group?.label || id} · ${CONFOUNDER_STATUSES[row.status] || row.status}` }), h("p", { textContent: row.reason })));
     }
     $("result").append(h("p", { className: "muted", textContent: run.outcome.limitations.join(" ") }));
   }
@@ -155,7 +157,7 @@ $("evaluate").addEventListener("click", () => action(async () => {
   const client = model();
   if (run.phase === "complete") return;
   if (!run.qualification) throw new Error("Qualify the selected claim first.");
-  await client.checkModel(); await evaluatePaper(client, await browserSession(client)); text("progress", "Private review complete. Inspect the evidence, reasons and limitations before any publication.");
+  await client.checkModel(); await evaluatePaper(client, await browserSession(client)); text("progress", `Automated review complete. ${MANUAL_REVIEW_NOTICE}`);
 }));
 $("resolve").addEventListener("click", () => action(async () => {
   const client = model(); await resolveSplit(client, await browserSession(client));
@@ -170,7 +172,7 @@ $("retry").addEventListener("click", () => action(async () => {
 }));
 $("export").addEventListener("click", () => action(async () => {
   if (!run) throw new Error("No private review to export.");
-  const url = URL.createObjectURL(new Blob([JSON.stringify(run, null, 2)], { type: "application/json" }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ ...run, reviewNotice: MANUAL_REVIEW_NOTICE }, null, 2)], { type: "application/json" }));
   const link = h("a", { href: url, download: `echo-paper-${run.id}.json` }); link.click(); URL.revokeObjectURL(url);
 }));
 $("preview").addEventListener("click", () => action(async () => {

@@ -128,6 +128,9 @@ test("a full fixture review excludes the focal paper, validates coverage and rem
       : { decision: "retained", reason: "The endpoint definitions and population support this link.", reason_code: "", questioned_end: "", undeniable: true } };
   const outcome = await evaluatePaper(model, session);
   assert.equal(run.phase, "complete");
+  assert.equal(outcome.statusLabels.unaddressed, "May be unaddressed");
+  assert.match(outcome.reviewNotice, /Manually review the original paper/);
+  assert.equal(outcome.review.confounders.k.status, "unaddressed");
   assert.equal(outcome.review.findings.ky.decision, "excluded");
   assert.equal(outcome.review.findings.xy.decision, "excluded");
   assert.equal(session.status, "editing"); assert.equal(run.published, undefined);
