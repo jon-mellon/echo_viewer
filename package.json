@@ -6,7 +6,7 @@
     "prepare": "git config --local core.hooksPath .githooks",
     "check:secrets": "node scripts/check_push_secrets.mjs --all",
     "test:secrets": "node --test tests/check_push_secrets.test.mjs",
-    "test": "npm run check:dom-safety && npm run check:css && npm run check:boundaries && npm run check:types && npm run test:secrets && node --test tests/site_build.test.mjs tests/default_snapshot_assets.test.mjs && npm run test:controllers && npm run test:graph && npm run test:dagitty && npm run test:agent",
+    "test": "npm run check:dom-safety && npm run check:css && npm run check:boundaries && npm run check:types && npm run test:secrets && node --test tests/site_build.test.mjs tests/default_snapshot_assets.test.mjs && npm run test:controllers && npm run test:graph && npm run test:dagitty && npm run test:agent && npm run test:extension",
     "check:dom-safety": "node scripts/check_dom_safety.mjs",
     "check:css": "node scripts/check_css_tokens.mjs",
     "check:snapshot-assets": "node scripts/check_snapshot_assets.mjs",
@@ -30,7 +30,11 @@
     "profile:explore": "node scripts/profile_explore_views.mjs",
     "profile:review": "node scripts/profile_variable_review.mjs",
     "profile:selection-concept": "node scripts/profile_selection_and_concept.mjs",
-    "agent:mcp": "node agent/mcp.mjs"
+    "agent:mcp": "node agent/mcp.mjs",
+    "build:extension": "node scripts/build_extension.mjs",
+    "test:extension": "node --test tests/paper_extension.test.mjs",
+    "test:extension:browser": "node tests/paper_extension_smoke.mjs",
+    "build:extension:staging": "node scripts/build_extension.mjs --staging"
   },
   "dependencies": {
     "@duckdb/duckdb-wasm": "1.32.0",

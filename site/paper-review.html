@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>Echo · Paper review</title><link rel="stylesheet" href="./paper_review.css"></head>
+<body><main>
+  <header><span class="wordmark">echo<span class="dot">.</span></span><span class="badge">Paper review · Preview</span><h1>A closer look at the claim.</h1><p>Choose a finding. Inspect its evidence and potential confounders.</p></header>
+  <p class="notice">Private by default. Paper text is kept in this browser and sent to OpenRouter only when you request a model step. Publication is a separate action. AI reviews need human inspection.</p>
+  <section><h2>1 <span>Confirm the paper</span></h2><p id="capture-note">Capture a browser page with the extension, or paste the paper below. No abstract is assumed.</p>
+    <label>Title<input id="title" maxlength="2000"></label><label>Article URL<input id="sourceUrl" type="url"></label><label>DOI (optional)<input id="doi"></label>
+    <label>Abstract<textarea id="abstract" rows="5" maxlength="50000"></textarea></label><label>Article text<textarea id="articleText" rows="7" maxlength="500000"></textarea></label>
+    <label>Available text<select id="coverage"><option value="unknown">Unknown</option><option value="partial">Partial page or selected text</option><option value="abstract_only">Abstract only</option><option value="full">I confirm the full article text is supplied</option></select></label>
+    <button id="confirm">Confirm paper / start new review</button>
+  </section>
+  <section><h2>2 <span>Connect & choose a claim</span></h2><p>A capped OpenRouter key is required: $5 or less, with no reset. The key stays in memory and is cleared on disconnect or reload.</p>
+    <div class="actions"><button id="connect">Connect OpenRouter</button><button id="disconnect" class="secondary">Disconnect</button></div><p id="connection" role="status">Not connected</p>
+    <details><summary>Use an existing capped key</summary><label>OpenRouter key<input id="key" type="password" autocomplete="off"></label><button id="use-key">Check & connect key</button></details>
+    <label>OpenRouter model<input id="model" placeholder="provider/model"></label><p class="muted">Must support tools and structured output. Provider fallback is disabled. No Flex tier is requested; cache discounts are not guaranteed.</p>
+    <button id="extract">Extract abstract claims</button><p class="muted">Extraction may be incomplete. Edit or add a source-grounded claim before selecting it.</p><div id="claims"></div>
+    <details><summary>Edit / add claims as JSON</summary><label>Claims with exact abstract sentences<textarea id="claims-json" rows="8"></textarea></label><button id="save-claims">Save claim edits</button></details>
+    <button id="qualify">Qualify selected claim</button><pre id="qualification"></pre>
+  </section>
+  <section><h2>3 <span>Review the evidence</span></h2><p>The implemented protocol covers person-level nonrandomized observational causal estimates with measured adjustment. Full article text is required.</p>
+    <div class="actions"><button id="evaluate">Run / resume private review</button><button id="cancel" class="secondary">Cancel</button></div>
+    <p id="progress" role="status" aria-live="polite">Ready when you are.</p><p id="usage" class="muted"></p>
+    <button id="retry" hidden class="secondary">Acknowledge possible charge & retry uncertain work</button><button id="resolve" hidden>Resolve split & rebuild evidence</button>
+    <div id="result"></div><details><summary>Inspect structured result</summary><pre id="outcome"></pre></details>
+    <div class="actions"><button id="export" class="secondary">Export private checkpoint</button><button id="preview" class="secondary">Preview public schema</button></div>
+    <div id="publication" hidden><p>Publishing creates an immutable public Echo schema: group definitions, membership, finding exclusion codes and review statuses. Paper text and private explanations are excluded. Inspect the preview below.</p><pre id="public-preview"></pre><button id="publish">Publish this schema publicly</button><p id="permalink"></p></div>
+  </section>
+  <section><h2>Saved in this browser</h2><div id="saved"></div><p class="muted">Deletion removes this private checkpoint. Already public publications and OpenRouter's processing records are separate.</p></section>
+  <p id="error" role="alert"></p>
+</main><script type="module" src="./paper_review.mjs"></script></body></html>

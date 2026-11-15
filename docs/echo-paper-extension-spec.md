@@ -2,6 +2,19 @@
 
 ## Objective
 
+### Architecture update (2026-11-15)
+
+The requested first version uses an **Echo-hosted review page**, embedded in a
+cross-origin iframe in the extension side panel, with an Echo-tab fallback.
+The extension packages only its shell and user-invoked article capture. Echo's
+page owns the review, OpenRouter connection, browser query engine and publication.
+Requests to the data host and publishing API therefore originate from
+`https://echo.epistemicinfra.org`, which is already permitted. This supersedes
+the requirements below to package the evaluation JavaScript/WASM in the extension
+and adapt OAuth to an extension-origin redirect. No remote script is imported
+into the privileged extension context; the hosted page receives no Chrome APIs
+or ability to request arbitrary captures. See [implementation and installation](echo-paper-extension.md).
+
 Provide a Chrome extension that evaluates a claim from the academic paper currently open in the browser using Echo's existing evidence, graph operations and agent evaluation protocol. The user connects their own OpenRouter key, sees claims extracted from the abstract, chooses one, and receives a private, inspectable evaluation with an optional Echo publication.
 
 Run the evaluation in the browser. Reuse Echo's static-hosted assets, client-side computation, existing OpenRouter connection and existing publication service. Do not introduce a hosted evaluation service, remote MCP endpoint, native companion, local Node/DuckDB installation or Flex API calls.

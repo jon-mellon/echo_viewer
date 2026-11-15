@@ -1,3 +1,4 @@
+import { createOpenRouterAuthorization, exchangeOpenRouterCode } from "./openrouter_connection.mjs";
 import { h, replaceChildren } from "./dom_builder.mjs";
 import { jevRunId, loadJevRun, listJevRuns, saveJevRun, saveJevBatch, deleteJevRun } from "./definition_jev_checkpoint.mjs";
 import { JEV_MODEL as MODEL, JEV_BATCH_SIZE as BATCH_SIZE, JEV_TEST_SIZE as TEST_SIZE, cappedKeyStatus, randomSampleIds, jevRecords, jevRequest, jevResults, openRouterJson, parseJevPricing, jevRequestSizes, estimatedJevCharge } from "./definition_jev_core.mjs";
@@ -28,14 +29,6 @@ export function spotCheckResults(results) {
 
 function formatUsd(amount) {
   return amount > 0 && amount < 0.000001 ? "<$0.000001" : `$${amount.toFixed(6)}`;
-}
-
-function base64Url(bytes) {
-  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-
-async function sha256Base64Url(value) {
-  return base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))));
 }
 
 // A new key has taken up to a couple of minutes to be recognised by OpenRouter.
@@ -557,13 +550,12 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
 
   async function connect() {
     if (!getDraft()) return;
-    const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
-    const state = base64Url(crypto.getRandomValues(new Uint8Array(24)));
-    const challenge = await sha256Base64Url(verifier);
+    const authorization = await createOpenRouterAuthorization(getReturnUrl(), "Echo variable split");
+    const { verifier, state } = authorization;
     sessionStorage.setItem(OAUTH_PENDING_KEY, JSON.stringify({ verifier, state }));
     sessionStorage.setItem(OAUTH_DRAFT_KEY, JSON.stringify(getDraft()));
     persistDraft();
-    const url = new URL("https://openrouter.ai/auth");
+    const url = new URL(authorization.url);
     const callback = new URL(getReturnUrl());
     callback.searchParams.delete("code");
     callback.searchParams.delete("state");
@@ -572,7 +564,6 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
     // the immutable dataset binding from the viewer permalink.
     sessionStorage.setItem(OAUTH_RETURN_URL_KEY, callback.href);
     url.searchParams.set("callback_url", callback.href);
-    url.searchParams.set("code_challenge", challenge);
     url.searchParams.set("code_challenge_method", "S256");
     url.searchParams.set("key_label", "Echo variable split");
     url.searchParams.set("state", state);
@@ -608,11 +599,7 @@ export function createDefinitionJevAssist({ elements: els, getDraft, getVariable
       return;
     }
     try {
-      const body = await openRouterJson("/api/v1/auth/keys", null, {
-        method: "POST", body: JSON.stringify({ code, code_verifier: pending.verifier, code_challenge_method: "S256" }),
-      });
-      if (typeof body.key !== "string" || !body.key) throw new Error("OpenRouter did not return a key.");
-      key = body.key;
+      key = await exchangeOpenRouterCode(code, pending.verifier);
       settingsUrl = await keySettingsUrl(key);
     } catch (error) {
       key = null;

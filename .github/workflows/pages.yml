@@ -51,6 +51,11 @@ jobs:
         run: npm run test:browser
       - name: Build cache-versioned site
         run: npm run build:site
+      - name: Package production Chrome extension
+        run: |
+          npm run build:extension
+          cd dist/extension
+          zip -qr ../site/echo-paper-review.zip .
       - name: Enforce performance budgets
         run: PROFILE_SITE_DIR=dist/site node scripts/ci_retry.mjs npm run profile
       - name: Enforce mobile performance budgets
