@@ -26,7 +26,7 @@ jobs:
         with:
           repository: jon-mellon/echo_viewer_permastaging
           ref: main
-          token: ${{ secrets.STAGING_REPO_TOKEN }}
+          ssh-key: ${{ secrets.PERMASTAGING_DEPLOY_KEY }}
           path: permastaging-pages
 
       - name: Set up Node
@@ -50,6 +50,7 @@ jobs:
         run: |
           npm run build:extension:permastaging
           touch dist/site/.nojekyll
+          node --input-type=module -e 'import { writeFileSync } from "node:fs"; writeFileSync("dist/site/permastaging-deployment.json", JSON.stringify({ source_sha: process.env.GITHUB_SHA }));'
           cd dist/extension
           zip -qr ../site/echo-paper-review.zip .
 
@@ -198,34 +199,27 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Deploy Echo permastaging from $GITHUB_SHA"
+          git commit --quiet -m "Deploy Echo permastaging from $GITHUB_SHA"
           git push origin HEAD:main
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      # Pushing to the publishing repository is not deploying: GitHub Pages builds it afterwards, and that
-      # build can fail or stall without this job noticing. Wait for the build of the pushed commit and fail
-      # this job unless it finishes as "built".
+      # Verify the source identity actually served by Pages, without a broad API token.
       - name: Confirm GitHub Pages deployed the commit
         if: steps.publish.outputs.sha != ''
         env:
-          GH_TOKEN: ${{ secrets.STAGING_REPO_TOKEN }}
-          SHA: ${{ steps.publish.outputs.sha }}
+          SOURCE_SHA: ${{ github.sha }}
         run: |
           deadline=$((SECONDS + 900))
+          url="https://www.jonathanmellon.com/echo_viewer_permastaging/permastaging-deployment.json?source=$SOURCE_SHA"
           while [ "$SECONDS" -lt "$deadline" ]; do
-            if ! builds=$(gh api "repos/jon-mellon/echo_viewer_permastaging/pages/builds?per_page=10" 2>&1); then
-              echo "::error::Could not read the Pages build status (the token needs Pages read access): $builds"
-              exit 1
+            if curl --fail --silent --show-error "$url" -o /tmp/permastaging-deployment.json; then
+              actual=$(jq -r '.source_sha // ""' /tmp/permastaging-deployment.json)
+              if [ "$actual" = "$SOURCE_SHA" ]; then
+                echo "Verified the live permastaging deployment for ${SOURCE_SHA:0:7}"
+                exit 0
+              fi
             fi
-            status=$(jq -r --arg sha "$SHA" '[.[] | select(.commit == $sha)][0].status // "pending"' <<<"$builds")
-            echo "Pages build for ${SHA:0:7}: $status"
-            case "$status" in
-              built) exit 0 ;;
-              errored)
-                echo "::error::GitHub Pages failed to deploy ${SHA:0:7}. The live permastaging site is still serving an older build; see the \"pages build and deployment\" run in jon-mellon/echo_viewer_permastaging."
-                exit 1 ;;
-            esac
             sleep 20
           done
-          echo "::error::GitHub Pages did not finish deploying ${SHA:0:7} within 15 minutes; the live permastaging site may be stale."
+          echo "::error::Permastaging did not serve ${SOURCE_SHA:0:7} within 15 minutes."
           exit 1

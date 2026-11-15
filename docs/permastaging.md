@@ -10,9 +10,11 @@ paper-review extension; it is not merged into `staging` or `main`.
 
 Pushing `permastaging` runs **Deploy Echo Permastaging**. It tests/builds the
 preview and extension, rewrites asset paths to `/echo_viewer_permastaging`, and
-pushes only to the dedicated hosting repository. The existing
-`STAGING_REPO_TOKEN` credential is reused if it has permission to that repository;
-no token is stored in source. Deployment is restricted to the permastaging ref,
+pushes only to the dedicated hosting repository. A dedicated SSH deploy key, stored as the source repository Actions secret
+`PERMASTAGING_DEPLOY_KEY`, can write only to this hosting repository. Its private
+half is not stored in source. The existing staging token was not expanded.
+Deployment completion is verified against the source identity served publicly
+in `permastaging-deployment.json`. Deployment is restricted to the permastaging ref,
 including manual dispatch. Normal staging deploys independently and does not
 include the extension. The preview's web origin remains an already allowed
 `www.jonathanmellon.com` origin.
