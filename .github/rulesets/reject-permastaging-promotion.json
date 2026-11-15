@@ -1,0 +1,25 @@
+{
+  "name": "Reject permastaging promotion",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/staging",
+        "refs/heads/main"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "required_status_checks": [{ "context": "profile", "integration_id": 15368 }],
+        "strict_required_status_checks_policy": false,
+        "do_not_enforce_on_create": false
+      }
+    }
+  ]
+}

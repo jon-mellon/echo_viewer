@@ -9,7 +9,7 @@ import { capturePaper } from "../extension/capture.mjs";
 
 const root = resolve("site"), profile = await mkdtemp(`${tmpdir()}/echo-extension-smoke-`);
 const origin = "https://www.jonathanmellon.com";
-const prefix = "/echo_viewer_staging";
+const prefix = "/echo_viewer_permastaging";
 const article = `<!doctype html><title>Paper fixture</title><meta name="citation_title" content="A person-level study"><meta name="citation_doi" content="10.1234/focal"><article><h1>A person-level study</h1><section id="abstract"><p>Exposure increases outcomes in adults.</p></section><h2>Methods</h2><p>We adjust for age and income.</p><p>Nonrandomized matching estimates a person-level causal effect. The analysis follows adult respondents over multiple survey waves and measures individual exposure before the outcome. The adjusted model includes the stated baseline covariates and reports uncertainty for the selected focal estimate.</p><nav>Navigation junk</nav></article>`;
 const qualification = { eligible: true, reason: "Eligible", causal: true, x: "Exposure", y: "Outcome", xUnit: "person", yUnit: "person", population: "adults", design: "matching", exposureRandomized: false, usesDid: false, assignment: "Nonrandomized exposure", controls: ["age", "income"], evidenceLocation: "Abstract and methods", evidenceQuote: "Exposure increases outcomes in adults.", adjustmentQuote: "We adjust for age and income.", articleHasRandomizedComponent: false, mixedMethodsBoundary: "" };
 let completions = 0, authExchanges = 0;

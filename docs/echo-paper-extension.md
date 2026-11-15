@@ -1,30 +1,30 @@
 # Echo Paper Review 0.1
 
-The implementation lives on `codex/echo-paper-extension-spec`. The extension is a
-small Manifest V3 shell. Its side panel embeds `https://www.jonathanmellon.com/echo_viewer_staging/paper-review.html`.
+The implementation lives on `permastaging`. The extension is a
+small Manifest V3 shell. Its side panel embeds `https://www.jonathanmellon.com/echo_viewer_permastaging/paper-review.html`.
 The browser runs the review in that web page, using the existing static data and
 publication service. There is no evaluation server or remote MCP endpoint.
 
 ## Build and install
 
-### Test after merging to staging
+### Test from the permanent preview branch
 
-Once the **Deploy Echo Staging** workflow and its GitHub Pages build succeed,
-open <https://www.jonathanmellon.com/echo_viewer_staging/extension.html>.
+Once the **Deploy Echo Permastaging** workflow and its GitHub Pages build succeed,
+open <https://www.jonathanmellon.com/echo_viewer_permastaging/extension.html>.
 Download its ZIP, unzip it, and load the extracted folder using Chrome's
-Developer mode **Load unpacked** control. The staging deployment builds this
-package with `npm run build:extension:staging`, so its review frame opens the
-staging page on the already allowed `www.jonathanmellon.com` origin.
+Developer mode **Load unpacked** control. The permastaging deployment builds this
+package with `npm run build:extension:permastaging`, so its review frame opens the
+permastaging page on the already allowed `www.jonathanmellon.com` origin.
 It does not depend on a production deployment. You will need your own capped
 OpenRouter key and a model supporting tools and structured output to try the
 model steps. This remains a preview whose live real-paper evaluation is unverified.
 
-### Local staging package
+### Local permastaging package
 
-1. Run `ECHO_PAPER_REVIEW_ENABLED=1 npm run build:site` for a staging or local
+1. Run `ECHO_PAPER_REVIEW_ENABLED=1 npm run build:site` for a permastaging or local
    development build. The new `paper-review.html`, `paper-auth.html` and
    their modules must be deployed together. **They are not deployed by the extension build.**
-2. Run `npm run build:extension:staging` (the default extension build also targets staging).
+2. Run `npm run build:extension:permastaging` (the default extension build also targets permastaging).
 3. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**,
    and select `dist/extension`.
 4. Open an HTML paper and click the Echo toolbar action. In the side panel choose
@@ -41,19 +41,21 @@ only the user can confirm that full text has been supplied.
 
 ## Production release gate
 
-Merging this code into `main` does not enable the preview on production.
+`permastaging` is not promoted into `staging` or `main`. Both release branches require the GitHub Actions `profile` check, and that check fails for any commit descending from the extension isolation root (`e05fbe0b8e51447b92ec4ed0123a3c42bc6d0a0c`). Renaming a branch does not bypass ancestry detection. Repository rules have no bypass actors. Permastaging itself cannot be force-pushed or deleted.
+
+Even if the files are copied into `main`, production does not enable the preview.
 `build:site` excludes the install page, review/auth pages, all `paper_*` modules,
-review CSS and any extension ZIP by default. Only the staging workflow sets
+review CSS and any extension ZIP by default. Only the permastaging workflow sets
 `ECHO_PAPER_REVIEW_ENABLED=1`; the production workflow does not package an extension.
 The browser entry point and OAuth callback also reject the production domain,
 including if raw source files are served accidentally. The only web deployment
-allowed at runtime is the exact staging origin/path; localhost is allowed for
-development. Extension builds target staging by default and reject an explicit
+allowed at runtime is the exact permastaging origin/path; localhost is allowed for
+development. Extension builds target permastaging by default and reject an explicit
 production target. Changing a URL or query parameter cannot enable production.
 
-This is a release gate, not invite-only authentication. The staging website and
+This is a release gate, not invite-only authentication. The permastaging website and
 its download are public. Named-testers-only access would require authentication
-at the staging host. Enabling a future production release requires deliberately
+at the permastaging host. Enabling a future production release requires deliberately
 changing the runtime host rule as well as the build/deployment configuration.
 
 ## Why requests go through the Echo origin

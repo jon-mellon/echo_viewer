@@ -14,6 +14,17 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject permanent preview history from release branches
+        env:
+          ISOLATION_ROOT: "e05fbe0b8e51447b92ec4ed0123a3c42bc6d0a0c"
+        run: |
+          # Check ancestry so renaming the preview branch does not bypass isolation.
+          if git cat-file -e "$ISOLATION_ROOT^{commit}" 2>/dev/null && git merge-base --is-ancestor "$ISOLATION_ROOT" HEAD; then
+            echo "::error::Permanent preview history cannot pass the required release profile check. Deploy it from permastaging instead."
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

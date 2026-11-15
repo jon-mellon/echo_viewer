@@ -148,29 +148,48 @@ test("extension has only user-initiated capture privileges; no API host access o
   const source = await readFile(new URL("../extension/panel.mjs", import.meta.url), "utf8");
   assert.match(source, /event.origin !== origin/); assert.match(source, /event.data.nonce !== nonce/);
 });
-test("only staging extension packages can be built, including the default build", async () => {
+test("only permastaging extension packages can be built, including the default build", async () => {
   const root = await mkdtemp(join(tmpdir(), "echo-extension-build-"));
   try {
-    await assert.rejects(buildExtension({ staging: false, destination: join(root, "production") }), /Production paper review is disabled/);
-    for (const options of [{ staging: true }, {}]) {
-      const destination = join(root, options.staging ? "staging" : "default");
+    await assert.rejects(buildExtension({ permastaging: false, destination: join(root, "production") }), /Production paper review is disabled/);
+    for (const options of [{ permastaging: true }, {}]) {
+      const destination = join(root, options.permastaging ? "staging" : "default");
       await buildExtension({ ...options, destination });
-      const url = REVIEW_URLS.staging;
+      const url = REVIEW_URLS.permastaging;
       assert.equal(await readFile(join(destination, "config.mjs"), "utf8"), `export const REVIEW_URL = ${JSON.stringify(url)};\n`);
       const manifest = JSON.parse(await readFile(join(destination, "manifest.json"), "utf8"));
       assert.ok(manifest.content_security_policy.extension_pages.includes(`frame-src ${new URL(url).origin};`));
-      assert.equal(manifest.name.includes("Staging"), true);
+      assert.equal(manifest.name.includes("Permastaging"), true);
       assert.equal(manifest.host_permissions, undefined);
     }
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 test("copied review pages cannot start on production or unrelated paths and origins", () => {
   const allowed = href => paperReviewAllowed({ href });
-  assert.equal(allowed(REVIEW_URLS.staging), true);
-  assert.equal(allowed("https://www.jonathanmellon.com/echo_viewer_staging/paper-auth.html"), true);
+  assert.equal(allowed(REVIEW_URLS.permastaging), true);
+  assert.equal(allowed("https://www.jonathanmellon.com/echo_viewer_permastaging/paper-auth.html"), true);
   assert.equal(allowed("http://127.0.0.1:8767/paper-review.html"), true);
-  for (const url of ["https://echo.epistemicinfra.org/paper-review.html", "https://echo.epistemicinfra.org/echo_viewer_staging/paper-review.html",
-    "https://www.jonathanmellon.com/paper-review.html", "https://www.jonathanmellon.com/echo_viewer_staging-fake/paper-review.html",
-    "https://evil.example/echo_viewer_staging/paper-review.html"]) assert.equal(allowed(url), false, url);
+  for (const url of ["https://echo.epistemicinfra.org/paper-review.html", "https://echo.epistemicinfra.org/echo_viewer_permastaging/paper-review.html",
+    "https://www.jonathanmellon.com/echo_viewer_staging/paper-review.html",
+    "https://www.jonathanmellon.com/paper-review.html", "https://www.jonathanmellon.com/echo_viewer_permastaging-fake/paper-review.html",
+    "https://evil.example/echo_viewer_permastaging/paper-review.html"]) assert.equal(allowed(url), false, url);
   assert.equal(paperReviewAllowed(null), false);
+});
+test("permastaging has separate hosting and required release checks without bypass actors", async () => {
+  const read = path => readFile(new URL(path, import.meta.url), "utf8");
+  const rules = JSON.parse(await read("../.github/rulesets/reject-permastaging-promotion.json"));
+  assert.equal(rules.enforcement, "active");
+  assert.deepEqual(rules.bypass_actors, []);
+  assert.deepEqual(rules.conditions.ref_name.include, ["refs/heads/staging", "refs/heads/main"]);
+  assert.deepEqual(rules.rules[0].parameters.required_status_checks, [{ context: "profile", integration_id: 15368 }]);
+  const preview = await read("../.github/workflows/deploy-permastaging.yml");
+  assert.match(preview, /if: github.ref == 'refs\/heads\/permastaging'/);
+  assert.match(preview, /repository: jon-mellon\/echo_viewer_permastaging\n/);
+  assert.match(preview, /prefix = "\/echo_viewer_permastaging"/);
+  assert.doesNotMatch(preview, /repository: jon-mellon\/echo_viewer_staging\n/);
+  const profile = await read("../.github/workflows/profile.yml");
+  assert.match(profile, /fetch-depth: 0/);
+  assert.match(profile, /e05fbe0b8e51447b92ec4ed0123a3c42bc6d0a0c/);
+  assert.match(profile, /git merge-base --is-ancestor/);
+  assert.match(profile, /exit 1/);
 });

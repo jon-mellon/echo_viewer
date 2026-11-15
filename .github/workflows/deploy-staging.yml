@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/staging'
     runs-on: ubuntu-latest
 
     steps:
@@ -33,15 +34,7 @@ jobs:
         run: npm test
 
       - name: Build Echo
-        env:
-          ECHO_PAPER_REVIEW_ENABLED: "1"
         run: npm run build:site
-
-      - name: Package staging Chrome extension
-        run: |
-          npm run build:extension:staging
-          cd dist/extension
-          zip -qr ../site/echo-paper-review.zip .
 
       # The browser download is the slowest and least predictable step; keep it between runs.
       - name: Restore Playwright browsers

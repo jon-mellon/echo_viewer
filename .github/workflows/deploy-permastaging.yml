@@ -1,0 +1,231 @@
+name: Deploy Echo Permastaging
+
+on:
+  push:
+    branches: [permastaging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: echo-permastaging-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/permastaging'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out permastaging source
+        uses: actions/checkout@v4
+
+      - name: Check out permastaging publishing repository
+        uses: actions/checkout@v4
+        with:
+          repository: jon-mellon/echo_viewer_permastaging
+          ref: main
+          token: ${{ secrets.STAGING_REPO_TOKEN }}
+          path: permastaging-pages
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Echo
+        env:
+          ECHO_PAPER_REVIEW_ENABLED: "1"
+        run: npm run build:site
+
+      - name: Package permastaging Chrome extension
+        run: |
+          npm run build:extension:permastaging
+          touch dist/site/.nojekyll
+          cd dist/extension
+          zip -qr ../site/echo-paper-review.zip .
+
+      # The browser download is the slowest and least predictable step; keep it between runs.
+      - name: Restore Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install profiling browser
+        run: npx playwright install --with-deps chromium
+
+      # Published schema files are immutable; keep them between runs instead of
+      # downloading about 5 MB per page load every time; a miss is fetched from Cloudflare R2.
+      - name: Restore published schema cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/published-schemas
+          key: published-schemas-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/published_schema_cache.cjs') }}
+          restore-keys: published-schemas-
+
+      - name: Check the default snapshot's viewer assets are published
+        run: npm run check:snapshot-assets
+
+      - name: Enforce mobile diagnostic switching budgets
+        run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
+
+      - name: Enforce evidence loading budgets on the default snapshot
+        run: PROFILE_SITE_DIR=dist/site npm run profile:edge-evidence
+
+      - name: Enforce mobile causes and consequences budgets
+        run: PROFILE_SITE_DIR=dist/site npm run profile:explore
+
+      - name: Enforce mobile variable review and schema page budgets
+        run: PROFILE_SITE_DIR=dist/site npm run profile:review
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: permastaging-diagnostic-profile
+          path: |
+            profile-results-diagnostics-mobile/
+            profile-results-edge-evidence/
+            profile-results-explore-mobile/
+            profile-results-review-mobile/
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Prepare permastaging website
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("dist/site")
+          prefix = "/echo_viewer_permastaging"
+
+          # Remove production custom domain
+          (root / "CNAME").unlink(missing_ok=True)
+
+          # Collect local files and directories
+          assets = {
+              p.relative_to(root).as_posix()
+              for p in root.rglob("*")
+              if p.is_file()
+          }
+          directories = {
+              p.name for p in root.iterdir()
+              if p.is_dir()
+          }
+
+          # Rewrite root-relative local asset references
+          pattern = re.compile(
+              r"""(["'`])/(?!/)([^"'`\r\n]+?)\1"""
+          )
+
+          def rewrite(match):
+              quote, value = match.groups()
+              asset = value.split("?")[0].split("#")[0]
+              local = (
+                  asset in assets
+                  or any(
+                      asset.startswith(d + "/")
+                      for d in directories
+                  )
+              )
+              if local:
+                  return f"{quote}{prefix}/{value}{quote}"
+              return match.group(0)
+
+          changed = 0
+          for path in root.rglob("*"):
+              if not path.is_file():
+                  continue
+              if path.suffix not in (".html", ".js", ".mjs", ".css"):
+                  continue
+              if "vendor" in path.relative_to(root).parts:
+                  continue
+
+              original = path.read_text()
+              updated = pattern.sub(rewrite, original)
+
+              if updated != original:
+                  path.write_text(updated)
+                  changed += 1
+
+          # Confirm critical paths were rewritten
+          html = (root / "index.html").read_text()
+          builder = (root / "dag_builder.js").read_text()
+
+          assert f'{prefix}/styles.css' in html
+          assert f'{prefix}/dag_builder.js' in html
+          assert f'{prefix}/dag_project.mjs' in builder
+          assert not (root / "CNAME").exists()
+
+          # Permastaging opens without the preview password; production keeps it.
+          index = root / "index.html"
+          html = index.read_text()
+          html, gates = re.subn(r'\s*<div id="passwordGate".*?</form>\s*</div>', "", html, count=1, flags=re.S)
+          html, scripts = re.subn(r'\s*<script src="[^"]*password_gate\.js[^"]*"></script>', "", html, count=1)
+          html = html.replace(" password-locked", "", 1)
+          assert gates == 1 and scripts == 1, "password gate markup changed; update the permastaging step"
+          assert "password-locked" not in html and "passwordGate" not in html
+          index.write_text(html)
+
+          print(f"Prepared permastaging site: {changed} files updated")
+          PY
+
+      - name: Copy built site
+        run: |
+          rsync -a --delete \
+            --exclude='.git/' \
+            dist/site/ permastaging-pages/
+
+      - name: Publish permastaging
+        id: publish
+        working-directory: permastaging-pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to publish"
+            exit 0
+          fi
+
+          git commit -m "Deploy Echo permastaging from $GITHUB_SHA"
+          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Pushing to the publishing repository is not deploying: GitHub Pages builds it afterwards, and that
+      # build can fail or stall without this job noticing. Wait for the build of the pushed commit and fail
+      # this job unless it finishes as "built".
+      - name: Confirm GitHub Pages deployed the commit
+        if: steps.publish.outputs.sha != ''
+        env:
+          GH_TOKEN: ${{ secrets.STAGING_REPO_TOKEN }}
+          SHA: ${{ steps.publish.outputs.sha }}
+        run: |
+          deadline=$((SECONDS + 900))
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            if ! builds=$(gh api "repos/jon-mellon/echo_viewer_permastaging/pages/builds?per_page=10" 2>&1); then
+              echo "::error::Could not read the Pages build status (the token needs Pages read access): $builds"
+              exit 1
+            fi
+            status=$(jq -r --arg sha "$SHA" '[.[] | select(.commit == $sha)][0].status // "pending"' <<<"$builds")
+            echo "Pages build for ${SHA:0:7}: $status"
+            case "$status" in
+              built) exit 0 ;;
+              errored)
+                echo "::error::GitHub Pages failed to deploy ${SHA:0:7}. The live permastaging site is still serving an older build; see the \"pages build and deployment\" run in jon-mellon/echo_viewer_permastaging."
+                exit 1 ;;
+            esac
+            sleep 20
+          done
+          echo "::error::GitHub Pages did not finish deploying ${SHA:0:7} within 15 minutes; the live permastaging site may be stale."
+          exit 1

@@ -5,5 +5,5 @@ if (paperReviewAllowed()) {
   await import("./paper_review_app.mjs");
 } else {
   document.body.replaceChildren(h("main", {}, h("h1", { textContent: "Paper review is not available on this site." }),
-    h("p", { textContent: "This preview is limited to the staging website." })));
+    h("p", { textContent: "This preview is limited to the permastaging website." })));
 }

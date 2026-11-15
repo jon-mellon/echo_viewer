@@ -3,7 +3,7 @@ import { paperReviewAllowed } from "./paper_review_access.mjs";
 const status = document.getElementById("status");
 const storageKey = "echo-paper-pkce-v1";
 async function connect() {
-  if (!paperReviewAllowed()) throw new Error("Paper review is limited to staging.");
+  if (!paperReviewAllowed()) throw new Error("Paper review is limited to permastaging.");
   const url = new URL(location.href), code = url.searchParams.get("code");
   if (!window.opener) throw new Error("Open this connection window from the Echo review page.");
   if (!code) {
