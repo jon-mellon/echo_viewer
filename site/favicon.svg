@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    text { fill: #17201b; font: 600 19px Inter, system-ui, sans-serif; letter-spacing: 0.02em; }
+    @media (prefers-color-scheme: dark) { text { fill: #f6f7f9; } }
+  </style>
+  <text x="32" y="39" text-anchor="middle" textLength="60" lengthAdjust="spacingAndGlyphs">ECHO</text>
+</svg>
