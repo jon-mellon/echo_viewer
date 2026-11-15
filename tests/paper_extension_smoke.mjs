@@ -105,6 +105,7 @@ try {
   await frame.locator("#evaluate").click(); await frame.getByText("Automated review complete", { exact: false }).first().waitFor();
   assert.equal(await frame.getByText("Age · May be unaddressed", { exact: true }).count(), 1);
   assert.equal(await frame.locator("#result").getByText("The AI could not identify adjustment for Age in the captured text.", { exact: false }).count(), 1);
+  assert.equal(await frame.locator("#result").getByText("x% (placeholder, not a measured result)", { exact: false }).count(), 1);
   assert.ok(await frame.getByText("These results may be incorrect or incomplete.", { exact: false }).count());
   assert.equal(completions, 6);
   const records = await frame.evaluate(async () => { const { paperStore } = await import("./paper_store.mjs"); return paperStore.list(); });

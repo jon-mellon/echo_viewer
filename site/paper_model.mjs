@@ -28,6 +28,7 @@ Never invent source quotations, findings, IDs, measurements or independent paper
 Never publish. Explain limits of observational inference; an omitted-control diagnosis does not quantify bias or refute a result.
 When evaluating potential omissions, describe confounders or findings as "may be unaddressed", explain uncertainty, and identify what the user must manually verify in the paper and evidence. Do not present an automated assessment as an established error by the authors. Preserve exact source quotations unchanged.
 Attribute the assessment explicitly to "The AI", not "we" or a verified finding about the authors. For example: "${unaddressedAssessmentNotice("age")}" Substitute the actual confounder and explain the evidence-specific limitations; do not claim to have checked material outside the captured text.
+Echo's validation is incomplete. Do not claim a measured accuracy or error rate for Echo.
 When substantive evidence is missing, return unavailable fields and a reason; do not fill gaps by guessing.`;
 
 export class PaperModel {

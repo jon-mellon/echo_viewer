@@ -130,9 +130,12 @@ test("a full fixture review excludes the focal paper, validates coverage and rem
   assert.equal(run.phase, "complete");
   assert.equal(outcome.statusLabels.unaddressed, "May be unaddressed");
   assert.match(outcome.reviewNotice, /Manually review the original paper/);
+  assert.match(outcome.validationNotice, /Validation is not yet complete/);
+  assert.match(outcome.validationNotice, /x% \(placeholder, not a measured result\)/);
   assert.equal(outcome.review.confounders.k.status, "unaddressed");
   assert.match(outcome.review.confounders.k.assessmentNotice, /^The AI could not identify adjustment for Age in the captured text\./);
   assert.match(outcome.review.confounders.k.assessmentNotice, /adjustment may be described elsewhere/);
+  assert.match(outcome.review.confounders.k.assessmentNotice, /This individual AI flag has not been independently verified and could be incorrect/);
   assert.match(outcome.review.confounders.k.assessmentNotice, /Manually review the methods and supplementary material before drawing conclusions/);
   assert.equal(outcome.review.findings.ky.decision, "excluded");
   assert.equal(outcome.review.findings.xy.decision, "excluded");

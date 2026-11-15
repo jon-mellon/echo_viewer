@@ -4,7 +4,7 @@ import { digest, materializeQueue, reviewCoverage, validateFindingDecision, requ
 import { createEchoTools } from "./echo_tools.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
 import { validateGroupingSchema } from "./data_validation.mjs";
-import { unaddressedAssessmentNotice } from "./paper_review_copy.mjs";
+import { unaddressedAssessmentNotice, VALIDATION_NOTICE } from "./paper_review_copy.mjs";
 
 export const claimSchema = object({ claims: array(object({ id: string, text: string, sourceSentences: array(string) })) });
 export const qualificationSchema = object({ eligible: boolean, reason: string, causal: boolean,
@@ -195,7 +195,7 @@ causes_y_only_via_x must reject EVERY alternate direct or two-link route in the 
     publicationId: session.record.sourcePublication.id, schemaHash: session.record.sourcePublication.content_hash,
     physicalSnapshotId: session.record.snapshotId, evidenceManifestHash: session.record.evidenceManifestHash,
     focalVariableMatches: run.focalVariables, linkReviews: coverage.linkReviews,
-    review, statusLabels: CONFOUNDER_STATUSES, reviewNotice: MANUAL_REVIEW_NOTICE, model: run.model, usage: run.calls,
+    review, statusLabels: CONFOUNDER_STATUSES, reviewNotice: MANUAL_REVIEW_NOTICE, validationNotice: VALIDATION_NOTICE, model: run.model, usage: run.calls,
     limitations: [MANUAL_REVIEW_NOTICE, "AI review does not establish identification or quantify bias.",
       "No previous private finding judgments or private split library were reused.",
       "Missing focal variable occurrences are not manufactured; inspect anchor membership and measurement correspondence.",
