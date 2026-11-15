@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Echo Paper Review",
+  "name": "Echo Paper Review (Staging)",
   "version": "0.1.0",
   "minimum_chrome_version": "116",
   "description": "Capture an academic paper you choose and review its claims in Echo.",
@@ -9,6 +9,6 @@
   "background": { "service_worker": "background.mjs", "type": "module" },
   "side_panel": { "default_path": "panel.html" },
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; frame-src https://echo.epistemicinfra.org; object-src 'none'; base-uri 'none'"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self'; frame-src https://www.jonathanmellon.com; object-src 'none'; base-uri 'none'"
   }
 }

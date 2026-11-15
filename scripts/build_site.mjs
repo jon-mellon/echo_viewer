@@ -42,9 +42,15 @@ function stagingDataConfig(source) {
 // checks them against the data host in the deploy and profile workflows, so the build itself asserts nothing.
 export async function assertDefaultSnapshotAssets() {}
 
-export async function buildSite(source, destination) {
-  const files = await filesIn(source);
+export function isPaperReviewFile(path) {
+  return /^(?:paper[-_][^/]*|extension\.html|echo-paper-review(?:-[^/]*)?\.zip)$/.test(path);
+}
+
+export async function buildSite(source, destination, { paperReview = process.env.ECHO_PAPER_REVIEW_ENABLED === "1" } = {}) {
+  const sourceFiles = await filesIn(source);
+  const files = sourceFiles.filter(file => paperReview || !isPaperReviewFile(relative(source, file)));
   const hash = createHash("sha256");
+  hash.update(`paper-review:${paperReview ? "enabled" : "disabled"}`);
   const hasDataOverride = process.env.DEFAULT_DATA_PUBLICATION || process.env.DEFAULT_DATA_SNAPSHOT;
   const configuredConfig = hasDataOverride
     ? stagingDataConfig(await readFile(join(source, "dag_data_config.mjs"), "utf8"))
@@ -62,6 +68,11 @@ export async function buildSite(source, destination) {
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
   await cp(source, destination, { recursive: true });
+  if (!paperReview) {
+    for (const file of sourceFiles.filter(file => isPaperReviewFile(relative(source, file)))) {
+      await rm(join(destination, relative(source, file)), { force: true });
+    }
+  }
   if (configuredConfig) await writeFile(join(destination, "dag_data_config.mjs"), configuredConfig);
 
   for (const file of files) {

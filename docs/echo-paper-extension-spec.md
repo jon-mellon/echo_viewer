@@ -9,7 +9,9 @@ cross-origin iframe in the extension side panel, with an Echo-tab fallback.
 The extension packages only its shell and user-invoked article capture. Echo's
 page owns the review, OpenRouter connection, browser query engine and publication.
 Requests to the data host and publishing API therefore originate from
-`https://echo.epistemicinfra.org`, which is already permitted. This supersedes
+`https://www.jonathanmellon.com` on staging, which is already permitted.
+Production builds omit the preview, and runtime entry points reject the production
+domain even if the feature branch is merged into `main`. This supersedes
 the requirements below to package the evaluation JavaScript/WASM in the extension
 and adapt OAuth to an extension-origin redirect. No remote script is imported
 into the privileged extension context; the hosted page receives no Chrome APIs

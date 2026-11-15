@@ -33,6 +33,8 @@ jobs:
         run: npm test
 
       - name: Build Echo
+        env:
+          ECHO_PAPER_REVIEW_ENABLED: "1"
         run: npm run build:site
 
       - name: Package staging Chrome extension

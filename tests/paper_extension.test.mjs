@@ -4,6 +4,7 @@ import { readFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildExtension, REVIEW_URLS } from "../scripts/build_extension.mjs";
+import { paperReviewAllowed } from "../site/paper_review_access.mjs";
 import { confirmedCapture, validateCapture, validateClaims, validateQualification } from "../site/paper_capture.mjs";
 import { PaperModel, object, string } from "../site/paper_model.mjs";
 import { EchoSessionCore } from "../site/echo_session_core.mjs";
@@ -147,18 +148,29 @@ test("extension has only user-initiated capture privileges; no API host access o
   const source = await readFile(new URL("../extension/panel.mjs", import.meta.url), "utf8");
   assert.match(source, /event.origin !== origin/); assert.match(source, /event.data.nonce !== nonce/);
 });
-test("staging and production packages open their respective deployed pages with a matching frame CSP", async () => {
+test("only staging extension packages can be built, including the default build", async () => {
   const root = await mkdtemp(join(tmpdir(), "echo-extension-build-"));
   try {
-    for (const staging of [false, true]) {
-      const destination = join(root, staging ? "staging" : "production");
-      await buildExtension({ staging, destination });
-      const url = staging ? REVIEW_URLS.staging : REVIEW_URLS.production;
+    await assert.rejects(buildExtension({ staging: false, destination: join(root, "production") }), /Production paper review is disabled/);
+    for (const options of [{ staging: true }, {}]) {
+      const destination = join(root, options.staging ? "staging" : "default");
+      await buildExtension({ ...options, destination });
+      const url = REVIEW_URLS.staging;
       assert.equal(await readFile(join(destination, "config.mjs"), "utf8"), `export const REVIEW_URL = ${JSON.stringify(url)};\n`);
       const manifest = JSON.parse(await readFile(join(destination, "manifest.json"), "utf8"));
       assert.ok(manifest.content_security_policy.extension_pages.includes(`frame-src ${new URL(url).origin};`));
-      assert.equal(manifest.name.includes("Staging"), staging);
+      assert.equal(manifest.name.includes("Staging"), true);
       assert.equal(manifest.host_permissions, undefined);
     }
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+test("copied review pages cannot start on production or unrelated paths and origins", () => {
+  const allowed = href => paperReviewAllowed({ href });
+  assert.equal(allowed(REVIEW_URLS.staging), true);
+  assert.equal(allowed("https://www.jonathanmellon.com/echo_viewer_staging/paper-auth.html"), true);
+  assert.equal(allowed("http://127.0.0.1:8767/paper-review.html"), true);
+  for (const url of ["https://echo.epistemicinfra.org/paper-review.html", "https://echo.epistemicinfra.org/echo_viewer_staging/paper-review.html",
+    "https://www.jonathanmellon.com/paper-review.html", "https://www.jonathanmellon.com/echo_viewer_staging-fake/paper-review.html",
+    "https://evil.example/echo_viewer_staging/paper-review.html"]) assert.equal(allowed(url), false, url);
+  assert.equal(paperReviewAllowed(null), false);
 });

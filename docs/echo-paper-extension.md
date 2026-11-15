@@ -1,7 +1,7 @@
 # Echo Paper Review 0.1
 
 The implementation lives on `codex/echo-paper-extension-spec`. The extension is a
-small Manifest V3 shell. Its side panel embeds `https://echo.epistemicinfra.org/paper-review.html`.
+small Manifest V3 shell. Its side panel embeds `https://www.jonathanmellon.com/echo_viewer_staging/paper-review.html`.
 The browser runs the review in that web page, using the existing static data and
 publication service. There is no evaluation server or remote MCP endpoint.
 
@@ -19,12 +19,12 @@ It does not depend on a production deployment. You will need your own capped
 OpenRouter key and a model supporting tools and structured output to try the
 model steps. This remains a preview whose live real-paper evaluation is unverified.
 
-### Local production package
+### Local staging package
 
-1. Run `npm run build:site` and deploy the resulting site through the existing
-   Echo deployment process. The new `paper-review.html`, `paper-auth.html` and
+1. Run `ECHO_PAPER_REVIEW_ENABLED=1 npm run build:site` for a staging or local
+   development build. The new `paper-review.html`, `paper-auth.html` and
    their modules must be deployed together. **They are not deployed by the extension build.**
-2. Run `npm run build:extension`.
+2. Run `npm run build:extension:staging` (the default extension build also targets staging).
 3. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**,
    and select `dist/extension`.
 4. Open an HTML paper and click the Echo toolbar action. In the side panel choose
@@ -38,6 +38,23 @@ externally-connectable command interface, or key storage. Clicking Capture is
 required to read a page. Restricted Chrome pages and inaccessible PDFs need
 paste fallback. Structured article captures are conservatively marked partial;
 only the user can confirm that full text has been supplied.
+
+## Production release gate
+
+Merging this code into `main` does not enable the preview on production.
+`build:site` excludes the install page, review/auth pages, all `paper_*` modules,
+review CSS and any extension ZIP by default. Only the staging workflow sets
+`ECHO_PAPER_REVIEW_ENABLED=1`; the production workflow does not package an extension.
+The browser entry point and OAuth callback also reject the production domain,
+including if raw source files are served accidentally. The only web deployment
+allowed at runtime is the exact staging origin/path; localhost is allowed for
+development. Extension builds target staging by default and reject an explicit
+production target. Changing a URL or query parameter cannot enable production.
+
+This is a release gate, not invite-only authentication. The staging website and
+its download are public. Named-testers-only access would require authentication
+at the staging host. Enabling a future production release requires deliberately
+changing the runtime host rule as well as the build/deployment configuration.
 
 ## Why requests go through the Echo origin
 

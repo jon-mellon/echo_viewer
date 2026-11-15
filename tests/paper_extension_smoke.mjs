@@ -8,7 +8,8 @@ import { chromium } from "playwright";
 import { capturePaper } from "../extension/capture.mjs";
 
 const root = resolve("site"), profile = await mkdtemp(`${tmpdir()}/echo-extension-smoke-`);
-const origin = "https://echo.epistemicinfra.org";
+const origin = "https://www.jonathanmellon.com";
+const prefix = "/echo_viewer_staging";
 const article = `<!doctype html><title>Paper fixture</title><meta name="citation_title" content="A person-level study"><meta name="citation_doi" content="10.1234/focal"><article><h1>A person-level study</h1><section id="abstract"><p>Exposure increases outcomes in adults.</p></section><h2>Methods</h2><p>We adjust for age and income.</p><p>Nonrandomized matching estimates a person-level causal effect. The analysis follows adult respondents over multiple survey waves and measures individual exposure before the outcome. The adjusted model includes the stated baseline covariates and reports uncertainty for the selected focal estimate.</p><nav>Navigation junk</nav></article>`;
 const qualification = { eligible: true, reason: "Eligible", causal: true, x: "Exposure", y: "Outcome", xUnit: "person", yUnit: "person", population: "adults", design: "matching", exposureRandomized: false, usesDid: false, assignment: "Nonrandomized exposure", controls: ["age", "income"], evidenceLocation: "Abstract and methods", evidenceQuote: "Exposure increases outcomes in adults.", adjustmentQuote: "We adjust for age and income.", articleHasRandomizedComponent: false, mixedMethodsBoundary: "" };
 let completions = 0, authExchanges = 0;
@@ -31,7 +32,7 @@ try {
     args: [`--disable-extensions-except=${resolve("dist/extension")}`, `--load-extension=${resolve("dist/extension")}`] });
   await context.route("https://example.test/**", route => route.fulfill({ contentType: "text/html", body: article }));
   await context.route(`${origin}/**`, async route => {
-    const path = new URL(route.request().url()).pathname;
+    const path = new URL(route.request().url()).pathname.replace(prefix, "");
     if (path === "/paper_browser_session.mjs") return route.fulfill({ contentType: "text/javascript", body: browserSessionFixture });
     const absolute = resolve(root, `.${path}`);
     if (!absolute.startsWith(`${root}/`)) return route.abort();
@@ -79,10 +80,10 @@ try {
   await page.goto(`chrome-extension://${extensionId}/panel.html`);
   const frame = await (await page.waitForSelector("#echo")).contentFrame();
   await frame.waitForSelector("#confirm");
-  await page.evaluate(capture => {
+  await page.evaluate(({ capture, origin }) => {
     const frame = document.getElementById("echo"), nonce = new URL(frame.src).hash.slice("#bridge=".length);
-    frame.contentWindow.postMessage({ type: "echo-paper-capture-v1", nonce, capture }, "https://echo.epistemicinfra.org");
-  }, capture);
+    frame.contentWindow.postMessage({ type: "echo-paper-capture-v1", nonce, capture }, origin);
+  }, { capture, origin });
   await frame.locator("#title").waitFor();
   assert.equal(await frame.locator("#title").inputValue(), capture.title);
   await frame.locator("#coverage").selectOption("full"); await frame.locator("#model").fill("fixture/model");
