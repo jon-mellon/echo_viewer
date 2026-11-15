@@ -4,6 +4,7 @@ import { digest, materializeQueue, reviewCoverage, validateFindingDecision, requ
 import { createEchoTools } from "./echo_tools.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
 import { validateGroupingSchema } from "./data_validation.mjs";
+import { unaddressedAssessmentNotice } from "./paper_review_copy.mjs";
 
 export const claimSchema = object({ claims: array(object({ id: string, text: string, sourceSentences: array(string) })) });
 export const qualificationSchema = object({ eligible: boolean, reason: string, causal: boolean,
@@ -137,6 +138,7 @@ causes_y_only_via_x must reject EVERY alternate direct or two-link route in the 
     await session.setConfounderStatus({ groupId, status: assessment.status, text: assessment.reason,
       rejectedPaths: assessment.rejectedPaths.map(row => row.id) });
     review.confounders[groupId] = { status: assessment.status, reason: assessment.reason,
+      ...(assessment.status === "unaddressed" ? { assessmentNotice: unaddressedAssessmentNotice(group.label) } : {}),
       ...(assessment.rejectedPaths.length ? { rejected_paths: rejected } : {}) };
     review.split_assessments[groupId] = { systematically_different: false, reason: assessment.splitReason || assessment.reason };
     await model.save();

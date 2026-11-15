@@ -8,6 +8,7 @@ import { BrowserEchoSession } from "./paper_browser_session.mjs";
 import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit, claimSchema } from "./paper_workflow.mjs";
 import { publicSchemaProjection } from "./public_schema_projection.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
+import { unaddressedAssessmentNotice } from "./paper_review_copy.mjs";
 
 const $ = id => document.getElementById(id);
 let run = null, session = null, key = null, busy = false, controller = null, authWindow = null, authNonce = null;
@@ -45,7 +46,10 @@ function render() {
       h("p", { textContent: run.selectedClaim.text }));
     for (const [id, row] of Object.entries(run.outcome.review.confounders)) {
       const group = (session?.schema || run.session?.schema)?.groups.find(group => group.group_id === id);
-      $("result").append(h("div", { className: "status-row" }, h("strong", { textContent: `${group?.label || id} · ${CONFOUNDER_STATUSES[row.status] || row.status}` }), h("p", { textContent: row.reason })));
+      $("result").append(h("div", { className: "status-row" },
+        h("strong", { textContent: `${group?.label || id} · ${CONFOUNDER_STATUSES[row.status] || row.status}` }),
+        row.status === "unaddressed" ? h("p", { className: "muted", textContent: row.assessmentNotice || unaddressedAssessmentNotice(group?.label) }) : null,
+        h("p", { textContent: row.reason })));
     }
     $("result").append(h("p", { className: "muted", textContent: run.outcome.limitations.join(" ") }));
   }

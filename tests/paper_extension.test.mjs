@@ -131,6 +131,9 @@ test("a full fixture review excludes the focal paper, validates coverage and rem
   assert.equal(outcome.statusLabels.unaddressed, "May be unaddressed");
   assert.match(outcome.reviewNotice, /Manually review the original paper/);
   assert.equal(outcome.review.confounders.k.status, "unaddressed");
+  assert.match(outcome.review.confounders.k.assessmentNotice, /^The AI could not identify adjustment for Age in the captured text\./);
+  assert.match(outcome.review.confounders.k.assessmentNotice, /adjustment may be described elsewhere/);
+  assert.match(outcome.review.confounders.k.assessmentNotice, /Manually review the methods and supplementary material before drawing conclusions/);
   assert.equal(outcome.review.findings.ky.decision, "excluded");
   assert.equal(outcome.review.findings.xy.decision, "excluded");
   assert.equal(session.status, "editing"); assert.equal(run.published, undefined);
