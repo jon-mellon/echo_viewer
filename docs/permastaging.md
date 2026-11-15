@@ -49,6 +49,8 @@ rewrite the isolation root out of its history. `[permastaging-only]` in preview
 commit messages is a human reminder; enforcement uses the required profile check,
 not commit-message metadata rules (GitHub rejected that rule type here).
 
-The separate preview is public, not an invitation-only environment. User-owned
+The download page uses the existing `12345` browser/session preview gate. This
+is a lightweight access notice, not server-side authentication: the ZIP's direct
+URL and source remain public. User-owned
 OpenRouter keys are still required, and live real-paper evaluation remains
 unverified.

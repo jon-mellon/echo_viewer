@@ -1,6 +1,16 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Install Echo Paper Review</title><link rel="stylesheet" href="./paper_review.css"></head>
-<body><main><header><span class="wordmark">echo<span class="dot">.</span></span><span class="badge">Chrome extension · Preview</span><h1>Review a paper with Echo.</h1></header>
+<body class="password-locked">
+<div id="passwordGate" class="password-gate" role="dialog" aria-modal="true" aria-labelledby="passwordGateTitle">
+  <form id="passwordGateForm" class="password-gate-card">
+    <p class="muted">Private preview</p><h1 id="passwordGateTitle">Enter password</h1>
+    <p>This extension is not ready for public consumption.</p>
+    <label for="passwordGateInput">Password<input id="passwordGateInput" type="password" autocomplete="current-password" required autofocus></label>
+    <p id="passwordGateError" role="alert" hidden>Incorrect password.</p>
+    <button type="submit">Open downloads</button>
+  </form>
+</div>
+<main class="paper-install-content"><header><span class="wordmark">echo<span class="dot">.</span></span><span class="badge">Chrome extension · Preview</span><h1>Review a paper with Echo.</h1></header>
 <section><h2>Install the preview</h2><p><a href="./echo-paper-review.zip" download>Download the Chrome extension ZIP</a></p><ol><li>Unzip the download into a folder you will keep.</li><li>Open <code>chrome://extensions</code> in Chrome and enable Developer mode.</li><li>Choose <strong>Load unpacked</strong> and select the folder containing <code>manifest.json</code>.</li><li>Open an HTML scientific paper, click Echo in the extensions menu, and choose <strong>Capture current paper</strong>.</li><li>Confirm the captured text, connect your own capped OpenRouter key, and select a model supporting tools and structured output.</li></ol><p>This preview is available only on permastaging. The download opens the permastaging review page; production use is disabled.</p></section>
 <p class="notice">This is a preview, not a Chrome Web Store release. End-to-end evaluation on a real paper has not yet been verified. Reviews stay private unless you explicitly publish a schema. Model calls use your OpenRouter allowance.</p>
-<p><a href="./paper-review.html">Open the review page</a></p></main></body></html>
+<p><a href="./paper-review.html">Open the review page</a></p></main><script src="./password_gate.js"></script></body></html>
