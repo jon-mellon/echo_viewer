@@ -1,4 +1,3 @@
-import { capturePaper } from "./capture.mjs";
 import { REVIEW_URL } from "./config.mjs";
 const origin = new URL(REVIEW_URL).origin;
 const nonce = crypto.randomUUID();
@@ -12,16 +11,30 @@ window.addEventListener("message", event => {
   if (event.origin !== origin || ![frame.contentWindow, popup].includes(event.source) || !event.source
     || event.data?.type !== "echo-paper-ready-v1" || event.data.nonce !== nonce) return;
   ready.add(event.source); send(event.source);
-  status.textContent = paper ? "Paper sent to Echo. Confirm the text before connecting or running a model." : "Echo is ready. Capture the paper to begin.";
+  status.textContent = paper ? "Paper sent to Echo. Connect to begin." : "Echo is ready. Reading the current paper…";
 });
-document.getElementById("capture").addEventListener("click", async () => {
+let windowId;
+function receive(result) {
+  if (result.error) {
+    status.textContent = /permission|cannot access|not allowed|host permission/i.test(result.error)
+      ? "Click the Echo extension icon in Chrome's toolbar on the article to allow automatic capture. Opening the side-panel picker does not grant page access."
+      : `Capture failed: ${result.error}`;
+    return;
+  }
+  paper = result.paper;
+  send(frame.contentWindow); if (popup && !popup.closed) send(popup);
+  status.textContent = "Paper captured automatically. Review its details in Echo, then connect to begin.";
+}
+async function captureCurrent(refresh = false) {
+  status.textContent = "Reading the current paper…";
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: capturePaper });
-    if (!result?.result) throw new Error("No accessible article text.");
-    paper = result.result;
-    send(frame.contentWindow); if (popup && !popup.closed) send(popup);
-    status.textContent = "Captured. Review the text and coverage in Echo; inaccessible PDFs and paywalls need pasted text.";
-  } catch { status.textContent = "Chrome cannot capture this page. Open an HTML article, select accessible text, or paste text in Echo."; }
+    windowId = (await chrome.windows.getCurrent()).id;
+    receive(await chrome.runtime.sendMessage({ type: "echo-capture-current", windowId, refresh }));
+  } catch (error) { receive({ error: error.message }); }
+}
+chrome.runtime.onMessage.addListener(message => {
+  if (message.type === "echo-capture-result" && message.windowId === windowId) receive(message);
 });
+document.getElementById("capture").addEventListener("click", () => captureCurrent(true));
+void captureCurrent();
 document.getElementById("open").addEventListener("click", () => { popup = window.open(url, "_blank"); });

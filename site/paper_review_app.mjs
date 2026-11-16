@@ -19,7 +19,7 @@ const text = (id, value) => { $(id).textContent = value; };
 function populate(capture) {
   for (const field of fields) $(field).value = capture[field] || "";
   captureMetadata = { extractionMethod: capture.extractionMethod, capturedAt: capture.capturedAt };
-  text("capture-note", `Source: ${capture.extractionMethod}. Captured ${capture.capturedAt}. Coverage: ${capture.coverage}. Correct the fields before confirming.`);
+  text("capture-note", `Source: ${capture.extractionMethod}. Captured ${capture.capturedAt}. Coverage: ${capture.coverage}. Paper details were filled automatically. Review them before relying on the results.`);
 }
 function render() {
   document.querySelectorAll("button").forEach(button => { button.disabled = busy && !["cancel", "disconnect"].includes(button.id); });
@@ -103,6 +103,12 @@ function model() {
 }
 async function connectKey(candidate) {
   await checkCappedKey(candidate, controller?.signal);
+  const catalogue = await openRouterJson("/api/v1/models", candidate, { signal: controller?.signal });
+  const available = (catalogue.data || []).filter(row => ["tools", "structured_outputs"].every(parameter => row.supported_parameters?.includes(parameter)));
+  const selected = run?.model || $("model").value;
+  $("model").replaceChildren(h("option", { value: "", textContent: "Choose a model" }), ...available.map(row => h("option", { value: row.id, textContent: row.name || row.id })));
+  if (available.some(row => row.id === selected)) $("model").value = selected;
+  else if (available.length === 1) $("model").value = available[0].id;
   key = candidate;
   text("progress", "OpenRouter connected. Review the paper and model before starting a step.");
 }
@@ -121,13 +127,14 @@ async function browserSession(client) {
   return session;
 }
 
-$("confirm").addEventListener("click", () => action(async () => {
-  const confirmed = await confirmedCapture({ ...captureMetadata, ...Object.fromEntries(fields.map(field => [field, $(field).value])) });
+async function startReview(capture) {
+  const confirmed = await confirmedCapture(capture);
   await session?.close(); session = null;
   run = { id: crypto.randomUUID(), ...confirmed, phase: "confirmed", claims: [], model: $("model").value.trim(), createdAt: new Date().toISOString() };
   $("publication").hidden = true; $("claims-json").value = "[]";
   await save(); text("progress", "Paper confirmed. New captures and edits cannot change this run's evidence.");
-}));
+}
+$("confirm").addEventListener("click", () => action(() => startReview({ ...captureMetadata, ...Object.fromEntries(fields.map(field => [field, $(field).value])) })));
 $("connect").addEventListener("click", () => {
   authNonce = crypto.randomUUID();
   authWindow = window.open(`./paper-auth.html#nonce=${authNonce}`, "_blank", "popup,width=680,height=780");
@@ -205,9 +212,18 @@ window.addEventListener("message", event => {
     || event.data?.type !== "echo-paper-capture-v1" || event.data.nonce !== bridgeNonce) return;
   try {
     const capture = validateCapture(event.data.capture);
-    if (busy || run) { text("capture-note", "A new capture arrived. This review remains bound to its confirmed paper. Start a new review in a fresh Echo window to use the new paper."); return; }
+    if (run?.capture.sourceUrl === capture.sourceUrl && run.capture.articleText === capture.articleText) return;
+    if (busy) { text("capture-note", "A new capture arrived while a step was running. Finish or cancel that step, then click the Echo toolbar icon again. Your existing review is saved."); return; }
     populate(capture);
-  } catch { text("error", "The captured paper was invalid. Paste the article text below."); }
+    if (capture.title && capture.abstract && capture.articleText) {
+      $("paper-details").open = false;
+      text("paper-summary", capture.title);
+      void action(() => startReview(capture));
+    } else {
+      $("paper-details").open = true;
+      text("capture-note", "The page did not expose a complete abstract. Open the publisher's HTML article and click the Echo toolbar icon again.");
+    }
+  } catch { text("error", "The captured page was not a valid article. Open the publisher's HTML article and click the Echo toolbar icon again."); }
 });
 if (bridgeNonce) {
   // Handshake contains only a nonce, never paper text or credentials. The wrapper checks exact source and Echo origin.

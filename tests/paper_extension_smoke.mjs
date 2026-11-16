@@ -10,7 +10,7 @@ import { capturePaper } from "../extension/capture.mjs";
 const root = resolve("site"), profile = await mkdtemp(`${tmpdir()}/echo-extension-smoke-`);
 const origin = "https://www.jonathanmellon.com";
 const prefix = "/echo_viewer_permastaging";
-const article = `<!doctype html><title>Paper fixture</title><meta name="citation_title" content="A person-level study"><meta name="citation_doi" content="10.1234/focal"><article><h1>A person-level study</h1><section id="abstract"><p>Exposure increases outcomes in adults.</p></section><h2>Methods</h2><p>We adjust for age and income.</p><p>Nonrandomized matching estimates a person-level causal effect. The analysis follows adult respondents over multiple survey waves and measures individual exposure before the outcome. The adjusted model includes the stated baseline covariates and reports uncertainty for the selected focal estimate.</p><nav>Navigation junk</nav></article>`;
+const article = `<!doctype html><title>Paper fixture</title><meta name="citation_title" content="A person-level study"><meta name="citation_doi" content="10.1234/focal"><article class="main-article-body"><h1>A person-level study</h1><section id="abstract"><p>Exposure increases outcomes in adults.</p></section><h2>Methods</h2><p>We adjust for age and income.</p><p>Nonrandomized matching estimates a person-level causal effect. The analysis follows adult respondents over multiple survey waves and measures individual exposure before the outcome. The adjusted model includes the stated baseline covariates and reports uncertainty for the selected focal estimate.</p><h2>Results</h2><p>The adjusted association was positive.</p><h2>Discussion</h2><p>Observational estimates may be confounded.</p><nav>Navigation junk</nav></article>`;
 const qualification = { eligible: true, reason: "Eligible", causal: true, x: "Exposure", y: "Outcome", xUnit: "person", yUnit: "person", population: "adults", design: "matching", exposureRandomized: false, usesDid: false, assignment: "Nonrandomized exposure", controls: ["age", "income"], evidenceLocation: "Abstract and methods", evidenceQuote: "Exposure increases outcomes in adults.", adjustmentQuote: "We adjust for age and income.", articleHasRandomizedComponent: false, mixedMethodsBoundary: "" };
 let completions = 0, authExchanges = 0;
 const errors = [];
@@ -30,7 +30,7 @@ let context;
 try {
   context = await chromium.launchPersistentContext(profile, { channel: "chromium", headless: true,
     args: [`--disable-extensions-except=${resolve("dist/extension")}`, `--load-extension=${resolve("dist/extension")}`] });
-  await context.route("https://example.test/**", route => route.fulfill({ contentType: "text/html", body: article }));
+  await context.route("https://pmc.ncbi.nlm.nih.gov/**", route => route.fulfill({ contentType: "text/html", body: article }));
   await context.route(`${origin}/**`, async route => {
     const path = new URL(route.request().url()).pathname.replace(prefix, "");
     if (path === "/paper_browser_session.mjs") return route.fulfill({ contentType: "text/javascript", body: browserSessionFixture });
@@ -72,22 +72,23 @@ try {
   });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
   const extensionId = new URL(worker.url()).hostname;
-  const articlePage = await context.newPage(); await articlePage.goto("https://example.test/paper");
+  const articlePage = await context.newPage(); await articlePage.goto("https://pmc.ncbi.nlm.nih.gov/articles/fixture/");
   const capture = await articlePage.evaluate(capturePaper);
+  await articlePage.evaluate(() => document.querySelector('h2:last-of-type').textContent = 'Limitations');
+  assert.equal((await articlePage.evaluate(capturePaper)).coverage, 'partial');
+  await articlePage.evaluate(() => document.querySelector('h2:last-of-type').textContent = 'Discussion');
   assert.equal(capture.title, "A person-level study"); assert.equal(capture.doi, "10.1234/focal");
-  assert.equal(capture.coverage, "partial"); assert.ok(!capture.articleText.includes("Navigation junk"));
+  assert.equal(capture.coverage, "full"); assert.ok(!capture.articleText.includes("Navigation junk"));
   const page = await context.newPage(); page.on("pageerror", error => errors.push(error.message));
   await page.goto(`chrome-extension://${extensionId}/panel.html`);
   const frame = await (await page.waitForSelector("#echo")).contentFrame();
-  await frame.waitForSelector("#confirm");
+  await frame.waitForSelector("#confirm", { state: "attached" });
   await page.evaluate(({ capture, origin }) => {
     const frame = document.getElementById("echo"), nonce = new URL(frame.src).hash.slice("#bridge=".length);
     frame.contentWindow.postMessage({ type: "echo-paper-capture-v1", nonce, capture }, origin);
   }, { capture, origin });
-  await frame.locator("#title").waitFor();
+  await frame.locator("#title").waitFor({ state: "attached" });
   assert.equal(await frame.locator("#title").inputValue(), capture.title);
-  await frame.locator("#coverage").selectOption("full"); await frame.locator("#model").fill("fixture/model");
-  await frame.locator("#confirm").click();
   await frame.getByText("Paper confirmed.", { exact: false }).waitFor();
   // PKCE navigates a real popup and returns the transient key only to the Echo iframe.
   const popupPromise = context.waitForEvent("page");
@@ -99,6 +100,8 @@ try {
   if (await popup.locator("h1").textContent({ timeout: 500 }).catch(() => "") === "404") await popup.reload();
   await frame.getByText("Connected · capped key checked · kept in memory", { exact: true }).waitFor();
   assert.equal(authExchanges, 1);
+  assert.equal(await frame.locator("#model").inputValue(), "fixture/model");
+  assert.equal(await frame.locator("#paper-details").getAttribute("open"), null);
   await frame.locator("#extract").click(); await frame.locator('input[name="claim"]').waitFor();
   await frame.locator('input[name="claim"]').check(); await frame.locator("#qualify").click();
   await frame.getByText("Claim qualifies", { exact: false }).waitFor();

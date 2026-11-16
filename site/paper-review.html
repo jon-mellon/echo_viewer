@@ -4,16 +4,17 @@
   <header><span class="wordmark">echo<span class="dot">.</span></span><span class="badge">Paper review · Preview</span><h1>A closer look at the claim.</h1><p>Choose a finding. Inspect its evidence and potential confounders.</p></header>
   <p class="notice">Private by default. Paper text is kept in this browser and sent to OpenRouter only when you request a model step. Publication is a separate action. Findings may be unaddressed; automated results may be incorrect or incomplete. Manually review the results, the original paper, its controls, and the supporting evidence before relying on or sharing them.</p>
   <p class="notice">Validation is not yet complete. Expert-review non-confirmation rate: x% (placeholder, not a measured result). Individual AI flags have not been independently verified and could be incorrect. Manually check the paper before treating a flag as an omission.</p>
-  <section><h2>1 <span>Confirm the paper</span></h2><p id="capture-note">Capture a browser page with the extension, or paste the paper below. No abstract is assumed.</p>
+  <section><h2>1 <span>Your paper</span></h2><p id="capture-note">Click the Echo toolbar icon on an article. Paper details are captured automatically; no copying or typing is needed for supported HTML articles.</p>
+    <details id="paper-details" open><summary id="paper-summary">Paper details / edit capture</summary>
     <label>Title<input id="title" maxlength="2000"></label><label>Article URL<input id="sourceUrl" type="url"></label><label>DOI (optional)<input id="doi"></label>
     <label>Abstract<textarea id="abstract" rows="5" maxlength="50000"></textarea></label><label>Article text<textarea id="articleText" rows="7" maxlength="500000"></textarea></label>
-    <label>Available text<select id="coverage"><option value="unknown">Unknown</option><option value="partial">Partial page or selected text</option><option value="abstract_only">Abstract only</option><option value="full">I confirm the full article text is supplied</option></select></label>
-    <button id="confirm">Confirm paper / start new review</button>
+    <label>Available text<select id="coverage"><option value="unknown">Unknown</option><option value="partial">Partial page or selected text</option><option value="abstract_only">Abstract only</option><option value="full">Full article text (detected or manually confirmed)</option></select></label>
+    <button id="confirm">Save edits / start new review</button></details>
   </section>
   <section><h2>2 <span>Connect & choose a claim</span></h2><p>A capped OpenRouter key is required: $5 or less, with no reset. The key stays in memory and is cleared on disconnect or reload.</p>
     <div class="actions"><button id="connect">Connect OpenRouter</button><button id="disconnect" class="secondary">Disconnect</button></div><p id="connection" role="status">Not connected</p>
     <details><summary>Use an existing capped key</summary><label>OpenRouter key<input id="key" type="password" autocomplete="off"></label><button id="use-key">Check & connect key</button></details>
-    <label>OpenRouter model<input id="model" placeholder="provider/model"></label><p class="muted">Must support tools and structured output. Provider fallback is disabled. No Flex tier is requested; cache discounts are not guaranteed.</p>
+    <label>OpenRouter model<select id="model"><option value="">Connect to load available models</option></select></label><p class="muted">Must support tools and structured output. Provider fallback is disabled. No Flex tier is requested; cache discounts are not guaranteed.</p>
     <button id="extract">Extract abstract claims</button><p class="muted">Extraction may be incomplete. Edit or add a source-grounded claim before selecting it.</p><div id="claims"></div>
     <details><summary>Edit / add claims as JSON</summary><label>Claims with exact abstract sentences<textarea id="claims-json" rows="8"></textarea></label><button id="save-claims">Save claim edits</button></details>
     <button id="qualify">Qualify selected claim</button><pre id="qualification"></pre>
