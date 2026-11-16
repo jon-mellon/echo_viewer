@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1254" height="1254" viewBox="0 0 1254 1254" role="img" aria-labelledby="title desc">
-  <title id="title">ECHO square icon</title>
-  <desc id="desc">ECHO wordmark, with a right-pointing arrow running through the H from the C to the O.</desc>
-  <rect width="1254" height="1254" fill="#FAF8F7"/>
-  <g fill="#080808">
-    <path d="M 302 505 L 122 506 L 122 744 L 310 744 L 311 743 L 311 709 L 310 708 L 157 708 L 155 706 L 155 634 L 157 632 L 288 632 L 288 602 L 157 602 L 155 600 L 155 540 L 157 538 L 302 538 L 303 537 L 303 506 Z" fill-rule="evenodd"/>
-    <path d="M 472 502 L 448 502 L 447 503 L 440 503 L 426 506 L 407 513 L 385 526 L 364 546 L 351 565 L 342 585 L 336 610 L 335 628 L 336 629 L 336 642 L 337 643 L 338 654 L 347 681 L 359 702 L 375 720 L 394 734 L 415 744 L 441 750 L 459 751 L 460 750 L 478 749 L 499 743 L 514 736 L 529 726 L 544 712 L 556 696 L 566 677 L 566 675 L 535 661 L 530 670 L 530 672 L 522 685 L 507 701 L 498 707 L 481 714 L 465 717 L 451 717 L 431 713 L 408 701 L 394 688 L 382 670 L 375 652 L 372 638 L 371 622 L 372 621 L 372 611 L 375 597 L 383 578 L 391 566 L 406 551 L 420 542 L 435 536 L 449 533 L 469 533 L 489 538 L 501 544 L 515 555 L 527 571 L 535 587 L 567 573 L 567 570 L 562 559 L 551 542 L 541 531 L 527 520 L 502 508 L 487 504 L 473 503 Z" fill-rule="evenodd"/>
-    <path d="M 1133 605 L 1128 581 L 1119 560 L 1108 543 L 1092 527 L 1077 517 L 1054 507 L 1028 502 L 1002 502 L 981 506 L 967 511 L 955 517 L 938 529 L 926 541 L 914 558 L 905 577 L 899 597 L 897 618 L 895 620 L 863 594 L 863 608 L 861 610 L 824 610 L 823 609 L 823 506 L 789 506 L 789 609 L 788 610 L 669 611 L 667 609 L 667 507 L 633 507 L 633 611 L 632 612 L 542 612 L 542 632 L 632 632 L 633 633 L 633 743 L 634 744 L 667 744 L 667 634 L 668 633 L 788 633 L 789 634 L 789 743 L 790 744 L 823 744 L 823 633 L 824 632 L 861 632 L 863 634 L 863 648 L 864 648 L 887 629 L 896 623 L 897 624 L 898 647 L 901 661 L 906 676 L 917 698 L 930 715 L 947 730 L 971 743 L 993 749 L 1018 751 L 1019 750 L 1031 750 L 1032 749 L 1042 748 L 1064 741 L 1074 736 L 1089 726 L 1105 710 L 1114 697 L 1123 679 L 1128 664 L 1133 639 Z M 1003 533 L 1027 533 L 1040 536 L 1058 544 L 1069 552 L 1081 565 L 1091 582 L 1095 593 L 1099 614 L 1099 633 L 1098 634 L 1097 646 L 1092 663 L 1082 682 L 1069 697 L 1057 706 L 1042 713 L 1023 717 L 1008 717 L 988 713 L 973 706 L 963 699 L 952 688 L 942 673 L 934 652 L 931 636 L 931 610 L 932 609 L 933 599 L 938 584 L 948 566 L 961 552 L 972 544 L 987 537 Z" fill-rule="evenodd"/>
+  <title id="title">ECHO square favicon</title>
+  <desc id="desc">Square ECHO favicon version with enlarged arrowhead integrated into the wordmark.</desc>
+  <rect width="1254" height="1254" fill="#F9F7F6"/>
+  <g id="wordmark">
+    <rect x="120" y="505" width="34" height="240" fill="#0B0B0B"/>
+    <rect x="120" y="505" width="190" height="34" fill="#0B0B0B"/>
+    <rect x="120" y="608.0" width="172" height="34" fill="#0B0B0B"/>
+    <rect x="120" y="711" width="190" height="34" fill="#0B0B0B"/>
+    <path d="M 540.11 691.49 A 108 108 0 1 1 540.11 558.51" fill="none" stroke="#0B0B0B" stroke-width="32" stroke-linecap="butt"/>
+    <rect x="630" y="505" width="32" height="240" fill="#0B0B0B"/>
+    <rect x="785" y="505" width="32" height="240" fill="#0B0B0B"/>
+    <circle cx="1010" cy="625" r="108" fill="none" stroke="#0B0B0B" stroke-width="32"/>
+    <rect x="547.00" y="609.00" width="317.00" height="32" fill="#0B0B0B"/>
+    <polygon points="864.00,583.00 918.00,625.00 864.00,667.00" fill="#0B0B0B"/>
   </g>
 </svg>
