@@ -7,6 +7,8 @@ import { tmpdir } from "node:os";
 import { chromium } from "playwright";
 import { capturePaper } from "../extension/capture.mjs";
 
+const retryCase = process.env.ECHO_TEST_RETRY === "1";
+let qualificationAttempts = 0;
 const unsupported = process.env.ECHO_TEST_UNSUPPORTED === "1";
 const unadjusted = process.env.ECHO_TEST_UNADJUSTED === "1";
 const root = resolve("site"), profile = await mkdtemp(`${tmpdir()}/echo-extension-smoke-`);
@@ -76,7 +78,7 @@ try {
     } else {
       const properties = request.response_format.json_schema.schema.properties;
       const value = properties.s ? { s: "success", v: [{ vi: "v1", a: ["person"], c: "uoa's exposure" }, { vi: "v2", a: ["person"], c: "uoa's outcome" }], l: [{ li: "l1", s: ["v1"], t: "v2", e: "present", p: "adults", d: unadjusted ? "other" : "implied_selection_on_observables" }] }
-        : properties.eligible ? (unsupported ? { ...qualification, eligible: false, causal: false, reason: "The full text gives a descriptive comparison without a causal interpretation." } : qualification)
+        : properties.eligible ? (retryCase && ++qualificationAttempts === 1 ? { ...qualification, xUnit: "country" } : unsupported ? { ...qualification, eligible: false, causal: false, reason: "The full text gives a descriptive comparison without a causal interpretation." } : qualification)
           : properties.systematicallyDifferent ? { status: "unaddressed", reason: "The measured age mechanism is not addressed in this specification.", systematicallyDifferent: false, splitReason: "The two legs instantiate the same age construct.", rejectedPaths: [] }
             : { decision: "retained", reason: "The same person-level construct and adult population support this causal link.", reason_code: "", questioned_end: "", undeniable: true };
       if (properties.eligible) await qualificationGate;
@@ -95,7 +97,7 @@ try {
   assert.equal(capture.coverage, "full"); assert.ok(!capture.articleText.includes("Navigation junk"));
   const page = await context.newPage(); page.on("pageerror", error => errors.push(error.message));
   await page.goto(`chrome-extension://${extensionId}/panel.html`);
-  const frame = await (await page.waitForSelector("#echo")).contentFrame();
+  let frame = await (await page.waitForSelector("#echo")).contentFrame();
   await frame.waitForSelector("#confirm", { state: "attached" });
   await page.evaluate(({ capture, origin }) => {
     const frame = document.getElementById("echo"), nonce = new URL(frame.src).hash.slice("#bridge=".length);
@@ -103,7 +105,7 @@ try {
   }, { capture, origin });
   await frame.locator("#title").waitFor({ state: "attached" });
   assert.equal(await frame.locator("#title").inputValue(), capture.title);
-  await frame.getByText("Paper captured. Connect once", { exact: false }).waitFor();
+  await frame.locator("#connect").waitFor();
   // PKCE navigates a real popup and returns the transient key only to the Echo iframe.
   const popupPromise = context.waitForEvent("page");
   await frame.locator("#connect").click();
@@ -112,7 +114,7 @@ try {
   // Chromium extension popups can bypass context routing on their first request.
   // Reload the test-only 404 to enter the mocked same-origin authorization page.
   if (await popup.locator("h1").textContent({ timeout: 500 }).catch(() => "") === "404") await popup.reload();
-  await frame.getByText("Connected · capped key checked · remembered for this Chrome session", { exact: true }).waitFor();
+  await frame.locator("#connection").filter({hasText:"remembered for this Chrome session"}).waitFor();
   assert.equal(authExchanges, 1);
   assert.equal(await frame.locator("#model").count(), 0);
   assert.equal(await frame.locator("#paper-details").getAttribute("open"), null);
@@ -132,13 +134,30 @@ try {
   assert.equal(await frame.locator('#activity-title').textContent(),'Checking the selected claim');
   assert.equal(await frame.locator('#activity-meter').getAttribute('value'),null);
   assert.equal(await frame.locator('#cancel').isVisible(),true);
-  assert.equal(await frame.locator('#retry').isVisible(),false);
+  assert.equal(await frame.locator('#review-action').isVisible(),false);
   await frame.waitForFunction(() => !document.getElementById('activity-elapsed').textContent.startsWith('0s'), null, {timeout:5000});
   assert.equal(await frame.locator('#activity-meter').getAttribute('value'),null);
   await screenshotReview(page, frame, '/tmp/echo-review-progress-waiting.png');
   releaseQualification();
+  if (retryCase) {
+    await frame.locator('#review-action').getByText('Retry review',{exact:true}).waitFor();
+    assert.equal(await frame.locator('#activity-title').textContent(),'Review stopped');
+    assert.equal(await frame.locator('.claims-card').isVisible(),false);
+    assert.match(await frame.locator('#recovery-cost').textContent(),/new AI request/);
+    assert.equal(await frame.getByRole('button',{name:/Continue selected claim|Acknowledge|Resume review/}).count(),0);
+    assert.equal(completions,2);
+    await screenshotReview(page,frame,'/tmp/echo-simple-retry.png');
+    await page.reload();
+    frame = await (await page.waitForSelector('#echo')).contentFrame();
+    await frame.locator('#connection').filter({hasText:'remembered for this Chrome session'}).waitFor();
+    await frame.locator('#review-history').evaluate(node=>node.open=true);
+    await frame.getByRole('button',{name:'Open',exact:true}).click();
+    await frame.getByRole('button',{name:'Retry review',exact:true}).waitFor();
+    assert.equal(completions,2); // Loading a stopped review never replays a paid request.
+    await frame.locator('#review-action').click();
+  }
   if (unsupported) {
-    await frame.locator('.qualification-note').waitFor();
+    await frame.getByRole('button',{name:'Choose another claim',exact:true}).waitFor();
     assert.equal(await frame.locator('#error').textContent(), '');
     assert.equal(await frame.locator('#review-state').textContent(), 'Not qualified');
     assert.equal(await frame.locator('input[name="claim"]').first().isEnabled(), true);
@@ -150,18 +169,19 @@ try {
     await screenshotReview(page, frame, '/tmp/echo-claim-not-qualified.png');
     await page.reload();
     const restored = await (await page.waitForSelector('#echo')).contentFrame();
-    await restored.getByText('Connected · capped key checked · remembered for this Chrome session', {exact:true}).waitFor();
-    await restored.getByRole('button',{name:'Resume',exact:true}).click();
-    await restored.locator('.qualification-note').waitFor();
+    await restored.locator('#connection').filter({hasText:'remembered for this Chrome session'}).waitFor();
+    await restored.locator('#review-history').evaluate(node=>node.open=true);
+    await restored.getByRole('button',{name:'Open',exact:true}).click();
+    await restored.getByRole('button',{name:'Choose another claim',exact:true}).waitFor();
     assert.equal(completions,2);assert.equal(await restored.locator('#error').textContent(),'');
     console.log('Passed: unsupported claim is a saved, non-error outcome, with no graph session and no repeat billing on reload.');
   } else {
-  await frame.getByText("Automated review complete", { exact: false }).first().waitFor();
+  await frame.locator("#activity-title").filter({hasText:"Review complete"}).waitFor();
   assert.equal(await frame.getByText("Age · May be unaddressed", { exact: true }).count(), 1);
   assert.equal(await frame.locator("#result").getByText("The AI could not identify adjustment for Age in the captured text.", { exact: false }).count(), 1);
   assert.equal(await frame.locator("#result").getByText("x% (placeholder, not a measured result)", { exact: false }).count(), 1);
   assert.ok(await frame.getByText("These results may be incorrect or incomplete.", { exact: false }).count());
-  assert.equal(completions, 6);
+  assert.equal(completions, retryCase ? 7 : 6);
   assert.equal(await frame.locator('#activity-title').textContent(),'Review complete');
   assert.match(await frame.locator('#activity-confounders').textContent(),/1 of 1 confounders assessed/);
   assert.equal(await frame.locator('#cancel').isVisible(),false);
@@ -188,15 +208,17 @@ try {
   }
   assert.equal(records[0].review.findings.ky.decision, "excluded");
   assert.equal(JSON.stringify(records).includes("fixture-secret-key"), false);
+  await frame.locator("#advanced-review").evaluate(node=>node.open=true);
   await frame.locator("#preview").click(); await frame.locator("#publish").waitFor({ state: "visible" });
   const publicSchema = JSON.parse(await frame.locator("#public-preview").innerText());
   assert.equal(publicSchema.finding_reviews, undefined); assert.equal(publicSchema.finding_decisions.ky.reason_text, undefined);
   const before = completions;
   await page.reload();
-  const reloaded = await (await page.waitForSelector("#echo")).contentFrame(); await reloaded.getByText("Connected · capped key checked · remembered for this Chrome session", { exact: true }).waitFor();
+  const reloaded = await (await page.waitForSelector("#echo")).contentFrame(); await reloaded.locator("#connection").filter({hasText:"remembered for this Chrome session"}).waitFor();
   assert.equal(completions, before);
-  await reloaded.getByRole("button", { name: "Resume", exact: true }).click();
-  await reloaded.getByText("Automated review complete", { exact: false }).first().waitFor();
+  await reloaded.locator("#review-history").evaluate(node=>node.open=true);
+  await reloaded.getByRole("button", { name: "Open", exact: true }).click();
+  await reloaded.locator("#activity-title").filter({hasText:"Review complete"}).waitFor();
   assert.equal(completions, before);
   assert.equal(authExchanges, 1); // Panel reload restores the connection without OAuth.
   const keyState = await worker.evaluate(async () => ({local:await chrome.storage.local.get(null),session:await chrome.storage.session.get(null)}));
@@ -204,10 +226,10 @@ try {
   assert.equal(keyState.session["echo-openrouter-key-v1"], "fixture-secret-key");
   await reloaded.getByText("Connection settings", {exact:true}).click();
   await reloaded.locator('#remember').check();
-  await reloaded.getByText('Connected · capped key checked · remembered on this device', {exact:true}).waitFor();
+  await reloaded.locator('#settings-connection').filter({hasText:'remembered on this device'}).waitFor();
   assert.equal(await worker.evaluate(async () => (await chrome.storage.local.get('echo-openrouter-key-v1'))['echo-openrouter-key-v1']), 'fixture-secret-key');
   await reloaded.locator('#disconnect').click();
-  await reloaded.getByText('Connect once to extract claims automatically.', {exact:true}).waitFor();
+  await reloaded.locator('#settings-connection').filter({hasText:'Connect once'}).waitFor();
   await page.waitForFunction(async () => {
     const all = await Promise.all([chrome.storage.local.get(null),chrome.storage.session.get(null)]);
     return all.every(area => !area['echo-openrouter-key-v1']);

@@ -66,7 +66,7 @@ export class PaperModel {
     if (this.run.receipts[requestHash]) return this.run.receipts[requestHash].message;
     await checkCappedKey(this.getKey(), this.signal, this.request);
     const id = crypto.randomUUID();
-    this.run.pending = { id, phase: name, requestHash, startedAt: new Date().toISOString() };
+    this.run.pending = { id, kind: "request", phase: name, requestHash, startedAt: new Date().toISOString() };
     this.run.phase = name;
     await this.save(); // Must succeed before sending a billable call.
     this.onProgress(name);
@@ -80,8 +80,9 @@ export class PaperModel {
     } catch {
       // A timeout or abort cannot tell us whether the provider charged. No automatic replay.
       this.run.phase = "uncertain";
+      this.run.pending.kind = "uncertain";
       await this.save();
-      throw new Error("The model call did not finish reliably. It may have been billed. Acknowledge retry to continue, or export the checkpoint.");
+      throw new Error("The AI request did not finish reliably. It may have been billed.");
     }
     const usage = body.usage;
     this.run.calls ||= [];
@@ -91,8 +92,8 @@ export class PaperModel {
       cacheWrite: usage?.prompt_tokens_details?.cache_write_tokens ?? null, cost: usage?.cost ?? null });
     const choice = body.choices?.[0];
     if (!choice?.message || !["stop", "tool_calls"].includes(choice.finish_reason)) {
-      this.run.phase = "invalid_response"; await this.save();
-      throw new Error("The model returned an incomplete response. No result was accepted; acknowledge retry to request another response.");
+      this.run.phase = "invalid_response"; this.run.pending.kind = "invalid_response"; await this.save();
+      throw new Error("The AI returned an incomplete response.");
     }
     this.run.receipts[requestHash] = { id, message: choice.message };
     this.run.pending = null;
@@ -112,8 +113,8 @@ export class PaperModel {
     try { value = JSON.parse(message.content); validateShape(value, schema); validateResult?.(value); }
     catch (error) {
       const requestHash = Object.keys(this.run.receipts).find(hash => this.run.receipts[hash].message === message);
-      this.run.pending = { id: this.run.receipts[requestHash]?.id, phase: "Invalid structured response", requestHash };
-      await this.save(); throw new Error(`${error.message} No result was accepted. Acknowledge retry to request another response.`);
+      this.run.pending = { id: this.run.receipts[requestHash]?.id, phase: "Invalid structured response", kind: "invalid_response", error: error.message, requestHash };
+      await this.save(); throw new Error(`${error.message} The response could not be used. Retry the review to request a new response.`);
     }
     return value;
   }

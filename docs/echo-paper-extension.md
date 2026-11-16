@@ -329,7 +329,7 @@ Other stages use an indeterminate meter; supporting findings can be skipped
 legitimately, so their available count is not presented as a promised total.
 Elapsed time never advances work counters or triggers a paid retry. Long gaps
 are described as no new update, not proof that work is progressing. Cancel,
-resume and uncertain-call acknowledgement are available within the activity
+a single continue/retry action and any relevant charge explanation are available within the activity
 panel. Interrupted calls show an action-needed state instead of a success.
 
 The browser regression deliberately holds an AI response, checks that the
@@ -356,3 +356,7 @@ survival analysis or repeated observation alone must not be classified as DiD.
 The old “with measured adjustment; difference-in-differences is unsupported”
 message can persist only in an already loaded older page. The hosted entry
 point and stylesheet use a new cache key for this update.
+
+## Focused review and recovery
+
+After claim selection, the claim list collapses to the selected relationship and the activity panel becomes the main view. Running reviews show progress and Cancel; stopped reviews show a reason and one Retry review (or Continue review) button. Retrying explicitly acknowledges the adjacent charge explanation and continues in the same action. Unusable received responses are distinguished from unconfirmed requests; neither is automatically replayed. Accepted receipts remain saved. Connection settings, review data, publication controls and saved reviews live in optional drawers.

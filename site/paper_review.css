@@ -170,3 +170,23 @@ pre { margin: var(--space-3) 0 0; padding: var(--space-3); max-height: 400px; ov
 .activity-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
 .activity-actions:not(:has(button:not([hidden]))) { display: none; }
 .activity-actions button { min-height: var(--control-sm); font-size: var(--text-sm); }
+
+/* One focused review state; tools and history are optional drawers. */
+.selected-claim { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-3); padding: 0 var(--space-1) var(--space-4); }
+.selected-claim .eyebrow { grid-column: 1 / -1; }
+.selected-claim strong { font-size: var(--text-base); overflow-wrap: anywhere; }
+.selected-claim button { align-self: start; padding: 0; border: 0; min-height: var(--control-sm); background: transparent; color: var(--accent); font-size: var(--text-sm); }
+.activity-panel[data-state="paused"] { border-color: var(--warn-border); }
+.activity-panel[data-state="paused"] .activity-heading h2 { color: var(--text); }
+#recovery-message p { font-size: var(--text-md); }
+#recovery-message #recovery-cost { font-size: var(--text-sm); margin-bottom: 0; }
+#recovery-reason { padding-left: var(--space-3); border-left: 2px solid var(--warn-border); color: var(--text-muted); overflow-wrap: anywhere; }
+.utility-drawer { padding: var(--space-3) 0; margin: 0; border-top: 1px solid var(--border); }
+.utility-drawer > summary { color: var(--text-muted); }
+.utility-drawer .saved-card { margin-top: var(--space-3); }
+#advanced-review #error:not(:empty) { position: static; max-height: 240px; box-shadow: none; color: var(--text-muted); border-color: var(--border); }
+#advanced-review #error:empty { display: none; }
+.paper-card:has(~ .selected-claim:not([hidden])) { padding-block: var(--space-3); }
+.paper-card:has(~ .selected-claim:not([hidden])) .section-heading { display: none; }
+.paper-card:has(~ .selected-claim:not([hidden])) #paper-title { font-size: var(--text-md); margin-bottom: var(--space-1); }
+.paper-card:has(~ .selected-claim:not([hidden])) #paper-meta { margin-bottom: var(--space-1); }

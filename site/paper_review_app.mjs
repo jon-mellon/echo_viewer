@@ -1,3 +1,4 @@
+import { recoveryState, acknowledgeRetry } from "./paper_review_state.mjs";
 import { REVIEW_STAGES, recordProgress, progressSnapshot, elapsedLabel } from "./paper_progress.mjs";
 import { PAPER_PIPELINE } from "./paper_pipeline_contract.mjs";
 import { h } from "./dom_builder.mjs";
@@ -16,6 +17,7 @@ let run = null, session = null, key = null, busy = false, controller = null, aut
 let captureMetadata = { extractionMethod: "paste", capturedAt: new Date().toISOString() };
 let bridgeTarget = null, bridgeOrigin = null, connectionPersistent = false;
 const bridgeRequests = new Map();
+let errorMessage = "", showClaimChoices = false;
 let intake = Promise.resolve(), needsResume = false, operationStartedAt = Date.now(), progressTimer = null;
 function enqueue(operation) { intake = intake.then(() => action(operation)).catch(() => {}); }
 function connectionRequest(type, data = {}) {
@@ -33,15 +35,24 @@ const displayClaim = claim => claim.replace(/\buoa's /g, "").split(" → ").map(
 const text = (id, value) => { $(id).textContent = value; };
 function renderActivity() {
   const state = progressSnapshot(run, { busy, startedAt: operationStartedAt, needsResume });
+  const recovery = !busy && (needsResume || run?.pending || errorMessage) ? recoveryState(run, { connected: Boolean(key), error: errorMessage }) : null;
   const panel = $("review-activity");
-  panel.hidden = !run || !(busy || run.selectedClaim || run.outcome || needsResume);
-  panel.dataset.state = state.state;
+  panel.hidden = !run || !(busy || run.selectedClaim || run.outcome || needsResume) || (showClaimChoices && !busy);
+  panel.dataset.state = recovery ? "paused" : state.state;
   const update = (id, value) => { if ($(id).textContent !== value) text(id, value); };
   const cancelling = busy && controller?.signal.aborted;
-  update("activity-title", cancelling ? "Cancelling review" : state.title);
+  update("activity-title", cancelling ? "Stopping review" : recovery ? recovery.title : state.title);
   update("activity-elapsed", busy ? `${elapsedLabel(state.elapsedSeconds)} elapsed` : state.state === "complete" ? "Saved" : "");
   $("activity-elapsed").hidden = !busy && state.state !== "complete";
-  update("activity-detail", cancelling ? "Waiting for the current operation to stop. Accepted decisions remain saved; in-flight requests may already have been billed." : state.state === "not_qualified" ? "The full-text check stopped before evidence review. See the assessment beside your selected claim." : state.state === "paused" ? "Your accepted decisions are saved. Check the message below before resuming; an interrupted request may already have been billed." : state.detail);
+  update("activity-detail", recovery ? "" : cancelling ? "Waiting for the current operation to stop. Your completed work is saved." : state.state === "not_qualified" ? `The AI could not review this claim: ${run.qualification.reason} Choose another claim to continue.` : state.detail);
+  $("activity-detail").hidden = Boolean(recovery);
+  $("recovery-message").hidden = !recovery;
+  update("recovery-summary", recovery?.message || "");
+  update("recovery-reason", recovery?.reason || ""); $("recovery-reason").hidden = !recovery?.reason;
+  update("recovery-cost", recovery?.cost || ""); $("recovery-cost").hidden = !recovery?.cost;
+  const chooseAgain = !busy && state.state === "not_qualified";
+  $("review-action").hidden = !recovery && !chooseAgain;
+  update("review-action", chooseAgain ? "Choose another claim" : recovery?.action || "Retry review");
   update("activity-wait", state.waiting);
   $("activity-wait").hidden = !state.waiting;
   update("activity-confounders", state.total === null ? state.stage === "map" ? "Finding confounders…" : "Confounders: pending" : `${state.assessed} of ${state.total} confounders assessed`);
@@ -50,7 +61,8 @@ function renderActivity() {
   $("activity-meter").hidden = !busy;
   if (state.determinate) { $("activity-meter").max = state.total; $("activity-meter").value = state.assessed; }
   else $("activity-meter").removeAttribute("value");
-  $("activity-stages").hidden = !run?.selectedClaim || state.state === "complete" || state.state === "not_qualified";
+  $("activity-stages").hidden = !busy || !run?.selectedClaim;
+  $("activity-counts").hidden = !busy && state.state !== "complete";
   const stageSignature = `${state.stage}:${state.state}`;
   if ($("activity-stages").dataset.signature !== stageSignature) {
     $("activity-stages").dataset.signature = stageSignature;
@@ -87,6 +99,15 @@ function render() {
   document.body.dataset.complete = String(Boolean(run?.outcome));
   $("cancel").hidden = !busy;
   $("export").hidden = !run;
+  const selected = Boolean(run?.selectedClaim);
+  document.querySelector(".claims-card").hidden = (selected || (!busy && needsResume && Boolean(run?.pending || errorMessage || !run?.pipelineExtraction))) && !showClaimChoices;
+  document.querySelector(".evidence-card").hidden = !run?.outcome;
+  document.querySelector(".review-intro").hidden = selected;
+  document.querySelector(".review-steps").hidden = selected;
+  $("selected-claim").hidden = !selected || showClaimChoices;
+  text("selected-claim-text", selected ? displayClaim(run.selectedClaim.text) : "");
+  $("change-claim").hidden = busy || Boolean(run?.session) || run?.qualification?.eligible === false;
+  $("change-claim").textContent = showClaimChoices ? "Keep this claim" : "Change claim";
   $("preview").hidden = !run?.outcome;
   const notQualified = run?.qualification?.eligible === false;
   const current = notQualified ? "claim" : run?.outcome || run?.selectedClaim ? "review" : run ? "claim" : "paper";
@@ -98,11 +119,9 @@ function render() {
   text("review-state", notQualified ? "Not qualified" : run?.outcome ? "Complete" : busy && run?.selectedClaim ? "In progress" : needsResume && run?.selectedClaim ? "Paused" : "Not started");
   text("claim-count", `${run?.claims?.length || 0} extracted`); $("claim-count").hidden = !run?.claims?.length;
   document.querySelectorAll("button").forEach(button => { button.disabled = busy && !["cancel", "disconnect"].includes(button.id); });
-  $("retry").hidden = busy || !run?.pending;
-  text("resume-review", run?.selectedClaim ? "Continue selected claim" : "Resume review");
-  $("resume-review").hidden = notQualified || !needsResume || !run || Boolean(run.outcome);
   $("connect").hidden = Boolean(key);
   text("connection", key ? `Connected · capped key checked · ${connectionPersistent ? "remembered on this device" : bridgeTarget ? "remembered for this Chrome session" : "this window only"}` : "Connect once to extract claims automatically.");
+  text("settings-connection", $("connection").textContent);
   text("qualification", run?.qualification ? JSON.stringify(run.qualification, null, 2) : "");
   const costs = (run?.calls || []).map(call => call.cost);
   const reported = costs.filter(value => typeof value === "number");
@@ -116,8 +135,8 @@ function render() {
     return h("div", { className: "claim-option" },
       h("label", { className: "claim" },
         h("input", { type: "radio", name: "claim", value: claim.id, checked: run.selectedClaim?.id === claim.id,
-          disabled: busy || Boolean(run.session) || claim.eligible === false, onchange: () => action(async () => {
-            needsResume = false;
+          disabled: busy || Boolean(run.session) || claim.eligible === false, onclick: () => { if (showClaimChoices && run.selectedClaim?.id === claim.id) { showClaimChoices = false; render(); } }, onchange: () => action(async () => {
+            needsResume = false; showClaimChoices = false;
             run.selectedClaim = structuredClone(claim); run.qualification = run.claimQualifications?.[claim.id] || null;
             await save(); await reviewSelectedClaim();
           }) }),
@@ -127,20 +146,18 @@ function render() {
         h("strong", { textContent: "The AI could not qualify this claim" }),
         h("p", { textContent: "This preview supports person-level observational claims with an explicit or implied causal interpretation, including unadjusted estimates. The AI did not verify that this claim fits that scope in the captured text. This assessment may be incorrect or incomplete; manually check the methods, tables and supplementary material." }),
         h("details", {}, h("summary", { textContent: "Why the AI stopped" }), h("p", { className: "qualification-reason", textContent: assessment.reason }), assessment.designEvidenceQuote ? h("blockquote", { textContent: assessment.designEvidenceQuote }) : null),
-        h("p", { className: "muted", textContent: "No confounder review was completed for this claim. You can choose a different extracted claim." })) : assessment?.eligible && !assessment.controls.length ? h("aside", { className: "adjustment-note" },
-        h("strong", { textContent: "No adjustment identified in the captured text" }),
-        h("p", { textContent: "The claim remains eligible for confounder review. This assessment may be incomplete; manually check the focal model and supplementary material." })) : null);
+        h("p", { className: "muted", textContent: "No confounder review was completed for this claim. You can choose a different extracted claim." })) : null);
   }));
   if (!run?.claims?.length) $("claims").append(h("div", { className: "empty-state" },
     h("strong", { textContent: run?.pipelineExtraction ? "No causal claims found" : busy && key ? "Finding the paper’s claims…" : "Claims will appear here" }),
     h("p", { textContent: run?.pipelineExtraction ? "The abstract did not provide causal links to review." : "Capture a paper and connect once to get started." })));
   $("result").replaceChildren();
   if (run?.outcome) {
-    $("result").append(h("h3", { textContent: "Automated review complete" }),
+    $("result").append(
       h("p", { className: "notice", textContent: VALIDATION_NOTICE }),
       h("p", { className: "notice", textContent: MANUAL_REVIEW_NOTICE }),
       h("p", { textContent: displayClaim(run.selectedClaim.text) }));
-    if (!run.qualification.controls.length) $("result").append(h("p", { className: "notice", textContent: NO_ADJUSTMENT_IDENTIFIED_NOTICE }));
+    if (!run.qualification.controls.length) $("result").append(h("aside", { className: "adjustment-note" }, h("strong", { textContent: "No adjustment identified in the captured text" }), h("p", { textContent: NO_ADJUSTMENT_IDENTIFIED_NOTICE })));
     const rows = Object.values(run.outcome.review.confounders);
     $("result").append(h("div", { className: "review-totals" },
       h("div", {}, h("strong", { textContent: rows.length }), h("span", { textContent: "Confounders reviewed" })),
@@ -161,11 +178,10 @@ async function listSaved() {
   const runs = (await paperStore.list()).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   $("saved").replaceChildren(...runs.map(record => h("div", { className: "saved-row" },
     h("strong", { textContent: record.capture.title }), h("p", { className: "muted", textContent: `${({ complete: "Review complete", claims_extracted: "Choose a claim", confirmed: "Paper captured", qualified: "Claim qualified", not_qualified: "Claim not qualified", uncertain: "Needs attention", split_required: "Review paused" })[record.phase] || "Review in progress"} · ${new Date(record.updatedAt || record.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` }),
-    h("button", { textContent: "Resume", onclick: () => action(async () => {
-      await session?.close(); session = null; run = record; needsResume = !["complete", "not_qualified"].includes(run.phase);
+    h("button", { textContent: "Open", onclick: () => action(async () => {
+      await session?.close(); session = null; run = record; errorMessage = run.failure?.message || run.pending?.error || ""; text("error", errorMessage); showClaimChoices = false; needsResume = !["complete", "not_qualified", "claims_extracted"].includes(run.phase);
       populate(run.capture);
       text("pipeline-extraction", JSON.stringify(run.pipelineExtraction || {}, null, 2));
-      if (run.pending) { run.phase = "uncertain"; await save(); }
       text("progress", run.pending ? "Interrupted call is uncertain. Explicit retry is required." : `Loaded ${run.phase}. Accepted work remains saved.`);
       $("publication").hidden = true;
     }) }),
@@ -176,7 +192,8 @@ async function listSaved() {
 }
 async function action(operation) {
   if (busy) return;
-  busy = true; operationStartedAt = Date.now(); controller = new AbortController(); text("error", ""); render();
+  busy = true; operationStartedAt = Date.now(); controller = new AbortController(); errorMessage = ""; text("error", ""); render();
+  let canSaveFailure = false;
   progressTimer = setInterval(renderActivity, 1000);
   // Prevent two windows from editing one run or replaying billable calls concurrently.
   try {
@@ -186,11 +203,18 @@ async function action(operation) {
         const stored = await paperStore.get(run.id);
         if (stored && stored.checkpointRevision !== run.checkpointRevision) throw new Error("This review changed in another window. Resume its latest saved checkpoint before continuing.");
       }
+      canSaveFailure = true;
+      if (run) run.failure = null;
       await operation();
     });
   } catch (error) {
     needsResume = true;
-    text("error", key ? String(error.message).replaceAll(key, "[redacted]") : error.message);
+    errorMessage = key ? String(error.message).replaceAll(key, "[redacted]") : String(error.message);
+    text("error", errorMessage);
+    if (run && canSaveFailure) {
+      run.failure = { message: errorMessage, at: new Date().toISOString() };
+      await save().catch(() => {});
+    }
   } finally { clearInterval(progressTimer); progressTimer = null; busy = false; render(); await listSaved().catch(() => {}); }
 }
 function model() {
@@ -216,7 +240,7 @@ async function extractCurrentClaims() {
   if (!run || !key || run.pipelineExtraction || run.pending || run.session) return;
   const client = model();
   await client.checkModel();
-  run.claims = await extractClaims(client); run.phase = "claims_extracted";
+  run.claims = await extractClaims(client); run.phase = "claims_extracted"; needsResume = false;
   run.selectedClaim = null; run.qualification = null;
   await save(); text("pipeline-extraction", JSON.stringify(run.pipelineExtraction, null, 2));
   text("progress", run.claims.length ? "Choose a claim. Its qualification and evidence review will run automatically." : "The Echo pipeline found no causal claims in this abstract.");
@@ -276,18 +300,19 @@ async function browserSession(client) {
 
 async function startReview(capture) {
   const confirmed = await confirmedCapture(capture);
-  await session?.close(); session = null; needsResume = false;
+  await session?.close(); session = null; needsResume = false; showClaimChoices = false;
   run = { id: crypto.randomUUID(), ...confirmed, phase: "confirmed", claims: [], model: PAPER_PIPELINE.model, pipeline: { sourceRevision: PAPER_PIPELINE.sourceRevision, promptVersion: PAPER_PIPELINE.promptVersion }, createdAt: new Date().toISOString() };
   $("publication").hidden = true; text("pipeline-extraction", "");
   await save(); text("progress", key ? "Paper captured. Extracting Echo pipeline claims…" : "Paper captured. Connect once to extract its claims automatically.");
   await extractCurrentClaims();
 }
 $("confirm").addEventListener("click", () => action(() => startReview({ ...captureMetadata, ...Object.fromEntries(fields.map(field => [field, $(field).value])) })));
-$("connect").addEventListener("click", () => {
+function connectWindow() {
   authNonce = crypto.randomUUID();
   authWindow = window.open(`./paper-auth.html#nonce=${authNonce}`, "_blank", "popup,width=680,height=780");
-  if (!authWindow) text("error", "Allow the connection popup, or use an existing capped key below.");
-});
+  if (!authWindow) text("error", "Allow the connection popup, or use an existing capped key in Connection settings.");
+}
+$("connect").addEventListener("click", connectWindow);
 $("use-key").addEventListener("click", () => action(async () => {
   const candidate = $("key").value.trim(); $("key").value = ""; await connectKey(candidate);
 }));
@@ -303,16 +328,18 @@ $("disconnect").addEventListener("click", () => {
   connectionPersistent = false; render();
   if (bridgeTarget) void connectionRequest("echo-paper-forget-key-v1").catch(error => text("error", error.message));
 });
-$("resume-review").addEventListener("click", () => action(async () => {
-  if (run?.selectedClaim) await reviewSelectedClaim(); else await extractCurrentClaims();
-}));
-$("cancel").addEventListener("click", () => { controller?.abort(); renderActivity(); text("progress", "Cancellation requested. Accepted decisions remain saved; in-flight model calls may be billed."); });
-$("retry").addEventListener("click", () => action(async () => {
-  if (!run?.pending) return;
-  run.uncertainCalls ||= []; run.uncertainCalls.push({ ...run.pending, retryAcknowledgedAt: new Date().toISOString() });
-  if (run.pending.requestHash) delete run.receipts?.[run.pending.requestHash];
-  run.pending = null; run.phase = "retry_acknowledged"; await save(); text("progress", "Retry acknowledged. Use Resume interrupted review to continue; earlier accepted decisions remain saved.");
-}));
+$("change-claim").addEventListener("click", () => { showClaimChoices = !showClaimChoices; render(); if (showClaimChoices) $("claims-heading").scrollIntoView({ block: "nearest" }); });
+$("review-action").addEventListener("click", () => {
+  if (run?.qualification?.eligible === false) {
+    showClaimChoices = true; render(); $("claims-heading").scrollIntoView({ block: "nearest" }); return;
+  }
+  if (!key) { connectWindow(); return; }
+  void action(async () => {
+    needsResume = false; acknowledgeRetry(run); await save();
+    if (run.selectedClaim) await reviewSelectedClaim(); else await extractCurrentClaims();
+  });
+});
+$("cancel").addEventListener("click", () => { controller?.abort(); renderActivity(); text("progress", "Stopping review. Your completed work is saved."); });
 $("export").addEventListener("click", () => action(async () => {
   if (!run) throw new Error("No private review to export.");
   const url = URL.createObjectURL(new Blob([JSON.stringify({ ...run, reviewNotice: MANUAL_REVIEW_NOTICE, validationNotice: VALIDATION_NOTICE }, null, 2)], { type: "application/json" }));

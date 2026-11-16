@@ -1,19 +1,10 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>ECHO · Paper review</title><link rel="icon" type="image/svg+xml" href="./favicon.svg?v=echo-brand-original"><link rel="stylesheet" href="./paper_review.css?v=qualification-feedback-v3"></head>
-<body>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>ECHO · Paper review</title><link rel="icon" type="image/svg+xml" href="./favicon.svg?v=echo-brand-original"><link rel="stylesheet" href="./paper_review.css?v=focused-review-v1"></head>
+<body data-review-ui="focused-review-v1">
   <header class="review-topbar"><img class="echo-logo" src="./echo-logo.svg?v=echo-brand-original" alt="ECHO — Every Cause of Human Outcomes"><span class="preview-badge">Paper review <span>Preview</span></span></header>
   <main>
     <header class="review-intro"><p class="eyebrow">Threats to inference</p><h1>A closer look at the claim.</h1><p>Choose a claim. Follow the evidence.</p><p class="intro-note">AI-assisted review. Manually check results before relying on them.</p></header>
     <ol class="review-steps" aria-label="Review progress"><li id="step-paper" aria-current="step"><span>1</span> Paper</li><li id="step-claim"><span>2</span> Choose a claim</li><li id="step-review"><span>3</span> Review</li></ol>
-    <section id="review-activity" class="activity-panel" aria-label="Review activity" hidden>
-      <div class="activity-heading"><span class="activity-indicator" aria-hidden="true"></span><h2 id="activity-title" aria-live="polite">Preparing review</h2><span id="activity-elapsed" class="meta-badge" aria-live="off"></span></div>
-      <p id="activity-detail"></p><progress id="activity-meter" aria-label="Current stage progress"></progress>
-      <p id="activity-wait" class="muted" aria-live="off"></p>
-      <div class="activity-counts" aria-live="off"><span id="activity-confounders"></span><span id="activity-findings"></span><span id="activity-calls"></span></div>
-      <ol id="activity-stages" class="activity-stages" aria-label="Review stages"></ol>
-      <details><summary>Recent activity</summary><ol id="activity-log" class="activity-log"></ol></details>
-      <div class="activity-actions"><button id="cancel" class="secondary" hidden>Cancel review</button><button id="resume-review" hidden>Resume review</button><button id="retry" hidden class="secondary">Acknowledge possible charge & retry uncertain work</button></div>
-    </section>
     <section class="paper-card" aria-labelledby="paper-heading"><div class="section-heading"><h2 id="paper-heading">Your paper</h2><span id="paper-coverage" class="meta-badge">Waiting for capture</span></div>
       <h3 id="paper-title" hidden></h3><p id="paper-meta" class="paper-meta" hidden></p>
       <p id="capture-note">Open an article and click the ECHO extension. Its details appear here automatically.</p>
@@ -24,28 +15,41 @@
         <button id="confirm">Save edits / start new review</button></div>
       </details>
     </section>
+    <div id="selected-claim" class="selected-claim" hidden><span class="eyebrow">Selected claim</span><strong id="selected-claim-text"></strong><button id="change-claim" class="secondary">Change claim</button></div>
+    <section id="review-activity" class="activity-panel" aria-label="Review activity" hidden>
+      <div class="activity-heading"><span class="activity-indicator" aria-hidden="true"></span><h2 id="activity-title" aria-live="polite">Preparing review</h2><span id="activity-elapsed" class="meta-badge" aria-live="off"></span></div>
+      <p id="activity-detail"></p><progress id="activity-meter" aria-label="Current stage progress"></progress>
+      <p id="activity-wait" class="muted" aria-live="off"></p>
+      <div id="activity-counts" class="activity-counts" aria-live="off"><span id="activity-confounders"></span><span id="activity-findings"></span><span id="activity-calls"></span></div>
+      <ol id="activity-stages" class="activity-stages" aria-label="Review stages"></ol>
+      <div id="recovery-message" hidden><p id="recovery-summary"></p><p id="recovery-reason"></p><p id="recovery-cost" class="muted"></p></div>
+      <div class="activity-actions"><button id="review-action" hidden>Retry review</button><button id="cancel" class="secondary" hidden>Cancel review</button></div>
+      <details><summary>Activity log</summary><ol id="activity-log" class="activity-log"></ol></details>
+    </section>
     <section class="claims-card" aria-labelledby="claims-heading"><div class="section-heading"><h2 id="claims-heading">Choose a claim</h2><span id="claim-count" class="meta-badge" hidden></span></div>
       <p class="section-description">Select the relationship you want to examine. ECHO checks the paper’s methods and supporting evidence.</p>
       <div class="connection-bar"><button id="connect">Connect OpenRouter once <span aria-hidden="true">↗</span></button><p id="connection" role="status">Connect once to extract claims automatically.</p></div>
       <div id="claims"></div>
-      <details class="connection-settings"><summary>Connection settings</summary><div class="details-content">
-        <p>A key capped at $5 or less, with no reset, is required. The extension remembers it for this Chrome session by default, across panel closes and reloads. It is never included in paper exports.</p>
-        <label class="check-label"><input id="remember" type="checkbox"> Also remember after Chrome restarts</label><p class="muted">This optional mode stores the key unencrypted in this browser profile, accessible only to trusted extension contexts. Someone with access to your profile could recover it. Use Forget connection here and revoke the key in OpenRouter to end access.</p>
-        <label>Existing capped key<input id="key" type="password" autocomplete="off"></label><div class="actions"><button id="use-key">Connect existing key</button><button id="disconnect" class="secondary">Forget connection</button></div>
-      </div></details>
-      <details class="technical-details"><summary>Inspect pipeline extraction</summary><pre id="pipeline-extraction"></pre></details>
     </section>
-    <section class="evidence-card" aria-labelledby="evidence-heading"><div class="section-heading"><h2 id="evidence-heading">Evidence review</h2><span id="review-state" class="meta-badge">Not started</span></div>
-      <div class="review-progress"><span class="progress-dot" aria-hidden="true"></span><p id="progress" role="status" aria-live="polite">Choose a claim to begin the review.</p></div>
+    <section class="evidence-card" aria-labelledby="evidence-heading"><div class="section-heading"><h2 id="evidence-heading">Potential confounders</h2></div>
       <div id="result"></div>
-      <details class="technical-details"><summary>Review details & usage</summary><p id="usage" class="muted"></p><details><summary>Claim qualification</summary><pre id="qualification"></pre></details><details><summary>Structured result</summary><pre id="outcome"></pre></details></details>
-      <div class="actions result-actions"><button id="export" class="secondary">Export private checkpoint</button><button id="preview" class="secondary">Preview public schema</button></div>
-      <div id="publication" hidden><p>Publishing creates an immutable public ECHO schema: group definitions, membership, finding exclusion codes and review statuses. Paper text and private explanations are excluded. Manually review the results and supporting evidence before publishing. Inspect the preview below.</p><pre id="public-preview"></pre><button id="publish">Publish this schema publicly</button><p id="permalink"></p></div>
+
     </section>
     <aside class="review-guidance" aria-label="Automated review guidance"><p><strong>AI-assisted review.</strong> Findings may be unaddressed; automated results may be incorrect or incomplete. Manually review the original paper and supporting evidence before relying on or sharing results.</p>
       <details><summary>Privacy, validation & limitations</summary><div class="details-content"><p>Private by default. Paper text is kept in this browser and sent to OpenRouter for automatic claim extraction after connection, then for qualification and review when you choose a claim. Publication is a separate action. Manually review the results, the original paper, its controls, and the supporting evidence before relying on or sharing them.</p><p>Validation is not yet complete. Expert-review non-confirmation rate: x% (placeholder, not a measured result). Individual AI flags have not been independently verified and could be incorrect. Manually check the paper before treating a flag as an omission.</p><p>The preview supports person-level nonrandomized observational claims with an explicit or implied causal interpretation, including unadjusted estimates. Full article text is required.</p></div></details>
     </aside>
-    <section class="saved-card" aria-labelledby="saved-heading"><div class="section-heading"><h2 id="saved-heading">Saved reviews</h2><span class="meta-badge">This browser</span></div><div id="saved"></div><p class="muted saved-note">Private checkpoints stay in this browser. Deleting a checkpoint does not remove a public publication or OpenRouter’s processing records.</p></section>
-    <p id="error" role="alert"></p><footer class="review-footer"><span>ECHO</span> Every Cause of Human Outcomes</footer>
-  </main><script type="module" src="./paper_review.mjs?v=qualification-feedback-v3"></script>
+      <details id="connection-settings" class="utility-drawer"><summary>Connection settings</summary><div class="details-content"><p id="settings-connection" role="status"></p>
+        <p>A key capped at $5 or less, with no reset, is required. The extension remembers it for this Chrome session by default, across panel closes and reloads. It is never included in paper exports.</p>
+        <label class="check-label"><input id="remember" type="checkbox"> Also remember after Chrome restarts</label><p class="muted">This optional mode stores the key unencrypted in this browser profile, accessible only to trusted extension contexts. Someone with access to your profile could recover it. Use Forget connection here and revoke the key in OpenRouter to end access.</p>
+        <label>Existing capped key<input id="key" type="password" autocomplete="off"></label><div class="actions"><button id="use-key">Connect existing key</button><button id="disconnect" class="secondary">Forget connection</button></div>
+      </div></details>
+    <details id="advanced-review" class="utility-drawer"><summary>Review details</summary><div class="details-content">
+      <p id="progress" hidden></p><p id="review-state" hidden></p><pre id="error"></pre><p id="usage" class="muted"></p>
+      <details><summary>Claim check</summary><pre id="qualification"></pre></details><details><summary>Extracted claims</summary><pre id="pipeline-extraction"></pre></details><details><summary>Review data</summary><pre id="outcome"></pre></details>
+      <div class="actions"><button id="export" class="secondary">Download review data</button><button id="preview" class="secondary">Preview public schema</button></div>
+      <div id="publication" hidden><p>Publishing creates an immutable public ECHO schema: group definitions, membership, finding exclusion codes and review statuses. Paper text and private explanations are excluded. Manually review the results and supporting evidence before publishing. Inspect the preview below.</p><pre id="public-preview"></pre><button id="publish">Publish this schema publicly</button><p id="permalink"></p></div>
+    </div></details>
+    <details id="review-history" class="utility-drawer"><summary>Saved reviews</summary><section class="saved-card" aria-labelledby="saved-heading"><div class="section-heading"><h2 id="saved-heading">Saved reviews</h2><span class="meta-badge">This browser</span></div><div id="saved"></div><p class="muted saved-note">Private checkpoints stay in this browser. Deleting a checkpoint does not remove a public publication or OpenRouter’s processing records.</p></section>
+    </details><footer class="review-footer"><span>ECHO</span> Every Cause of Human Outcomes</footer>
+  </main><script type="module" src="./paper_review.mjs?v=focused-review-v1"></script>
 </body></html>
