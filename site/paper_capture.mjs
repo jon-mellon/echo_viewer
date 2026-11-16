@@ -32,12 +32,37 @@ export function validateClaims(claims, abstract) {
   }
   return claims;
 }
+// Match only harmless presentation differences, then retain the exact source span.
+// No paraphrase, case folding, ellipsis joining, number changes or fuzzy matching.
+function quotationText(value) {
+  let text = "", starts = [], ends = [];
+  for (let i = 0; i < value.length;) {
+    const original = String.fromCodePoint(value.codePointAt(i)), end = i + original.length;
+    let char = original.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[‐‑]/g, "-");
+    if (char === "\u00ad") { i = end; continue; }
+    if (/\s/u.test(char)) char = " ";
+    if (char === " " && (!text || text.endsWith(" "))) { if (text) ends[ends.length - 1] = end; i = end; continue; }
+    text += char;
+    for (let j = 0; j < char.length; j++) { starts.push(i); ends.push(end); }
+    i = end;
+  }
+  if (text.endsWith(" ")) { text = text.slice(0, -1); starts.pop(); ends.pop(); }
+  return { text, starts, ends };
+}
+export function sourceQuotation(quote, articleText) {
+  if (!quote?.trim()) return null;
+  if (articleText.includes(quote)) return quote;
+  const source = quotationText(articleText), target = quotationText(quote).text;
+  if (!target) return null;
+  const at = source.text.indexOf(target);
+  return at < 0 ? null : articleText.slice(source.starts[at], source.ends[at + target.length - 1]);
+}
 const designName = qualification => String(qualification.design || "").trim().toLowerCase().replace(/[- ]+/g, "_");
 const isDid = qualification => qualification.usesDid || ["diff_in_diff", "difference_in_differences", "did"].includes(designName(qualification));
 const personAliases = new Set(["individual", "individuals", "human individual", "human individuals", "people", "person-year", "person-years", "person-waves", "participant", "participants", "patient", "patients", "respondent", "respondents", "adults", "older adult", "older adults"]);
 const isPerson = unit => PERSON_UOA_VALUES.has(String(unit).trim().toLowerCase()) || personAliases.has(String(unit).trim().toLowerCase());
 function verifyDesignEvidence(qualification, capture) {
-  if (isDid(qualification) && (!qualification.designEvidenceQuote?.trim() || !capture.articleText.includes(qualification.designEvidenceQuote))) {
+  if (isDid(qualification) && (!qualification.designEvidenceQuote?.trim() || !sourceQuotation(qualification.designEvidenceQuote, capture.articleText))) {
     throw new Error("The AI returned a difference-in-differences classification without a verified supporting quotation. That classification was not accepted; it does not establish that the paper uses this design.");
   }
 }
@@ -56,13 +81,19 @@ export function validateQualification(qualification, capture) {
   }
   if (qualification.controls.length && !qualification.adjustmentQuote?.trim()) throw new Error("Identified controls require an exact adjustment quotation.");
   for (const quote of [qualification.evidenceQuote, qualification.adjustmentQuote].filter(Boolean)) {
-    if (!capture.articleText.includes(quote)) throw new Error("Qualification quotations must occur exactly in the confirmed article text.");
+    if (!sourceQuotation(quote, capture.articleText)) throw new Error("Qualification quotations must occur exactly in the confirmed article text.");
   }
   if (qualification.articleHasRandomizedComponent && !qualification.mixedMethodsBoundary.trim()) throw new Error("Identify the boundary between the observational and randomized components.");
 }
 
 // A negative qualification is a valid review outcome, distinct from a failed call.
 export function validateQualificationResult(qualification, capture) {
+  for (const field of ["evidenceQuote", "adjustmentQuote", "designEvidenceQuote"]) {
+    if (qualification[field]) {
+      const exact = sourceQuotation(qualification[field], capture.articleText);
+      if (exact && exact !== qualification[field]) qualification = { ...qualification, [field]: exact };
+    }
+  }
   verifyDesignEvidence(qualification, capture);
   // Do not let the model's extra eligibility flag veto an otherwise supported
   // observational causal claim solely because its control inventory is empty.

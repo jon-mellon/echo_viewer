@@ -106,18 +106,36 @@ export class PaperModel {
       { role: "user", content: `${task}\nDATA:\n${JSON.stringify(data)}` }];
   }
   async structured(name, task, data, schema, options = {}) {
-    const { validateResult, ...requestOptions } = options;
-    const message = await this.call(name, { messages: this.context(task, data),
-      response_format: { type: "json_schema", json_schema: { name: "echo_result", strict: true, schema } }, ...requestOptions });
-    let value;
-    try { value = JSON.parse(message.content); validateShape(value, schema); validateResult?.(value); }
-    catch (error) {
+    const { validateResult, repairAttempts = 0, ...requestOptions } = options;
+    const payload = { messages: this.context(task, data),
+      response_format: { type: "json_schema", json_schema: { name: "echo_result", strict: true, schema } }, ...requestOptions };
+    const repairKey = await digest({ name, model: this.run.model, payload });
+    const limit = Math.min(2, Math.max(0, repairAttempts));
+    while (true) {
+      const repairs = this.run.responseRepairs?.[repairKey] || [];
+      const previous = repairs.at(-1);
+      const messages = previous ? [...payload.messages, previous.message, { role: "user", content:
+        `Correction attempt ${repairs.length} of ${limit}. Your previous response failed validation: ${previous.error}\nReturn a complete corrected response using the same claim and captured paper. Copy quotations directly from the captured article; do not paraphrase, join disjoint passages or invent support. Do not change a scope or adjustment conclusion merely to pass validation. All original requirements still apply.` }] : payload.messages;
+      // Transport failures stay outside this catch: an unconfirmed paid call is never replayed.
+      const message = await this.call(name, { ...payload, messages });
+      let value, invalid;
+      try { value = JSON.parse(message.content); validateShape(value, schema); validateResult?.(value); }
+      catch (error) { invalid = error; }
+      if (!invalid) return value;
       const requestHash = Object.keys(this.run.receipts).find(hash => this.run.receipts[hash].message === message);
-      this.run.pending = { id: this.run.receipts[requestHash]?.id, phase: "Invalid structured response", kind: "invalid_response", error: error.message, requestHash };
-      await this.save(); throw new Error(`${error.message} The response could not be used. Retry the review to request a new response.`);
+      if (repairs.length < limit && !this.signal?.aborted) {
+        this.run.responseRepairs ||= {};
+        this.run.responseRepairs[repairKey] = [...repairs, { requestHash, message, error: invalid.message, at: new Date().toISOString() }];
+        await this.save(); // Preserve the bad reply and bounded repair count before a new request.
+        this.onProgress({ title: "Checking the AI response", detail: "Correcting a response that did not pass ECHO’s checks." });
+        continue;
+      }
+      this.run.pending = { id: this.run.receipts[requestHash]?.id, phase: "Invalid structured response", kind: "invalid_response", error: invalid.message, requestHash };
+      await this.save();
+      throw new Error(limit ? "ECHO could not verify the AI response after automatic correction. Your completed work is saved. Try again later." : `${invalid.message} The response could not be used. Retry the review to request a new response.`);
     }
-    return value;
   }
+
   async jevRequest(path, key, options = {}) {
     this.signal?.throwIfAborted();
     if (this.run.pipeline && path === "/api/v1/model/typesafe/jev-1.13") {

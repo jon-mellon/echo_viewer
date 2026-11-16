@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { chromium } from "playwright";
 import { capturePaper } from "../extension/capture.mjs";
 
+const repairCase = process.env.ECHO_TEST_REPAIR === "1";
 const retryCase = process.env.ECHO_TEST_RETRY === "1";
 let qualificationAttempts = 0;
 const unsupported = process.env.ECHO_TEST_UNSUPPORTED === "1";
@@ -78,7 +79,7 @@ try {
     } else {
       const properties = request.response_format.json_schema.schema.properties;
       const value = properties.s ? { s: "success", v: [{ vi: "v1", a: ["person"], c: "uoa's exposure" }, { vi: "v2", a: ["person"], c: "uoa's outcome" }], l: [{ li: "l1", s: ["v1"], t: "v2", e: "present", p: "adults", d: unadjusted ? "other" : "implied_selection_on_observables" }] }
-        : properties.eligible ? (retryCase && ++qualificationAttempts === 1 ? { ...qualification, xUnit: "country" } : unsupported ? { ...qualification, eligible: false, causal: false, reason: "The full text gives a descriptive comparison without a causal interpretation." } : qualification)
+        : properties.eligible ? ((retryCase || repairCase) && ++qualificationAttempts <= (retryCase ? 3 : 1) ? { ...qualification, evidenceQuote: "This quotation was invented by the fixture." } : unsupported ? { ...qualification, eligible: false, causal: false, reason: "The full text gives a descriptive comparison without a causal interpretation." } : qualification)
           : properties.systematicallyDifferent ? { status: "unaddressed", reason: "The measured age mechanism is not addressed in this specification.", systematicallyDifferent: false, splitReason: "The two legs instantiate the same age construct.", rejectedPaths: [] }
             : { decision: "retained", reason: "The same person-level construct and adult population support this causal link.", reason_code: "", questioned_end: "", undeniable: true };
       if (properties.eligible) await qualificationGate;
@@ -145,7 +146,7 @@ try {
     assert.equal(await frame.locator('.claims-card').isVisible(),false);
     assert.match(await frame.locator('#recovery-cost').textContent(),/new AI request/);
     assert.equal(await frame.getByRole('button',{name:/Continue selected claim|Acknowledge|Resume review/}).count(),0);
-    assert.equal(completions,2);
+    assert.equal(completions,4);
     await screenshotReview(page,frame,'/tmp/echo-simple-retry.png');
     await page.reload();
     frame = await (await page.waitForSelector('#echo')).contentFrame();
@@ -153,7 +154,7 @@ try {
     await frame.locator('#review-history').evaluate(node=>node.open=true);
     await frame.getByRole('button',{name:'Open',exact:true}).click();
     await frame.getByRole('button',{name:'Retry review',exact:true}).waitFor();
-    assert.equal(completions,2); // Loading a stopped review never replays a paid request.
+    assert.equal(completions,4); // Loading a stopped review never replays a paid request.
     await frame.locator('#review-action').click();
   }
   if (unsupported) {
@@ -177,11 +178,12 @@ try {
     console.log('Passed: unsupported claim is a saved, non-error outcome, with no graph session and no repeat billing on reload.');
   } else {
   await frame.locator("#activity-title").filter({hasText:"Review complete"}).waitFor();
+  if (repairCase) assert.equal(await frame.locator("#review-action").isVisible(),false);
   assert.equal(await frame.getByText("Age · May be unaddressed", { exact: true }).count(), 1);
   assert.equal(await frame.locator("#result").getByText("The AI could not identify adjustment for Age in the captured text.", { exact: false }).count(), 1);
   assert.equal(await frame.locator("#result").getByText("x% (placeholder, not a measured result)", { exact: false }).count(), 1);
   assert.ok(await frame.getByText("These results may be incorrect or incomplete.", { exact: false }).count());
-  assert.equal(completions, retryCase ? 7 : 6);
+  assert.equal(completions, retryCase ? 9 : repairCase ? 7 : 6);
   assert.equal(await frame.locator('#activity-title').textContent(),'Review complete');
   assert.match(await frame.locator('#activity-confounders').textContent(),/1 of 1 confounders assessed/);
   assert.equal(await frame.locator('#cancel').isVisible(),false);

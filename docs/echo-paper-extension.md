@@ -360,3 +360,9 @@ point and stylesheet use a new cache key for this update.
 ## Focused review and recovery
 
 After claim selection, the claim list collapses to the selected relationship and the activity panel becomes the main view. Running reviews show progress and Cancel; stopped reviews show a reason and one Retry review (or Continue review) button. Retrying explicitly acknowledges the adjacent charge explanation and continues in the same action. Unusable received responses are distinguished from unconfirmed requests; neither is automatically replayed. Accepted receipts remain saved. Connection settings, review data, publication controls and saved reviews live in optional drawers.
+
+## Automatic qualification correction
+
+Qualification quotation checks tolerate whitespace, curly quotes, discretionary soft hyphens and typographic hyphen variants. Accepted quotations are restored to exact spans of the captured article. There is no fuzzy, paraphrase, case-insensitive, numeric or ellipsis matching. Raw model replies stay in durable receipts.
+
+A received qualification response that fails JSON, schema or evidence validation gets up to two automatic correction requests using the same pipeline model and validation rules. These are additional potentially billable calls under the existing key cap. The original bad reply, validation reason and correction count are saved before each request, so restoration cannot reset the automatic limit or replay completed corrections. Progress explains that ECHO is correcting a response. If correction fails, the UI gives a plain failure and retains the checkpoint. Unconfirmed network calls are never automatically replayed.

@@ -13,7 +13,7 @@ if (paperReviewAllowed()) {
         h("p", { textContent: "Your saved reviews are safe. Refresh to load the updated page." }),
         h("button", { textContent: "Refresh page", onclick: () => { fresh.searchParams.set("refresh", String(Date.now())); location.replace(fresh.href); } })));
     }
-  } else await import("./paper_review_app.mjs");
+  } else await import("./paper_review_app.mjs?v=automatic-correction-v1");
 } else {
   document.body.replaceChildren(h("main", {}, h("h1", { textContent: "Paper review is not available on this site." }),
     h("p", { textContent: "This preview is limited to the permastaging website." })));

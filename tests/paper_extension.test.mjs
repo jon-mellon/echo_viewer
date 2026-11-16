@@ -236,3 +236,48 @@ test("the pipeline's implied selection design is accepted and unrelated failures
   const didCapture={...capture,articleText:capture.articleText+" We estimate a difference-in-differences model."};
   assert.throws(() => validateQualification({ ...implied, usesDid:true,designEvidenceQuote:"We estimate a difference-in-differences model." },didCapture), /The AI classified this estimate/);
 });
+
+test('quotation verification restores exact source spans across presentation differences only', () => {
+  const source = 'Exposure “increases”\n outcomes in adults. We adjust for age\u00a0 and income.';
+  const result = validateQualificationResult({ ...qualification, evidenceQuote: 'Exposure "increases" outcomes in adults.' }, { ...capture, articleText: source });
+  assert.equal(result.evidenceQuote, 'Exposure “increases”\n outcomes in adults.');
+  assert.equal(result.adjustmentQuote, 'We adjust for age\u00a0 and income.');
+  assert.ok(source.includes(result.evidenceQuote));
+  for (const quote of ['Exposure decreases outcomes in adults.', 'Exposure increases ... adults.', 'Exposure increases outcomes in 10 adults.']) {
+    assert.throws(() => validateQualificationResult({ ...qualification, evidenceQuote: quote }, capture), /exactly/);
+  }
+});
+test('known invalid qualification responses are corrected automatically with durable bounded receipts', async () => {
+  const run = { model: 'fixture/model', capture, selectedClaim: {} }, saves = [];
+  let requests = 0;
+  const request = async (path, key, options) => {
+    if (path === '/api/v1/key') return { data: {limit:5,limit_remaining:5,limit_reset:null} };
+    requests++;
+    if (requests > 1) {
+      assert.equal(saves.at(-1).responseRepairs && Object.values(saves.at(-1).responseRepairs)[0].length, requests - 1);
+      assert.match(JSON.parse(options.body).messages.at(-1).content,/Copy quotations directly/);
+    }
+    return {choices:[{finish_reason:'stop',message:{role:'assistant',content:JSON.stringify({value:requests < 3 ? 'invented' : 'supported'})}}]};
+  };
+  const model = new PaperModel({run,getKey:()=> 'secret-key',save:async()=>saves.push(structuredClone(run)),request});
+  const options = {repairAttempts:2,validateResult:result=>{ if(result.value!=='supported') throw new Error('Quotation not in source'); }};
+  assert.deepEqual(await model.structured('qualification','Task',{},object({value:string}),options),{value:'supported'});
+  assert.equal(requests,3);assert.equal(run.pending,null);assert.equal(Object.keys(run.receipts).length,3);
+  assert.equal(Object.values(run.responseRepairs)[0].length,2);
+  const restored = new PaperModel({run:structuredClone(run),getKey:()=> 'secret-key',save:async()=>{},request});
+  await restored.structured('qualification','Task',{},object({value:string}),options);
+  assert.equal(requests,3);assert.equal(JSON.stringify(run).includes('secret-key'),false);
+});
+test('automatic correction stops at its limit and never retries unconfirmed requests', async () => {
+  for (const lost of [false,true]) {
+    let requests=0;
+    const run={model:'fixture/model',capture,selectedClaim:{}};
+    const model=new PaperModel({run,getKey:()=> 'key',save:async()=>{},request:async path=>{
+      if(path==='/api/v1/key')return {data:{limit:5,limit_remaining:5,limit_reset:null}};
+      requests++;if(lost)throw new Error('timeout');
+      return {choices:[{finish_reason:'stop',message:{role:'assistant',content:'{"value":"bad"}'}}]};
+    }});
+    await assert.rejects(()=>model.structured('qualification','Task',{},object({value:string}),{repairAttempts:2,validateResult:()=>{throw new Error('Invalid quote');}}),lost?/may have been billed/:/after automatic correction/);
+    assert.equal(requests,lost?1:3);assert.equal(run.pending.kind,lost?'uncertain':'invalid_response');
+  }
+});

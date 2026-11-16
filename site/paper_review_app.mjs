@@ -3,11 +3,11 @@ import { REVIEW_STAGES, recordProgress, progressSnapshot, elapsedLabel } from ".
 import { PAPER_PIPELINE } from "./paper_pipeline_contract.mjs";
 import { h } from "./dom_builder.mjs";
 import { paperStore } from "./paper_store.mjs";
-import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs";
+import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=automatic-correction-v1";
 import { checkCappedKey } from "./openrouter_connection.mjs";
-import { PaperModel } from "./paper_model.mjs";
+import { PaperModel } from "./paper_model.mjs?v=automatic-correction-v1";
 import { BrowserEchoSession } from "./paper_browser_session.mjs";
-import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit } from "./paper_workflow.mjs";
+import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit } from "./paper_workflow.mjs?v=automatic-correction-v1";
 import { publicSchemaProjection } from "./public_schema_projection.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
 import { unaddressedAssessmentNotice, VALIDATION_NOTICE } from "./paper_review_copy.mjs";
@@ -222,7 +222,7 @@ function model() {
   if (!key) throw new Error("Connect your capped OpenRouter key first.");
   if (run.model !== PAPER_PIPELINE.model) throw new Error("This older review uses a different model. Capture the paper again to start a pipeline review.");
   return new PaperModel({ run, getKey: () => key, save, signal: controller.signal,
-    onProgress: event => { text("progress", typeof event === "string" ? event : event.title); render(); } });
+    onProgress: event => { if (typeof event !== "string") activity(run.progress?.stage || "qualify", event.title, event.detail || ""); else text("progress", event); render(); } });
 }
 async function connectKey(candidate, { restored = false, persistent = false } = {}) {
   await checkCappedKey(candidate, controller?.signal);

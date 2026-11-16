@@ -69,6 +69,7 @@ jobs:
           ECHO_TEST_UNADJUSTED=1 npm run test:extension:browser
           ECHO_TEST_UNSUPPORTED=1 npm run test:extension:browser
           ECHO_TEST_RETRY=1 npm run test:extension:browser
+          ECHO_TEST_REPAIR=1 npm run test:extension:browser
 
       # Published schema files are immutable; keep them between runs instead of
       # downloading about 5 MB per page load every time; a miss is fetched from Cloudflare R2.
