@@ -2,7 +2,15 @@ import { createKeyStore } from "./key_store.mjs";
 import { REVIEW_URL } from "./config.mjs";
 const origin = new URL(REVIEW_URL).origin;
 const nonce = crypto.randomUUID();
-const url = `${REVIEW_URL}#bridge=${nonce}`;
+let reviewId = null;
+function reviewUrl() {
+  const fresh = new URL(REVIEW_URL);
+  fresh.searchParams.set("view", crypto.randomUUID());
+  if (reviewId) fresh.searchParams.set("review", reviewId);
+  fresh.hash = `bridge=${nonce}`;
+  return fresh.href;
+}
+const url = reviewUrl();
 const frame = document.getElementById("echo"), status = document.getElementById("status");
 frame.src = url;
 let paper = null, popup = null;
@@ -18,7 +26,12 @@ window.addEventListener("message", async event => {
     try { reply({ type: "echo-paper-connection-v1", ...(await keys.read()) }); }
     catch { reply({ type: "echo-paper-storage-error-v1", message: "Connection storage is unavailable. Reconnect for this window." }); }
     send(event.source);
-    status.textContent = paper ? "Paper sent to Echo. Choose a claim after extraction." : "Echo is ready. Reading the current paper…";
+    status.textContent = "Loading your review…";
+  } else if (event.data.type === "echo-paper-status-v1" && event.source === frame.contentWindow && ready.has(event.source)) {
+    reviewId = typeof event.data.reviewId === "string" ? event.data.reviewId : null;
+    status.textContent = event.data.message;
+    document.getElementById("capture").disabled = event.data.busy === true;
+    document.getElementById("update").disabled = event.data.busy === true;
   } else if (ready.has(event.source) && ["echo-paper-save-key-v1", "echo-paper-forget-key-v1"].includes(event.data.type)) {
     try {
       if (event.data.type === "echo-paper-save-key-v1") await keys.save(event.data.key, event.data.persistent === true);
@@ -37,7 +50,7 @@ function receive(result) {
   }
   paper = result.paper;
   send(frame.contentWindow); if (popup && !popup.closed) send(popup);
-  status.textContent = "Paper captured automatically. Echo will extract the claims automatically once connected.";
+  status.textContent = "Paper captured. Loading your saved review or preparing claim choices…";
 }
 async function captureCurrent(refresh = false) {
   status.textContent = "Reading the current paper…";
@@ -51,10 +64,16 @@ chrome.runtime.onMessage.addListener(message => {
 });
 document.getElementById("capture").addEventListener("click", () => captureCurrent(true));
 void captureCurrent();
-document.getElementById("open").addEventListener("click", () => { popup = window.open(url, "_blank"); });
+document.getElementById("open").addEventListener("click", () => { popup = window.open(reviewUrl(), "_blank"); });
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === "session" && changes["echo-openrouter-key-v1"] && !changes["echo-openrouter-key-v1"].newValue) {
     for (const target of ready) target.postMessage({ type: "echo-paper-forgotten-v1", nonce }, origin);
   }
+});
+
+document.getElementById("update").addEventListener("click", () => {
+  ready.delete(frame.contentWindow);
+  frame.src = reviewUrl();
+  status.textContent = "Loading the latest review screen. Your saved work is kept.";
 });

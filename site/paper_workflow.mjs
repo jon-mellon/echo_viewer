@@ -1,7 +1,7 @@
 import { reportProgress } from "./paper_progress.mjs";
 import { extractPipelineClaims } from "./paper_pipeline.mjs";
-import { object, array, string, boolean, validateShape } from "./paper_model.mjs?v=spend-retry-v1";
-import { validateQualification, validateQualificationResult, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=spend-retry-v1";
+import { object, array, string, boolean, validateShape } from "./paper_model.mjs?v=review-ux-v1";
+import { validateQualification, validateQualificationResult, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=review-ux-v1";
 import { digest, materializeQueue, reviewCoverage, validateFindingDecision, requiredIds } from "./paper_review_contract.mjs";
 import { createEchoTools } from "./echo_tools.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";

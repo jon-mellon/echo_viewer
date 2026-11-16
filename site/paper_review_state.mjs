@@ -1,4 +1,4 @@
-import { retryPolicy, spendLabel } from './paper_spend.mjs';
+import { retryPolicy } from './paper_spend.mjs';
 export function recoveryState(run, { connected = false, error = '' } = {}) {
   if (!run || run.outcome || run.qualification?.eligible === false) return null;
   const pending = run.pending;
@@ -9,15 +9,13 @@ export function recoveryState(run, { connected = false, error = '' } = {}) {
   const rawReason = error || run.failure?.message || pending?.error || '';
   if (!pending && !rawReason && !run.selectedClaim && run.pipelineExtraction) return null;
   return {
-    title: needsCostApproval ? 'Continue this review?' : !pending && !rawReason ? 'Continue your review' : 'Review stopped',
-    message: needsCostApproval ? policy.reason === 'spend' ? 'This review has passed the $0.10 automatic-retry allowance. Your completed work is saved.' : 'ECHO cannot confirm the cost of the last request. Your completed work is saved.' : received ? 'The AI returned a response ECHO could not use. Your completed work is saved.'
-      : pending ? 'ECHO did not receive a confirmed response to the last AI request. Your completed work is saved.'
-        : rawReason ? 'The review stopped before it could finish. Your completed work is saved.' : 'Continue from where you stopped. Your completed work is saved.',
-    reason: needsCostApproval ? '' : /The protocol requires a person-level nonrandomized observational causal/i.test(rawReason)
-      ? 'A previous claim-check rule could not validate this response. Retry to check the claim with the current rules.'
-      : rawReason.replace(/\s+No result was accepted\.[\s\S]*$/, '').replace(/\s+The response could not be used\.[\s\S]*$/, '').replace(/\s+Acknowledge retry[\s\S]*$/, '').slice(0, 350),
-    cost: needsCostApproval ? `${spendLabel(run)} for this review. Another request may add a charge.` : '',
-    action: connected ? pending && needsCostApproval ? 'Retry review' : 'Continue review' : 'Reconnect to continue',
+    title: needsCostApproval ? 'Review paused — your choice' : 'Review paused',
+    message: pending ? received ? 'The last AI response could not be used. The review has not finished.' : 'The last AI request was interrupted. ECHO cannot confirm whether it finished or was charged.'
+      : 'The review stopped before it finished. Completed work is saved.',
+    reason: needsCostApproval && policy.reason === 'spend' ? 'Automatic retries stopped because this review has used more than its $0.10 allowance, including any estimated charges.'
+      : needsCostApproval ? 'Automatic retries stopped because the cost of a request is unavailable.' : '',
+    cost: pending ? 'Retry sends a new paid AI request for the unfinished step. Completed steps will not be repeated.' : 'Resume continues from the saved step. Further AI requests use your connected OpenRouter key.',
+    action: connected ? pending ? 'Retry unfinished step' : 'Resume review' : 'Connect OpenRouter to resume',
     kind: received ? 'invalid_response' : pending ? 'uncertain' : 'stopped'
   };
 }

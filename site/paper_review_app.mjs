@@ -1,14 +1,14 @@
-import { spendLabel } from "./paper_spend.mjs";
-import { recoveryState, acknowledgeRetry } from "./paper_review_state.mjs?v=spend-retry-v1";
+import { spendLabel, reviewSpend } from "./paper_spend.mjs";
+import { recoveryState, acknowledgeRetry } from "./paper_review_state.mjs?v=review-ux-v1";
 import { REVIEW_STAGES, recordProgress, progressSnapshot, elapsedLabel } from "./paper_progress.mjs";
 import { PAPER_PIPELINE } from "./paper_pipeline_contract.mjs";
 import { h } from "./dom_builder.mjs";
 import { paperStore } from "./paper_store.mjs";
-import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=spend-retry-v1";
+import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=review-ux-v1";
 import { checkCappedKey } from "./openrouter_connection.mjs";
-import { PaperModel } from "./paper_model.mjs?v=spend-retry-v1";
+import { PaperModel } from "./paper_model.mjs?v=review-ux-v1";
 import { BrowserEchoSession } from "./paper_browser_session.mjs";
-import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit } from "./paper_workflow.mjs?v=spend-retry-v1";
+import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit } from "./paper_workflow.mjs?v=review-ux-v1";
 import { publicSchemaProjection } from "./public_schema_projection.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
 import { unaddressedAssessmentNotice, VALIDATION_NOTICE } from "./paper_review_copy.mjs";
@@ -42,7 +42,14 @@ function renderActivity() {
   panel.dataset.state = recovery ? "paused" : state.state;
   const update = (id, value) => { if ($(id).textContent !== value) text(id, value); };
   const cancelling = busy && controller?.signal.aborted;
-  update("activity-spend", spendLabel(run)); $("activity-spend").hidden = !run;
+  update("activity-spend", spendLabel(run));
+  $("review-cost").hidden = !run;
+  const spend = reviewSpend(run), money = value => `$${value.toFixed(4)} (${(value * 100).toFixed(2)}¢)`;
+  update("cost-confirmed", money(spend.reported));
+  $("cost-unconfirmed-row").hidden = !spend.estimated && !spend.unknown;
+  update("cost-unconfirmed", `${spend.estimated ? `Estimated ${money(spend.estimated)}` : ""}${spend.unknown ? `${spend.estimated ? " + " : ""}cost unavailable for ${spend.unknown} request${spend.unknown === 1 ? "" : "s"}` : ""}`);
+  update("cost-explanation", spend.estimated || spend.unknown ? "The total billed is not yet known. The final charge may be higher than the confirmed amount." : "Includes successful and unsuccessful AI requests in this review.");
+  update("action-help", busy ? "Stop review prevents new requests. A request already sent may still be charged. Your completed work is saved." : "Viewing this screen sends no AI requests and adds no charges.");
   update("activity-title", cancelling ? "Stopping review" : recovery ? recovery.title : state.title);
   update("activity-elapsed", busy ? `${elapsedLabel(state.elapsedSeconds)} elapsed` : state.state === "complete" ? "Saved" : "");
   $("activity-elapsed").hidden = !busy && state.state !== "complete";
@@ -54,7 +61,7 @@ function renderActivity() {
   update("recovery-cost", recovery?.cost || ""); $("recovery-cost").hidden = !recovery?.cost;
   const chooseAgain = !busy && state.state === "not_qualified";
   $("review-action").hidden = !recovery && !chooseAgain;
-  update("review-action", chooseAgain ? "Choose another claim" : recovery?.action || "Retry review");
+  update("review-action", chooseAgain ? "Choose another claim" : recovery?.action || "Retry unfinished step");
   update("activity-wait", state.waiting);
   $("activity-wait").hidden = !state.waiting;
   update("activity-confounders", state.total === null ? state.stage === "map" ? "Finding confounders…" : "Confounders: pending" : `${state.assessed} of ${state.total} confounders assessed`);
@@ -98,6 +105,8 @@ function populate(capture) {
 function render() {
   renderActivity();
   document.body.dataset.busy = String(busy);
+  if (bridgeTarget && bridgeNonce) bridgeTarget.postMessage({ type: "echo-paper-status-v1", nonce: bridgeNonce, busy, reviewId: run?.id || null,
+    message: busy ? "Review running automatically. Progress and charges are shown below." : run?.outcome ? "Review complete. Results and charges are shown below." : run?.selectedClaim ? "Review paused. No AI requests are running. See the next action and charges below." : run?.claims?.length ? "Choose one claim below to start its review." : "Connect once below; ECHO will read the paper automatically." }, bridgeOrigin);
   document.body.dataset.complete = String(Boolean(run?.outcome));
   $("cancel").hidden = !busy;
   $("export").hidden = !run;
@@ -174,23 +183,38 @@ function render() {
   text("outcome", run?.outcome ? JSON.stringify(run.outcome, null, 2) : "");
   if (run?.published?.permalink) $("permalink").replaceChildren(h("a", { href: run.published.permalink, target: "_blank", rel: "noopener noreferrer", textContent: "Open published Echo schema ↗" }));
 }
+async function loadSaved(record) {
+  await session?.close(); session = null; run = record;
+  errorMessage = run.failure?.message || run.pending?.error || ""; text("error", errorMessage);
+  showClaimChoices = false; needsResume = !["complete", "not_qualified", "claims_extracted"].includes(run.phase);
+  populate(run.capture); $("paper-details").open = false;
+  text("pipeline-extraction", JSON.stringify(run.pipelineExtraction || {}, null, 2));
+  $("publication").hidden = true;
+}
 async function listSaved() {
   const runs = (await paperStore.list()).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  const totals = runs.map(reviewSpend).reduce((a, b) => ({ reported: a.reported + b.reported, estimated: a.estimated + b.estimated, unknown: a.unknown + b.unknown }), { reported: 0, estimated: 0, unknown: 0 });
+  text("saved-cost-total", `Across these saved reviews: $${totals.reported.toFixed(4)} confirmed${totals.estimated ? ` + $${totals.estimated.toFixed(4)} estimated` : ""}${totals.unknown ? " + charges not yet confirmed" : ""}.`);
   $("saved").replaceChildren(...runs.map(record => h("div", { className: "saved-row" },
-    h("strong", { textContent: record.capture.title }), h("p", { className: "muted", textContent: `${({ complete: "Review complete", claims_extracted: "Choose a claim", confirmed: "Paper captured", qualified: "Claim qualified", not_qualified: "Claim not qualified", uncertain: "Needs attention", split_required: "Review paused" })[record.phase] || "Review in progress"} · ${new Date(record.updatedAt || record.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` }),
-    h("button", { textContent: "Open", onclick: () => action(async () => {
-      await session?.close(); session = null; run = record; errorMessage = run.failure?.message || run.pending?.error || ""; text("error", errorMessage); showClaimChoices = false; needsResume = !["complete", "not_qualified", "claims_extracted"].includes(run.phase);
-      populate(run.capture);
-      text("pipeline-extraction", JSON.stringify(run.pipelineExtraction || {}, null, 2));
-      text("progress", run.pending ? "Interrupted call is uncertain. Explicit retry is required." : `Loaded ${run.phase}. Accepted work remains saved.`);
-      $("publication").hidden = true;
-    }) }),
-    h("button", { className: "secondary", textContent: "Delete", onclick: () => action(async () => {
-      if (run?.id === record.id) { await session?.close(); session = null; run = null; }
-      await paperStore.delete(record.id);
-    }) }))));
+    h("strong", { textContent: record.capture.title }),
+    record.selectedClaim ? h("p", { textContent: displayClaim(record.selectedClaim.text) }) : null,
+    h("p", { className: "muted", textContent: `${record.outcome ? "Complete" : record.selectedClaim ? "Paused" : "Waiting for a claim"} · ${new Date(record.updatedAt || record.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` }),
+    h("p", { className: "muted", textContent: `This review: ${spendLabel(record)}` }),
+    h("div", { className: "saved-actions" },
+      record.id === run?.id ? h("span", { className: "current-review", textContent: "Currently open" }) : h("button", { textContent: "View saved review", onclick: () => action(async () => {
+        const latest = await paperStore.get(record.id);
+        if (!latest) throw new Error("This saved review was removed.");
+        await loadSaved(latest);
+        $("review-history").open = false;
+        $("review-cost").scrollIntoView({ block: "start" });
+      }, { readOnly: true }) }),
+      h("button", { className: "secondary", textContent: "Delete saved review", onclick: () => action(async () => {
+        if (run?.id === record.id) { await session?.close(); session = null; run = null; }
+        await paperStore.delete(record.id);
+      }) })))));
 }
-async function action(operation) {
+
+async function action(operation, { readOnly = false } = {}) {
   if (busy) return;
   busy = true; operationStartedAt = Date.now(); controller = new AbortController(); errorMessage = ""; text("error", ""); render();
   let canSaveFailure = false;
@@ -199,12 +223,12 @@ async function action(operation) {
   try {
     await navigator.locks.request(`echo-paper:${run?.id || "new"}`, { ifAvailable: true }, async lock => {
       if (!lock) throw new Error("This review is active in another Echo window.");
-      if (run) {
+      if (run && !readOnly) {
         const stored = await paperStore.get(run.id);
         if (stored && stored.checkpointRevision !== run.checkpointRevision) throw new Error("This review changed in another window. Resume its latest saved checkpoint before continuing.");
       }
-      canSaveFailure = true;
-      if (run) run.failure = null;
+      canSaveFailure = !readOnly;
+      if (run && !readOnly) run.failure = null;
       await operation();
     });
   } catch (error) {
@@ -215,7 +239,7 @@ async function action(operation) {
       run.failure = { message: errorMessage, at: new Date().toISOString() };
       await save().catch(() => {});
     }
-  } finally { clearInterval(progressTimer); progressTimer = null; busy = false; render(); await listSaved().catch(() => {}); }
+  } finally { clearInterval(progressTimer); progressTimer = null; busy = false; render(); await listSaved().catch(() => {}); if (errorMessage && run) $("review-cost").scrollIntoView({ block: "start" }); }
 }
 function model() {
   if (!run) throw new Error("Confirm a paper first.");
@@ -385,15 +409,17 @@ window.addEventListener("message", event => {
   if (event.data.type !== "echo-paper-capture-v1") return;
   try {
     const capture = validateCapture(event.data.capture);
-    if (run?.capture.sourceUrl === capture.sourceUrl && run.capture.articleText === capture.articleText) return;
+    if (run?.capture.sourceUrl === capture.sourceUrl && run.capture.articleText === capture.articleText) { render(); return; }
     if (busy && run) { text("capture-note", "A new capture arrived while a step was running. Finish or cancel that step, then click the Echo toolbar icon again. Your existing review is saved."); return; }
     populate(capture);
     if (capture.title && capture.abstract && capture.articleText) {
       $("paper-details").open = false;
       text("paper-summary", "Paper details / edit capture");
       enqueue(async () => {
-        if (run?.capture.sourceUrl === capture.sourceUrl && run.capture.articleText === capture.articleText) return;
-        await startReview(capture);
+        if (run?.capture.sourceUrl === capture.sourceUrl && run.capture.articleText === capture.articleText) { render(); return; }
+        const existing = (await paperStore.list()).filter(record => record.capture.sourceUrl === capture.sourceUrl && record.capture.articleText === capture.articleText)
+          .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))[0];
+        if (existing) await loadSaved(existing); else await startReview(capture);
       });
     } else {
       $("paper-details").open = true;
@@ -401,6 +427,11 @@ window.addEventListener("message", event => {
     }
   } catch { text("error", "The captured page was not a valid article. Open the publisher's HTML article and click the Echo toolbar icon again."); }
 });
+const requestedReview = new URL(location.href).searchParams.get("review");
+if (requestedReview) {
+  const saved = await paperStore.get(requestedReview).catch(() => null);
+  if (saved) await loadSaved(saved);
+}
 if (bridgeNonce) {
   // Handshake contains only a nonce, never paper text or credentials. The wrapper checks exact source and Echo origin.
   for (const target of [window.parent !== window ? window.parent : null, window.opener].filter(Boolean)) {

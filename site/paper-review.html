@@ -1,6 +1,6 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>ECHO · Paper review</title><link rel="icon" type="image/svg+xml" href="./favicon.svg?v=echo-brand-original"><link rel="stylesheet" href="./paper_review.css?v=focused-review-v1"></head>
-<body data-review-ui="spend-retry-v1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>ECHO · Paper review</title><link rel="icon" type="image/svg+xml" href="./favicon.svg?v=echo-brand-original"><link rel="stylesheet" href="./paper_review.css?v=review-ux-v1"></head>
+<body data-review-ui="review-ux-v1">
   <header class="review-topbar"><img class="echo-logo" src="./echo-logo.svg?v=echo-brand-original" alt="ECHO — Every Cause of Human Outcomes"><span class="preview-badge">Paper review <span>Preview</span></span></header>
   <main>
     <header class="review-intro"><p class="eyebrow">Threats to inference</p><h1>A closer look at the claim.</h1><p>Choose a claim. Follow the evidence.</p><p class="intro-note">AI-assisted review. Manually check results before relying on them.</p></header>
@@ -15,7 +15,12 @@
         <button id="confirm">Save edits / start new review</button></div>
       </details>
     </section>
-    <p id="activity-spend" class="muted" role="status" hidden></p>
+    <section id="review-cost" class="cost-card" aria-labelledby="cost-heading" hidden>
+      <div class="section-heading"><h2 id="cost-heading">Cost of this review</h2><span class="muted">USD</span></div>
+      <dl><div><dt>Confirmed by OpenRouter</dt><dd id="cost-confirmed"></dd></div><div id="cost-unconfirmed-row"><dt>Not yet confirmed</dt><dd id="cost-unconfirmed"></dd></div></dl>
+      <p id="cost-explanation" class="muted"></p><p id="activity-spend" hidden></p>
+      <details><summary>What these amounts include</summary><p>All AI requests in this saved review, including unsuccessful attempts. An interrupted request may still be charged. Estimates are not confirmed charges. Other saved reviews have separate costs, shown below. <a href="https://openrouter.ai/activity" target="_blank" rel="noopener noreferrer">Check charges in OpenRouter ↗</a></p></details>
+    </section>
     <div id="selected-claim" class="selected-claim" hidden><span class="eyebrow">Selected claim</span><strong id="selected-claim-text"></strong><button id="change-claim" class="secondary">Change claim</button></div>
     <section id="review-activity" class="activity-panel" aria-label="Review activity" hidden>
       <div class="activity-heading"><span class="activity-indicator" aria-hidden="true"></span><h2 id="activity-title" aria-live="polite">Preparing review</h2><span id="activity-elapsed" class="meta-badge" aria-live="off"></span></div>
@@ -24,7 +29,7 @@
       <div id="activity-counts" class="activity-counts" aria-live="off"><span id="activity-confounders"></span><span id="activity-findings"></span><span id="activity-calls"></span></div>
       <ol id="activity-stages" class="activity-stages" aria-label="Review stages"></ol>
       <div id="recovery-message" hidden><p id="recovery-summary"></p><p id="recovery-reason"></p><p id="recovery-cost" class="muted"></p></div>
-      <div class="activity-actions"><button id="review-action" hidden>Retry review</button><button id="cancel" class="secondary" hidden>Cancel review</button></div>
+      <div class="activity-actions"><button id="review-action" hidden>Retry unfinished step</button><button id="cancel" class="secondary" hidden>Stop review</button></div><p id="action-help" class="muted"></p>
       <details><summary>Activity log</summary><ol id="activity-log" class="activity-log"></ol></details>
     </section>
     <section class="claims-card" aria-labelledby="claims-heading"><div class="section-heading"><h2 id="claims-heading">Choose a claim</h2><span id="claim-count" class="meta-badge" hidden></span></div>
@@ -50,7 +55,7 @@
       <div class="actions"><button id="export" class="secondary">Download review data</button><button id="preview" class="secondary">Preview public schema</button></div>
       <div id="publication" hidden><p>Publishing creates an immutable public ECHO schema: group definitions, membership, finding exclusion codes and review statuses. Paper text and private explanations are excluded. Manually review the results and supporting evidence before publishing. Inspect the preview below.</p><pre id="public-preview"></pre><button id="publish">Publish this schema publicly</button><p id="permalink"></p></div>
     </div></details>
-    <details id="review-history" class="utility-drawer"><summary>Saved reviews</summary><section class="saved-card" aria-labelledby="saved-heading"><div class="section-heading"><h2 id="saved-heading">Saved reviews</h2><span class="meta-badge">This browser</span></div><div id="saved"></div><p class="muted saved-note">Private checkpoints stay in this browser. Deleting a checkpoint does not remove a public publication or OpenRouter’s processing records.</p></section>
+    <details id="review-history" class="utility-drawer"><summary>Saved reviews</summary><p class="muted">View opens a saved result or progress screen. It does not send AI requests or add charges. To continue a paused review, use its Resume or Retry button after opening it.</p><section class="saved-card" aria-labelledby="saved-heading"><div class="section-heading"><h2 id="saved-heading">Saved reviews</h2><span class="meta-badge">This browser</span></div><p id="saved-cost-total" class="muted"></p><div id="saved"></div><p class="muted saved-note">Private checkpoints stay in this browser. Deleting a saved review removes it from this browser. It does not refund AI charges or remove a public publication.</p></section>
     </details><footer class="review-footer"><span>ECHO</span> Every Cause of Human Outcomes</footer>
-  </main><script type="module" src="./paper_review.mjs?v=spend-retry-v1"></script>
+  </main><script type="module" src="./paper_review.mjs?v=review-ux-v1"></script>
 </body></html>

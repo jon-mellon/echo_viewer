@@ -1,4 +1,4 @@
-# Echo Paper Review 0.2.1
+# Echo Paper Review 0.2.2
 
 The implementation lives on `permastaging`. The extension is a
 small Manifest V3 shell. Its side panel embeds `https://www.jonathanmellon.com/echo_viewer_permastaging/paper-review.html`.
@@ -362,3 +362,9 @@ After claim selection, the claim list collapses to the selected relationship and
 Qualification quotation checks tolerate whitespace, curly quotes, discretionary soft hyphens and typographic hyphen variants. Accepted quotations are restored to exact spans of the captured article. There is no fuzzy, paraphrase, case-insensitive, numeric or ellipsis matching. Raw model replies stay in durable receipts.
 
 Structured responses that fail JSON, schema or evidence validation are corrected using the same model and validation rules within the cumulative $0.10 automatic-retry allowance. This replaces the previous two-correction limit. Retry receipts, estimates and reasons are saved before another request. The total includes successful steps, failed replies and estimated unconfirmed charges, and persists across reopening. At exactly $0.10 automatic retry is still allowed; once the total exceeds it, another retry requires explicit approval. This is a retry-approval threshold, not a hard cap on the cost of a successful review or the next request. There is a technical ceiling of 100 automatic retries per review to stop pathological free/near-free loops. Cancellation always stops retries. Publication and accepted local tool operations are never automatically repeated.
+
+## Clear costs and actions (0.2.2)
+
+The cost card separates confirmed OpenRouter charges from estimated or unavailable charges and shows both dollars and cents. These amounts cover one review; saved history also shows the aggregate across its retained reviews. It does not claim a full lifetime account bill. Viewing a saved review sends no AI requests. Retry unfinished step sends a new paid request for incomplete work, preserving completed steps. Raw protocol diagnostics live under Review details. The status panel no longer sticks over costs or content.
+
+The extension toolbar separates Use current article (capture) from Update screen (reload current saved review with a fresh URL and no recapture). Its status follows the review instead of retaining the initial choose-a-claim instruction. Opening an unchanged article reuses its latest saved review, avoiding duplicate extraction and charges. Version 0.2.2 requires replacing the unpacked extension files and reloading its Chrome extensions card to get the new toolbar. Hosted page updates remain independent.

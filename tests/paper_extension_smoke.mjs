@@ -5,6 +5,7 @@ import { readFile, mkdtemp, rm } from "node:fs/promises";
 import { resolve, extname } from "node:path";
 import { tmpdir } from "node:os";
 import { chromium } from "playwright";
+import { buildExtension } from "../scripts/build_extension.mjs";
 import { capturePaper } from "../extension/capture.mjs";
 
 const repairCase = process.env.ECHO_TEST_REPAIR === "1";
@@ -44,8 +45,9 @@ async function screenshotReview(page, frame, path) {
   await page.setViewportSize(viewport);
 }
 try {
+  const extensionPath = await buildExtension({ destination: resolve(profile, "extension") });
   context = await chromium.launchPersistentContext(profile, { channel: "chromium", headless: true,
-    args: [`--disable-extensions-except=${resolve("dist/extension")}`, `--load-extension=${resolve("dist/extension")}`] });
+    args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`] });
   await context.route("https://pmc.ncbi.nlm.nih.gov/**", route => route.fulfill({ contentType: "text/html", body: article }));
   await context.route(`${origin}/**`, async route => {
     const path = new URL(route.request().url()).pathname.replace(prefix, "");
@@ -135,26 +137,33 @@ try {
   assert.equal(await frame.locator('#activity-title').textContent(),'Checking the selected claim');
   assert.equal(await frame.locator('#activity-meter').getAttribute('value'),null);
   assert.equal(await frame.locator('#cancel').isVisible(),true);
+  assert.equal(await page.locator('#update').isEnabled(),false);
+  assert.match(await page.locator('#status').textContent(),/running automatically/);
+  await frame.locator('#cost-unconfirmed-row').waitFor();
+  assert.match(await frame.locator('#cost-unconfirmed').textContent(),/Estimated/);
+  assert.match(await frame.locator('#cost-confirmed').textContent(),/0.0010/);
   assert.equal(await frame.locator('#review-action').isVisible(),false);
   await frame.waitForFunction(() => !document.getElementById('activity-elapsed').textContent.startsWith('0s'), null, {timeout:5000});
   assert.equal(await frame.locator('#activity-meter').getAttribute('value'),null);
   await screenshotReview(page, frame, '/tmp/echo-review-progress-waiting.png');
   releaseQualification();
   if (retryCase) {
-    await frame.locator('#review-action').getByText('Retry review',{exact:true}).waitFor();
-    assert.equal(await frame.locator('#activity-title').textContent(),'Continue this review?');
+    await frame.locator('#review-action').getByText('Retry unfinished step',{exact:true}).waitFor();
+    assert.equal(await frame.locator('#activity-title').textContent(),'Review paused — your choice');
     assert.equal(await frame.locator('.claims-card').isVisible(),false);
-    assert.match(await frame.locator('#recovery-cost').textContent(),/Another request/);
+    assert.match(await frame.locator('#recovery-cost').textContent(),/new paid AI request/);
     assert.equal(await frame.getByRole('button',{name:/Continue selected claim|Acknowledge|Resume review/}).count(),0);
     assert.equal(completions,4);
+    assert.match(await frame.locator("#cost-confirmed").textContent(), /12.10¢/);
     assert.match(await frame.locator("#activity-spend").textContent(),/\$0.1210 spent/);
     await screenshotReview(page,frame,'/tmp/echo-simple-retry.png');
-    await page.reload();
+    await page.screenshot({path:'/tmp/echo-review-paused-panel.png'});
+    await page.locator('#update').click();
     frame = await (await page.waitForSelector('#echo')).contentFrame();
-    await frame.locator('#connection').filter({hasText:'remembered for this Chrome session'}).waitFor();
-    await frame.locator('#review-history').evaluate(node=>node.open=true);
-    await frame.getByRole('button',{name:'Open',exact:true}).click();
-    await frame.getByRole('button',{name:'Retry review',exact:true}).waitFor();
+    await frame.locator('#review-cost').waitFor();
+    assert.ok(new URL(frame.url()).searchParams.get('review'));
+    assert.match(await frame.locator('#cost-confirmed').textContent(), /0.1210/);
+    await frame.getByRole('button',{name:'Retry unfinished step',exact:true}).waitFor();
     assert.equal(completions,4); // Loading a stopped review never replays a paid request.
     await frame.locator('#review-action').click();
   }
@@ -173,7 +182,7 @@ try {
     const restored = await (await page.waitForSelector('#echo')).contentFrame();
     await restored.locator('#connection').filter({hasText:'remembered for this Chrome session'}).waitFor();
     await restored.locator('#review-history').evaluate(node=>node.open=true);
-    await restored.getByRole('button',{name:'Open',exact:true}).click();
+    await restored.getByRole('button',{name:'View saved review',exact:true}).click();
     await restored.getByRole('button',{name:'Choose another claim',exact:true}).waitFor();
     assert.equal(completions,2);assert.equal(await restored.locator('#error').textContent(),'');
     console.log('Passed: unsupported claim is a saved, non-error outcome, with no graph session and no repeat billing on reload.');
@@ -218,13 +227,28 @@ try {
   assert.equal(publicSchema.finding_reviews, undefined); assert.equal(publicSchema.finding_decisions.ky.reason_text, undefined);
   const before = completions;
   await page.reload();
-  const reloaded = await (await page.waitForSelector("#echo")).contentFrame(); await reloaded.locator("#connection").filter({hasText:"remembered for this Chrome session"}).waitFor();
+  let reloaded = await (await page.waitForSelector("#echo")).contentFrame(); await reloaded.locator("#connection").filter({hasText:"remembered for this Chrome session"}).waitFor();
   assert.equal(completions, before);
   await reloaded.locator("#review-history").evaluate(node=>node.open=true);
-  await reloaded.getByRole("button", { name: "Open", exact: true }).click();
+  await reloaded.getByRole("button", { name: "View saved review", exact: true }).click();
   await reloaded.locator("#activity-title").filter({hasText:"Review complete"}).waitFor();
   assert.equal(completions, before);
   assert.equal(authExchanges, 1); // Panel reload restores the connection without OAuth.
+  assert.equal(await reloaded.locator('#cost-unconfirmed-row').isVisible(),false);
+  assert.equal(await reloaded.getByText('Currently open',{exact:true}).count(),1);
+  assert.match(await reloaded.locator('#saved-cost-total').textContent(),/confirmed/);
+  // A later capture of this same unchanged article reopens the review without
+  // another extraction, a duplicate saved run or additional billing.
+  await page.reload();
+  reloaded = await (await page.waitForSelector('#echo')).contentFrame();
+  await reloaded.locator('#connection').filter({hasText:'remembered for this Chrome session'}).waitFor();
+  await page.evaluate(({capture,origin})=>{
+    const frame=document.getElementById('echo'),nonce=new URL(frame.src).hash.slice('#bridge='.length);
+    frame.contentWindow.postMessage({type:'echo-paper-capture-v1',nonce,capture},origin);
+  },{capture,origin});
+  await reloaded.locator('#activity-title').filter({hasText:'Review complete'}).waitFor();
+  assert.equal(completions,before);
+  assert.equal(await reloaded.evaluate(async()=>{const {paperStore}=await import('./paper_store.mjs');return (await paperStore.list()).length;}),1);
   const keyState = await worker.evaluate(async () => ({local:await chrome.storage.local.get(null),session:await chrome.storage.session.get(null)}));
   assert.deepEqual(keyState.local, {});
   assert.equal(keyState.session["echo-openrouter-key-v1"], "fixture-secret-key");
