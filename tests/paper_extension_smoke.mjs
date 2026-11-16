@@ -8,6 +8,7 @@ import { chromium } from "playwright";
 import { buildExtension } from "../scripts/build_extension.mjs";
 import { capturePaper } from "../extension/capture.mjs";
 
+const providerErrorCase = process.env.ECHO_TEST_PROVIDER_ERROR === "1";
 const repairCase = process.env.ECHO_TEST_REPAIR === "1";
 const retryCase = process.env.ECHO_TEST_RETRY === "1";
 let qualificationAttempts = 0;
@@ -61,7 +62,7 @@ try {
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: {
       "access-control-allow-origin": origin, "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "authorization, content-type" } });
     const url = new URL(route.request().url());
-    const json = body => route.fulfill({ contentType: "application/json", body: JSON.stringify(body), headers: { "access-control-allow-origin": origin } });
+    const json = (body,status=200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body), headers: { "access-control-allow-origin": origin } });
     if (url.pathname === "/auth") {
       const callback = new URL(url.searchParams.get("callback_url")); callback.searchParams.set("code", "fixture-code"); callback.searchParams.set("state", url.searchParams.get("state"));
       return route.fulfill({ status: 302, headers: { location: callback.href } });
@@ -80,6 +81,10 @@ try {
         : { role: "assistant", content: null, tool_calls: [{ id: "anchor-op", type: "function", function: { name: "echo_set_anchors", arguments: '{"ivId":"x","dvId":"y"}' } }] };
     } else {
       const properties = request.response_format.json_schema.schema.properties;
+      if (providerErrorCase && properties.eligible) {
+        await qualificationGate;
+        return json({error:{code:400,message:"Provider rejected this request",metadata:{provider_name:"Fixture provider",raw:JSON.stringify({error:{message:"The selected provider does not support the requested reasoning parameter."}})}}},400);
+      }
       const value = properties.s ? { s: "success", v: [{ vi: "v1", a: ["person"], c: "uoa's exposure" }, { vi: "v2", a: ["person"], c: "uoa's outcome" }], l: [{ li: "l1", s: ["v1"], t: "v2", e: "present", p: "adults", d: unadjusted ? "other" : "implied_selection_on_observables" }] }
         : properties.eligible ? ((retryCase || repairCase) && ++qualificationAttempts <= (retryCase ? 3 : 1) ? { ...qualification, evidenceQuote: "This quotation was invented by the fixture." } : unsupported ? { ...qualification, eligible: false, causal: false, reason: "The full text gives a descriptive comparison without a causal interpretation." } : qualification)
           : properties.systematicallyDifferent ? { status: "unaddressed", reason: "The measured age mechanism is not addressed in this specification.", systematicallyDifferent: false, splitReason: "The two legs instantiate the same age construct.", rejectedPaths: [] }
@@ -167,7 +172,26 @@ try {
     assert.equal(completions,4); // Loading a stopped review never replays a paid request.
     await frame.locator('#review-action').click();
   }
-  if (unsupported) {
+  if (providerErrorCase) {
+    await frame.getByRole('button',{name:'Download error details',exact:true}).waitFor();
+    assert.match(await frame.locator('#recovery-summary').textContent(),/error 400/);
+    assert.match(await frame.locator('#recovery-summary').textContent(),/does not support the requested reasoning/);
+    assert.match(await frame.locator('#recovery-step').textContent(),/Qualifying selected claim/);
+    assert.equal(completions,2);
+    assert.equal(await frame.getByRole('button',{name:'Retry unfinished step',exact:true}).count(),0);
+    await frame.locator('#request-diagnostic').evaluate(node=>node.open=true);
+    assert.match(await frame.locator('#request-diagnostic-data').textContent(),/"retryable": false/);
+    assert.doesNotMatch(await frame.locator('#request-diagnostic-data').textContent(),/fixture-secret-key/);
+    const downloadPromise=page.waitForEvent('download');
+    await frame.getByRole('button',{name:'Download error details',exact:true}).click();
+    const downloaded=await downloadPromise;
+    const details=JSON.parse(await readFile(await downloaded.path(),'utf8'));
+    assert.equal(details.failure.status,400);assert.equal(details.failure.retryable,false);
+    assert.equal(details.paper,undefined);assert.equal(completions,2);
+    await screenshotReview(page,frame,'/tmp/echo-provider-error-details.png');
+    assert.deepEqual(errors,[]);
+    console.log('Passed: HTTP 400 shows the exact provider cause and failed step, stops without repeated paid requests, and exports safe diagnostics.');
+  } else if (unsupported) {
     await frame.getByRole('button',{name:'Choose another claim',exact:true}).waitFor();
     assert.equal(await frame.locator('#error').textContent(), '');
     assert.equal(await frame.locator('#review-state').textContent(), 'Not qualified');

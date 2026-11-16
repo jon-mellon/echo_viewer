@@ -5,12 +5,12 @@ export const JEV_MAX_KEY_LIMIT_USD = 5;
 const REQUEST_TIMEOUT_MS = 60_000;
 
 export async function openRouterJson(path, key, options = {}, fetchImpl = fetch) {
-  const { signal, ...fetchOptions } = options;
+  const { signal, timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options;
   const controller = new AbortController();
   const stop = () => controller.abort(signal.reason);
   if (signal?.aborted) stop();
   else signal?.addEventListener("abort", stop, { once: true });
-  const timer = setTimeout(() => controller.abort("timeout"), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort("timeout"), timeoutMs);
   try {
     const response = await fetchImpl(`https://openrouter.ai${path}`, {
       ...fetchOptions, signal: controller.signal,
@@ -19,12 +19,28 @@ export async function openRouterJson(path, key, options = {}, fetchImpl = fetch)
     });
     const body = await response.json().catch(error => {
       if (controller.signal.aborted) throw error;
-      return {};
+      throw Object.assign(new Error(`OpenRouter returned HTTP ${response.status} with an unreadable JSON response.`), {
+        kind: response.ok ? "invalid_json" : "http", status: response.status,
+        requestId: response.headers?.get("x-request-id") || response.headers?.get("cf-ray") || null,
+        retryable: response.ok || [408,425,429].includes(response.status) || response.status >= 500
+      });
     });
-    if (!response.ok) throw new Error(body.error?.message || body.message || `OpenRouter returned ${response.status}.`);
+    if (!response.ok || body.error) {
+      const providerCode = body.error?.code;
+      const code = Number(providerCode) || response.status;
+      throw Object.assign(new Error(body.error?.message || (typeof body.error === "string" ? body.error : "") || body.message || `OpenRouter returned ${response.status}.`), {
+        kind: "http", status: response.status, providerCode: providerCode ?? null,
+        provider: body.error?.metadata?.provider_name || null,
+        providerDetail: body.error?.metadata?.raw || null,
+        limitSource: body.error?.metadata?.limit_source || null,
+        requestId: response.headers?.get("x-request-id") || body.id || null,
+        retryable: [408, 425, 429].includes(code) || code >= 500 || (code === 402 && body.error?.metadata?.limit_source === "openrouter_in_flight_budget"),
+        retryAfterMs: Math.max(0, Number(response.headers?.get("retry-after")) * 1000) || null
+      });
+    }
     return body;
   } catch (error) {
-    if (controller.signal.reason === "timeout") throw new Error("OpenRouter did not respond within 60 seconds.");
+    if (controller.signal.reason === "timeout") throw Object.assign(new Error(`OpenRouter did not respond within ${Math.round(timeoutMs / 1000)} seconds.`), { kind: "timeout", timeoutMs, retryable: true });
     throw error;
   } finally {
     clearTimeout(timer);

@@ -1,5 +1,6 @@
+import { requestFailure, failureExplanation } from "./paper_request_error.mjs";
 import { retryPolicy, recordAutomaticRetry, estimateRequestCost } from "./paper_spend.mjs";
-import { openRouterJson } from "./definition_jev_core.mjs";
+import { openRouterJson } from "./definition_jev_core.mjs?v=request-diagnostics-v1";
 import { checkCappedKey } from "./openrouter_connection.mjs";
 import { PAPER_PIPELINE } from "./paper_pipeline_contract.mjs";
 import { digest } from "./paper_review_contract.mjs";
@@ -74,23 +75,25 @@ export class PaperModel {
       const id = crypto.randomUUID();
       const bodyPayload = { model: this.run.model, stream: false, max_tokens: 12000,
         provider: { require_parameters: true, allow_fallbacks: false },
-        ...(this.run.pipeline && name === "Setting up Echo variables" ? { reasoning: { effort: PAPER_PIPELINE.setupReasoning } } : {}), ...payload };
-      this.run.pending = { id, kind: "request", phase: name, requestHash, estimatedCost: estimateRequestCost(this.run.modelPricing, bodyPayload), startedAt: new Date().toISOString() };
+        ...(this.run.pipeline ? { reasoning: { effort: PAPER_PIPELINE.setupReasoning } } : {}), ...payload };
+      this.run.pending = { id, kind: "request", phase: name, requestHash, timeoutMs: 180000, estimatedCost: estimateRequestCost(this.run.modelPricing, bodyPayload), startedAt: new Date().toISOString() };
       this.run.phase = name;
       await this.save(); // Save the request and cost reservation before it can be billed.
       this.onProgress(name);
       let body;
       try {
-        body = await this.request("/api/v1/chat/completions", this.getKey(), { method: "POST", signal: this.signal, body: JSON.stringify(bodyPayload) });
-      } catch {
-        this.run.phase = "uncertain"; this.run.pending.kind = "uncertain";
+        body = await this.request("/api/v1/chat/completions", this.getKey(), { method: "POST", signal: this.signal, timeoutMs: 180000, body: JSON.stringify(bodyPayload) });
+      } catch (error) {
+        const failure = requestFailure(error, { key: this.getKey(), step: name, model: this.run.model, cancelled: this.signal?.aborted });
+        this.run.phase = "uncertain";
+        Object.assign(this.run.pending, { kind: failure.kind === "http" ? "rejected" : "uncertain", requestError: failure, error: failureExplanation(failure) });
         await this.save();
         if (await this.retryFailed(this.run.pending)) continue;
-        throw new Error("The AI request did not finish reliably. It may have been billed.");
+        throw new Error(`${failureExplanation(failure)} The cost of this request has not been confirmed; it may have been billed.`);
       }
       const usage = body.usage;
       this.run.calls ||= [];
-      this.run.calls.push({ id, phase: name, model: body.model || this.run.model, provider: body.provider || null,
+      this.run.calls.push({ id, phase: name, model: body.model || this.run.model, provider: body.provider || null, generationId: body.id || null,
         input: usage?.prompt_tokens ?? null, output: usage?.completion_tokens ?? null,
         cachedRead: usage?.prompt_tokens_details?.cached_tokens ?? null,
         cacheWrite: usage?.prompt_tokens_details?.cache_write_tokens ?? null, cost: usage?.cost ?? null,
@@ -98,6 +101,7 @@ export class PaperModel {
       const choice = body.choices?.[0];
       if (!choice?.message || !["stop", "tool_calls"].includes(choice.finish_reason)) {
         this.run.phase = "invalid_response"; this.run.pending.kind = "invalid_response";
+        this.run.pending.requestError = requestFailure({ kind: "incomplete", message: `The AI response ended with finish_reason=${choice?.finish_reason || "missing"} instead of a complete answer.`, retryable: true }, { key: this.getKey(), step: name, model: this.run.model });
         await this.save();
         if (await this.retryFailed(this.run.pending)) continue;
         throw new Error("The AI returned an incomplete response.");
@@ -109,14 +113,14 @@ export class PaperModel {
     }
   }
   async retryFailed(failed) {
-    if (this.signal?.aborted || !retryPolicy(this.run).allowed) return false;
+    if (this.signal?.aborted || failed.requestError?.retryable === false || !retryPolicy(this.run).allowed) return false;
     recordAutomaticRetry(this.run, failed);
     await this.save();
-    this.onProgress({ title: "Continuing your review", detail: "ECHO is retrying automatically within the review’s $0.10 allowance." });
+    this.onProgress({ title: "Continuing your review", detail: failed.requestError ? `${failureExplanation(failed.requestError)} Retrying within the review’s $0.10 allowance.` : "ECHO is retrying automatically within the review’s $0.10 allowance." });
     // Back off transient failures without a timer that survives cancellation.
-    if (failed.kind === "uncertain") await new Promise((resolve, reject) => {
+    if (failed.kind === "uncertain" || failed.requestError) await new Promise((resolve, reject) => {
       const abort = () => { clearTimeout(timer); reject(this.signal.reason); };
-      const timer = setTimeout(() => { this.signal?.removeEventListener("abort", abort); resolve(); }, Math.min(2000, 250 * this.run.autoRetries.length));
+      const timer = setTimeout(() => { this.signal?.removeEventListener("abort", abort); resolve(); }, Math.max(failed.requestError?.retryAfterMs || 0, Math.min(2000, 250 * this.run.autoRetries.length)));
       this.signal?.addEventListener("abort", abort, { once: true });
       if (this.signal?.aborted) abort();
     });
@@ -153,7 +157,7 @@ export class PaperModel {
         this.onProgress({ title: "Checking the AI response", detail: "Correcting a response that did not pass ECHO’s checks." });
         continue;
       }
-      this.run.pending = { id: this.run.receipts[requestHash]?.id, phase: "Invalid structured response", kind: "invalid_response", error: invalid.message, requestHash };
+      this.run.pending = { id: this.run.receipts[requestHash]?.id, phase: "Invalid structured response", kind: "invalid_response", error: invalid.message, requestHash, requestError: requestFailure({ kind: "validation", message: invalid.message, retryable: true }, { key: this.getKey(), step: name, model: this.run.model }) };
       await this.save();
       throw new Error("ECHO could not verify the AI response automatically. Your completed work is saved.");
     }

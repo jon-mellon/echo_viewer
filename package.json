@@ -32,7 +32,7 @@
     "profile:selection-concept": "node scripts/profile_selection_and_concept.mjs",
     "agent:mcp": "node agent/mcp.mjs",
     "build:extension": "node scripts/build_extension.mjs",
-    "test:extension": "node --test tests/paper_extension.test.mjs tests/paper_capture_action.test.mjs tests/paper_pipeline.test.mjs tests/paper_progress.test.mjs tests/paper_review_state.test.mjs tests/paper_spend.test.mjs",
+    "test:extension": "node --test tests/paper_extension.test.mjs tests/paper_capture_action.test.mjs tests/paper_pipeline.test.mjs tests/paper_progress.test.mjs tests/paper_review_state.test.mjs tests/paper_spend.test.mjs tests/paper_request_error.test.mjs",
     "test:extension:browser": "node tests/paper_extension_smoke.mjs",
     "build:extension:permastaging": "node scripts/build_extension.mjs --permastaging"
   },

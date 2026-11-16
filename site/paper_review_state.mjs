@@ -1,21 +1,29 @@
+import { failureExplanation } from './paper_request_error.mjs';
 import { retryPolicy } from './paper_spend.mjs';
 export function recoveryState(run, { connected = false, error = '' } = {}) {
   if (!run || run.outcome || run.qualification?.eligible === false) return null;
   const pending = run.pending;
   const policy = retryPolicy(run);
+  const failure = pending?.requestError || run.failure?.requestError;
+  const permanent = failure?.retryable === false && failure.kind !== 'cancelled';
+  const code = Number(failure?.providerCode) || failure?.status;
+  const intent = !connected || (permanent && code === 401) ? 'reconnect' : permanent && code === 402 ? 'account' : permanent ? 'diagnostic' : 'retry';
   const needsCostApproval = pending && !policy.allowed && policy.reason !== "unavailable";
   const received = pending && (pending.kind === 'invalid_response' || /invalid structured response/i.test(pending.phase || '')
     || run.phase === 'invalid_response' || run.calls?.some(call => call.id === pending.id));
   const rawReason = error || run.failure?.message || pending?.error || '';
   if (!pending && !rawReason && !run.selectedClaim && run.pipelineExtraction) return null;
   return {
-    title: needsCostApproval ? 'Review paused — your choice' : 'Review paused',
-    message: pending ? received ? 'The last AI response could not be used. The review has not finished.' : 'The last AI request was interrupted. ECHO cannot confirm whether it finished or was charged.'
-      : 'The review stopped before it finished. Completed work is saved.',
-    reason: needsCostApproval && policy.reason === 'spend' ? 'Automatic retries stopped because this review has used more than its $0.10 allowance, including any estimated charges.'
+    title: permanent ? 'Request failed — retrying will not fix it' : needsCostApproval ? 'Review paused — your choice' : 'Review paused',
+    message: failure ? failureExplanation(failure) : pending && !received ? failureExplanation(null) : pending ? received ? pending.error || 'The last AI response could not be used. The review has not finished.' : 'The last AI request was interrupted. ECHO cannot confirm whether it finished or was charged.'
+      : rawReason && !/The protocol requires a person-level/i.test(rawReason) ? rawReason : 'The review stopped before it finished. Completed work is saved.',
+    step: pending?.phase || run.progress?.title || '',
+    diagnostic: failure || null,
+    intent,
+    reason: permanent ? 'Automatic retries stopped because this request was rejected. The error needs to be resolved before sending it again.' : needsCostApproval && policy.reason === 'spend' ? 'Automatic retries stopped because this review has used more than its $0.10 allowance, including any estimated charges.'
       : needsCostApproval ? 'Automatic retries stopped because the cost of a request is unavailable.' : '',
-    cost: pending ? 'Retry sends a new paid AI request for the unfinished step. Completed steps will not be repeated.' : 'Resume continues from the saved step. Further AI requests use your connected OpenRouter key.',
-    action: connected ? pending ? 'Retry unfinished step' : 'Resume review' : 'Connect OpenRouter to resume',
+    cost: permanent ? 'No retry is running. Completed work is saved. The cost card shows confirmed and unconfirmed charges separately.' : pending ? 'Retry sends a new paid AI request for the unfinished step. Completed steps will not be repeated.' : 'Resume continues from the saved step. Further AI requests use your connected OpenRouter key.',
+    action: intent === 'reconnect' ? 'Reconnect OpenRouter' : intent === 'account' ? 'Check OpenRouter credits' : intent === 'diagnostic' ? 'Download error details' : pending ? 'Retry unfinished step' : 'Resume review',
     kind: received ? 'invalid_response' : pending ? 'uncertain' : 'stopped'
   };
 }

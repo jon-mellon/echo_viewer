@@ -11,8 +11,8 @@ test('known unusable replies offer one retry with an accurate charge explanation
 });
 test('unknown request outcomes warn about a possible repeat charge and reconnect is distinct', () => {
  const run={pending:{id:'lost',phase:'Checking claim',requestHash:'lost-hash'}};
- assert.match(recoveryState(run,{connected:true}).message,/cannot confirm/);
- assert.equal(recoveryState(run).action,'Connect OpenRouter to resume');
+ assert.match(recoveryState(run,{connected:true}).message,/did not record/);
+ assert.equal(recoveryState(run).action,'Reconnect OpenRouter');
 });
 test('explicit retry clears only failed work and preserves its received reply and accepted receipts', () => {
  const reply={id:'bad',message:{content:'invalid'}};

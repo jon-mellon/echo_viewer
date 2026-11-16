@@ -1,14 +1,15 @@
+import { requestFailure } from "./paper_request_error.mjs";
 import { spendLabel, reviewSpend } from "./paper_spend.mjs";
-import { recoveryState, acknowledgeRetry } from "./paper_review_state.mjs?v=review-ux-v1";
+import { recoveryState, acknowledgeRetry } from "./paper_review_state.mjs?v=request-diagnostics-v1";
 import { REVIEW_STAGES, recordProgress, progressSnapshot, elapsedLabel } from "./paper_progress.mjs";
 import { PAPER_PIPELINE } from "./paper_pipeline_contract.mjs";
 import { h } from "./dom_builder.mjs";
 import { paperStore } from "./paper_store.mjs";
-import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=review-ux-v1";
+import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=request-diagnostics-v1";
 import { checkCappedKey } from "./openrouter_connection.mjs";
-import { PaperModel } from "./paper_model.mjs?v=review-ux-v1";
+import { PaperModel } from "./paper_model.mjs?v=request-diagnostics-v1";
 import { BrowserEchoSession } from "./paper_browser_session.mjs";
-import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit } from "./paper_workflow.mjs?v=review-ux-v1";
+import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit } from "./paper_workflow.mjs?v=request-diagnostics-v1";
 import { publicSchemaProjection } from "./public_schema_projection.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
 import { unaddressedAssessmentNotice, VALIDATION_NOTICE } from "./paper_review_copy.mjs";
@@ -56,6 +57,10 @@ function renderActivity() {
   update("activity-detail", recovery ? "" : cancelling ? "Waiting for the current operation to stop. Your completed work is saved." : state.state === "not_qualified" ? `The AI could not review this claim: ${run.qualification.reason} Choose another claim to continue.` : state.detail);
   $("activity-detail").hidden = Boolean(recovery);
   $("recovery-message").hidden = !recovery;
+  update("recovery-step", recovery?.step ? `Stopped during: ${recovery.step}` : "");
+  $("review-action").dataset.intent = recovery?.intent || "retry";
+  $("request-diagnostic").hidden = !recovery?.diagnostic;
+  update("request-diagnostic-data", recovery?.diagnostic ? JSON.stringify(recovery.diagnostic, null, 2) : "");
   update("recovery-summary", recovery?.message || "");
   update("recovery-reason", recovery?.reason || ""); $("recovery-reason").hidden = !recovery?.reason;
   update("recovery-cost", recovery?.cost || ""); $("recovery-cost").hidden = !recovery?.cost;
@@ -236,7 +241,7 @@ async function action(operation, { readOnly = false } = {}) {
     errorMessage = key ? String(error.message).replaceAll(key, "[redacted]") : String(error.message);
     text("error", errorMessage);
     if (run && canSaveFailure) {
-      run.failure = { message: errorMessage, at: new Date().toISOString() };
+      run.failure = { message: errorMessage, ...(error.kind || error.status ? { requestError: requestFailure(error, { key, step: run.progress?.title, model: run.model, cancelled: controller.signal.aborted }) } : {}), at: new Date().toISOString() };
       await save().catch(() => {});
     }
   } finally { clearInterval(progressTimer); progressTimer = null; busy = false; render(); await listSaved().catch(() => {}); if (errorMessage && run) $("review-cost").scrollIntoView({ block: "start" }); }
@@ -256,6 +261,7 @@ async function connectKey(candidate, { restored = false, persistent = false } = 
     persistent = result.persistent;
   }
   connectionPersistent = persistent;
+  if (Number(run?.pending?.requestError?.providerCode || run?.pending?.requestError?.status) === 401) { acknowledgeRetry(run); await save(); }
   $("remember").checked = persistent;
   text("progress", "Connected. Extracting the paper’s claims with the Echo pipeline…");
   await extractCurrentClaims();
@@ -354,6 +360,13 @@ $("disconnect").addEventListener("click", () => {
 });
 $("change-claim").addEventListener("click", () => { showClaimChoices = !showClaimChoices; render(); if (showClaimChoices) $("claims-heading").scrollIntoView({ block: "nearest" }); });
 $("review-action").addEventListener("click", () => {
+  if ($("review-action").dataset.intent === "reconnect") { key = null; connectWindow(); return; }
+  if ($("review-action").dataset.intent === "account") { window.open("https://openrouter.ai/settings/credits", "_blank", "noopener"); return; }
+  if ($("review-action").dataset.intent === "diagnostic") {
+    const diagnostic = { step: run?.pending?.phase, failure: run?.pending?.requestError, reviewId: run?.id, spend: reviewSpend(run) };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(diagnostic, null, 2)], { type: "application/json" }));
+    h("a", { href: url, download: "echo-request-error.json" }).click(); URL.revokeObjectURL(url); return;
+  }
   if (run?.qualification?.eligible === false) {
     showClaimChoices = true; render(); $("claims-heading").scrollIntoView({ block: "nearest" }); return;
   }
