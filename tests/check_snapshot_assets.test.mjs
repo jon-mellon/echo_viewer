@@ -18,9 +18,10 @@ function files(directory = FIXTURE) {
   });
 }
 
-async function withHost(transform, work) {
+async function withHost(transform, work, intercept = () => false) {
   const served = new Map(files().map(path => [`/${SNAPSHOT}/viewer-assets/${relative(FIXTURE, path)}`, readFileSync(path)]));
   const server = createServer((request, response) => {
+    if (intercept(request, response)) return;
     let body = served.get(request.url);
     if (!body) { response.writeHead(404).end(); return; }
     body = transform(request.url, body);
@@ -55,5 +56,36 @@ test("the check fails when a snapshot has no assets published or committed", asy
     const result = await check(base, "b".repeat(64));
     assert.equal(result.code, 1);
     assert.match(result.stderr, /no viewer assets, published or committed/);
+  });
+});
+
+
+test("temporary HEAD connection resets are retried without bypassing asset verification", async () => {
+  const reset = new Set();
+  await withHost((url, body) => body, async base => {
+    const result = await check(base);
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.stdout, /published and verified/);
+    assert.ok(reset.size > 0);
+  }, request => {
+    if (request.method === "HEAD" && !reset.has(request.url)) {
+      reset.add(request.url); request.socket.destroy(); return true;
+    }
+    return false;
+  });
+});
+
+test("persistent transport failure still fails after three attempts", async () => {
+  let target, attempts = 0;
+  await withHost((url, body) => body, async base => {
+    const result = await check(base);
+    assert.notEqual(result.code, 0);
+    assert.equal(attempts, 3);
+    assert.match(result.stderr, /fetch failed/);
+  }, request => {
+    if (request.method !== "HEAD") return false;
+    target ||= request.url;
+    if (request.url !== target) return false;
+    attempts++; request.socket.destroy(); return true;
   });
 });

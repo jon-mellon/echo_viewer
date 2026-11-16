@@ -19,7 +19,19 @@ const snapshot = process.argv[2] || evidenceSnapshotIdFromManifestUrl(PRODUCTION
 const base = process.env.ECHO_EVIDENCE_LAYOUTS_BASE || PRODUCTION_EVIDENCE_MANIFEST.replace(/[0-9a-f]{64}\/manifest\.json$/, "");
 const manifestUrl = `${base}${snapshot}/manifest.json`;
 // The data host's CDN refuses some default client identifiers.
-const get = (url, options) => fetch(url, { ...options, headers: { "User-Agent": "echo-viewer-ci/1" } });
+// Retry transport failures of these read-only probes, not missing assets or
+// failed integrity checks. A CDN connection reset must not restart a deployment.
+async function get(url, options = {}) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await fetch(url, { ...options, signal: options.signal || AbortSignal.timeout(15_000),
+        headers: { "User-Agent": "echo-viewer-ci/1" } });
+    } catch (error) {
+      if (attempt === 2 || options.signal?.aborted) throw error;
+      await new Promise(resolve => setTimeout(resolve, 250 * 2 ** attempt));
+    }
+  }
+}
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const problems = [];
 
