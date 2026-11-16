@@ -126,7 +126,7 @@ function render() {
       rejected ? h("aside", { className: "qualification-note", attrs: { "aria-label": "Full-text qualification assessment" } },
         h("strong", { textContent: "The AI could not qualify this claim" }),
         h("p", { textContent: "This preview supports person-level observational claims with an explicit or implied causal interpretation, including unadjusted estimates. The AI did not verify that this claim fits that scope in the captured text. This assessment may be incorrect or incomplete; manually check the methods, tables and supplementary material." }),
-        h("details", {}, h("summary", { textContent: "Why the AI stopped" }), h("p", { className: "qualification-reason", textContent: assessment.reason })),
+        h("details", {}, h("summary", { textContent: "Why the AI stopped" }), h("p", { className: "qualification-reason", textContent: assessment.reason }), assessment.designEvidenceQuote ? h("blockquote", { textContent: assessment.designEvidenceQuote }) : null),
         h("p", { className: "muted", textContent: "No confounder review was completed for this claim. You can choose a different extracted claim." })) : assessment?.eligible && !assessment.controls.length ? h("aside", { className: "adjustment-note" },
         h("strong", { textContent: "No adjustment identified in the captured text" }),
         h("p", { textContent: "The claim remains eligible for confounder review. This assessment may be incomplete; manually check the focal model and supplementary material." })) : null);

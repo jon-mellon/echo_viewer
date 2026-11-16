@@ -336,3 +336,23 @@ The browser regression deliberately holds an AI response, checks that the
 status panel and cancellation control remain visible and the elapsed clock
 advances, then releases it and checks the completed counters. Unit tests cover
 paused requests, genuine work counts, bounded history and indeterminate stages.
+
+## Specific qualification diagnostics
+
+Qualification accepts both the extractor's `implied_selection_on_observables`
+label and the demonstration runner's `implicit_selection_on_observables` alias.
+Ordinary cohort/Cox/survival labels and human-individual unit aliases are accepted
+when the remaining observational causal-claim evidence is valid. The model's
+new qualification schema distinguishes an identification design from an
+estimator or follow-up structure.
+
+Each failed gate reports its own field instead of using a catch-all message
+that mentions DiD. A DiD flag, including a negative qualification, needs an
+exact `designEvidenceQuote` in the captured text. Otherwise the classification
+is not accepted and is explicitly attributed to the AI. With a verified quote,
+the UI displays that quote alongside the AI's qualification reason. A cohort,
+survival analysis or repeated observation alone must not be classified as DiD.
+
+The old “with measured adjustment; difference-in-differences is unsupported”
+message can persist only in an already loaded older page. The hosted entry
+point and stylesheet use a new cache key for this update.

@@ -210,7 +210,7 @@ test("an implied observational causal claim remains eligible with no identified 
   const unadjusted = { ...qualification, x: "BMI", y: "Mortality", design: "observational", controls: [], evidenceQuote: evidence, adjustmentQuote: "" };
   assert.doesNotThrow(() => validateQualification(unadjusted, unadjustedCapture));
   assert.throws(() => validateQualification({ ...unadjusted, controls: ["age"] }, unadjustedCapture), /adjustment quotation/);
-  assert.throws(() => validateQualification({ ...unadjusted, causal: false }, unadjustedCapture), /causal claim/);
+  assert.throws(() => validateQualification({ ...unadjusted, causal: false }, unadjustedCapture), /causal interpretation/);
   assert.throws(() => validateQualification({ ...unadjusted, exposureRandomized: true }, unadjustedCapture), /nonrandomized/);
   const inconsistent = validateQualificationResult({ ...unadjusted, eligible: false, reason: "No adjusted estimate was identified." }, unadjustedCapture);
   assert.equal(inconsistent.eligible, true);
@@ -218,4 +218,21 @@ test("an implied observational causal claim remains eligible with no identified 
   const rejection = { ...unadjusted, causal: false, eligible: false, reason: "Only a descriptive population count is stated." };
   assert.equal(validateQualificationResult(rejection, unadjustedCapture), rejection);
   assert.throws(() => validateQualification(rejection, unadjustedCapture), /descriptive/);
+});
+
+
+test("the pipeline's implied selection design is accepted and unrelated failures never mention DiD", () => {
+  const implied = { ...qualification, design: "implied_selection_on_observables", usesDid: false };
+  assert.doesNotThrow(() => validateQualification(implied, capture));
+  assert.doesNotThrow(() => validateQualification({ ...implied, design: "cox_regression", xUnit: "individual", yUnit: "person-years" }, capture));
+  for (const changed of [{ xUnit: "country" }, { causal: false }, { design: "unknown" }, { exposureRandomized: true }]) {
+    assert.throws(() => validateQualification({ ...implied, ...changed }, capture), error => {
+      assert.doesNotMatch(error.message, /difference-in-differences|DiD/);
+      assert.match(error.message, /The AI/);return true;
+    });
+  }
+  assert.throws(() => validateQualification({ ...implied, usesDid: true }, capture), /without a verified supporting quotation/);
+  assert.throws(() => validateQualificationResult({ ...implied, eligible: false, usesDid: true }, capture), /without a verified supporting quotation/);
+  const didCapture={...capture,articleText:capture.articleText+" We estimate a difference-in-differences model."};
+  assert.throws(() => validateQualification({ ...implied, usesDid:true,designEvidenceQuote:"We estimate a difference-in-differences model." },didCapture), /The AI classified this estimate/);
 });
