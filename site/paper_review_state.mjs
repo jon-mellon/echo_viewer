@@ -14,7 +14,7 @@ export function recoveryState(run, { connected = false, error = '' } = {}) {
   const rawReason = error || run.failure?.message || pending?.error || '';
   if (!pending && !rawReason && !run.selectedClaim && run.pipelineExtraction) return null;
   return {
-    title: permanent ? 'Request failed — retrying will not fix it' : needsCostApproval ? 'Review paused — your choice' : 'Review paused',
+    title: permanent ? 'Request rejected — fix needed' : needsCostApproval ? 'Review paused — your choice' : 'Review paused',
     message: failure ? failureExplanation(failure) : pending && !received ? failureExplanation(null) : pending ? received ? pending.error || 'The last AI response could not be used. The review has not finished.' : 'The last AI request was interrupted. ECHO cannot confirm whether it finished or was charged.'
       : rawReason && !/The protocol requires a person-level/i.test(rawReason) ? rawReason : 'The review stopped before it finished. Completed work is saved.',
     step: pending?.phase || run.progress?.title || '',
@@ -22,7 +22,7 @@ export function recoveryState(run, { connected = false, error = '' } = {}) {
     intent,
     reason: permanent ? 'Automatic retries stopped because this request was rejected. The error needs to be resolved before sending it again.' : needsCostApproval && policy.reason === 'spend' ? 'Automatic retries stopped because this review has used more than its $0.10 allowance, including any estimated charges.'
       : needsCostApproval ? 'Automatic retries stopped because the cost of a request is unavailable.' : '',
-    cost: permanent ? 'No retry is running. Completed work is saved. The cost card shows confirmed and unconfirmed charges separately.' : pending ? 'Retry sends a new paid AI request for the unfinished step. Completed steps will not be repeated.' : 'Resume continues from the saved step. Further AI requests use your connected OpenRouter key.',
+    cost: permanent ? 'After the problem is fixed, Retry after fixing this sends a new paid request. Completed steps will not be repeated.' : pending ? 'Retry sends a new paid AI request for the unfinished step. Completed steps will not be repeated.' : 'Resume continues from the saved step. Further AI requests use your connected OpenRouter key.',
     action: intent === 'reconnect' ? 'Reconnect OpenRouter' : intent === 'account' ? 'Check OpenRouter credits' : intent === 'diagnostic' ? 'Download error details' : pending ? 'Retry unfinished step' : 'Resume review',
     kind: received ? 'invalid_response' : pending ? 'uncertain' : 'stopped'
   };

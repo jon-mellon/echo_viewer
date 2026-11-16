@@ -1,15 +1,15 @@
 import { requestFailure } from "./paper_request_error.mjs";
 import { spendLabel, reviewSpend } from "./paper_spend.mjs";
-import { recoveryState, acknowledgeRetry } from "./paper_review_state.mjs?v=request-diagnostics-v1";
+import { recoveryState, acknowledgeRetry } from "./paper_review_state.mjs?v=request-diagnostics-v2";
 import { REVIEW_STAGES, recordProgress, progressSnapshot, elapsedLabel } from "./paper_progress.mjs";
 import { PAPER_PIPELINE } from "./paper_pipeline_contract.mjs";
 import { h } from "./dom_builder.mjs";
 import { paperStore } from "./paper_store.mjs";
-import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=request-diagnostics-v1";
+import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=request-diagnostics-v2";
 import { checkCappedKey } from "./openrouter_connection.mjs";
-import { PaperModel } from "./paper_model.mjs?v=request-diagnostics-v1";
+import { PaperModel } from "./paper_model.mjs?v=request-diagnostics-v2";
 import { BrowserEchoSession } from "./paper_browser_session.mjs";
-import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit } from "./paper_workflow.mjs?v=request-diagnostics-v1";
+import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit } from "./paper_workflow.mjs?v=request-diagnostics-v2";
 import { publicSchemaProjection } from "./public_schema_projection.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
 import { unaddressedAssessmentNotice, VALIDATION_NOTICE } from "./paper_review_copy.mjs";
@@ -60,6 +60,7 @@ function renderActivity() {
   update("recovery-step", recovery?.step ? `Stopped during: ${recovery.step}` : "");
   $("review-action").dataset.intent = recovery?.intent || "retry";
   $("request-diagnostic").hidden = !recovery?.diagnostic;
+  $("retry-after-fix").hidden = !recovery?.diagnostic || recovery.diagnostic.retryable !== false || recovery.diagnostic.kind === "cancelled";
   update("request-diagnostic-data", recovery?.diagnostic ? JSON.stringify(recovery.diagnostic, null, 2) : "");
   update("recovery-summary", recovery?.message || "");
   update("recovery-reason", recovery?.reason || ""); $("recovery-reason").hidden = !recovery?.reason;
@@ -370,6 +371,13 @@ $("review-action").addEventListener("click", () => {
   if (run?.qualification?.eligible === false) {
     showClaimChoices = true; render(); $("claims-heading").scrollIntoView({ block: "nearest" }); return;
   }
+  if (!key) { connectWindow(); return; }
+  void action(async () => {
+    needsResume = false; acknowledgeRetry(run); await save();
+    if (run.selectedClaim) await reviewSelectedClaim(); else await extractCurrentClaims();
+  });
+});
+$("retry-after-fix").addEventListener("click", () => {
   if (!key) { connectWindow(); return; }
   void action(async () => {
     needsResume = false; acknowledgeRetry(run); await save();

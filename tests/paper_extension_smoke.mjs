@@ -189,6 +189,9 @@ try {
     assert.equal(details.failure.status,400);assert.equal(details.failure.retryable,false);
     assert.equal(details.paper,undefined);assert.equal(completions,2);
     await screenshotReview(page,frame,'/tmp/echo-provider-error-details.png');
+    await frame.getByRole('button',{name:'Retry after fixing this',exact:true}).click();
+    await frame.getByRole('button',{name:'Download error details',exact:true}).waitFor();
+    assert.equal(completions,3); // One explicitly requested attempt; never an automatic rejection loop.
     assert.deepEqual(errors,[]);
     console.log('Passed: HTTP 400 shows the exact provider cause and failed step, stops without repeated paid requests, and exports safe diagnostics.');
   } else if (unsupported) {
