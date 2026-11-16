@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Echo Paper Review (Permastaging)",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "minimum_chrome_version": "116",
   "description": "Capture an academic paper you choose and review its claims in Echo.",
-  "permissions": ["activeTab", "scripting", "sidePanel"],
+  "permissions": ["activeTab", "scripting", "sidePanel", "storage"],
   "action": { "default_title": "Review this paper with Echo" },
   "background": { "service_worker": "background.mjs", "type": "module" },
   "side_panel": { "default_path": "panel.html" },

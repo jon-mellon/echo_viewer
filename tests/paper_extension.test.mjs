@@ -152,10 +152,10 @@ test("a substantive split request cannot be represented as a completed review", 
 });
 test("extension has only user-initiated capture privileges; no API host access or external-message commands", async () => {
   const manifest = JSON.parse(await readFile(new URL("../extension/manifest.json", import.meta.url), "utf8"));
-  assert.deepEqual(manifest.permissions, ["activeTab", "scripting", "sidePanel"]);
+  assert.deepEqual(manifest.permissions, ["activeTab", "scripting", "sidePanel", "storage"]);
   assert.equal(manifest.host_permissions, undefined); assert.equal(manifest.externally_connectable, undefined);
   const source = await readFile(new URL("../extension/panel.mjs", import.meta.url), "utf8");
-  assert.match(source, /event.origin !== origin/); assert.match(source, /event.data.nonce !== nonce/);
+  assert.match(source, /event.origin !== origin/); assert.match(source, /event.data\?\.nonce !== nonce/);
 });
 test("only permastaging extension packages can be built, including the default build", async () => {
   const root = await mkdtemp(join(tmpdir(), "echo-extension-build-"));

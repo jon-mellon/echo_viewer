@@ -9,6 +9,11 @@ import { publicationPermalink } from "./published_schema_loader.mjs";
 import { digest } from "./paper_review_contract.mjs";
 
 export class BrowserEchoSession extends EchoSessionCore {
+  async jevEstimate(args) {
+    const estimate = await super.jevEstimate(args);
+    return this.runtime.classifierModel && estimate.model
+      ? { ...estimate, model: this.runtime.classifierModel, estimateNote: "Approximate token estimate; split classification uses the pinned pipeline model." } : estimate;
+  }
   static async start({ record = null, save, getKey, request, onStatus = () => {}, publicationId = DEFAULT_SCHEMA_PUBLICATION_ID }) {
     const { ParquetManifestDagDataSource } = await import("./dag_data_source.mjs");
     const loaded = await loadPublishedSchema(record?.sourcePublication.id || publicationId);

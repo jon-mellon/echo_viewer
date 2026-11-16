@@ -1,4 +1,4 @@
-# Echo Paper Review 0.1.1
+# Echo Paper Review 0.2.0
 
 The implementation lives on `permastaging`. The extension is a
 small Manifest V3 shell. Its side panel embeds `https://www.jonathanmellon.com/echo_viewer_permastaging/paper-review.html`.
@@ -16,8 +16,8 @@ Developer mode **Load unpacked** control. The permastaging deployment builds thi
 package with `npm run build:extension:permastaging`, so its review frame opens the
 permastaging page on the already allowed `www.jonathanmellon.com` origin.
 It does not depend on a production deployment. You will need your own capped
-OpenRouter key and a model supporting tools and structured output to try the
-model steps. This remains a preview whose live real-paper evaluation is unverified.
+OpenRouter key for the initial connection. Echo chooses the pipeline models
+internally; the user only chooses the claim to evaluate. This remains a preview whose live real-paper evaluation is unverified.
 
 ### Local permastaging package
 
@@ -30,21 +30,24 @@ model steps. This remains a preview whose live real-paper evaluation is unverifi
 4. Open an HTML paper and click the Echo toolbar action. This grants temporary
    tab access and automatically captures and saves its metadata and text. Review
    the captured details; corrections remain available in the expandable form.
-5. Connect a capped OpenRouter key, choose a model from the supported-model list,
-   extract/edit/select a claim, qualify it, and start the review.
+5. Connect a capped OpenRouter key once. Abstract claim extraction runs
+   automatically. Choose a claim; qualification, variable setup, split handling
+   and evidence review run automatically. No model selector or step buttons
+   are required in the normal flow.
 
 To update an installed unpacked extension, replace its folder contents with the
 new ZIP and click **Reload** on its card in `chrome://extensions`.
 
-The extension has only `activeTab`, `scripting` and `sidePanel` permissions. It
+The extension has only `activeTab`, `scripting`, `sidePanel` and `storage` permissions. It
 has no persistent article-host access, API-host access, ambient tab tracking,
-externally-connectable command interface, or key storage. Clicking the toolbar
+or externally-connectable command interface. Clicking the toolbar
 action captures that article automatically. Opening Chrome’s side-panel picker
 does not grant activeTab; the panel explains how to invoke the toolbar action
 instead. Restricted Chrome pages and inaccessible PDFs remain unsupported.
 PMC HTML with an abstract, methods, results and discussion is recognized as full
 article text when no selection or truncation occurred. Other pages remain
-partial until the user confirms their coverage. No model call runs on capture.
+partial until the user confirms their coverage. When connected, capture triggers
+automatic abstract extraction. Qualification and evaluation wait for claim choice.
 
 ## Production release gate
 
@@ -72,8 +75,8 @@ DuckDB worker requests have the Echo origin/referrer and use the existing
 Cloudflare allowlists. Its scripts and WASM execute inside Echo's web context;
 the privileged extension shell only uses packaged JavaScript. The frame has a
 sandbox with scripts, same-origin web behavior, forms, downloads and escaping
-popups enabled. It cannot access extension APIs or the parent DOM. No incoming
-message can ask the shell to fetch, run scripts, read tabs or publish.
+popups enabled. It cannot access extension APIs or the parent DOM. The authenticated Echo frame can ask the shell to remember or forget its capped
+key. It cannot ask the shell to fetch, run scripts, read tabs or publish.
 
 Capture messages require the exact frame/opener, expected origin and a random
 per-panel nonce. The readiness message contains only the nonce. Article text
@@ -123,7 +126,7 @@ decision effects and confounder diagnostics must agree with full compilation.
 
 The first version provides:
 
-- Editable source-grounded abstract claims and selected-claim qualification.
+- Pipeline variable/link extraction, user claim choice and automatic selected-claim qualification.
 - Exact article quotations for the focal estimate and adjustment description;
   unsupported designs, missing full text and invalid qualifications stop work.
 - Model-directed group search, published-split lookup, existing split operations,
@@ -161,21 +164,22 @@ silently truncating evidence. No live model-cost/cache benchmark is included.
 OpenRouter PKCE generation/exchange and capped-key validation reuse shared
 helpers with the existing Jev integration. Authentication uses an Echo-origin
 popup, a random state/verifier, an expiry, an exact opener check and a separate
-nonce for returning the transient key. The key is passed only between the Echo
-popup and Echo review page. It never goes through the extension or article.
+nonce for returning the key from the Echo popup to the Echo review page.
+After cap validation it may pass to the trusted extension vault. It never
+passes to the article page.
 Existing capped keys can also be pasted; they must pass the same rules.
 
-The key remains in memory. Disconnect cancels work and clears it; a reload or
-closed page requires reconnecting. A newly issued OpenRouter key may not be
-recognized immediately; the user can reconnect/recheck explicitly. No model
-call is automatically retried. A pending-call checkpoint is written before a
-billable request, and the returned response receipt is saved before applying
-its result, so reopening can consume that receipt without another charge.
-Uncertain calls require explicit acknowledgement before a possibly charged
-retry. Reported token/cost/cache metrics preserve null for unavailable values.
-Standard requests never set Flex; provider/model fallback is disabled, explicit
-provider cache controls are omitted, and stable paper/instruction prefixes can
-benefit from supported automatic caching without promising a discount.
+The hosted page holds the key in memory. The extension remembers it in trusted-
+context session storage by default, or local storage with explicit opt-in (see
+Remembered connection below). Forget connection cancels work and removes stored
+copies. A newly issued OpenRouter key may not be recognized immediately; the
+user can reconnect/recheck explicitly. Model calls wait for successful cap validation.
+
+No model call is automatically retried. A pending-call checkpoint is written
+before a billable request, and the response receipt is saved before applying
+its result. Reopening can consume that receipt without another charge.
+Uncertain or invalid calls require explicit acknowledgement before a possibly
+charged retry. Reported usage preserves null for unavailable values.
 
 IndexedDB stores private runs on the Echo web origin, possibly in an
 extension-partitioned storage area. Web Locks prevent simultaneous operation on
@@ -216,3 +220,50 @@ live model evaluation. Tests cover toolbar-handler handoff with mocked Chrome
 APIs, missing-section coverage, automatic form population and snapshot saving,
 and a mocked complete review. The actual installed toolbar click could not be
 verified because Computer Use permission was unavailable.
+
+## Pipeline contract and claim-only flow (0.2.0)
+
+`site/paper_pipeline_contract.mjs` is generated from the actual
+`harvest_abstracts` runner and Pydantic definitions by
+`scripts/sync_paper_pipeline.py`. It contains the exact v4 extraction prompt,
+`DagConceptExtraction.model_json_schema(by_alias=True)`, split-classification
+prompt, model/reasoning settings, upstream revision and source hashes.
+Regenerate with the harvest classify virtualenv Python; pass `--check` to
+verify byte-for-byte parity without writing. The pipeline stage is
+`analysis/openai_luna_dag_20.py --concept-uoa-only`, invoked by
+`analysis/run_claim_pipeline.sh`. Its `prompt_human` template is reproduced
+exactly, including title markup removal. An additional safety instruction
+marks article content as untrusted data. OpenRouter carries the same model
+(`openai/gpt-6-luna`), with low extraction/setup reasoning and none for split
+classification; no Flex tier or fallback model is requested. This is browser
+execution of the shared extraction contract, not a remote Python pipeline job.
+
+Raw variable/link output is saved unchanged. Graph references, uniqueness and
+types are validated, and malformed receipts require explicit retry. Displayed
+claims come from pipeline links rather than a separate prose-claim extractor.
+Only present, single-exposure, person-level observational claims are selectable
+for this preview's review protocol. The full article still verifies the chosen
+claim; a pipeline extraction label alone does not establish eligibility.
+
+## Remembered connection
+
+After cap validation, the hosted page passes its key over the exact-origin,
+exact-source, nonce-authenticated bridge to the extension vault. The vault
+restricts both storage areas to `TRUSTED_CONTEXTS` before reading or writing.
+Default `chrome.storage.session` survives panel and worker recreation without
+writing a persistent secret to disk. Optional “Also remember after Chrome
+restarts” stores the key in `chrome.storage.local`, never sync or web-origin
+storage. This local option is unencrypted; browser-profile compromise can
+recover the key. It is explicitly opt-in. The UI describes the tradeoff.
+
+The hosted page receives the remembered key only in memory and rechecks its
+cap on reconnection and before paid requests. Keys are excluded from paper
+checkpoints, exports, captures and publication payloads. Forget connection
+removes session and local copies and clears connected review windows. It does
+not revoke the credential at OpenRouter; users can revoke it there separately.
+Normal panel reload no longer requires another OAuth exchange.
+
+Acceptance tests use mocked paid responses to check pipeline extraction, no
+automatic claim selection, a claim click running the remaining review, session
+restoration without another OAuth exchange, opt-in persistence and forgetting.
+A paid end-to-end real-paper review remains unverified.

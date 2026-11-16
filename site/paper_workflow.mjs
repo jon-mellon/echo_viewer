@@ -1,12 +1,12 @@
+import { extractPipelineClaims } from "./paper_pipeline.mjs";
 import { object, array, string, boolean, validateShape } from "./paper_model.mjs";
-import { validateClaims, validateQualification } from "./paper_capture.mjs";
+import { validateQualification } from "./paper_capture.mjs";
 import { digest, materializeQueue, reviewCoverage, validateFindingDecision, requiredIds } from "./paper_review_contract.mjs";
 import { createEchoTools } from "./echo_tools.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
 import { validateGroupingSchema } from "./data_validation.mjs";
 import { unaddressedAssessmentNotice, VALIDATION_NOTICE } from "./paper_review_copy.mjs";
 
-export const claimSchema = object({ claims: array(object({ id: string, text: string, sourceSentences: array(string) })) });
 export const qualificationSchema = object({ eligible: boolean, reason: string, causal: boolean,
   x: string, y: string, xUnit: string, yUnit: string, population: string, design: string,
   exposureRandomized: boolean, usesDid: boolean, assignment: string, controls: array(string),
@@ -22,13 +22,11 @@ const normalizeDoi = value => String(value || "").trim().replace(/^https?:\/\/(?
 const lookupKey = ids => JSON.stringify([...new Set(ids)].sort());
 
 export async function extractClaims(model) {
-  const result = await model.structured("Extracting abstract claims", "Extract ALL distinct substantive abstract claims. Preserve direction, population, uncertainty and qualifications. Associate each claim with exact complete source sentence(s). Do not evaluate claims. Extraction may be incomplete.",
-    { abstract: model.run.capture.abstract }, claimSchema);
-  return validateClaims(result.claims, model.run.capture.abstract);
+  return extractPipelineClaims(model);
 }
 export async function qualifyClaim(model) {
   const result = await model.structured("Qualifying selected claim", `Verify the selected claim against the full captured text. Identify the actual focal estimate and its evidence location, X/Y measurements, person-level units, population, assignment, design and adjustment inventory.
-Only person-level nonrandomized observational causal estimates using measured adjustment/selection on observables or matching are eligible. No DiD, instruments, randomized estimates, noncausal claims or other units. If contradicted, unavailable, unsupported, or insufficient, eligible=false and explain. Fields unavailable must be empty, not guesses. Give exact evidence and adjustment quotations. Separate randomized components of mixed-method papers.`, {}, qualificationSchema);
+Only person-level nonrandomized observational causal estimates using measured adjustment/selection on observables or matching are eligible. No DiD, instruments, randomized estimates, noncausal claims or other units. If contradicted, unavailable, unsupported, or insufficient, eligible=false and explain. Fields unavailable must be empty, not guesses. Give exact evidence and adjustment quotations. Separate randomized components of mixed-method papers. Verify exactly the selected pipeline link and its endpoint concepts; do not substitute another claim.`, { pipelineLink: model.run.selectedClaim?.pipelineLink, pipelineVariables: model.run.selectedClaim?.pipelineVariables }, qualificationSchema);
   validateQualification(result, model.run.capture);
   return result;
 }

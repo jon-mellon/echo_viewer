@@ -50,7 +50,7 @@ try {
     }
     if (url.pathname === "/api/v1/auth/keys") { authExchanges++; assert.equal(JSON.parse(route.request().postData()).code_challenge_method, "S256"); return json({ key: "fixture-secret-key" }); }
     if (url.pathname === "/api/v1/key") return json({ data: { limit: 5, limit_remaining: 4, limit_reset: null } });
-    if (url.pathname === "/api/v1/models") return json({ data: [{ id: "fixture/model", supported_parameters: ["tools", "structured_outputs"] }] });
+    if (url.pathname === "/api/v1/models") return json({ data: [{ id: "openai/gpt-6-luna", supported_parameters: ["tools", "structured_outputs"] }] });
     if (url.pathname !== "/api/v1/chat/completions") return route.abort();
     completions++;
     const request = JSON.parse(route.request().postData());
@@ -62,13 +62,13 @@ try {
         : { role: "assistant", content: null, tool_calls: [{ id: "anchor-op", type: "function", function: { name: "echo_set_anchors", arguments: '{"ivId":"x","dvId":"y"}' } }] };
     } else {
       const properties = request.response_format.json_schema.schema.properties;
-      const value = properties.claims ? { claims: [{ id: "c1", text: "Exposure increases outcomes in adults.", sourceSentences: ["Exposure increases outcomes in adults."] }] }
+      const value = properties.s ? { s: "success", v: [{ vi: "v1", a: ["person"], c: "uoa's exposure" }, { vi: "v2", a: ["person"], c: "uoa's outcome" }], l: [{ li: "l1", s: ["v1"], t: "v2", e: "present", p: "adults", d: "implied_selection_on_observables" }] }
         : properties.eligible ? qualification
           : properties.systematicallyDifferent ? { status: "unaddressed", reason: "The measured age mechanism is not addressed in this specification.", systematicallyDifferent: false, splitReason: "The two legs instantiate the same age construct.", rejectedPaths: [] }
             : { decision: "retained", reason: "The same person-level construct and adult population support this causal link.", reason_code: "", questioned_end: "", undeniable: true };
       message = { role: "assistant", content: JSON.stringify(value) };
     }
-    return json({ model: "fixture/model", choices: [{ finish_reason: message.tool_calls ? "tool_calls" : "stop", message }], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 } });
+    return json({ model: "openai/gpt-6-luna", choices: [{ finish_reason: message.tool_calls ? "tool_calls" : "stop", message }], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 } });
   });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
   const extensionId = new URL(worker.url()).hostname;
@@ -89,7 +89,7 @@ try {
   }, { capture, origin });
   await frame.locator("#title").waitFor({ state: "attached" });
   assert.equal(await frame.locator("#title").inputValue(), capture.title);
-  await frame.getByText("Paper confirmed.", { exact: false }).waitFor();
+  await frame.getByText("Paper captured. Connect once", { exact: false }).waitFor();
   // PKCE navigates a real popup and returns the transient key only to the Echo iframe.
   const popupPromise = context.waitForEvent("page");
   await frame.locator("#connect").click();
@@ -98,14 +98,16 @@ try {
   // Chromium extension popups can bypass context routing on their first request.
   // Reload the test-only 404 to enter the mocked same-origin authorization page.
   if (await popup.locator("h1").textContent({ timeout: 500 }).catch(() => "") === "404") await popup.reload();
-  await frame.getByText("Connected · capped key checked · kept in memory", { exact: true }).waitFor();
+  await frame.getByText("Connected · capped key checked · remembered for this Chrome session", { exact: true }).waitFor();
   assert.equal(authExchanges, 1);
-  assert.equal(await frame.locator("#model").inputValue(), "fixture/model");
+  assert.equal(await frame.locator("#model").count(), 0);
   assert.equal(await frame.locator("#paper-details").getAttribute("open"), null);
-  await frame.locator("#extract").click(); await frame.locator('input[name="claim"]').waitFor();
-  await frame.locator('input[name="claim"]').check(); await frame.locator("#qualify").click();
-  await frame.getByText("Claim qualifies", { exact: false }).waitFor();
-  await frame.locator("#evaluate").click(); await frame.getByText("Automated review complete", { exact: false }).first().waitFor();
+  await frame.locator('input[name="claim"]').waitFor();
+  assert.equal(completions, 1); // Capture/connection extracts; no claim was selected for the user.
+  assert.equal(await frame.locator('input[name="claim"]').isChecked(), false);
+  // The only review action is choosing a claim: qualification, setup and review follow.
+  await frame.locator('input[name="claim"]').check();
+  await frame.getByText("Automated review complete", { exact: false }).first().waitFor();
   assert.equal(await frame.getByText("Age · May be unaddressed", { exact: true }).count(), 1);
   assert.equal(await frame.locator("#result").getByText("The AI could not identify adjustment for Age in the captured text.", { exact: false }).count(), 1);
   assert.equal(await frame.locator("#result").getByText("x% (placeholder, not a measured result)", { exact: false }).count(), 1);
@@ -120,17 +122,31 @@ try {
   assert.equal(publicSchema.finding_reviews, undefined); assert.equal(publicSchema.finding_decisions.ky.reason_text, undefined);
   const before = completions;
   await page.reload();
-  const reloaded = await (await page.waitForSelector("#echo")).contentFrame(); await reloaded.getByText("Not connected", { exact: true }).waitFor();
+  const reloaded = await (await page.waitForSelector("#echo")).contentFrame(); await reloaded.getByText("Connected · capped key checked · remembered for this Chrome session", { exact: true }).waitFor();
   assert.equal(completions, before);
   await reloaded.getByRole("button", { name: "Resume", exact: true }).click();
   await reloaded.getByText("Automated review complete", { exact: false }).first().waitFor();
   assert.equal(completions, before);
+  assert.equal(authExchanges, 1); // Panel reload restores the connection without OAuth.
+  const keyState = await worker.evaluate(async () => ({local:await chrome.storage.local.get(null),session:await chrome.storage.session.get(null)}));
+  assert.deepEqual(keyState.local, {});
+  assert.equal(keyState.session["echo-openrouter-key-v1"], "fixture-secret-key");
+  await reloaded.getByText("Connection settings", {exact:true}).click();
+  await reloaded.locator('#remember').check();
+  await reloaded.getByText('Connected · capped key checked · remembered on this device', {exact:true}).waitFor();
+  assert.equal(await worker.evaluate(async () => (await chrome.storage.local.get('echo-openrouter-key-v1'))['echo-openrouter-key-v1']), 'fixture-secret-key');
+  await reloaded.locator('#disconnect').click();
+  await reloaded.getByText('Connect once to extract claims automatically.', {exact:true}).waitFor();
+  await page.waitForFunction(async () => {
+    const all = await Promise.all([chrome.storage.local.get(null),chrome.storage.session.get(null)]);
+    return all.every(area => !area['echo-openrouter-key-v1']);
+  });
   await page.setViewportSize({ width: 390, height: 850 });
   await reloaded.evaluate(() => window.scrollTo(0, 0));
   assert.equal(await reloaded.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: "/tmp/echo-paper-extension-preview.png", fullPage: true });
   assert.deepEqual(errors, []);
-  console.log("Passed: real extension iframe, capture, PKCE popup, claims, qualification, tool setup, private review, public projection, reload/reconnect and no key in IndexedDB.");
+  console.log("Passed: real extension iframe, capture, one-time PKCE, pipeline extraction, claim choice automatically runs qualification/setup/review, public projection, key restoration on reload, opt-in persistence, forget, and no key in IndexedDB.");
 } finally {
   await context?.close(); await rm(profile, { recursive: true, force: true });
 }
