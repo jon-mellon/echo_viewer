@@ -66,7 +66,7 @@ try {
     }
     if (url.pathname === "/api/v1/auth/keys") { authExchanges++; assert.equal(JSON.parse(route.request().postData()).code_challenge_method, "S256"); return json({ key: "fixture-secret-key" }); }
     if (url.pathname === "/api/v1/key") return json({ data: { limit: 5, limit_remaining: 4, limit_reset: null } });
-    if (url.pathname === "/api/v1/models") return json({ data: [{ id: "openai/gpt-6-luna", supported_parameters: ["tools", "structured_outputs"] }] });
+    if (url.pathname === "/api/v1/models") return json({ data: [{ id: "openai/gpt-6-luna", supported_parameters: ["tools", "structured_outputs"], pricing: {prompt:"0.0000001",completion:"0.0000001"} }] });
     if (url.pathname !== "/api/v1/chat/completions") return route.abort();
     completions++;
     const request = JSON.parse(route.request().postData());
@@ -85,7 +85,7 @@ try {
       if (properties.eligible) await qualificationGate;
       message = { role: "assistant", content: JSON.stringify(value) };
     }
-    return json({ model: "openai/gpt-6-luna", choices: [{ finish_reason: message.tool_calls ? "tool_calls" : "stop", message }], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 } });
+    return json({ model: "openai/gpt-6-luna", choices: [{ finish_reason: message.tool_calls ? "tool_calls" : "stop", message }], usage: { prompt_tokens: 100, completion_tokens: 20, cost: retryCase && qualificationAttempts <= 3 && qualificationAttempts > 0 ? 0.04 : 0.001 } });
   });
   const worker = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker");
   const extensionId = new URL(worker.url()).hostname;
@@ -142,11 +142,12 @@ try {
   releaseQualification();
   if (retryCase) {
     await frame.locator('#review-action').getByText('Retry review',{exact:true}).waitFor();
-    assert.equal(await frame.locator('#activity-title').textContent(),'Review stopped');
+    assert.equal(await frame.locator('#activity-title').textContent(),'Continue this review?');
     assert.equal(await frame.locator('.claims-card').isVisible(),false);
-    assert.match(await frame.locator('#recovery-cost').textContent(),/new AI request/);
+    assert.match(await frame.locator('#recovery-cost').textContent(),/Another request/);
     assert.equal(await frame.getByRole('button',{name:/Continue selected claim|Acknowledge|Resume review/}).count(),0);
     assert.equal(completions,4);
+    assert.match(await frame.locator("#activity-spend").textContent(),/\$0.1210 spent/);
     await screenshotReview(page,frame,'/tmp/echo-simple-retry.png');
     await page.reload();
     frame = await (await page.waitForSelector('#echo')).contentFrame();
@@ -184,6 +185,7 @@ try {
   assert.equal(await frame.locator("#result").getByText("x% (placeholder, not a measured result)", { exact: false }).count(), 1);
   assert.ok(await frame.getByText("These results may be incorrect or incomplete.", { exact: false }).count());
   assert.equal(completions, retryCase ? 9 : repairCase ? 7 : 6);
+  assert.equal(await frame.locator("#activity-spend").textContent(), `$${(retryCase ? .126 : repairCase ? .007 : .006).toFixed(4)} spent`);
   assert.equal(await frame.locator('#activity-title').textContent(),'Review complete');
   assert.match(await frame.locator('#activity-confounders').textContent(),/1 of 1 confounders assessed/);
   assert.equal(await frame.locator('#cancel').isVisible(),false);

@@ -175,11 +175,7 @@ Remembered connection below). Forget connection cancels work and removes stored
 copies. A newly issued OpenRouter key may not be recognized immediately; the
 user can reconnect/recheck explicitly. Model calls wait for successful cap validation.
 
-No model call is automatically retried. A pending-call checkpoint is written
-before a billable request, and the response receipt is saved before applying
-its result. Reopening can consume that receipt without another charge.
-Uncertain or invalid calls require explicit acknowledgement before a possibly
-charged retry. Reported usage preserves null for unavailable values.
+A pending-call checkpoint and cost estimate are written before each billable request; its receipt is saved before applying its result. Reopening consumes accepted receipts without another charge. Invalid and unconfirmed model requests retry automatically while cumulative review spend is at most $0.10. Actual reported costs and estimates for missing or lost usage are tracked separately. Approval is required once the total exceeds the allowance, or when no cost estimate is available. Reported usage preserves null for unavailable values.
 
 IndexedDB stores private runs on the Echo web origin, possibly in an
 extension-partitioned storage area. Web Locks prevent simultaneous operation on
@@ -239,7 +235,7 @@ classification; no Flex tier or fallback model is requested. This is browser
 execution of the shared extraction contract, not a remote Python pipeline job.
 
 Raw variable/link output is saved unchanged. Graph references, uniqueness and
-types are validated, and malformed receipts require explicit retry. Displayed
+types are validated; malformed responses are corrected within the review’s automatic-retry spending allowance. Displayed
 claims come from pipeline links rather than a separate prose-claim extractor.
 Present, single-exposure, person-level observational claims are selectable for
 full-text qualification, including an unspecified observational strategy. The full article still verifies the chosen
@@ -359,10 +355,10 @@ point and stylesheet use a new cache key for this update.
 
 ## Focused review and recovery
 
-After claim selection, the claim list collapses to the selected relationship and the activity panel becomes the main view. Running reviews show progress and Cancel; stopped reviews show a reason and one Retry review (or Continue review) button. Retrying explicitly acknowledges the adjacent charge explanation and continues in the same action. Unusable received responses are distinguished from unconfirmed requests; neither is automatically replayed. Accepted receipts remain saved. Connection settings, review data, publication controls and saved reviews live in optional drawers.
+After claim selection, the claim list collapses to the selected relationship and the activity panel becomes the main view. Running reviews show progress and Cancel; stopped reviews show a reason and one Retry review (or Continue review) button. Retrying explicitly acknowledges the adjacent charge explanation and continues in the same action. Unusable received responses are distinguished from unconfirmed requests; both can retry within the spending allowance. Unconfirmed requests count an estimated reservation toward the allowance. Accepted receipts remain saved. Connection settings, review data, publication controls and saved reviews live in optional drawers.
 
 ## Automatic qualification correction
 
 Qualification quotation checks tolerate whitespace, curly quotes, discretionary soft hyphens and typographic hyphen variants. Accepted quotations are restored to exact spans of the captured article. There is no fuzzy, paraphrase, case-insensitive, numeric or ellipsis matching. Raw model replies stay in durable receipts.
 
-A received qualification response that fails JSON, schema or evidence validation gets up to two automatic correction requests using the same pipeline model and validation rules. These are additional potentially billable calls under the existing key cap. The original bad reply, validation reason and correction count are saved before each request, so restoration cannot reset the automatic limit or replay completed corrections. Progress explains that ECHO is correcting a response. If correction fails, the UI gives a plain failure and retains the checkpoint. Unconfirmed network calls are never automatically replayed.
+Structured responses that fail JSON, schema or evidence validation are corrected using the same model and validation rules within the cumulative $0.10 automatic-retry allowance. This replaces the previous two-correction limit. Retry receipts, estimates and reasons are saved before another request. The total includes successful steps, failed replies and estimated unconfirmed charges, and persists across reopening. At exactly $0.10 automatic retry is still allowed; once the total exceeds it, another retry requires explicit approval. This is a retry-approval threshold, not a hard cap on the cost of a successful review or the next request. There is a technical ceiling of 100 automatic retries per review to stop pathological free/near-free loops. Cancellation always stops retries. Publication and accepted local tool operations are never automatically repeated.

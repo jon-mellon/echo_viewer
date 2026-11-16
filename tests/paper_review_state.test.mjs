@@ -2,16 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { recoveryState, acknowledgeRetry } from '../site/paper_review_state.mjs';
 test('known unusable replies offer one retry with an accurate charge explanation', () => {
- const run={pending:{id:'bad',phase:'Invalid structured response',requestHash:'bad-hash'},calls:[{id:'bad'}]};
+ const run={pending:{id:'bad',phase:'Invalid structured response',requestHash:'bad-hash'},calls:[{id:'bad',cost:0.11}]};
  const state=recoveryState(run,{connected:true,error:'The AI returned an unverified classification. No result was accepted. Acknowledge retry.'});
  assert.equal(state.action,'Retry review');assert.equal(state.kind,'invalid_response');
- assert.match(state.message,/returned a response/);assert.match(state.cost,/new AI request/);
+ assert.match(state.message,/passed the \$0.10/);assert.match(state.cost,/Another request/);
  assert.doesNotMatch(state.cost,/already/);assert.doesNotMatch(state.reason,/Acknowledge/);
  assert.ok(run.pending); // Rendering a choice never authorizes a retry.
 });
 test('unknown request outcomes warn about a possible repeat charge and reconnect is distinct', () => {
  const run={pending:{id:'lost',phase:'Checking claim',requestHash:'lost-hash'}};
- assert.match(recoveryState(run,{connected:true}).cost,/may already have been charged/);
+ assert.match(recoveryState(run,{connected:true}).cost,/unconfirmed charges/);
  assert.equal(recoveryState(run).action,'Reconnect to continue');
 });
 test('explicit retry clears only failed work and preserves its received reply and accepted receipts', () => {
@@ -33,4 +33,10 @@ test('retired catch-all diagnostics do not repeat misleading DiD claims in the m
 test('a captured review can continue extraction while extracted claims need only a choice', () => {
  assert.equal(recoveryState({phase:'confirmed'},{connected:true}).action,'Continue review');
  assert.equal(recoveryState({phase:'claims_extracted',pipelineExtraction:{}},{connected:true}),null);
+});
+test('a stopped request below ten cents shows no charge acknowledgement',()=>{
+ const run={selectedClaim:{id:'x'},calls:[{id:'valid',cost:.04}],pending:{id:'cancelled',kind:'uncertain',estimatedCost:.02}};
+ const state=recoveryState(run,{connected:true});
+ assert.equal(state.cost,'');assert.equal(state.action,'Continue review');
+ assert.doesNotMatch(state.message,/allowance|confirm the cost/);
 });

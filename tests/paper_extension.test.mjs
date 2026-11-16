@@ -56,14 +56,14 @@ test("claims must quote the actual abstract and qualification rejects missing or
   assert.throws(() => validateQualification({ ...qualification, exposureRandomized: true }, capture), /nonrandomized/);
   assert.throws(() => validateQualification({ ...qualification, evidenceQuote: "invented" }, capture), /exactly/);
 });
-test("model checkpoints uncertain calls before billing, does not replay them, and never persists keys", async () => {
+test("unknown-cost calls require confirmation and never persist keys", async () => {
   const run = { id: "a", model: "fixture/model", capture, selectedClaim: {}, calls: [] }, saves = [];
   let requests = 0;
   const model = new PaperModel({ run, getKey: () => "secret-key", save: async () => saves.push(structuredClone(run)),
     request: async path => { if (path === "/api/v1/key") return { data: { limit: 5, limit_remaining: 5, limit_reset: null } };
       requests++; assert.ok(saves.at(-1).pending); throw new Error("timeout"); } });
   await assert.rejects(() => model.structured("test", "Task", {}, object({ value: string })), /may have been billed/);
-  await assert.rejects(() => model.structured("test", "Task", {}, object({ value: string })), /uncertain/);
+  await assert.rejects(() => model.structured("test", "Task", {}, object({ value: string })), /confirmation/);
   assert.equal(requests, 1);
   assert.equal(JSON.stringify(saves).includes("secret-key"), false);
 });
@@ -257,7 +257,7 @@ test('known invalid qualification responses are corrected automatically with dur
       assert.equal(saves.at(-1).responseRepairs && Object.values(saves.at(-1).responseRepairs)[0].length, requests - 1);
       assert.match(JSON.parse(options.body).messages.at(-1).content,/Copy quotations directly/);
     }
-    return {choices:[{finish_reason:'stop',message:{role:'assistant',content:JSON.stringify({value:requests < 3 ? 'invented' : 'supported'})}}]};
+    return {usage:{cost:0.04},choices:[{finish_reason:'stop',message:{role:'assistant',content:JSON.stringify({value:requests < 3 ? 'invented' : 'supported'})}}]};
   };
   const model = new PaperModel({run,getKey:()=> 'secret-key',save:async()=>saves.push(structuredClone(run)),request});
   const options = {repairAttempts:2,validateResult:result=>{ if(result.value!=='supported') throw new Error('Quotation not in source'); }};
@@ -268,16 +268,16 @@ test('known invalid qualification responses are corrected automatically with dur
   await restored.structured('qualification','Task',{},object({value:string}),options);
   assert.equal(requests,3);assert.equal(JSON.stringify(run).includes('secret-key'),false);
 });
-test('automatic correction stops at its limit and never retries unconfirmed requests', async () => {
+test('automatic correction stops above ten cents and unknown-cost failures require confirmation', async () => {
   for (const lost of [false,true]) {
     let requests=0;
     const run={model:'fixture/model',capture,selectedClaim:{}};
     const model=new PaperModel({run,getKey:()=> 'key',save:async()=>{},request:async path=>{
       if(path==='/api/v1/key')return {data:{limit:5,limit_remaining:5,limit_reset:null}};
       requests++;if(lost)throw new Error('timeout');
-      return {choices:[{finish_reason:'stop',message:{role:'assistant',content:'{"value":"bad"}'}}]};
+      return {usage:{cost:0.04},choices:[{finish_reason:'stop',message:{role:'assistant',content:'{"value":"bad"}'}}]};
     }});
-    await assert.rejects(()=>model.structured('qualification','Task',{},object({value:string}),{repairAttempts:2,validateResult:()=>{throw new Error('Invalid quote');}}),lost?/may have been billed/:/after automatic correction/);
+    await assert.rejects(()=>model.structured('qualification','Task',{},object({value:string}),{repairAttempts:2,validateResult:()=>{throw new Error('Invalid quote');}}),lost?/may have been billed/:/could not verify/);
     assert.equal(requests,lost?1:3);assert.equal(run.pending.kind,lost?'uncertain':'invalid_response');
   }
 });

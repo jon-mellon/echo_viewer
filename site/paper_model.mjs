@@ -1,3 +1,4 @@
+import { retryPolicy, recordAutomaticRetry, estimateRequestCost } from "./paper_spend.mjs";
 import { openRouterJson } from "./definition_jev_core.mjs";
 import { checkCappedKey } from "./openrouter_connection.mjs";
 import { PAPER_PIPELINE } from "./paper_pipeline_contract.mjs";
@@ -56,66 +57,87 @@ export class PaperModel {
     if (!model || !["tools", "structured_outputs"].every(parameter => model.supported_parameters?.includes(parameter))) {
       throw new Error(this.run.pipeline ? "The pipeline model is currently unavailable with tools and structured output. Try again later; Echo will not substitute a different model." : "Choose an OpenRouter model that advertises tools and structured_outputs. No fallback model will be selected.");
     }
+    this.run.modelPricing = model.pricing || null;
   }
   async call(name, payload) {
     this.signal?.throwIfAborted();
     if (!this.getKey()) throw new Error("Reconnect OpenRouter to continue.");
-    if (this.run.pending) throw new Error("An earlier call is uncertain. Explicitly acknowledge retry before continuing; it may charge again.");
     const requestHash = await digest({ name, model: this.run.model, payload });
     this.run.receipts ||= {};
+    if (this.run.pending) {
+      if (this.run.pending.requestHash !== requestHash || !await this.retryFailed(this.run.pending)) throw new Error("The review needs confirmation before another AI request.");
+    }
     if (this.run.receipts[requestHash]) return this.run.receipts[requestHash].message;
-    await checkCappedKey(this.getKey(), this.signal, this.request);
-    const id = crypto.randomUUID();
-    this.run.pending = { id, kind: "request", phase: name, requestHash, startedAt: new Date().toISOString() };
-    this.run.phase = name;
-    await this.save(); // Must succeed before sending a billable call.
-    this.onProgress(name);
-    let body;
-    try {
-      body = await this.request("/api/v1/chat/completions", this.getKey(), { method: "POST", signal: this.signal,
-        body: JSON.stringify({ model: this.run.model, stream: false, max_tokens: 12000,
-          provider: { require_parameters: true, allow_fallbacks: false },
-          ...(this.run.pipeline && name === "Setting up Echo variables" ? { reasoning: { effort: PAPER_PIPELINE.setupReasoning } } : {}),
-          ...payload }) });
-    } catch {
-      // A timeout or abort cannot tell us whether the provider charged. No automatic replay.
-      this.run.phase = "uncertain";
-      this.run.pending.kind = "uncertain";
-      await this.save();
-      throw new Error("The AI request did not finish reliably. It may have been billed.");
+    while (true) {
+      this.signal?.throwIfAborted();
+      await checkCappedKey(this.getKey(), this.signal, this.request);
+      const id = crypto.randomUUID();
+      const bodyPayload = { model: this.run.model, stream: false, max_tokens: 12000,
+        provider: { require_parameters: true, allow_fallbacks: false },
+        ...(this.run.pipeline && name === "Setting up Echo variables" ? { reasoning: { effort: PAPER_PIPELINE.setupReasoning } } : {}), ...payload };
+      this.run.pending = { id, kind: "request", phase: name, requestHash, estimatedCost: estimateRequestCost(this.run.modelPricing, bodyPayload), startedAt: new Date().toISOString() };
+      this.run.phase = name;
+      await this.save(); // Save the request and cost reservation before it can be billed.
+      this.onProgress(name);
+      let body;
+      try {
+        body = await this.request("/api/v1/chat/completions", this.getKey(), { method: "POST", signal: this.signal, body: JSON.stringify(bodyPayload) });
+      } catch {
+        this.run.phase = "uncertain"; this.run.pending.kind = "uncertain";
+        await this.save();
+        if (await this.retryFailed(this.run.pending)) continue;
+        throw new Error("The AI request did not finish reliably. It may have been billed.");
+      }
+      const usage = body.usage;
+      this.run.calls ||= [];
+      this.run.calls.push({ id, phase: name, model: body.model || this.run.model, provider: body.provider || null,
+        input: usage?.prompt_tokens ?? null, output: usage?.completion_tokens ?? null,
+        cachedRead: usage?.prompt_tokens_details?.cached_tokens ?? null,
+        cacheWrite: usage?.prompt_tokens_details?.cache_write_tokens ?? null, cost: usage?.cost ?? null,
+        estimatedCost: estimateRequestCost(this.run.modelPricing, bodyPayload, usage) });
+      const choice = body.choices?.[0];
+      if (!choice?.message || !["stop", "tool_calls"].includes(choice.finish_reason)) {
+        this.run.phase = "invalid_response"; this.run.pending.kind = "invalid_response";
+        await this.save();
+        if (await this.retryFailed(this.run.pending)) continue;
+        throw new Error("The AI returned an incomplete response.");
+      }
+      this.run.receipts[requestHash] = { id, message: choice.message };
+      this.run.pending = null;
+      await this.save(); // Accepted receipts are never replayed by automatic retry.
+      return choice.message;
     }
-    const usage = body.usage;
-    this.run.calls ||= [];
-    this.run.calls.push({ id, phase: name, model: body.model || this.run.model, provider: body.provider || null,
-      input: usage?.prompt_tokens ?? null, output: usage?.completion_tokens ?? null,
-      cachedRead: usage?.prompt_tokens_details?.cached_tokens ?? null,
-      cacheWrite: usage?.prompt_tokens_details?.cache_write_tokens ?? null, cost: usage?.cost ?? null });
-    const choice = body.choices?.[0];
-    if (!choice?.message || !["stop", "tool_calls"].includes(choice.finish_reason)) {
-      this.run.phase = "invalid_response"; this.run.pending.kind = "invalid_response"; await this.save();
-      throw new Error("The AI returned an incomplete response.");
-    }
-    this.run.receipts[requestHash] = { id, message: choice.message };
-    this.run.pending = null;
-    await this.save(); // Receipt and cleared pending state commit together, before output is applied.
-    return choice.message;
   }
+  async retryFailed(failed) {
+    if (this.signal?.aborted || !retryPolicy(this.run).allowed) return false;
+    recordAutomaticRetry(this.run, failed);
+    await this.save();
+    this.onProgress({ title: "Continuing your review", detail: "ECHO is retrying automatically within the review’s $0.10 allowance." });
+    // Back off transient failures without a timer that survives cancellation.
+    if (failed.kind === "uncertain") await new Promise((resolve, reject) => {
+      const abort = () => { clearTimeout(timer); reject(this.signal.reason); };
+      const timer = setTimeout(() => { this.signal?.removeEventListener("abort", abort); resolve(); }, Math.min(2000, 250 * this.run.autoRetries.length));
+      this.signal?.addEventListener("abort", abort, { once: true });
+      if (this.signal?.aborted) abort();
+    });
+    return true;
+  }
+
   context(task, data) {
     return [{ role: "system", content: SAFETY },
       { role: "user", content: JSON.stringify({ paper: this.run.capture, claim: this.run.selectedClaim, qualification: this.run.qualification || null }) },
       { role: "user", content: `${task}\nDATA:\n${JSON.stringify(data)}` }];
   }
   async structured(name, task, data, schema, options = {}) {
-    const { validateResult, repairAttempts = 0, ...requestOptions } = options;
+    const { validateResult, repairAttempts, ...requestOptions } = options;
     const payload = { messages: this.context(task, data),
       response_format: { type: "json_schema", json_schema: { name: "echo_result", strict: true, schema } }, ...requestOptions };
     const repairKey = await digest({ name, model: this.run.model, payload });
-    const limit = Math.min(2, Math.max(0, repairAttempts));
     while (true) {
       const repairs = this.run.responseRepairs?.[repairKey] || [];
       const previous = repairs.at(-1);
       const messages = previous ? [...payload.messages, previous.message, { role: "user", content:
-        `Correction attempt ${repairs.length} of ${limit}. Your previous response failed validation: ${previous.error}\nReturn a complete corrected response using the same claim and captured paper. Copy quotations directly from the captured article; do not paraphrase, join disjoint passages or invent support. Do not change a scope or adjustment conclusion merely to pass validation. All original requirements still apply.` }] : payload.messages;
+        `Correction attempt ${repairs.length}. Your previous response failed validation: ${previous.error}\nReturn a complete corrected response using the same claim and captured paper. Copy quotations directly from the captured article; do not paraphrase, join disjoint passages or invent support. Do not change a scope or adjustment conclusion merely to pass validation. All original requirements still apply.` }] : payload.messages;
       // Transport failures stay outside this catch: an unconfirmed paid call is never replayed.
       const message = await this.call(name, { ...payload, messages });
       let value, invalid;
@@ -123,16 +145,17 @@ export class PaperModel {
       catch (error) { invalid = error; }
       if (!invalid) return value;
       const requestHash = Object.keys(this.run.receipts).find(hash => this.run.receipts[hash].message === message);
-      if (repairs.length < limit && !this.signal?.aborted) {
+      if (retryPolicy(this.run).allowed && !this.signal?.aborted) {
         this.run.responseRepairs ||= {};
         this.run.responseRepairs[repairKey] = [...repairs, { requestHash, message, error: invalid.message, at: new Date().toISOString() }];
-        await this.save(); // Preserve the bad reply and bounded repair count before a new request.
+        recordAutomaticRetry(this.run, { id: this.run.receipts[requestHash]?.id, requestHash, phase: name, kind: "invalid_response" });
+        await this.save(); // Preserve failed replies and cumulative retry spend before another request.
         this.onProgress({ title: "Checking the AI response", detail: "Correcting a response that did not pass ECHO’s checks." });
         continue;
       }
       this.run.pending = { id: this.run.receipts[requestHash]?.id, phase: "Invalid structured response", kind: "invalid_response", error: invalid.message, requestHash };
       await this.save();
-      throw new Error(limit ? "ECHO could not verify the AI response after automatic correction. Your completed work is saved. Try again later." : `${invalid.message} The response could not be used. Retry the review to request a new response.`);
+      throw new Error("ECHO could not verify the AI response automatically. Your completed work is saved.");
     }
   }
 

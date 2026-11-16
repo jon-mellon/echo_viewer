@@ -77,7 +77,7 @@ test('an invalid pipeline graph is marked for explicit retry rather than silentl
     if(path==='/api/v1/key') return {data:{limit:5,limit_remaining:4,limit_reset:null}};
     requests++;return {choices:[{finish_reason:'stop',message:{content:JSON.stringify(invalid)}}]};
   }});
-  await assert.rejects(extractPipelineClaims(model),/unknown variables/);
-  assert.ok(run.pending);assert.equal(run.pipelineExtraction,undefined);
-  await assert.rejects(extractPipelineClaims(model),/uncertain/);assert.equal(requests,1);
+  await assert.rejects(extractPipelineClaims(model),/could not verify/);
+  assert.ok(run.pending);assert.match(run.pending.error,/unknown variables/);assert.equal(run.pipelineExtraction,undefined);
+  await assert.rejects(extractPipelineClaims(model),/confirmation/);assert.equal(requests,1);
 });

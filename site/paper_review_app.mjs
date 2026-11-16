@@ -1,13 +1,14 @@
-import { recoveryState, acknowledgeRetry } from "./paper_review_state.mjs";
+import { spendLabel } from "./paper_spend.mjs";
+import { recoveryState, acknowledgeRetry } from "./paper_review_state.mjs?v=spend-retry-v1";
 import { REVIEW_STAGES, recordProgress, progressSnapshot, elapsedLabel } from "./paper_progress.mjs";
 import { PAPER_PIPELINE } from "./paper_pipeline_contract.mjs";
 import { h } from "./dom_builder.mjs";
 import { paperStore } from "./paper_store.mjs";
-import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=automatic-correction-v1";
+import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs?v=spend-retry-v1";
 import { checkCappedKey } from "./openrouter_connection.mjs";
-import { PaperModel } from "./paper_model.mjs?v=automatic-correction-v1";
+import { PaperModel } from "./paper_model.mjs?v=spend-retry-v1";
 import { BrowserEchoSession } from "./paper_browser_session.mjs";
-import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit } from "./paper_workflow.mjs?v=automatic-correction-v1";
+import { extractClaims, qualifyClaim, evaluatePaper, resolveSplit } from "./paper_workflow.mjs?v=spend-retry-v1";
 import { publicSchemaProjection } from "./public_schema_projection.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
 import { unaddressedAssessmentNotice, VALIDATION_NOTICE } from "./paper_review_copy.mjs";
@@ -41,6 +42,7 @@ function renderActivity() {
   panel.dataset.state = recovery ? "paused" : state.state;
   const update = (id, value) => { if ($(id).textContent !== value) text(id, value); };
   const cancelling = busy && controller?.signal.aborted;
+  update("activity-spend", spendLabel(run)); $("activity-spend").hidden = !run;
   update("activity-title", cancelling ? "Stopping review" : recovery ? recovery.title : state.title);
   update("activity-elapsed", busy ? `${elapsedLabel(state.elapsedSeconds)} elapsed` : state.state === "complete" ? "Saved" : "");
   $("activity-elapsed").hidden = !busy && state.state !== "complete";
@@ -123,9 +125,7 @@ function render() {
   text("connection", key ? `Connected · capped key checked · ${connectionPersistent ? "remembered on this device" : bridgeTarget ? "remembered for this Chrome session" : "this window only"}` : "Connect once to extract claims automatically.");
   text("settings-connection", $("connection").textContent);
   text("qualification", run?.qualification ? JSON.stringify(run.qualification, null, 2) : "");
-  const costs = (run?.calls || []).map(call => call.cost);
-  const reported = costs.filter(value => typeof value === "number");
-  const cost = reported.length ? `reported cost $${reported.reduce((a, b) => a + b, 0).toFixed(4)}${reported.length !== costs.length ? " + unknown charges" : ""}` : "cost unavailable";
+  const cost = spendLabel(run);
   const cached = (run?.calls || []).map(call => call.cachedRead);
   const cache = cached.length && cached.every(value => typeof value === "number") ? `${cached.reduce((a, b) => a + b, 0)} cached input tokens` : "cache usage unavailable or partial";
   text("usage", run?.calls?.length ? `${run.calls.length} model calls · ${cost} · ${cache} · model ${run.model}` : "");

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="strict-origin-when-cross-origin"><title>ECHO · Paper review</title><link rel="icon" type="image/svg+xml" href="./favicon.svg?v=echo-brand-original"><link rel="stylesheet" href="./paper_review.css?v=focused-review-v1"></head>
-<body data-review-ui="focused-review-v1">
+<body data-review-ui="spend-retry-v1">
   <header class="review-topbar"><img class="echo-logo" src="./echo-logo.svg?v=echo-brand-original" alt="ECHO — Every Cause of Human Outcomes"><span class="preview-badge">Paper review <span>Preview</span></span></header>
   <main>
     <header class="review-intro"><p class="eyebrow">Threats to inference</p><h1>A closer look at the claim.</h1><p>Choose a claim. Follow the evidence.</p><p class="intro-note">AI-assisted review. Manually check results before relying on them.</p></header>
@@ -15,6 +15,7 @@
         <button id="confirm">Save edits / start new review</button></div>
       </details>
     </section>
+    <p id="activity-spend" class="muted" role="status" hidden></p>
     <div id="selected-claim" class="selected-claim" hidden><span class="eyebrow">Selected claim</span><strong id="selected-claim-text"></strong><button id="change-claim" class="secondary">Change claim</button></div>
     <section id="review-activity" class="activity-panel" aria-label="Review activity" hidden>
       <div class="activity-heading"><span class="activity-indicator" aria-hidden="true"></span><h2 id="activity-title" aria-live="polite">Preparing review</h2><span id="activity-elapsed" class="meta-badge" aria-live="off"></span></div>
@@ -51,5 +52,5 @@
     </div></details>
     <details id="review-history" class="utility-drawer"><summary>Saved reviews</summary><section class="saved-card" aria-labelledby="saved-heading"><div class="section-heading"><h2 id="saved-heading">Saved reviews</h2><span class="meta-badge">This browser</span></div><div id="saved"></div><p class="muted saved-note">Private checkpoints stay in this browser. Deleting a checkpoint does not remove a public publication or OpenRouter’s processing records.</p></section>
     </details><footer class="review-footer"><span>ECHO</span> Every Cause of Human Outcomes</footer>
-  </main><script type="module" src="./paper_review.mjs?v=automatic-correction-v1"></script>
+  </main><script type="module" src="./paper_review.mjs?v=spend-retry-v1"></script>
 </body></html>
