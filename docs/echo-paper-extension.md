@@ -1,4 +1,4 @@
-# Echo Paper Review 0.1
+# Echo Paper Review 0.1.1
 
 The implementation lives on `permastaging`. The extension is a
 small Manifest V3 shell. Its side panel embeds `https://www.jonathanmellon.com/echo_viewer_permastaging/paper-review.html`.
@@ -27,17 +27,24 @@ model steps. This remains a preview whose live real-paper evaluation is unverifi
 2. Run `npm run build:extension:permastaging` (the default extension build also targets permastaging).
 3. Open `chrome://extensions`, enable Developer mode, choose **Load unpacked**,
    and select `dist/extension`.
-4. Open an HTML paper and click the Echo toolbar action. In the side panel choose
-   **Capture current paper**. Correct the text and coverage before confirming it.
-5. Connect a capped OpenRouter key, select a model ID that advertises tools and
-   structured output, extract/edit/select a claim, qualify it, and start the review.
+4. Open an HTML paper and click the Echo toolbar action. This grants temporary
+   tab access and automatically captures and saves its metadata and text. Review
+   the captured details; corrections remain available in the expandable form.
+5. Connect a capped OpenRouter key, choose a model from the supported-model list,
+   extract/edit/select a claim, qualify it, and start the review.
+
+To update an installed unpacked extension, replace its folder contents with the
+new ZIP and click **Reload** on its card in `chrome://extensions`.
 
 The extension has only `activeTab`, `scripting` and `sidePanel` permissions. It
-has no persistent article-host access, API-host access, background capture,
-externally-connectable command interface, or key storage. Clicking Capture is
-required to read a page. Restricted Chrome pages and inaccessible PDFs need
-paste fallback. Structured article captures are conservatively marked partial;
-only the user can confirm that full text has been supplied.
+has no persistent article-host access, API-host access, ambient tab tracking,
+externally-connectable command interface, or key storage. Clicking the toolbar
+action captures that article automatically. Opening Chrome’s side-panel picker
+does not grant activeTab; the panel explains how to invoke the toolbar action
+instead. Restricted Chrome pages and inaccessible PDFs remain unsupported.
+PMC HTML with an abstract, methods, results and discussion is recognized as full
+article text when no selection or truncation occurred. Other pages remain
+partial until the user confirms their coverage. No model call runs on capture.
 
 ## Production release gate
 
@@ -71,7 +78,9 @@ message can ask the shell to fetch, run scripts, read tabs or publish.
 Capture messages require the exact frame/opener, expected origin and a random
 per-panel nonce. The readiness message contains only the nonce. Article text
 is sent using an exact Echo target origin. The receiver validates and bounds the
-capture. New captures cannot replace an existing confirmed run.
+capture. Each new article starts a separate saved review; it never changes the
+evidence in an earlier run. Captures arriving during an active step are deferred
+until the user finishes/cancels and invokes capture again.
 
 Live header probes on 2026-11-15 found:
 
@@ -197,3 +206,13 @@ live OpenRouter login/key recognition and one supported paper evaluation, check
 real Turnstile/publication in both tab and embedded modes, and measure cold/warm
 data loading and reported cost/cache usage. Mocked acceptance cannot establish
 those live-service results.
+
+## Capture regression verification (0.1.1)
+
+Extraction was checked against downloaded HTML from PMC2796879: title and DOI
+`10.1093/gerona/glp099`, a 1,796-character abstract, and 23,074 characters of
+article text were captured with full coverage. This verifies extraction, not a
+live model evaluation. Tests cover toolbar-handler handoff with mocked Chrome
+APIs, missing-section coverage, automatic form population and snapshot saving,
+and a mocked complete review. The actual installed toolbar click could not be
+verified because Computer Use permission was unavailable.
