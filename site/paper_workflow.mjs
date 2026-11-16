@@ -1,13 +1,14 @@
 import { extractPipelineClaims } from "./paper_pipeline.mjs";
 import { object, array, string, boolean, validateShape } from "./paper_model.mjs";
-import { validateQualification } from "./paper_capture.mjs";
+import { validateQualification, validateQualificationResult, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs";
 import { digest, materializeQueue, reviewCoverage, validateFindingDecision, requiredIds } from "./paper_review_contract.mjs";
 import { createEchoTools } from "./echo_tools.mjs";
 import { CONFOUNDER_STATUSES, MANUAL_REVIEW_NOTICE } from "./confounder_status.mjs";
 import { validateGroupingSchema } from "./data_validation.mjs";
 import { unaddressedAssessmentNotice, VALIDATION_NOTICE } from "./paper_review_copy.mjs";
 
-export const qualificationSchema = object({ eligible: boolean, reason: string, causal: boolean,
+export const qualificationSchema = object({ eligible: { ...boolean, description: "Within scope for confounder scrutiny, not an endorsement of causal identification. Unadjusted, potentially confounded observational causal claims are eligible." }, reason: string,
+  causal: { ...boolean, description: "The authors explicitly or implicitly interpret the selected relationship causally. This does not mean the estimate identifies a causal effect; no adjustment is required." },
   x: string, y: string, xUnit: string, yUnit: string, population: string, design: string,
   exposureRandomized: boolean, usesDid: boolean, assignment: string, controls: array(string),
   evidenceLocation: string, evidenceQuote: string, adjustmentQuote: string,
@@ -26,9 +27,9 @@ export async function extractClaims(model) {
 }
 export async function qualifyClaim(model) {
   const result = await model.structured("Qualifying selected claim", `Verify the selected claim against the full captured text. Identify the actual focal estimate and its evidence location, X/Y measurements, person-level units, population, assignment, design and adjustment inventory.
-Only person-level nonrandomized observational causal estimates using measured adjustment/selection on observables or matching are eligible. No DiD, instruments, randomized estimates, noncausal claims or other units. If contradicted, unavailable, unsupported, or insufficient, eligible=false and explain. Fields unavailable must be empty, not guesses. Give exact evidence and adjustment quotations. Separate randomized components of mixed-method papers. Verify exactly the selected pipeline link and its endpoint concepts; do not substitute another claim.`, { pipelineLink: model.run.selectedClaim?.pipelineLink, pipelineVariables: model.run.selectedClaim?.pipelineVariables }, qualificationSchema);
-  validateQualification(result, model.run.capture);
-  return result;
+Person-level nonrandomized observational claims are eligible when the authors state or imply a causal interpretation, including protective/harmful effects or causal explanations of observational associations. Formal causal terminology and adjustment are NOT prerequisites. An observational association alone without any explicit or implied causal interpretation is not enough. Do not reject a causal interpretation merely because the focal estimate is crude or unadjusted: missing adjustment is something the confounder review must examine.
+No DiD, instruments, randomized estimates, purely noncausal descriptions or other units. If contradicted, unavailable, unsupported, or insufficient for those requirements, eligible=false and explain. Use design="observational" for observational estimates without a more specific supported design. Fields unavailable must be empty, not guesses. Give an exact evidence quotation. Build the adjustment inventory for the selected focal estimate only; do not transfer covariates from a different exposure, contrast or model. If no adjustment is identified for this estimate, controls=[] and adjustmentQuote="" are valid and must not make the claim ineligible. Describe this as "No adjustment identified in the captured text", not proof that the authors made no adjustment. When controls are identified, give an exact adjustment quotation. Separate randomized components of mixed-method papers. Verify exactly the selected pipeline link and its endpoint concepts; do not substitute another claim.`, { pipelineLink: model.run.selectedClaim?.pipelineLink, pipelineVariables: model.run.selectedClaim?.pipelineVariables }, qualificationSchema, { validateResult: value => validateQualificationResult(value, model.run.capture) });
+  return validateQualificationResult(result, model.run.capture);
 }
 
 const setupNames = new Set(["echo_status", "echo_groups", "echo_search_variables", "echo_variables", "echo_neighbors", "echo_group_neighbors", "echo_findings", "echo_graph",
@@ -123,7 +124,7 @@ export async function evaluatePaper(model, session) {
     const group = session.schema.groups.find(row => row.group_id === groupId);
     const legs = queue.links.filter(link => link.source_group_id === groupId);
     const assessment = await model.structured(`Assessing ${group.label}`, `Assess whether K means systematically different things on K→X and K→Y, invalidating a common-confounder inference. If a split is required, say so and explain boundaries; do not dismiss an independent remainder.
-Build the focal paper's control inventory and choose exactly one supplied status with a detailed reason. Credit defensible pre-treatment proxies and fixed effects with limitations. Precise measurement, limited samples or observed effect patterns alone do not establish design control. not_in_minimal_adjustment_set requires tracing paths and naming actual adjusted blockers.
+Build the selected focal estimate's control inventory and choose exactly one supplied status with a detailed reason. Unadjusted observational causal claims are valid review targets. Credit controls only if they apply to this focal exposure/contrast/model; do not borrow covariates from the paper's other models. An empty inventory is valid and should lead to evidence-based confounder assessments, not rejection of the review. Credit defensible pre-treatment proxies and fixed effects with limitations. Precise measurement, limited samples or observed effect patterns alone do not establish design control. not_in_minimal_adjustment_set requires tracing paths and naming actual adjusted blockers.
 causes_y_only_via_x must reject EVERY alternate direct or two-link route in the supplied graph, each with a reason. Use id=direct for K→Y and an intermediate group ID for K→Z→Y. Other statuses require rejectedPaths=[].`,
       { group, legs, statuses: CONFOUNDER_STATUSES, graph: run.initialGraph.dag.edges }, assessmentSchema);
     if (assessment.systematicallyDifferent) {
@@ -189,7 +190,9 @@ causes_y_only_via_x must reject EVERY alternate direct or two-link route in the 
   }
   validateGroupingSchema(session.schema);
   run.outcome = { format: "echo-paper-review-v1", captureHash: run.captureHash, claim: run.selectedClaim,
-    qualification: run.qualification, anchors: session.record.anchors,
+    qualification: run.qualification,
+    ...(!run.qualification.controls.length ? { adjustmentNotice: NO_ADJUSTMENT_IDENTIFIED_NOTICE } : {}),
+    anchors: session.record.anchors,
     publicationId: session.record.sourcePublication.id, schemaHash: session.record.sourcePublication.content_hash,
     physicalSnapshotId: session.record.snapshotId, evidenceManifestHash: session.record.evidenceManifestHash,
     focalVariableMatches: run.focalVariables, linkReviews: coverage.linkReviews,

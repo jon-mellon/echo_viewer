@@ -1,7 +1,7 @@
 import { PAPER_PIPELINE } from "./paper_pipeline_contract.mjs";
 import { h } from "./dom_builder.mjs";
 import { paperStore } from "./paper_store.mjs";
-import { validateCapture, confirmedCapture } from "./paper_capture.mjs";
+import { validateCapture, confirmedCapture, NO_ADJUSTMENT_IDENTIFIED_NOTICE } from "./paper_capture.mjs";
 import { checkCappedKey } from "./openrouter_connection.mjs";
 import { PaperModel } from "./paper_model.mjs";
 import { BrowserEchoSession } from "./paper_browser_session.mjs";
@@ -46,17 +46,19 @@ function render() {
   $("cancel").hidden = !busy;
   $("export").hidden = !run;
   $("preview").hidden = !run?.outcome;
-  const current = run?.outcome || run?.selectedClaim ? "review" : run ? "claim" : "paper";
+  const notQualified = run?.qualification?.eligible === false;
+  const current = notQualified ? "claim" : run?.outcome || run?.selectedClaim ? "review" : run ? "claim" : "paper";
   for (const [index, name] of ["paper", "claim", "review"].entries()) {
     const step = $(`step-${name}`);
     if (name === current) step.setAttribute("aria-current", "step"); else step.removeAttribute("aria-current");
     step.dataset.complete = String(index < ["paper", "claim", "review"].indexOf(current) || Boolean(run?.outcome));
   }
-  text("review-state", run?.outcome ? "Complete" : busy && run?.selectedClaim ? "In progress" : needsResume && run?.selectedClaim ? "Paused" : "Not started");
+  text("review-state", notQualified ? "Not qualified" : run?.outcome ? "Complete" : busy && run?.selectedClaim ? "In progress" : needsResume && run?.selectedClaim ? "Paused" : "Not started");
   text("claim-count", `${run?.claims?.length || 0} extracted`); $("claim-count").hidden = !run?.claims?.length;
   document.querySelectorAll("button").forEach(button => { button.disabled = busy && !["cancel", "disconnect"].includes(button.id); });
   $("retry").hidden = !run?.pending;
-  $("resume-review").hidden = !needsResume || !run || Boolean(run.outcome);
+  text("resume-review", run?.selectedClaim ? "Continue selected claim" : "Resume review");
+  $("resume-review").hidden = notQualified || !needsResume || !run || Boolean(run.outcome);
   $("connect").hidden = Boolean(key);
   text("connection", key ? `Connected · capped key checked · ${connectionPersistent ? "remembered on this device" : bridgeTarget ? "remembered for this Chrome session" : "this window only"}` : "Connect once to extract claims automatically.");
   text("qualification", run?.qualification ? JSON.stringify(run.qualification, null, 2) : "");
@@ -66,12 +68,27 @@ function render() {
   const cached = (run?.calls || []).map(call => call.cachedRead);
   const cache = cached.length && cached.every(value => typeof value === "number") ? `${cached.reduce((a, b) => a + b, 0)} cached input tokens` : "cache usage unavailable or partial";
   text("usage", run?.calls?.length ? `${run.calls.length} model calls · ${cost} · ${cache} · model ${run.model}` : "");
-  $("claims").replaceChildren(...(run?.claims || []).map(claim => h("label", { className: "claim" },
-    h("input", { type: "radio", name: "claim", value: claim.id, checked: run.selectedClaim?.id === claim.id,
-      disabled: busy || Boolean(run.session) || claim.eligible === false, onchange: () => action(async () => {
-        run.selectedClaim = structuredClone(claim); run.qualification = null; await save(); await reviewSelectedClaim();
-      }) }), h("span", { className: "claim-content" }, h("span", { className: "claim-title", textContent: displayClaim(claim.text) }),
-    h("p", { className: "muted", textContent: claim.eligibilityNote || "Saved claim from an earlier review." })))));
+  $("claims").replaceChildren(...(run?.claims || []).map(claim => {
+    const assessment = run?.claimQualifications?.[claim.id] || (run?.selectedClaim?.id === claim.id ? run.qualification : null);
+    const rejected = assessment?.eligible === false;
+    return h("div", { className: "claim-option" },
+      h("label", { className: "claim" },
+        h("input", { type: "radio", name: "claim", value: claim.id, checked: run.selectedClaim?.id === claim.id,
+          disabled: busy || Boolean(run.session) || claim.eligible === false, onchange: () => action(async () => {
+            needsResume = false;
+            run.selectedClaim = structuredClone(claim); run.qualification = run.claimQualifications?.[claim.id] || null;
+            await save(); await reviewSelectedClaim();
+          }) }),
+        h("span", { className: "claim-content" }, h("span", { className: "claim-title", textContent: displayClaim(claim.text) }),
+          h("p", { className: "muted", textContent: rejected ? "Full-text check: not qualified for this preview’s review protocol." : claim.eligibilityNote || "Saved claim from an earlier review." }))),
+      rejected ? h("aside", { className: "qualification-note", attrs: { "aria-label": "Full-text qualification assessment" } },
+        h("strong", { textContent: "The AI could not qualify this claim" }),
+        h("p", { textContent: "This preview supports person-level observational claims with an explicit or implied causal interpretation, including unadjusted estimates. The AI did not verify that this claim fits that scope in the captured text. This assessment may be incorrect or incomplete; manually check the methods, tables and supplementary material." }),
+        h("details", {}, h("summary", { textContent: "Why the AI stopped" }), h("p", { className: "qualification-reason", textContent: assessment.reason })),
+        h("p", { className: "muted", textContent: "No confounder review was completed for this claim. You can choose a different extracted claim." })) : assessment?.eligible && !assessment.controls.length ? h("aside", { className: "adjustment-note" },
+        h("strong", { textContent: "No adjustment identified in the captured text" }),
+        h("p", { textContent: "The claim remains eligible for confounder review. This assessment may be incomplete; manually check the focal model and supplementary material." })) : null);
+  }));
   if (!run?.claims?.length) $("claims").append(h("div", { className: "empty-state" },
     h("strong", { textContent: run?.pipelineExtraction ? "No causal claims found" : busy && key ? "Finding the paper’s claims…" : "Claims will appear here" }),
     h("p", { textContent: run?.pipelineExtraction ? "The abstract did not provide causal links to review." : "Capture a paper and connect once to get started." })));
@@ -81,6 +98,7 @@ function render() {
       h("p", { className: "notice", textContent: VALIDATION_NOTICE }),
       h("p", { className: "notice", textContent: MANUAL_REVIEW_NOTICE }),
       h("p", { textContent: displayClaim(run.selectedClaim.text) }));
+    if (!run.qualification.controls.length) $("result").append(h("p", { className: "notice", textContent: NO_ADJUSTMENT_IDENTIFIED_NOTICE }));
     const rows = Object.values(run.outcome.review.confounders);
     $("result").append(h("div", { className: "review-totals" },
       h("div", {}, h("strong", { textContent: rows.length }), h("span", { textContent: "Confounders reviewed" })),
@@ -100,9 +118,9 @@ function render() {
 async function listSaved() {
   const runs = (await paperStore.list()).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   $("saved").replaceChildren(...runs.map(record => h("div", { className: "saved-row" },
-    h("strong", { textContent: record.capture.title }), h("p", { className: "muted", textContent: `${({ complete: "Review complete", claims_extracted: "Choose a claim", confirmed: "Paper captured", qualified: "Claim qualified", uncertain: "Needs attention", split_required: "Review paused" })[record.phase] || "Review in progress"} · ${new Date(record.updatedAt || record.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` }),
+    h("strong", { textContent: record.capture.title }), h("p", { className: "muted", textContent: `${({ complete: "Review complete", claims_extracted: "Choose a claim", confirmed: "Paper captured", qualified: "Claim qualified", not_qualified: "Claim not qualified", uncertain: "Needs attention", split_required: "Review paused" })[record.phase] || "Review in progress"} · ${new Date(record.updatedAt || record.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` }),
     h("button", { textContent: "Resume", onclick: () => action(async () => {
-      await session?.close(); session = null; run = record; needsResume = run.phase !== "complete";
+      await session?.close(); session = null; run = record; needsResume = !["complete", "not_qualified"].includes(run.phase);
       populate(run.capture);
       text("pipeline-extraction", JSON.stringify(run.pipelineExtraction || {}, null, 2));
       if (run.pending) { run.phase = "uncertain"; await save(); }
@@ -167,7 +185,17 @@ async function reviewSelectedClaim() {
   if (run.capture.coverage !== "full") throw new Error("This page did not expose a complete article. Open the full HTML article and capture it again.");
   await client.checkModel();
   if (!run.qualification) {
-    run.qualification = await qualifyClaim(client); run.phase = "qualified"; await save();
+    run.qualification = await qualifyClaim(client);
+    run.claimQualifications ||= {};
+    run.claimQualifications[run.selectedClaim.id] = structuredClone(run.qualification);
+    run.phase = run.qualification.eligible ? "qualified" : "not_qualified";
+    run.qualificationPolicy = "observational-causal-including-unadjusted-v1";
+    await save();
+  }
+  if (!run.qualification.eligible) {
+    needsResume = false;
+    text("progress", "The AI could not qualify this claim for the current review protocol. See its full-text assessment beside the claim, or choose another claim.");
+    return;
   }
   const currentSession = await browserSession(client);
   while (run.phase !== "complete") {

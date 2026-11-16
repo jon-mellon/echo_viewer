@@ -129,3 +129,16 @@ pre { margin: var(--space-3) 0 0; padding: var(--space-3); max-height: 400px; ov
   .review-steps li:not(:last-child)::after { margin-inline: var(--space-1); }
 }
 @media (prefers-reduced-motion: reduce) { body[data-busy="true"] .progress-dot { animation: none; } }
+
+.qualification-note { margin: calc(-1 * var(--space-2)) 0 var(--space-3); padding: var(--space-3); border: 1px solid var(--warn-border); border-top: 0; border-radius: 0 0 var(--radius-md) var(--radius-md); background: var(--warn-bg); color: var(--warn-text); font-size: var(--text-sm); }
+.qualification-note > strong { display: block; margin-bottom: var(--space-2); font-size: var(--text-md); }
+.qualification-note > p:last-child { margin-bottom: 0; }
+.qualification-note details { margin-bottom: var(--space-3); }
+.qualification-note summary { color: var(--warn-text); }
+.qualification-reason { margin: var(--space-2) 0 0; overflow-wrap: anywhere; }
+
+.adjustment-note { margin: 0 0 var(--space-3); padding: var(--space-3); border-left: 2px solid var(--warn-border); font-size: var(--text-sm); color: var(--text-muted); }
+.adjustment-note strong { display: block; margin-bottom: var(--space-1); color: var(--text); }
+.adjustment-note p { margin: 0; }
+
+#error:not(:empty) { max-height: min(35vh, 240px); overflow: auto; white-space: pre-wrap; }

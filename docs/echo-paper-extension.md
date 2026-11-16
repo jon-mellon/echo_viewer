@@ -241,8 +241,8 @@ execution of the shared extraction contract, not a remote Python pipeline job.
 Raw variable/link output is saved unchanged. Graph references, uniqueness and
 types are validated, and malformed receipts require explicit retry. Displayed
 claims come from pipeline links rather than a separate prose-claim extractor.
-Only present, single-exposure, person-level observational claims are selectable
-for this preview's review protocol. The full article still verifies the chosen
+Present, single-exposure, person-level observational claims are selectable for
+full-text qualification, including an unspecified observational strategy. The full article still verifies the chosen
 claim; a pipeline extraction label alone does not establish eligibility.
 
 ## Remembered connection
@@ -282,3 +282,36 @@ notices remain accessible and appear with completed results.
 The extension acceptance test captures narrow claim-selection/result screens
 and a full-width result screen with fixture data. These are visual previews,
 not evidence of live real-paper evaluation.
+
+## Unadjusted observational causal claims
+
+The extension deliberately broadens the demonstration runner's qualification
+scope: an explicit or implied causal interpretation of a person-level
+nonrandomized observational association can be reviewed even when no
+adjustment is identified. The shared harvest abstract extraction prompt, schema
+and model remain unchanged. Candidate links with `other` identification strategy
+can reach the full-text check instead of being preemptively excluded.
+
+When the model reports the required causal-interpretation, unit, design and
+exact evidence fields but vetoes an empty control inventory, the review-scope
+check admits the claim and records the eligibility basis. The original model
+answer remains unchanged in its durable receipt.
+
+Qualification accepts `design=observational`, `controls=[]` and an empty
+`adjustmentQuote`. Evidence for the focal claim still requires an exact quote.
+If controls are identified, their adjustment quotation must still match the
+captured text. Adjustment from a different exposure, contrast or model cannot
+be credited to this focal estimate. The UI and exports label an empty inventory
+“No adjustment identified in the captured text”, explicitly as a potentially
+incomplete AI assessment. It proceeds to confounder and supporting-finding review.
+
+A genuinely unsupported claim is a saved `not_qualified` outcome, displayed
+beside the chosen claim with its reason and scope. It is not a generic red
+runtime error, does not open a graph session or publish anything, and leaves
+other claims selectable. Accepted qualification decisions are saved per claim.
+Uncertain/billed call recovery still requires explicit acknowledgement.
+
+The browser smoke test runs both normally and with
+`ECHO_TEST_UNADJUSTED=1 npm run test:extension:browser` to verify an unadjusted
+causal claim reaches a complete private review without a fictitious adjustment
+quote. The `ECHO_TEST_UNSUPPORTED=1` variant verifies that genuine scope rejections are saved without a runtime error or duplicate billing on reload. Responses and evidence are fixtures, not live scientific validation.

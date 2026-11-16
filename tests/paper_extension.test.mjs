@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildExtension, REVIEW_URLS } from "../scripts/build_extension.mjs";
 import { paperReviewAllowed } from "../site/paper_review_access.mjs";
-import { confirmedCapture, validateCapture, validateClaims, validateQualification } from "../site/paper_capture.mjs";
+import { confirmedCapture, validateCapture, validateClaims, validateQualification, validateQualificationResult } from "../site/paper_capture.mjs";
 import { PaperModel, object, string } from "../site/paper_model.mjs";
 import { EchoSessionCore } from "../site/echo_session_core.mjs";
 import { BrowserEchoSession } from "../site/paper_browser_session.mjs";
@@ -201,4 +201,21 @@ test("permastaging has separate hosting and required release checks without bypa
   assert.match(profile, /e05fbe0b8e51447b92ec4ed0123a3c42bc6d0a0c/);
   assert.match(profile, /git merge-base --is-ancestor/);
   assert.match(profile, /exit 1/);
+});
+
+
+test("an implied observational causal claim remains eligible with no identified adjustment", () => {
+  const evidence = "Older men were resistive to hazards of overweight and adiposity";
+  const unadjustedCapture = { ...capture, articleText: evidence + ". The selected BMI estimate is a crude comparison." };
+  const unadjusted = { ...qualification, x: "BMI", y: "Mortality", design: "observational", controls: [], evidenceQuote: evidence, adjustmentQuote: "" };
+  assert.doesNotThrow(() => validateQualification(unadjusted, unadjustedCapture));
+  assert.throws(() => validateQualification({ ...unadjusted, controls: ["age"] }, unadjustedCapture), /adjustment quotation/);
+  assert.throws(() => validateQualification({ ...unadjusted, causal: false }, unadjustedCapture), /causal claim/);
+  assert.throws(() => validateQualification({ ...unadjusted, exposureRandomized: true }, unadjustedCapture), /nonrandomized/);
+  const inconsistent = validateQualificationResult({ ...unadjusted, eligible: false, reason: "No adjusted estimate was identified." }, unadjustedCapture);
+  assert.equal(inconsistent.eligible, true);
+  assert.match(inconsistent.eligibilityBasis, /Missing adjustment does not exclude/);
+  const rejection = { ...unadjusted, causal: false, eligible: false, reason: "Only a descriptive population count is stated." };
+  assert.equal(validateQualificationResult(rejection, unadjustedCapture), rejection);
+  assert.throws(() => validateQualification(rejection, unadjustedCapture), /descriptive/);
 });

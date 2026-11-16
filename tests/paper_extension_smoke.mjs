@@ -7,11 +7,14 @@ import { tmpdir } from "node:os";
 import { chromium } from "playwright";
 import { capturePaper } from "../extension/capture.mjs";
 
+const unsupported = process.env.ECHO_TEST_UNSUPPORTED === "1";
+const unadjusted = process.env.ECHO_TEST_UNADJUSTED === "1";
 const root = resolve("site"), profile = await mkdtemp(`${tmpdir()}/echo-extension-smoke-`);
 const origin = "https://www.jonathanmellon.com";
 const prefix = "/echo_viewer_permastaging";
-const article = `<!doctype html><title>Paper fixture</title><meta name="citation_title" content="A person-level study"><meta name="citation_doi" content="10.1234/focal"><article class="main-article-body"><h1>A person-level study</h1><section id="abstract"><p>Exposure increases outcomes in adults.</p></section><h2>Methods</h2><p>We adjust for age and income.</p><p>Nonrandomized matching estimates a person-level causal effect. The analysis follows adult respondents over multiple survey waves and measures individual exposure before the outcome. The adjusted model includes the stated baseline covariates and reports uncertainty for the selected focal estimate.</p><h2>Results</h2><p>The adjusted association was positive.</p><h2>Discussion</h2><p>Observational estimates may be confounded.</p><nav>Navigation junk</nav></article>`;
-const qualification = { eligible: true, reason: "Eligible", causal: true, x: "Exposure", y: "Outcome", xUnit: "person", yUnit: "person", population: "adults", design: "matching", exposureRandomized: false, usesDid: false, assignment: "Nonrandomized exposure", controls: ["age", "income"], evidenceLocation: "Abstract and methods", evidenceQuote: "Exposure increases outcomes in adults.", adjustmentQuote: "We adjust for age and income.", articleHasRandomizedComponent: false, mixedMethodsBoundary: "" };
+let article = `<!doctype html><title>Paper fixture</title><meta name="citation_title" content="A person-level study"><meta name="citation_doi" content="10.1234/focal"><article class="main-article-body"><h1>A person-level study</h1><section id="abstract"><p>Exposure increases outcomes in adults.</p></section><h2>Methods</h2><p>We adjust for age and income.</p><p>Nonrandomized matching estimates a person-level causal effect. The analysis follows adult respondents over multiple survey waves and measures individual exposure before the outcome. The adjusted model includes the stated baseline covariates and reports uncertainty for the selected focal estimate.</p><h2>Results</h2><p>The adjusted association was positive.</p><h2>Discussion</h2><p>Observational estimates may be confounded.</p><nav>Navigation junk</nav></article>`;
+if (unadjusted) article = article.replace('We adjust for age and income.', 'The focal estimate is a crude observational comparison.').replace('The adjusted model includes the stated baseline covariates', 'The focal model reports a crude association').replace('Nonrandomized matching estimates a person-level causal effect.', 'An unadjusted observational estimate is interpreted as a causal effect.').replace('The adjusted association was positive.', 'The crude association was positive.');
+const qualification = { eligible: !unadjusted, reason: unadjusted ? "No measured-adjusted estimate was identified, although the authors imply a causal interpretation." : "Eligible", causal: true, x: "Exposure", y: "Outcome", xUnit: "person", yUnit: "person", population: "adults", design: unadjusted ? "observational" : "matching", exposureRandomized: false, usesDid: false, assignment: "Nonrandomized exposure", controls: unadjusted ? [] : ["age", "income"], evidenceLocation: "Abstract and methods", evidenceQuote: "Exposure increases outcomes in adults.", adjustmentQuote: unadjusted ? "" : "We adjust for age and income.", articleHasRandomizedComponent: false, mixedMethodsBoundary: "" };
 let completions = 0, authExchanges = 0;
 const errors = [];
 const browserSessionFixture = `
@@ -70,8 +73,8 @@ try {
         : { role: "assistant", content: null, tool_calls: [{ id: "anchor-op", type: "function", function: { name: "echo_set_anchors", arguments: '{"ivId":"x","dvId":"y"}' } }] };
     } else {
       const properties = request.response_format.json_schema.schema.properties;
-      const value = properties.s ? { s: "success", v: [{ vi: "v1", a: ["person"], c: "uoa's exposure" }, { vi: "v2", a: ["person"], c: "uoa's outcome" }], l: [{ li: "l1", s: ["v1"], t: "v2", e: "present", p: "adults", d: "implied_selection_on_observables" }] }
-        : properties.eligible ? qualification
+      const value = properties.s ? { s: "success", v: [{ vi: "v1", a: ["person"], c: "uoa's exposure" }, { vi: "v2", a: ["person"], c: "uoa's outcome" }], l: [{ li: "l1", s: ["v1"], t: "v2", e: "present", p: "adults", d: unadjusted ? "other" : "implied_selection_on_observables" }] }
+        : properties.eligible ? (unsupported ? { ...qualification, eligible: false, causal: false, reason: "The full text gives a descriptive comparison without a causal interpretation." } : qualification)
           : properties.systematicallyDifferent ? { status: "unaddressed", reason: "The measured age mechanism is not addressed in this specification.", systematicallyDifferent: false, splitReason: "The two legs instantiate the same age construct.", rejectedPaths: [] }
             : { decision: "retained", reason: "The same person-level construct and adult population support this causal link.", reason_code: "", questioned_end: "", undeniable: true };
       message = { role: "assistant", content: JSON.stringify(value) };
@@ -110,9 +113,9 @@ try {
   assert.equal(authExchanges, 1);
   assert.equal(await frame.locator("#model").count(), 0);
   assert.equal(await frame.locator("#paper-details").getAttribute("open"), null);
-  await frame.locator('input[name="claim"]').waitFor();
+  await frame.locator('input[name="claim"]').first().waitFor();
   assert.equal(completions, 1); // Capture/connection extracts; no claim was selected for the user.
-  assert.equal(await frame.locator('input[name="claim"]').isChecked(), false);
+  assert.equal(await frame.locator('input[name="claim"]').first().isChecked(), false);
   await page.setViewportSize({ width: 420, height: 920 });
   assert.equal(await frame.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await screenshotReview(page, frame, '/tmp/echo-paper-review-claims-mobile.png');
@@ -120,18 +123,53 @@ try {
   assert.equal(await frame.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.setViewportSize({width:420,height:920});
   // The only review action is choosing a claim: qualification, setup and review follow.
-  await frame.locator('input[name="claim"]').check();
+  await frame.locator('input[name="claim"]').first().check();
+  if (unsupported) {
+    await frame.locator('.qualification-note').waitFor();
+    assert.equal(await frame.locator('#error').textContent(), '');
+    assert.equal(await frame.locator('#review-state').textContent(), 'Not qualified');
+    assert.equal(await frame.locator('input[name="claim"]').first().isEnabled(), true);
+    assert.equal(completions, 2);
+    const rejected = await frame.evaluate(async () => { const {paperStore}=await import('./paper_store.mjs');return (await paperStore.list())[0]; });
+    assert.equal(rejected.phase,'not_qualified');assert.equal(rejected.qualification.eligible,false);
+    assert.equal(rejected.session,undefined);assert.equal(rejected.outcome,undefined);
+    assert.equal(rejected.claimQualifications.l1.eligible,false);
+    await screenshotReview(page, frame, '/tmp/echo-claim-not-qualified.png');
+    await page.reload();
+    const restored = await (await page.waitForSelector('#echo')).contentFrame();
+    await restored.getByText('Connected · capped key checked · remembered for this Chrome session', {exact:true}).waitFor();
+    await restored.getByRole('button',{name:'Resume',exact:true}).click();
+    await restored.locator('.qualification-note').waitFor();
+    assert.equal(completions,2);assert.equal(await restored.locator('#error').textContent(),'');
+    console.log('Passed: unsupported claim is a saved, non-error outcome, with no graph session and no repeat billing on reload.');
+  } else {
   await frame.getByText("Automated review complete", { exact: false }).first().waitFor();
   assert.equal(await frame.getByText("Age · May be unaddressed", { exact: true }).count(), 1);
   assert.equal(await frame.locator("#result").getByText("The AI could not identify adjustment for Age in the captured text.", { exact: false }).count(), 1);
   assert.equal(await frame.locator("#result").getByText("x% (placeholder, not a measured result)", { exact: false }).count(), 1);
   assert.ok(await frame.getByText("These results may be incorrect or incomplete.", { exact: false }).count());
   assert.equal(completions, 6);
+  assert.equal(await frame.locator('#error').textContent(), '');
+  if (unadjusted) {
+    await frame.getByText('No adjustment identified in the captured text', {exact:true}).waitFor();
+    assert.equal(await frame.locator('.qualification-note').count(),0);
+    assert.equal(await frame.locator('#review-state').textContent(),'Complete');
+  }
   await screenshotReview(page, frame, '/tmp/echo-paper-review-results-mobile.png');
   await page.setViewportSize({ width: 1280, height: 960 });
   await screenshotReview(page, frame, '/tmp/echo-paper-review-results-desktop.png');
   const records = await frame.evaluate(async () => { const { paperStore } = await import("./paper_store.mjs"); return paperStore.list(); });
   assert.equal(records.length, 1); assert.equal(records[0].phase, "complete");
+  if (unadjusted) {
+    assert.equal(records[0].qualification.eligible, true);
+    assert.match(records[0].qualification.eligibilityBasis, /Missing adjustment does not exclude/);
+    const qualificationCall = records[0].calls.find(call => call.phase === 'Qualifying selected claim');
+    const receipt = Object.values(records[0].receipts).find(row => row.id === qualificationCall.id);
+    assert.equal(JSON.parse(receipt.message.content).eligible, false); // Original model answer is retained.
+    assert.deepEqual(records[0].qualification.controls, []);
+    assert.equal(records[0].qualification.adjustmentQuote, '');
+    assert.match(records[0].outcome.adjustmentNotice, /not confirmation that the authors made no adjustment/);
+  }
   assert.equal(records[0].review.findings.ky.decision, "excluded");
   assert.equal(JSON.stringify(records).includes("fixture-secret-key"), false);
   await frame.locator("#preview").click(); await frame.locator("#publish").waitFor({ state: "visible" });
@@ -164,6 +202,7 @@ try {
   await page.screenshot({ path: "/tmp/echo-paper-extension-preview.png", fullPage: true });
   assert.deepEqual(errors, []);
   console.log("Passed: real extension iframe, capture, one-time PKCE, pipeline extraction, claim choice automatically runs qualification/setup/review, public projection, key restoration on reload, opt-in persistence, forget, and no key in IndexedDB.");
+  }
 } finally {
   await context?.close(); await rm(profile, { recursive: true, force: true });
 }

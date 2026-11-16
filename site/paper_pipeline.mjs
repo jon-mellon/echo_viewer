@@ -23,7 +23,7 @@ export function pipelineClaims(extraction) {
     const sources = link.s.map(id => variables.get(id)), target = variables.get(link.t);
     const person = variable => variable.a.some(unit => unit.split(',').some(part => PERSON_UOA_VALUES.has(part.trim().toLowerCase())));
     const eligible = link.e === "present" && sources.length === 1 && sources.every(person) && person(target)
-      && ["implied_selection_on_observables", "selection_on_observables", "matching"].includes(link.d);
+      && ["implied_selection_on_observables", "selection_on_observables", "matching", "other"].includes(link.d);
     return { id: link.li, text: `${sources.map(row => row.c).join(" + ")} → ${target.c}`,
       sourceSentences: [], pipelineLink: link, pipelineVariables: [...sources, target], eligible,
       eligibilityNote: eligible ? "Select to evaluate this observational claim against the full article."

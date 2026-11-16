@@ -36,13 +36,32 @@ export function validateQualification(qualification, capture) {
   if (!qualification.eligible) throw new Error(qualification.reason || "This claim is outside the implemented protocol.");
   if (!qualification.causal || qualification.exposureRandomized || qualification.usesDid
     || qualification.xUnit !== "person" || qualification.yUnit !== "person"
-    || !["implicit_selection_on_observables", "selection_on_observables", "matching"].includes(qualification.design)
-    || !qualification.controls.length) throw new Error("The protocol requires a person-level nonrandomized observational causal estimate with measured adjustment; difference-in-differences is unsupported.");
-  for (const field of ["x", "y", "population", "assignment", "evidenceLocation", "evidenceQuote", "adjustmentQuote"]) {
+    || !["implicit_selection_on_observables", "selection_on_observables", "matching", "observational"].includes(qualification.design)) throw new Error("The protocol requires a person-level nonrandomized observational causal claim; difference-in-differences is unsupported.");
+  for (const field of ["x", "y", "population", "assignment", "evidenceLocation", "evidenceQuote"]) {
     if (!qualification[field]?.trim()) throw new Error(`Qualification is missing ${field}.`);
   }
-  for (const quote of [qualification.evidenceQuote, qualification.adjustmentQuote]) {
+  if (qualification.controls.length && !qualification.adjustmentQuote?.trim()) throw new Error("Identified controls require an exact adjustment quotation.");
+  for (const quote of [qualification.evidenceQuote, qualification.adjustmentQuote].filter(Boolean)) {
     if (!capture.articleText.includes(quote)) throw new Error("Qualification quotations must occur exactly in the confirmed article text.");
   }
   if (qualification.articleHasRandomizedComponent && !qualification.mixedMethodsBoundary.trim()) throw new Error("Identify the boundary between the observational and randomized components.");
 }
+
+// A negative qualification is a valid review outcome, distinct from a failed call.
+export function validateQualificationResult(qualification, capture) {
+  // Do not let the model's extra eligibility flag veto an otherwise supported
+  // observational causal claim solely because its control inventory is empty.
+  // The original model answer remains in the durable response receipt.
+  if (!qualification.eligible && Array.isArray(qualification.controls) && !qualification.controls.length) {
+    const candidate = { ...qualification, eligible: true };
+    try {
+      validateQualification(candidate, capture);
+      return { ...candidate, eligibilityBasis: "The structured evidence meets the observational causal-claim scope. Missing adjustment does not exclude it from confounder scrutiny; the model's original eligibility flag is retained in the response receipt." };
+    } catch { /* Other scope or evidence failures remain valid rejections. */ }
+  }
+  if (qualification.eligible) validateQualification(qualification, capture);
+  else if (!qualification.reason?.trim()) throw new Error("An unqualified claim needs an explanation.");
+  return qualification;
+}
+
+export const NO_ADJUSTMENT_IDENTIFIED_NOTICE = "No adjustment identified in the captured text. This is an AI assessment, not confirmation that the authors made no adjustment. Manually review the focal estimate’s methods, tables and supplementary material.";

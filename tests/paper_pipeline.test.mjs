@@ -26,6 +26,7 @@ test('pipeline graph validation preserves references, uniqueness, null populatio
   g.l[0].t='v3';assert.throws(()=>pipelineClaims(g),/unknown variables/);
   g.l[0].t='v2';g.v.push(g.v[0]);assert.throws(()=>pipelineClaims(g),/Duplicate/);
   const malformed=graph();malformed.v[0].c='invented';assert.throws(()=>pipelineClaims(malformed),/invalid string/);
+  const unspecified=graph();unspecified.l[0].d='other';assert.equal(pipelineClaims(unspecified)[0].eligible,true);
   const randomized=graph();randomized.l[0].d='randomized_experiment';assert.equal(pipelineClaims(randomized)[0].eligible,false);
   const nonperson=graph();nonperson.v[0].a=['country'];assert.equal(pipelineClaims(nonperson)[0].eligible,false);
   assert.deepEqual(pipelineClaims({s:'no_variables_found',v:[],l:[]}),[]);
