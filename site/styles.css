@@ -2888,7 +2888,9 @@ h2 {
 }
 .task-bar[hidden] { display: none; }
 .task-bar-brand { padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; font-weight: var(--weight-strong); letter-spacing: 0.02em; cursor: pointer; }
-.task-bar-brand:hover { color: var(--accent); }
+.task-bar-brand img { display: block; width: 120px; height: auto; }
+@media (max-width: 480px) { .task-bar-brand img { width: 72px; } }
+.task-bar-brand:hover { opacity: 0.75; }
 .task-bar-brand:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; border-radius: var(--radius-sm); }
 /* Task selector: "Task" label, current task and chevron form one compact,
    bordered control, quieter than the Causes / Consequences switch. */
