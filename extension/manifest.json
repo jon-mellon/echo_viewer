@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Echo Paper Review (Permastaging)",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "minimum_chrome_version": "116",
   "description": "Capture an academic paper you choose and review its claims in Echo.",
   "permissions": ["activeTab", "scripting", "sidePanel", "storage"],

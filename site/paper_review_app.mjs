@@ -28,13 +28,32 @@ function connectionRequest(type, data = {}) {
 }
 const fields = ["title", "sourceUrl", "doi", "abstract", "articleText", "coverage"];
 const save = async () => { if (run) { run.updatedAt = new Date().toISOString(); run.checkpointRevision = (run.checkpointRevision || 0) + 1; await paperStore.save(run); } };
+const displayClaim = claim => claim.replace(/\buoa's /g, "").split(" → ").map(part => part ? part[0].toUpperCase() + part.slice(1) : part).join(" → ");
 const text = (id, value) => { $(id).textContent = value; };
 function populate(capture) {
   for (const field of fields) $(field).value = capture[field] || "";
   captureMetadata = { extractionMethod: capture.extractionMethod, capturedAt: capture.capturedAt };
+  text("paper-title", capture.title); $("paper-title").hidden = !capture.title;
+  const meta = [capture.sourceUrl ? new URL(capture.sourceUrl).hostname : "", capture.doi ? `DOI ${capture.doi}` : ""].filter(Boolean).join(" · ");
+  text("paper-meta", meta); $("paper-meta").hidden = !meta;
+  text("paper-coverage", ({ full: "Full article", partial: "Partial text", abstract_only: "Abstract only", unknown: "Coverage unknown" })[capture.coverage]);
+  document.querySelector(".paper-card").dataset.captured = Boolean(capture.title);
   text("capture-note", `Source: ${capture.extractionMethod}. Captured ${capture.capturedAt}. Coverage: ${capture.coverage}. Paper details were filled automatically. Review them before relying on the results.`);
 }
 function render() {
+  document.body.dataset.busy = String(busy);
+  document.body.dataset.complete = String(Boolean(run?.outcome));
+  $("cancel").hidden = !busy;
+  $("export").hidden = !run;
+  $("preview").hidden = !run?.outcome;
+  const current = run?.outcome || run?.selectedClaim ? "review" : run ? "claim" : "paper";
+  for (const [index, name] of ["paper", "claim", "review"].entries()) {
+    const step = $(`step-${name}`);
+    if (name === current) step.setAttribute("aria-current", "step"); else step.removeAttribute("aria-current");
+    step.dataset.complete = String(index < ["paper", "claim", "review"].indexOf(current) || Boolean(run?.outcome));
+  }
+  text("review-state", run?.outcome ? "Complete" : busy && run?.selectedClaim ? "In progress" : needsResume && run?.selectedClaim ? "Paused" : "Not started");
+  text("claim-count", `${run?.claims?.length || 0} extracted`); $("claim-count").hidden = !run?.claims?.length;
   document.querySelectorAll("button").forEach(button => { button.disabled = busy && !["cancel", "disconnect"].includes(button.id); });
   $("retry").hidden = !run?.pending;
   $("resume-review").hidden = !needsResume || !run || Boolean(run.outcome);
@@ -51,17 +70,24 @@ function render() {
     h("input", { type: "radio", name: "claim", value: claim.id, checked: run.selectedClaim?.id === claim.id,
       disabled: busy || Boolean(run.session) || claim.eligible === false, onchange: () => action(async () => {
         run.selectedClaim = structuredClone(claim); run.qualification = null; await save(); await reviewSelectedClaim();
-      }) }), claim.text,
-    h("p", { className: "muted", textContent: claim.eligibilityNote || "Saved claim from an earlier review." }))));
+      }) }), h("span", { className: "claim-content" }, h("span", { className: "claim-title", textContent: displayClaim(claim.text) }),
+    h("p", { className: "muted", textContent: claim.eligibilityNote || "Saved claim from an earlier review." })))));
+  if (!run?.claims?.length) $("claims").append(h("div", { className: "empty-state" },
+    h("strong", { textContent: run?.pipelineExtraction ? "No causal claims found" : busy && key ? "Finding the paper’s claims…" : "Claims will appear here" }),
+    h("p", { textContent: run?.pipelineExtraction ? "The abstract did not provide causal links to review." : "Capture a paper and connect once to get started." })));
   $("result").replaceChildren();
   if (run?.outcome) {
     $("result").append(h("h3", { textContent: "Automated review complete" }),
       h("p", { className: "notice", textContent: VALIDATION_NOTICE }),
       h("p", { className: "notice", textContent: MANUAL_REVIEW_NOTICE }),
-      h("p", { textContent: run.selectedClaim.text }));
+      h("p", { textContent: displayClaim(run.selectedClaim.text) }));
+    const rows = Object.values(run.outcome.review.confounders);
+    $("result").append(h("div", { className: "review-totals" },
+      h("div", {}, h("strong", { textContent: rows.length }), h("span", { textContent: "Confounders reviewed" })),
+      h("div", {}, h("strong", { textContent: rows.filter(row => row.status === "unaddressed").length }), h("span", { textContent: "May be unaddressed" }))));
     for (const [id, row] of Object.entries(run.outcome.review.confounders)) {
       const group = (session?.schema || run.session?.schema)?.groups.find(group => group.group_id === id);
-      $("result").append(h("div", { className: "status-row" },
+      $("result").append(h("div", { className: "status-row", dataset: { status: row.status } },
         h("strong", { textContent: `${group?.label || id} · ${CONFOUNDER_STATUSES[row.status] || row.status}` }),
         row.status === "unaddressed" ? h("p", { className: "muted", textContent: row.assessmentNotice || unaddressedAssessmentNotice(group?.label) }) : null,
         h("p", { textContent: row.reason })));
@@ -74,7 +100,7 @@ function render() {
 async function listSaved() {
   const runs = (await paperStore.list()).sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   $("saved").replaceChildren(...runs.map(record => h("div", { className: "saved-row" },
-    h("strong", { textContent: record.capture.title }), h("p", { className: "muted", textContent: `${record.phase} · ${record.updatedAt || record.createdAt}` }),
+    h("strong", { textContent: record.capture.title }), h("p", { className: "muted", textContent: `${({ complete: "Review complete", claims_extracted: "Choose a claim", confirmed: "Paper captured", qualified: "Claim qualified", uncertain: "Needs attention", split_required: "Review paused" })[record.phase] || "Review in progress"} · ${new Date(record.updatedAt || record.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}` }),
     h("button", { textContent: "Resume", onclick: () => action(async () => {
       await session?.close(); session = null; run = record; needsResume = run.phase !== "complete";
       populate(run.capture);
@@ -256,7 +282,7 @@ window.addEventListener("message", event => {
     populate(capture);
     if (capture.title && capture.abstract && capture.articleText) {
       $("paper-details").open = false;
-      text("paper-summary", capture.title);
+      text("paper-summary", "Paper details / edit capture");
       enqueue(async () => {
         if (run?.capture.sourceUrl === capture.sourceUrl && run.capture.articleText === capture.articleText) return;
         await startReview(capture);

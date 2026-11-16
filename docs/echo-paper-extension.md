@@ -1,4 +1,4 @@
-# Echo Paper Review 0.2.0
+# Echo Paper Review 0.2.1
 
 The implementation lives on `permastaging`. The extension is a
 small Manifest V3 shell. Its side panel embeds `https://www.jonathanmellon.com/echo_viewer_permastaging/paper-review.html`.
@@ -267,3 +267,18 @@ Acceptance tests use mocked paid responses to check pipeline extraction, no
 automatic claim selection, a claim click running the remaining review, session
 restoration without another OAuth exchange, opt-in persistence and forgetting.
 A paid end-to-end real-paper review remains unverified.
+
+## ECHO visual alignment (0.2.1)
+
+The hosted review, install screen and extension toolbar use the main viewer’s
+neutral surfaces, sans-serif type, teal accents and compact controls. The ECHO
+logo and favicon are shared assets. `scripts/sync_paper_theme.mjs` extracts the
+main `site/styles.css` design tokens into `site/paper_theme.css` and packaged
+`extension/theme.css`; run it after token changes, or use `--check` to verify
+parity. Claim choice stays the primary review interaction. Technical details
+and editing controls are secondary disclosures; manual-review and validation
+notices remain accessible and appear with completed results.
+
+The extension acceptance test captures narrow claim-selection/result screens
+and a full-width result screen with fixture data. These are visual previews,
+not evidence of live real-paper evaluation.

@@ -1,0 +1,93 @@
+/* Generated from site/styles.css by scripts/sync_paper_theme.mjs. */
+:root {
+  color-scheme: light;
+
+  /* ── Design tokens. Outside :root, styles may only use these (scripts/check_css_tokens.mjs). ── */
+
+  /* Spacing: a 4px grid. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* Type: four sizes, three weights, two line heights (plus one display size for the start page). */
+  --text-sm: 12px;    /* metadata, counts, badges */
+  --text-md: 13px;    /* controls, secondary text */
+  --text-base: 14px;  /* body, list labels */
+  --text-lg: 16px;    /* section headings */
+  --text-xl: 22px;    /* start-page title only */
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-strong: 600;
+  --leading-tight: 1.25;
+  --leading-body: 1.45;
+
+  /* Colour, by role. */
+  --bg: #f6f6f6;
+  --surface: #ffffff;
+  --surface-sunken: #f8f8f8;
+  --overlay: rgba(255, 255, 255, 0.94);
+  --backdrop: rgba(15, 23, 42, 0.48);
+  --border: #d8ded6;
+  --border-strong: #b9c4bd;
+  --text: #17201b;
+  --text-muted: #607066;
+  --on-accent: #ffffff;
+  --accent: #1f7a67;
+  --accent-hover: #186453;
+  --accent-subtle: #ececec;  /* neutral: never a green background */
+  --accent-border: #9ccbbd;
+  --hover-bg: #efefef;
+  --focus-ring: #1f7a67;
+  --danger: #b42318;
+  --danger-subtle: #fce8eb;
+  --warn-text: #70401c;
+  --warn-bg: #fff6ec;
+  --warn-border: #e2b48a;
+  --warn-dot: #d97706;
+  --grid-line: rgba(23, 32, 27, 0.045);
+
+  /* Graph and role colours (data encodings, not UI chrome). */
+  --role-iv: #315f9d;
+  --role-iv-strong: #1d3d6b;
+  --role-iv-glow: rgba(49, 95, 157, 0.45);
+  --role-dv: #9b5c2e;
+  --role-instrument: #6d4cb3;
+  --role-confounder: #801744;
+  --dag-confounder: #D55E00;
+  --dag-collider: #CC79A7;
+  --dag-iv: #0072B2;
+  --dag-dv: #E69F00;
+  --dag-instrument: #009E73;
+  --dag-confounder-deep: #8a3d00;
+  --dag-collider-deep: #854f6d;
+  --role-preview: #bd38b2;
+  --role-preview-strong: #9a1694;
+  --diag-instrument: #166534;
+  --diag-path: #176b80;
+  --selection: #b83b5e;
+  --selection-ring: rgba(184, 59, 94, 0.25);
+  --selection-subtle: rgba(184, 59, 94, 0.1);
+  --edge: #7a9188;
+  --edge-hover: #354f45;
+
+  /* Shape and elevation. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-full: 999px;
+  --shadow-sm: 0 2px 8px rgba(28, 38, 32, 0.12);
+  --shadow-lg: 0 12px 36px rgba(15, 23, 42, 0.16);
+
+  /* Control heights. */
+  --control-sm: 28px;
+  --control-md: 34px;
+  --control-touch: 44px;
+
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+}

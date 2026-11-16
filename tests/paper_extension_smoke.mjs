@@ -27,6 +27,14 @@ export class BrowserEchoSession extends EchoSessionCore {
  async close() {}
 }`;
 let context;
+async function screenshotReview(page, frame, path) {
+  const viewport = page.viewportSize();
+  const height = await frame.locator('body').evaluate(body => body.scrollHeight);
+  await page.setViewportSize({ width: viewport.width, height: height + 140 });
+  await frame.evaluate(() => scrollTo(0, 0));
+  await frame.locator('body').screenshot({ path });
+  await page.setViewportSize(viewport);
+}
 try {
   context = await chromium.launchPersistentContext(profile, { channel: "chromium", headless: true,
     args: [`--disable-extensions-except=${resolve("dist/extension")}`, `--load-extension=${resolve("dist/extension")}`] });
@@ -36,7 +44,7 @@ try {
     if (path === "/paper_browser_session.mjs") return route.fulfill({ contentType: "text/javascript", body: browserSessionFixture });
     const absolute = resolve(root, `.${path}`);
     if (!absolute.startsWith(`${root}/`)) return route.abort();
-    try { await route.fulfill({ body: await readFile(absolute), contentType: ({ ".mjs": "text/javascript", ".js": "text/javascript", ".html": "text/html", ".css": "text/css", ".wasm": "application/wasm" })[extname(path)] || "application/octet-stream" }); }
+    try { await route.fulfill({ body: await readFile(absolute), contentType: ({ ".mjs": "text/javascript", ".js": "text/javascript", ".html": "text/html", ".css": "text/css", ".svg": "image/svg+xml", ".wasm": "application/wasm" })[extname(path)] || "application/octet-stream" }); }
     catch { await route.fulfill({ status: 404, body: "Missing fixture" }); }
   });
   await context.route("https://openrouter.ai/**", async route => {
@@ -105,6 +113,12 @@ try {
   await frame.locator('input[name="claim"]').waitFor();
   assert.equal(completions, 1); // Capture/connection extracts; no claim was selected for the user.
   assert.equal(await frame.locator('input[name="claim"]').isChecked(), false);
+  await page.setViewportSize({ width: 420, height: 920 });
+  assert.equal(await frame.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await screenshotReview(page, frame, '/tmp/echo-paper-review-claims-mobile.png');
+  await page.setViewportSize({width:320,height:920});
+  assert.equal(await frame.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.setViewportSize({width:420,height:920});
   // The only review action is choosing a claim: qualification, setup and review follow.
   await frame.locator('input[name="claim"]').check();
   await frame.getByText("Automated review complete", { exact: false }).first().waitFor();
@@ -113,6 +127,9 @@ try {
   assert.equal(await frame.locator("#result").getByText("x% (placeholder, not a measured result)", { exact: false }).count(), 1);
   assert.ok(await frame.getByText("These results may be incorrect or incomplete.", { exact: false }).count());
   assert.equal(completions, 6);
+  await screenshotReview(page, frame, '/tmp/echo-paper-review-results-mobile.png');
+  await page.setViewportSize({ width: 1280, height: 960 });
+  await screenshotReview(page, frame, '/tmp/echo-paper-review-results-desktop.png');
   const records = await frame.evaluate(async () => { const { paperStore } = await import("./paper_store.mjs"); return paperStore.list(); });
   assert.equal(records.length, 1); assert.equal(records[0].phase, "complete");
   assert.equal(records[0].review.findings.ky.decision, "excluded");
