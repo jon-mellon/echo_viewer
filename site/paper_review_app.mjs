@@ -1,3 +1,4 @@
+import { REVIEW_STAGES, recordProgress, progressSnapshot, elapsedLabel } from "./paper_progress.mjs";
 import { PAPER_PIPELINE } from "./paper_pipeline_contract.mjs";
 import { h } from "./dom_builder.mjs";
 import { paperStore } from "./paper_store.mjs";
@@ -15,7 +16,7 @@ let run = null, session = null, key = null, busy = false, controller = null, aut
 let captureMetadata = { extractionMethod: "paste", capturedAt: new Date().toISOString() };
 let bridgeTarget = null, bridgeOrigin = null, connectionPersistent = false;
 const bridgeRequests = new Map();
-let intake = Promise.resolve(), needsResume = false;
+let intake = Promise.resolve(), needsResume = false, operationStartedAt = Date.now(), progressTimer = null;
 function enqueue(operation) { intake = intake.then(() => action(operation)).catch(() => {}); }
 function connectionRequest(type, data = {}) {
   if (!bridgeTarget || !bridgeNonce) return Promise.reject(new Error("Open this page through the extension to remember a connection."));
@@ -30,6 +31,46 @@ const fields = ["title", "sourceUrl", "doi", "abstract", "articleText", "coverag
 const save = async () => { if (run) { run.updatedAt = new Date().toISOString(); run.checkpointRevision = (run.checkpointRevision || 0) + 1; await paperStore.save(run); } };
 const displayClaim = claim => claim.replace(/\buoa's /g, "").split(" → ").map(part => part ? part[0].toUpperCase() + part.slice(1) : part).join(" → ");
 const text = (id, value) => { $(id).textContent = value; };
+function renderActivity() {
+  const state = progressSnapshot(run, { busy, startedAt: operationStartedAt, needsResume });
+  const panel = $("review-activity");
+  panel.hidden = !run || !(busy || run.selectedClaim || run.outcome || needsResume);
+  panel.dataset.state = state.state;
+  const update = (id, value) => { if ($(id).textContent !== value) text(id, value); };
+  const cancelling = busy && controller?.signal.aborted;
+  update("activity-title", cancelling ? "Cancelling review" : state.title);
+  update("activity-elapsed", busy ? `${elapsedLabel(state.elapsedSeconds)} elapsed` : state.state === "complete" ? "Saved" : "");
+  $("activity-elapsed").hidden = !busy && state.state !== "complete";
+  update("activity-detail", cancelling ? "Waiting for the current operation to stop. Accepted decisions remain saved; in-flight requests may already have been billed." : state.state === "not_qualified" ? "The full-text check stopped before evidence review. See the assessment beside your selected claim." : state.state === "paused" ? "Your accepted decisions are saved. Check the message below before resuming; an interrupted request may already have been billed." : state.detail);
+  update("activity-wait", state.waiting);
+  $("activity-wait").hidden = !state.waiting;
+  update("activity-confounders", state.total === null ? state.stage === "map" ? "Finding confounders…" : "Confounders: pending" : `${state.assessed} of ${state.total} confounders assessed`);
+  update("activity-findings", `${state.decisions} evidence decisions`);
+  update("activity-calls", `${state.completedCalls} AI responses received`);
+  $("activity-meter").hidden = !busy;
+  if (state.determinate) { $("activity-meter").max = state.total; $("activity-meter").value = state.assessed; }
+  else $("activity-meter").removeAttribute("value");
+  $("activity-stages").hidden = !run?.selectedClaim || state.state === "complete" || state.state === "not_qualified";
+  const stageSignature = `${state.stage}:${state.state}`;
+  if ($("activity-stages").dataset.signature !== stageSignature) {
+    $("activity-stages").dataset.signature = stageSignature;
+    $("activity-stages").replaceChildren(...REVIEW_STAGES.map(([id, title], index) => h("li", {
+      dataset: { state: state.stage === id ? "current" : state.stageIndex > index || state.state === "complete" ? "done" : "next" },
+      attrs: state.stage === id ? { "aria-current": "step" } : {}
+    }, h("span", { attrs: { "aria-hidden": "true" }, textContent: state.stageIndex > index ? "✓" : String(index + 1) }), title)));
+  }
+  const logSignature = JSON.stringify(state.history);
+  if ($("activity-log").dataset.signature !== logSignature) {
+    $("activity-log").dataset.signature = logSignature;
+    $("activity-log").replaceChildren(...state.history.slice(-6).reverse().map(event => h("li", {},
+      h("time", { dateTime: event.at, textContent: new Date(event.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" }) }),
+      h("span", { textContent: event.detail || event.title }))));
+  }
+}
+function activity(stage, title, detail = "") {
+  if (run) recordProgress(run, stage, title, detail);
+  text("progress", title); renderActivity();
+}
 function populate(capture) {
   for (const field of fields) $(field).value = capture[field] || "";
   captureMetadata = { extractionMethod: capture.extractionMethod, capturedAt: capture.capturedAt };
@@ -41,6 +82,7 @@ function populate(capture) {
   text("capture-note", `Source: ${capture.extractionMethod}. Captured ${capture.capturedAt}. Coverage: ${capture.coverage}. Paper details were filled automatically. Review them before relying on the results.`);
 }
 function render() {
+  renderActivity();
   document.body.dataset.busy = String(busy);
   document.body.dataset.complete = String(Boolean(run?.outcome));
   $("cancel").hidden = !busy;
@@ -56,7 +98,7 @@ function render() {
   text("review-state", notQualified ? "Not qualified" : run?.outcome ? "Complete" : busy && run?.selectedClaim ? "In progress" : needsResume && run?.selectedClaim ? "Paused" : "Not started");
   text("claim-count", `${run?.claims?.length || 0} extracted`); $("claim-count").hidden = !run?.claims?.length;
   document.querySelectorAll("button").forEach(button => { button.disabled = busy && !["cancel", "disconnect"].includes(button.id); });
-  $("retry").hidden = !run?.pending;
+  $("retry").hidden = busy || !run?.pending;
   text("resume-review", run?.selectedClaim ? "Continue selected claim" : "Resume review");
   $("resume-review").hidden = notQualified || !needsResume || !run || Boolean(run.outcome);
   $("connect").hidden = Boolean(key);
@@ -134,7 +176,8 @@ async function listSaved() {
 }
 async function action(operation) {
   if (busy) return;
-  busy = true; controller = new AbortController(); text("error", ""); render();
+  busy = true; operationStartedAt = Date.now(); controller = new AbortController(); text("error", ""); render();
+  progressTimer = setInterval(renderActivity, 1000);
   // Prevent two windows from editing one run or replaying billable calls concurrently.
   try {
     await navigator.locks.request(`echo-paper:${run?.id || "new"}`, { ifAvailable: true }, async lock => {
@@ -148,14 +191,14 @@ async function action(operation) {
   } catch (error) {
     needsResume = true;
     text("error", key ? String(error.message).replaceAll(key, "[redacted]") : error.message);
-  } finally { busy = false; render(); await listSaved().catch(() => {}); }
+  } finally { clearInterval(progressTimer); progressTimer = null; busy = false; render(); await listSaved().catch(() => {}); }
 }
 function model() {
   if (!run) throw new Error("Confirm a paper first.");
   if (!key) throw new Error("Connect your capped OpenRouter key first.");
   if (run.model !== PAPER_PIPELINE.model) throw new Error("This older review uses a different model. Capture the paper again to start a pipeline review.");
   return new PaperModel({ run, getKey: () => key, save, signal: controller.signal,
-    onProgress: phase => { text("progress", phase); render(); } });
+    onProgress: event => { text("progress", typeof event === "string" ? event : event.title); render(); } });
 }
 async function connectKey(candidate, { restored = false, persistent = false } = {}) {
   await checkCappedKey(candidate, controller?.signal);
@@ -183,6 +226,7 @@ async function reviewSelectedClaim() {
   if (run.phase === "complete") return;
   if (!run.selectedClaim) throw new Error("Choose a claim to review.");
   if (run.capture.coverage !== "full") throw new Error("This page did not expose a complete article. Open the full HTML article and capture it again.");
+  activity("qualify", "Checking the selected claim", "Reading the full text and identifying the focal estimate and its controls.");
   await client.checkModel();
   if (!run.qualification) {
     run.qualification = await qualifyClaim(client);
@@ -207,11 +251,20 @@ async function reviewSelectedClaim() {
 }
 async function browserSession(client) {
   if (!session) {
-    text("progress", "Loading and verifying pinned Echo schema and evidence…");
+    activity("load", "Loading ECHO evidence", "Downloading and verifying the reference dataset. First-time loading can take a little while.");
+    await save();
     session = await BrowserEchoSession.start({ record: run.session || null, getKey: () => key,
       save: async record => { run.session = record; await save(); },
       request: (path, requestKey, options) => client.jevRequest(path, requestKey, options),
-      onStatus: phase => text("progress", phase) });
+      onStatus: phase => {
+        const message = String(phase);
+        const detail = message.includes("published schema") ? "Loading concept definitions and the reference graph…"
+          : message.includes("unavailable") ? "Loading additional reference evidence. This can take longer on the first review."
+          : message.includes("manifest") ? "Checking which evidence files are needed…"
+          : message.includes("variable schema") ? "Loading reference variable definitions…"
+          : message.includes("query engine") ? "Preparing the evidence search…" : "Receiving and verifying reference data…";
+        activity(run.progress?.stage || "load", run.progress?.title || "Loading ECHO evidence", detail);
+      } });
     run.session = session.record;
     await save();
   }
@@ -253,7 +306,7 @@ $("disconnect").addEventListener("click", () => {
 $("resume-review").addEventListener("click", () => action(async () => {
   if (run?.selectedClaim) await reviewSelectedClaim(); else await extractCurrentClaims();
 }));
-$("cancel").addEventListener("click", () => { controller?.abort(); text("progress", "Cancellation requested. Accepted decisions remain saved; in-flight model calls may be billed."); });
+$("cancel").addEventListener("click", () => { controller?.abort(); renderActivity(); text("progress", "Cancellation requested. Accepted decisions remain saved; in-flight model calls may be billed."); });
 $("retry").addEventListener("click", () => action(async () => {
   if (!run?.pending) return;
   run.uncertainCalls ||= []; run.uncertainCalls.push({ ...run.pending, retryAcknowledgedAt: new Date().toISOString() });

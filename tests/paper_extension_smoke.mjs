@@ -16,6 +16,8 @@ let article = `<!doctype html><title>Paper fixture</title><meta name="citation_t
 if (unadjusted) article = article.replace('We adjust for age and income.', 'The focal estimate is a crude observational comparison.').replace('The adjusted model includes the stated baseline covariates', 'The focal model reports a crude association').replace('Nonrandomized matching estimates a person-level causal effect.', 'An unadjusted observational estimate is interpreted as a causal effect.').replace('The adjusted association was positive.', 'The crude association was positive.');
 const qualification = { eligible: !unadjusted, reason: unadjusted ? "No measured-adjusted estimate was identified, although the authors imply a causal interpretation." : "Eligible", causal: true, x: "Exposure", y: "Outcome", xUnit: "person", yUnit: "person", population: "adults", design: unadjusted ? "observational" : "matching", exposureRandomized: false, usesDid: false, assignment: "Nonrandomized exposure", controls: unadjusted ? [] : ["age", "income"], evidenceLocation: "Abstract and methods", evidenceQuote: "Exposure increases outcomes in adults.", adjustmentQuote: unadjusted ? "" : "We adjust for age and income.", articleHasRandomizedComponent: false, mixedMethodsBoundary: "" };
 let completions = 0, authExchanges = 0;
+let releaseQualification;
+const qualificationGate = new Promise(resolve => { releaseQualification = resolve; });
 const errors = [];
 const browserSessionFixture = `
 import { EchoSessionCore } from './echo_session_core.mjs';
@@ -77,6 +79,7 @@ try {
         : properties.eligible ? (unsupported ? { ...qualification, eligible: false, causal: false, reason: "The full text gives a descriptive comparison without a causal interpretation." } : qualification)
           : properties.systematicallyDifferent ? { status: "unaddressed", reason: "The measured age mechanism is not addressed in this specification.", systematicallyDifferent: false, splitReason: "The two legs instantiate the same age construct.", rejectedPaths: [] }
             : { decision: "retained", reason: "The same person-level construct and adult population support this causal link.", reason_code: "", questioned_end: "", undeniable: true };
+      if (properties.eligible) await qualificationGate;
       message = { role: "assistant", content: JSON.stringify(value) };
     }
     return json({ model: "openai/gpt-6-luna", choices: [{ finish_reason: message.tool_calls ? "tool_calls" : "stop", message }], usage: { prompt_tokens: 100, completion_tokens: 20, cost: 0.001 } });
@@ -124,6 +127,16 @@ try {
   await page.setViewportSize({width:420,height:920});
   // The only review action is choosing a claim: qualification, setup and review follow.
   await frame.locator('input[name="claim"]').first().check();
+  await frame.locator('#review-activity[data-state="working"]').waitFor();
+  await frame.locator('#activity-wait').getByText('Waiting for the AI response', {exact:false}).waitFor();
+  assert.equal(await frame.locator('#activity-title').textContent(),'Checking the selected claim');
+  assert.equal(await frame.locator('#activity-meter').getAttribute('value'),null);
+  assert.equal(await frame.locator('#cancel').isVisible(),true);
+  assert.equal(await frame.locator('#retry').isVisible(),false);
+  await frame.waitForFunction(() => !document.getElementById('activity-elapsed').textContent.startsWith('0s'), null, {timeout:5000});
+  assert.equal(await frame.locator('#activity-meter').getAttribute('value'),null);
+  await screenshotReview(page, frame, '/tmp/echo-review-progress-waiting.png');
+  releaseQualification();
   if (unsupported) {
     await frame.locator('.qualification-note').waitFor();
     assert.equal(await frame.locator('#error').textContent(), '');
@@ -149,6 +162,9 @@ try {
   assert.equal(await frame.locator("#result").getByText("x% (placeholder, not a measured result)", { exact: false }).count(), 1);
   assert.ok(await frame.getByText("These results may be incorrect or incomplete.", { exact: false }).count());
   assert.equal(completions, 6);
+  assert.equal(await frame.locator('#activity-title').textContent(),'Review complete');
+  assert.match(await frame.locator('#activity-confounders').textContent(),/1 of 1 confounders assessed/);
+  assert.equal(await frame.locator('#cancel').isVisible(),false);
   assert.equal(await frame.locator('#error').textContent(), '');
   if (unadjusted) {
     await frame.getByText('No adjustment identified in the captured text', {exact:true}).waitFor();

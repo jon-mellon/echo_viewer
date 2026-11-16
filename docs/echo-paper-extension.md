@@ -315,3 +315,24 @@ The browser smoke test runs both normally and with
 `ECHO_TEST_UNADJUSTED=1 npm run test:extension:browser` to verify an unadjusted
 causal claim reaches a complete private review without a fictitious adjustment
 quote. The `ECHO_TEST_UNSUPPORTED=1` variant verifies that genuine scope rejections are saved without a runtime error or duplicate billing on reload. Responses and evidence are fixtures, not live scientific validation.
+
+## Visible review progress
+
+The review has a sticky activity panel above the paper and claim list, so a
+long list cannot hide its status. It shows the current stage, elapsed time for
+the active attempt, the real wait time for a pending AI response, accepted
+confounder assessments, evidence decisions and returned AI calls. The recent
+activity log and bounded stage history are stored with the private checkpoint.
+
+Only confounder assessment has a determinate meter, once its queue is known.
+Other stages use an indeterminate meter; supporting findings can be skipped
+legitimately, so their available count is not presented as a promised total.
+Elapsed time never advances work counters or triggers a paid retry. Long gaps
+are described as no new update, not proof that work is progressing. Cancel,
+resume and uncertain-call acknowledgement are available within the activity
+panel. Interrupted calls show an action-needed state instead of a success.
+
+The browser regression deliberately holds an AI response, checks that the
+status panel and cancellation control remain visible and the elapsed clock
+advances, then releases it and checks the completed counters. Unit tests cover
+paused requests, genuine work counts, bounded history and indeterminate stages.
