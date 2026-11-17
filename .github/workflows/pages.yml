@@ -15,10 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  validation:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -51,37 +48,80 @@ jobs:
         run: npm run test:browser
       - name: Build cache-versioned site
         run: npm run build:site
-      - name: Enforce performance budgets
-        run: PROFILE_SITE_DIR=dist/site node scripts/ci_retry.mjs npm run profile
-      - name: Enforce mobile performance budgets
-        run: PROFILE_SITE_DIR=dist/site PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
-      - name: Enforce permalink performance budgets
-        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink node scripts/ci_retry.mjs npm run profile
-      - name: Enforce mobile permalink performance budgets
-        run: PROFILE_SITE_DIR=dist/site PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
       - name: Check the default snapshot's viewer assets are published
         run: npm run check:snapshot-assets
+      - uses: actions/upload-artifact@v4
+        with:
+          name: validated-site
+          path: dist/site
+          include-hidden-files: true
 
-      - name: Enforce mobile diagnostic switching budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
-      - name: Enforce mobile causes and consequences budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:explore
-      - name: Enforce mobile variable review and schema page budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:review
+
+  performance:
+    name: Performance (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: desktop
+            command: node scripts/ci_retry.mjs npm run profile
+          - scenario: mobile
+            command: PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
+          - scenario: permalink
+            command: PROFILE_SCENARIO=permalink node scripts/ci_retry.mjs npm run profile
+          - scenario: mobile-permalink
+            command: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
+          - scenario: diagnostics
+            command: npm run profile:diagnostics
+          - scenario: explore
+            command: npm run profile:explore
+          - scenario: review
+            command: npm run profile:review
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run build:site
+      - name: Restore Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+      - name: Restore published schema cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/published-schemas
+          key: published-schemas-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/published_schema_cache.cjs') }}
+          restore-keys: published-schemas-
+      - name: Run performance scenario
+        env:
+          PROFILE_SITE_DIR: dist/site
+        run: ${{ matrix.command }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: viewer-profile
-          path: |
-            profile-results/
-            profile-results-mobile/
-            profile-results-permalink/
-            profile-results-permalink-mobile/
-            profile-results-diagnostics-mobile/
-            profile-results-explore-mobile/
-            profile-results-review-mobile/
+          name: viewer-profile-${{ matrix.scenario }}
+          path: profile-results*/
           if-no-files-found: ignore
           retention-days: 1
+
+  deploy:
+    needs: [validation, performance]
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: validated-site
+          path: dist/site
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
         with:

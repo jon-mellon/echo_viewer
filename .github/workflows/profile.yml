@@ -7,10 +7,8 @@ on:
     - cron: "0 9 * * 1"
 
 jobs:
-  profile:
+  checks:
     runs-on: ubuntu-latest
-    # Original baseline was 15 minutes; this runner limit is a non-performance CI timeout. The browser install alone
-    # has taken from 20 seconds to 9 minutes on a busy runner, so leave room for it.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -20,49 +18,107 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      # The browser download is the slowest and least predictable step; keep it between runs.
+      - name: Check the default snapshot's viewer assets are published
+        run: npm run check:snapshot-assets
+
+  browser:
+    name: Browser (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, exports]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
       - name: Restore Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium
-      # Published schema files are immutable; keep them between runs instead of
-      # downloading about 5 MB per test every time; a miss is fetched from Cloudflare R2.
       - name: Restore published schema cache
         uses: actions/cache@v4
         with:
           path: .cache/published-schemas
           key: published-schemas-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/published_schema_cache.cjs') }}
           restore-keys: published-schemas-
-      - run: npm run test:browser
-      - run: node scripts/ci_retry.mjs npm run profile
-      - run: PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
-      - run: PROFILE_SCENARIO=permalink node scripts/ci_retry.mjs npm run profile
-      - run: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
-      - name: Check the default snapshot's viewer assets are published
-        run: npm run check:snapshot-assets
+      # The export test rate-limits bibliography enrichment and dominates a shard.
+      - name: Run browser shard
+        if: matrix.shard != 'exports'
+        run: npm run test:browser -- --fully-parallel --reporter=list --grep-invert 'bibliography, Markdown, and LaTeX export controls produce downloads' --shard=${{ matrix.shard }}/7
+      - name: Run export test
+        if: matrix.shard == 'exports'
+        run: npm run test:browser -- --reporter=list --grep 'bibliography, Markdown, and LaTeX export controls produce downloads'
 
-      - name: Enforce mobile diagnostic switching budgets
-        run: npm run profile:diagnostics
-      - name: Enforce evidence loading budgets on the default snapshot
-        run: npm run profile:edge-evidence
-      - name: Enforce mobile causes and consequences budgets
-        run: npm run profile:explore
-      # The deploy gate runs this too; running it on the PR catches a regression before it reaches staging.
-      - name: Enforce mobile variable review and schema page budgets
-        run: PROFILE_SITE_DIR=site npm run profile:review
+  performance:
+    name: Performance (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: desktop
+            command: node scripts/ci_retry.mjs npm run profile
+          - scenario: mobile
+            command: PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
+          - scenario: permalink
+            command: PROFILE_SCENARIO=permalink node scripts/ci_retry.mjs npm run profile
+          - scenario: mobile-permalink
+            command: PROFILE_SCENARIO=permalink PROFILE_DEVICE=mobile node scripts/ci_retry.mjs npm run profile
+          - scenario: diagnostics
+            command: npm run profile:diagnostics
+          - scenario: edge-evidence
+            command: npm run profile:edge-evidence
+          - scenario: explore
+            command: npm run profile:explore
+          - scenario: review
+            command: PROFILE_SITE_DIR=site npm run profile:review
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Restore Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+      - name: Restore published schema cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/published-schemas
+          key: published-schemas-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/published_schema_cache.cjs') }}
+          restore-keys: published-schemas-
+      - name: Run performance scenario
+        run: ${{ matrix.command }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: viewer-profile
-          path: |
-            profile-results/
-            profile-results-mobile/
-            profile-results-permalink/
-            profile-results-permalink-mobile/
-            profile-results-diagnostics-mobile/
-            profile-results-edge-evidence/
-            profile-results-explore-mobile/
-            profile-results-review-mobile/
+          name: viewer-profile-${{ matrix.scenario }}
+          path: profile-results*/
+          if-no-files-found: ignore
           retention-days: 1
+
+  # Keep the existing required check name and fail if any parallel job fails or is skipped.
+  profile:
+    if: always()
+    needs: [checks, browser, performance]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all checks to pass
+        env:
+          CHECKS: ${{ needs.checks.result }}
+          BROWSER: ${{ needs.browser.result }}
+          PERFORMANCE: ${{ needs.performance.result }}
+        run: |
+          test "$CHECKS" = success && test "$BROWSER" = success && test "$PERFORMANCE" = success

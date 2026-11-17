@@ -161,7 +161,7 @@ directory. Chromium also writes a CPU profile. Open that profile in Chrome
 DevTools Performance, or inspect a trace with
 `npx playwright show-trace profile-results/playwright-trace.zip`.
 The suites also run every Monday in GitHub Actions; download the one-day
-`viewer-profile` artifact to inspect a failing synthetic run. Set `PROFILE_URL` to
+`viewer-profile-<scenario>` artifact to inspect a failing synthetic run. Set `PROFILE_URL` to
 profile another deployment. Only profile a deployment where you have access;
 the script uses the preview's session gate and does not submit a password.
 The scenarios include the edge inspector's Exclude action and verify that the edge

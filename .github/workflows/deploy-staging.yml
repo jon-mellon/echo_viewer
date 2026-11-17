@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  validation:
     runs-on: ubuntu-latest
 
     steps:
@@ -35,51 +35,72 @@ jobs:
       - name: Build Echo
         run: npm run build:site
 
-      # The browser download is the slowest and least predictable step; keep it between runs.
+      - name: Check the default snapshot's viewer assets are published
+        run: npm run check:snapshot-assets
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: validated-site
+          path: dist/site
+          include-hidden-files: true
+
+
+  performance:
+    name: Performance (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: diagnostics
+            command: npm run profile:diagnostics
+          - scenario: edge-evidence
+            command: npm run profile:edge-evidence
+          - scenario: explore
+            command: npm run profile:explore
+          - scenario: review
+            command: npm run profile:review
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run build:site
       - name: Restore Playwright browsers
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Install profiling browser
-        run: npx playwright install --with-deps chromium
-
-      # Published schema files are immutable; keep them between runs instead of
-      # downloading about 5 MB per page load every time; a miss is fetched from Cloudflare R2.
+      - run: npx playwright install --with-deps chromium
       - name: Restore published schema cache
         uses: actions/cache@v4
         with:
           path: .cache/published-schemas
           key: published-schemas-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/published_schema_cache.cjs') }}
           restore-keys: published-schemas-
-
-      - name: Check the default snapshot's viewer assets are published
-        run: npm run check:snapshot-assets
-
-      - name: Enforce mobile diagnostic switching budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:diagnostics
-
-      - name: Enforce evidence loading budgets on the default snapshot
-        run: PROFILE_SITE_DIR=dist/site npm run profile:edge-evidence
-
-      - name: Enforce mobile causes and consequences budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:explore
-
-      - name: Enforce mobile variable review and schema page budgets
-        run: PROFILE_SITE_DIR=dist/site npm run profile:review
-
+      - name: Run performance scenario
+        env:
+          PROFILE_SITE_DIR: dist/site
+        run: ${{ matrix.command }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: staging-diagnostic-profile
-          path: |
-            profile-results-diagnostics-mobile/
-            profile-results-edge-evidence/
-            profile-results-explore-mobile/
-            profile-results-review-mobile/
+          name: viewer-profile-${{ matrix.scenario }}
+          path: profile-results*/
           if-no-files-found: ignore
           retention-days: 1
 
+  deploy:
+    needs: [validation, performance]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: validated-site
+          path: dist/site
       - name: Prepare staging website
         run: |
           python3 - <<'PY'
