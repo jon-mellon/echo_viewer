@@ -48,7 +48,7 @@ jobs:
           path: .cache/published-schemas
           key: published-schemas-${{ hashFiles('site/dag_data_config.mjs', 'tests/support/published_schema_cache.cjs') }}
           restore-keys: published-schemas-
-      - run: npm run test:browser -- --fully-parallel --shard=${{ matrix.shard }}/7
+      - run: npm run test:browser -- --fully-parallel --reporter=list --shard=${{ matrix.shard }}/7
 
   performance:
     name: Performance (${{ matrix.scenario }})
